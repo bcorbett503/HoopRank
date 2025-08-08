@@ -19,11 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
 
-      # ✅ Create/repair the Flutter web app WITHOUT heredocs
+      # Create/repair the Flutter web app (first run safe)
       - name: Bootstrap Flutter app
         shell: bash
         run: |
@@ -38,10 +39,17 @@ jobs:
         run: flutter pub get
         working-directory: mobile
 
-      # IMPORTANT: base href must match repo name
+      # Build with metadata so the app shows version + commit
       - name: Build web
-        run: flutter build web --release --base-href /HoopRank/
+        shell: bash
         working-directory: mobile
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          flutter build web --release --base-href /HoopRank/ \
+            --dart-define=APP_VERSION=0.1.0 \
+            --dart-define=BUILD_SHA="$SHORT_SHA" \
+            --dart-define=BUILD_TIME="$BUILD_TIME"
 
       - uses: actions/upload-pages-artifact@v3
         with:
