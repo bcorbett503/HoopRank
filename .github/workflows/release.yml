@@ -1,73 +1,82 @@
 name: Release Backend Image
 
 on:
-  push:
-    tags: ['v*.*.*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional image tag (defaults to manual-<shortsha>)"
+        required: false
+        default: ""
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  # --- UPDATE ONLY IF YOUR ACCOUNT/REGION/REPO CHANGE ---
+  ECR_REGISTRY: 066396399970.dkr.ecr.us-east-2.amazonaws.com
+  ECR_REPOSITORY: hooprank-backend
+  AWS_REGION: ${{ vars.AWS_REGION }}          # us-east-2 (you set this)
+  PUSH_TO_ECR: ${{ vars.PUSH_TO_ECR }}        # "true" or "false"
 
 jobs:
-  build-and-optional-push:
+  build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-2' }}
-      ECR_REPO: hooprank-backend
-      PUSH_TO_ECR: ${{ vars.PUSH_TO_ECR || 'false' }}
-      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || '' }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compute image tag
-        id: meta
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=manual-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # Build the Docker image (multi-stage compiles TS inside)
-      - name: Build Docker image
-        run: docker build -t local/backend:${{ steps.meta.outputs.tag }} backend
+      - name: Compute TAG and image names
+        id: meta
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="manual-${GITHUB_SHA::7}"; fi
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "LOCAL_IMAGE=local/backend:$TAG" >> $GITHUB_ENV
+          echo "ECR_IMAGE=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$TAG" >> $GITHUB_ENV
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "ecr_image=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$TAG" >> $GITHUB_OUTPUT
+
+      # Assume AWS role only if we intend to push
+      - name: Configure AWS credentials (for ECR push)
+        if: env.PUSH_TO_ECR == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: env.PUSH_TO_ECR == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: true
+
+      - name: Docker build (tags local + ECR) and load
+        run: |
+          docker buildx build \
+            --file backend/Dockerfile \
+            --tag "$LOCAL_IMAGE" \
+            --tag "$ECR_IMAGE" \
+            --load \
+            backend
+
+      - name: Push to ECR
+        if: env.PUSH_TO_ECR == 'true'
+        run: docker push "$ECR_IMAGE"
 
       - name: Save image as artifact
-        run: docker save local/backend:${{ steps.meta.outputs.tag }} -o backend-image.tar
+        run: docker save "$LOCAL_IMAGE" -o backend-image.tar
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: backend-image-${{ steps.meta.outputs.tag }}
           path: backend-image.tar
 
-      # --- ECR push (only if enabled by repo variables) ---
-      - name: Configure AWS (OIDC)
-        if: env.PUSH_TO_ECR == 'true'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to ECR
-        if: env.PUSH_TO_ECR == 'true'
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Debug ECR registry
-        if: env.PUSH_TO_ECR == 'true'
-        run: echo "ECR registry is: ${{ steps.login-ecr.outputs.registry }}"
-
-      - name: Push to ECR
-        if: env.PUSH_TO_ECR == 'true'
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        shell: bash
+      - name: Summary
         run: |
-          if [[ -z "$REGISTRY" ]]; then
-            echo "ECR login did not return a registry. Check AWS_ROLE_ARN, region, and OIDC trust."; exit 1
-          fi
-          IMAGE="$REGISTRY/${{ env.ECR_REPO }}:${{ steps.meta.outputs.tag }}"
-          docker tag local/backend:${{ steps.meta.outputs.tag }} "$IMAGE"
-          docker push "$IMAGE"
-          echo "Pushed $IMAGE"
+          echo "Built tag: $TAG" >> $GITHUB_STEP_SUMMARY
+          echo "Local image: $LOCAL_IMAGE" >> $GITHUB_STEP_SUMMARY
+          echo "ECR image: $ECR_IMAGE" >> $GITHUB_STEP_SUMMARY
