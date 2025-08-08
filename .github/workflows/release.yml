@@ -2,40 +2,61 @@ name: Release Backend Image
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    tags: ['v*.*.*']
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  build-and-optional-push:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
+      id-token: write
     env:
       AWS_REGION: us-west-2
       ECR_REPO: hooprank-backend
+      # Leave these as-is for now; we’ll flip PUSH_TO_ECR to true after AWS is wired.
+      PUSH_TO_ECR: ${{ vars.PUSH_TO_ECR || 'false' }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || '' }}
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build backend (TypeScript → dist)
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+        working-directory: backend
+
+      - name: Build Docker image
+        run: |
+          docker build -t local/backend:${GITHUB_REF_NAME} backend
+          docker save local/backend:${GITHUB_REF_NAME} -o backend-image.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-image
+          path: backend-image.tar
+
+      # Optional ECR push (disabled until we set repo Variables)
       - name: Configure AWS (OIDC)
+        if: env.PUSH_TO_ECR == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<AWS_ACCOUNT_ID>:role/github-oidc-hooprank
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
+        if: env.PUSH_TO_ECR == 'true'
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build image
+      - name: Push to ECR
+        if: env.PUSH_TO_ECR == 'true'
         run: |
-          IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}"
-          TAG="${GITHUB_REF_NAME}"
-          docker build -t "$IMAGE:$TAG" backend
-          docker tag "$IMAGE:$TAG" "$IMAGE:latest"
-          echo "IMAGE_URI=$IMAGE:$TAG" >> $GITHUB_ENV
-
-      - name: Push image
-        run: |
-          docker push "${IMAGE_URI}"
-          docker push "${IMAGE_URI%:*}:latest"
+          REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          IMAGE=$REGISTRY/${{ env.ECR_REPO }}:${GITHUB_REF_NAME}
+          docker tag local/backend:${GITHUB_REF_NAME} $IMAGE
+          docker push $IMAGE
