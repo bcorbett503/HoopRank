@@ -1,0 +1,23 @@
+name: Terraform Validate
+
+on:
+  push:
+    paths: ['infra/terraform/**']
+  pull_request:
+    paths: ['infra/terraform/**']
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+      - name: Init (no backend)
+        working-directory: infra/terraform/staging
+        run: terraform init -backend=false
+      - name: Validate
+        working-directory: infra/terraform/staging
+        run: terraform validate
