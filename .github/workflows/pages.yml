@@ -8,15 +8,16 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      # ✅ Bootstrap or fix the Flutter app so web builds succeed
+      # ✅ Bootstrap or repair the Flutter app so web builds succeed
       - name: Bootstrap Flutter app if missing / incomplete
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
           if [ ! -d mobile ]; then
-            flutter create --platforms web mobile
+            flutter create --platforms web --project-name hooprank_web mobile
           else
-            # Ensure platform files (web/) exist
-            (cd mobile && flutter create --platforms web .)
+            # Ensure web platform & files exist even if the folder is partial
+            (cd mobile && flutter create --platforms web --project-name hooprank_web --overwrite .)
             # Ensure we have a minimal entrypoint
             if [ ! -f mobile/lib/main.dart ]; then
               mkdir -p mobile/lib
@@ -70,11 +71,13 @@ jobs:
             fi
           fi
 
-      - run: flutter pub get
+      - name: Pub get
+        run: flutter pub get
         working-directory: mobile
 
-      # IMPORTANT: base href must match repo name
-      - run: flutter build web --release --base-href /HoopRank/
+      # IMPORTANT: base href must match repo name (HoopRank)
+      - name: Build web
+        run: flutter build web --release --base-href /HoopRank/
         working-directory: mobile
 
       - uses: actions/upload-pages-artifact@v3
