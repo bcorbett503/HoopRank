@@ -17,8 +17,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
-      - name: Format check
-        run: flutter format --set-exit-if-changed .
+      - name: Analyze
+        run: flutter analyze
         working-directory: mobile
       - name: Tests
         run: flutter test
