@@ -1,0 +1,44 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'docker-compose.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'docker-compose.yml'
+
+jobs:
+  test-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Unit tests
+        run: npm test
+        working-directory: backend
+
+      - name: Compose up (backend + deps)
+        run: |
+          docker compose up -d --build backend db redis queue
+          echo "Waiting for backend..."
+          for i in {1..60}; do
+            if curl -sf http://localhost:3000/health >/dev/null; then
+              echo "Backend is up"; break
+            fi
+            sleep 1
+          done
+          curl -sSf http://localhost:3000/health
+
+      - name: Show version endpoint
+        run: curl -s http://localhost:3000/api/v1/version || true
+
+      - name: Compose down
+        if: always()
+        run: docker compose down -v
