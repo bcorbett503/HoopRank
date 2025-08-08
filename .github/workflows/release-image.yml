@@ -1,0 +1,69 @@
+name: Release Backend Image
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: us-east-2
+      ECR_REPO: hooprank-backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=manual-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build image
+        run: docker build -t local/backend:${{ steps.meta.outputs.tag }} backend
+
+      # ---- Push to ECR if repo vars are set ----
+      - name: Configure AWS (OIDC)
+        if: ${{ vars.PUSH_TO_ECR == 'true' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        if: ${{ vars.PUSH_TO_ECR == 'true' }}
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push to ECR
+        if: ${{ vars.PUSH_TO_ECR == 'true' }}
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        shell: bash
+        run: |
+          if [ -z "$REGISTRY" ]; then
+            echo "No ECR registry returned from login"; exit 1
+          fi
+          IMAGE="$REGISTRY/${{ env.ECR_REPO }}:${{ steps.meta.outputs.tag }}"
+          docker tag local/backend:${{ steps.meta.outputs.tag }} "$IMAGE"
+          docker push "$IMAGE"
+          echo "Pushed $IMAGE"
+
+      # Always save the image as an artifact too
+      - name: Save image as artifact
+        if: always()
+        run: docker save local/backend:${{ steps.meta.outputs.tag }} -o backend-image.tar
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-image-${{ steps.meta.outputs.tag }}
+          path: backend-image.tar
