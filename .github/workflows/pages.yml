@@ -19,24 +19,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
+
+      # ✅ Create the Flutter app if it doesn't exist yet
+      - name: Bootstrap Flutter app if missing
+        run: |
+          if [ ! -f mobile/pubspec.yaml ]; then
+            flutter create --platforms web mobile
+          fi
+
       - run: flutter pub get
         working-directory: mobile
+
       # IMPORTANT: set base-href to your repo name so it works on GitHub Pages
       - run: flutter build web --release --base-href /HoopRank/
         working-directory: mobile
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: mobile/build/web
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
