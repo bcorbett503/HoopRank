@@ -18,13 +18,24 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install deps
+        run: npm ci
+        working-directory: backend
+
+      - name: Lint
+        run: npm run lint
+        working-directory: backend
+
+      - name: Build (TS → dist)
+        run: npm run build
+        working-directory: backend
+
       - name: Unit tests
         run: npm test
         working-directory: backend
 
       - name: Docker Compose up (backend + deps)
         run: |
-          docker compose version
           docker compose up -d --build backend db redis queue
           echo "Waiting for backend on :3000..."
           for i in {1..90}; do
@@ -34,9 +45,7 @@ jobs:
             sleep 1
           done
           curl -sSf http://localhost:3000/health
-
-      - name: Version endpoint
-        run: curl -sSf http://localhost:3000/api/v1/version || true
+          curl -sSf http://localhost:3000/api/v1/version || true
 
       - name: Docker Compose down
         if: always()
