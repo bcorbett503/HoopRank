@@ -1,3 +1,19 @@
+name: Deploy Flutter Web to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -8,24 +24,24 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      # ✅ Bootstrap or repair the Flutter app so web builds succeed
+      # ✅ Bootstrap/repair the Flutter app so web builds succeed (handles missing or partial folders)
       - name: Bootstrap Flutter app if missing / incomplete
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -d mobile ]; then
+          echo "Repo root contents:" && ls -la
+          if [[ ! -d mobile ]]; then
+            echo "Creating fresh Flutter web app at mobile/..."
             flutter create --platforms web --project-name hooprank_web mobile
           else
-            # Ensure web platform & files exist even if the folder is partial
+            echo "Ensuring web platform files exist under mobile/..."
             (cd mobile && flutter create --platforms web --project-name hooprank_web --overwrite .)
-            # Ensure we have a minimal entrypoint
-            if [ ! -f mobile/lib/main.dart ]; then
+            # Minimal entrypoint if missing
+            if [[ ! -f mobile/lib/main.dart ]]; then
               mkdir -p mobile/lib
               cat > mobile/lib/main.dart <<'DART'
               import 'package:flutter/material.dart';
-
               void main() => runApp(const HoopRankApp());
-
               class HoopRankApp extends StatelessWidget {
                 const HoopRankApp({super.key});
                 @override
@@ -37,13 +53,11 @@ jobs:
                   );
                 }
               }
-
               class HomePage extends StatefulWidget {
                 const HomePage({super.key});
                 @override
                 State<HomePage> createState() => _HomePageState();
               }
-
               class _HomePageState extends State<HomePage> {
                 int _index = 0;
                 final _pages = const [
@@ -70,6 +84,7 @@ jobs:
               DART
             fi
           fi
+          echo "mobile/ contents:" && ls -la mobile
 
       - name: Pub get
         run: flutter pub get
@@ -83,3 +98,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: mobile/build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
