@@ -1,12 +1,38 @@
 {
   "name": "hooprank-backend",
   "version": "0.1.0",
-  "description": "HoopRank minimal API",
-  "main": "src/server.js",
+  "description": "HoopRank API (NestJS)",
+  "main": "dist/main.js",
   "scripts": {
-    "start": "node src/server.js",
-    "test": "node --test"
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint . --ext .ts",
+    "test": "jest --runInBand"
   },
   "engines": { "node": ">=20" },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/core": "^10.3.0",
+    "@nestjs/platform-express": "^10.3.0",
+    "reflect-metadata": "^0.2.1",
+    "rxjs": "^7.8.1",
+    "nestjs-pino": "^3.5.0",
+    "pino": "^9.0.0",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/eslint-plugin": "^7.11.0",
+    "@typescript-eslint/parser": "^7.11.0",
+    "eslint": "^9.5.0",
+    "@eslint/js": "^9.5.0",
+    "eslint-config-prettier": "^9.1.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
 }
