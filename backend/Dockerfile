@@ -2,12 +2,14 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-# Use install, not ci (no lockfile); tolerate peer dep quirks
+# No lockfile -> use install, allow peer dep quirks
 RUN npm install --no-audit --no-fund --legacy-peer-deps
 
 # ---- Build (transpile TS) ----
 FROM node:20-alpine AS build
 WORKDIR /app
+# ✅ package.json must exist for "npm run build"
+COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY tsconfig*.json ./
 COPY src ./src
@@ -17,11 +19,10 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-# Bring runtime deps, then drop dev deps
+# ✅ prune needs package.json present
+COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 RUN npm prune --omit=dev
-# App files
-COPY package*.json ./
 COPY --from=build /app/dist ./dist
 
 EXPOSE 3000
