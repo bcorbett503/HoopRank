@@ -14,34 +14,45 @@ jobs:
     env:
       AWS_REGION: us-west-2
       ECR_REPO: hooprank-backend
-      # Leave these as-is for now; we’ll flip PUSH_TO_ECR to true after AWS is wired.
+      # Flip to true later (Repo Settings → Variables) once AWS is wired:
       PUSH_TO_ECR: ${{ vars.PUSH_TO_ECR || 'false' }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || '' }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Build backend (TypeScript → dist)
+      - name: Debug info
         run: |
-          npm install --no-audit --no-fund
-          npm run build
-        working-directory: backend
+          set -x
+          docker --version
+          echo "Ref type: $GITHUB_REF_TYPE  name: $GITHUB_REF_NAME"
+          ls -la
+          ls -la backend || true
 
+      - name: Compute image tag
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="manual-${GITHUB_SHA::7}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # Build the image using backend/Dockerfile (multi-stage compiles TS inside)
       - name: Build Docker image
-        run: |
-          docker build -t local/backend:${GITHUB_REF_NAME} backend
-          docker save local/backend:${GITHUB_REF_NAME} -o backend-image.tar
+        run: docker build -t local/backend:${{ steps.meta.outputs.tag }} backend
+
+      - name: Save image as artifact
+        run: docker save local/backend:${{ steps.meta.outputs.tag }} -o backend-image.tar
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backend-image
+          name: backend-image-${{ steps.meta.outputs.tag }}
           path: backend-image.tar
 
-      # Optional ECR push (disabled until we set repo Variables)
+      # Optional ECR push (off until repo Variables are set)
       - name: Configure AWS (OIDC)
         if: env.PUSH_TO_ECR == 'true'
         uses: aws-actions/configure-aws-credentials@v4
@@ -57,6 +68,6 @@ jobs:
         if: env.PUSH_TO_ECR == 'true'
         run: |
           REGISTRY=${{ steps.login-ecr.outputs.registry }}
-          IMAGE=$REGISTRY/${{ env.ECR_REPO }}:${GITHUB_REF_NAME}
-          docker tag local/backend:${GITHUB_REF_NAME} $IMAGE
+          IMAGE=$REGISTRY/${{ env.ECR_REPO }}:${{ steps.meta.outputs.tag }}
+          docker tag local/backend:${{ steps.meta.outputs.tag }} $IMAGE
           docker push $IMAGE
