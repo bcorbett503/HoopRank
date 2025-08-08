@@ -1,19 +1,3 @@
-name: Deploy Flutter Web to Pages
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: 'pages'
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -24,17 +8,72 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      # ✅ Create the Flutter app if it doesn't exist yet
-      - name: Bootstrap Flutter app if missing
+      # ✅ Bootstrap or fix the Flutter app so web builds succeed
+      - name: Bootstrap Flutter app if missing / incomplete
         run: |
-          if [ ! -f mobile/pubspec.yaml ]; then
+          set -e
+          if [ ! -d mobile ]; then
             flutter create --platforms web mobile
+          else
+            # Ensure platform files (web/) exist
+            (cd mobile && flutter create --platforms web .)
+            # Ensure we have a minimal entrypoint
+            if [ ! -f mobile/lib/main.dart ]; then
+              mkdir -p mobile/lib
+              cat > mobile/lib/main.dart <<'DART'
+              import 'package:flutter/material.dart';
+
+              void main() => runApp(const HoopRankApp());
+
+              class HoopRankApp extends StatelessWidget {
+                const HoopRankApp({super.key});
+                @override
+                Widget build(BuildContext context) {
+                  return MaterialApp(
+                    title: 'HoopRank',
+                    theme: ThemeData(useMaterial3: true),
+                    home: const HomePage(),
+                  );
+                }
+              }
+
+              class HomePage extends StatefulWidget {
+                const HomePage({super.key});
+                @override
+                State<HomePage> createState() => _HomePageState();
+              }
+
+              class _HomePageState extends State<HomePage> {
+                int _index = 0;
+                final _pages = const [
+                  Center(child: Text('Play')),
+                  Center(child: Text('Discover Players')),
+                  Center(child: Text('Discover Courts')),
+                ];
+                @override
+                Widget build(BuildContext context) {
+                  return Scaffold(
+                    body: _pages[_index],
+                    bottomNavigationBar: BottomNavigationBar(
+                      currentIndex: _index,
+                      onTap: (i) => setState(() => _index = i),
+                      items: const [
+                        BottomNavigationBarItem(icon: Icon(Icons.sports_basketball), label: 'Play'),
+                        BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Discover Players'),
+                        BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Discover Courts'),
+                      ],
+                    ),
+                  );
+                }
+              }
+              DART
+            fi
           fi
 
       - run: flutter pub get
         working-directory: mobile
 
-      # IMPORTANT: set base-href to your repo name so it works on GitHub Pages
+      # IMPORTANT: base href must match repo name
       - run: flutter build web --release --base-href /HoopRank/
         working-directory: mobile
 
