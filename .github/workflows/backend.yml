@@ -17,9 +17,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install deps
-        run: npm ci
+        run: npm install --no-audit --no-fund
         working-directory: backend
 
       - name: Lint
@@ -44,8 +46,9 @@ jobs:
             fi
             sleep 1
           done
-          curl -sSf http://localhost:3000/health
-          curl -sSf http://localhost:3000/api/v1/version || true
+          echo "Health:" && curl -sSf http://localhost:3000/health
+          echo "Version:" && curl -sSf http://localhost:3000/api/v1/version || true
+          echo "Metrics (first lines):" && curl -sSf http://localhost:3000/metrics | head -n 20 || true
 
       - name: Docker Compose down
         if: always()
