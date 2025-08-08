@@ -1,0 +1,33 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['mobile/**']
+  pull_request:
+    branches: [main]
+    paths: ['mobile/**']
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+      - name: Format check
+        run: flutter format --set-exit-if-changed .
+        working-directory: mobile
+      - name: Tests
+        run: flutter test
+        working-directory: mobile
+      - name: Build web (artifact only)
+        run: flutter build web --release
+        working-directory: mobile
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-web-build
+          path: mobile/build/web
