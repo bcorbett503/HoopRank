@@ -1,0 +1,30 @@
+{
+  "simpleRank": {
+    "startRating": 3.0,
+    "floor": 1.0,
+    "ceiling": 5.0,
+    "baseWin": 0.10,
+    "upsetBonus": 0.05,
+    "upsetPenalty": 0.05,
+    "ratingDiffThreshold": 0.5
+  },
+  "newOpponent": {
+    "neverPlayedMult": 1.5,
+    "firstTimeThisWeekMult": 1.2,
+    "schedule": [
+      1.0,
+      0.5,
+      0.25,
+      0.1
+    ]
+  },
+  "activity": {
+    "firstGameTodayBonus": 0.02,
+    "streakBonusPerDay": 0.01,
+    "maxStreakDays": 5
+  },
+  "display": {
+    "floor": 1.0,
+    "ceiling": 5.0
+  }
+}
