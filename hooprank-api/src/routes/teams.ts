@@ -28,8 +28,8 @@ router.post(
         // Ensure user exists in database (auto-create if not)
         // This handles Firebase users who haven't synced yet
         await pool.query(
-            `INSERT INTO users (id, name, rating, hoop_rank)
-             VALUES ($1, 'Player', 3.0, 3.0)
+            `INSERT INTO users (id, name, hoop_rank)
+             VALUES ($1, 'Player', 3.0)
              ON CONFLICT (id) DO NOTHING`,
             [uid]
         );
