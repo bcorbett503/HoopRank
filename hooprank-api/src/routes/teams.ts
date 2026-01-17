@@ -25,6 +25,15 @@ router.post(
         const uid = getUserId(req);
         const { name, teamType } = CreateTeamSchema.parse(req.body);
 
+        // Ensure user exists in database (auto-create if not)
+        // This handles Firebase users who haven't synced yet
+        await pool.query(
+            `INSERT INTO users (id, name, rating, hoop_rank)
+             VALUES ($1, 'Player', 3.0, 3.0)
+             ON CONFLICT (id) DO NOTHING`,
+            [uid]
+        );
+
         // Note: Team group chat will be implemented separately
         // The current threads table schema is designed for 1:1 chats (user_a, user_b)
         // Team group chats require a different approach
