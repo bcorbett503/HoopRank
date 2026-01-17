@@ -1193,10 +1193,10 @@ app.get(
     const uid = getUserId(req);
 
     const r = await pool.query(`
-      SELECT id, name, avatar_url, rating, city, position
+      SELECT id, name, avatar_url, hoop_rank, city, position
       FROM users
       WHERE id != $1
-      ORDER BY rating DESC
+      ORDER BY hoop_rank DESC
       LIMIT 100
     `, [uid]);
 
@@ -1204,7 +1204,7 @@ app.get(
       id: row.id,
       name: row.name,
       photoUrl: row.avatar_url,
-      rating: row.rating ?? 3.0,
+      rating: row.hoop_rank ?? 3.0,
       city: row.city,
       position: row.position,
     }));
@@ -2084,7 +2084,7 @@ app.get(
     const uid = getUserId(req);
 
     const r = await pool.query(
-      `SELECT id, name, avatar_url, rating, position, city, matches_played, wins, losses
+      `SELECT id, name, avatar_url, hoop_rank, position, city, matches_played, wins, losses
        FROM users WHERE id = $1`,
       [uid]
     );
@@ -2098,7 +2098,7 @@ app.get(
       id: row.id,
       name: row.name,
       photoUrl: row.avatar_url,
-      rating: row.rating ?? 3.0,
+      rating: row.hoop_rank ?? 3.0,
       position: row.position,
       city: row.city,
       matchesPlayed: row.matches_played ?? 0,

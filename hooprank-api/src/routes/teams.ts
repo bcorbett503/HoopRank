@@ -155,7 +155,7 @@ router.get(
 
         // Get members with user info
         const membersResult = await pool.query(
-            `SELECT tm.*, u.name, u.avatar_url, u.rating as user_rating
+            `SELECT tm.*, u.name, u.avatar_url, u.hoop_rank as user_rating
        FROM team_members tm
        JOIN users u ON u.id = tm.user_id
        WHERE tm.team_id = $1

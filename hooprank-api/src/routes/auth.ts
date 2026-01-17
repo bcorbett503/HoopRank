@@ -107,7 +107,7 @@ router.post(
             id: u.id,
             name: u.name,
             photoUrl: u.avatar_url,
-            rating: Number(u.rating),
+            rating: Number(u.hoop_rank),
             position: u.position,
             matchesPlayed: gamesPlayed,
             gamesPlayed,
