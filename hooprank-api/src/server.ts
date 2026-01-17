@@ -311,7 +311,7 @@ app.post(
       id: u.id,
       name: u.name,
       photoUrl: u.avatar_url,
-      rating: Number(u.rating),
+      rating: Number(u.hoop_rank),
       position: u.position,
       matchesPlayed: 0,
     });
@@ -343,7 +343,7 @@ app.get(
     const radiusMeters = radiusMiles * 1609.34;
 
     const r = await pool.query(`
-      SELECT id, name, avatar_url, rating, city, position, lat, lng, games_played, games_contested
+      SELECT id, name, avatar_url, hoop_rank, city, position, lat, lng, games_played, games_contested
       FROM users
       WHERE id != $1
         AND lat IS NOT NULL
@@ -353,7 +353,7 @@ app.get(
           ST_SetSRID(ST_MakePoint($3, $2), 4326)::geography,
           $4
         )
-      ORDER BY rating DESC
+      ORDER BY hoop_rank DESC
       LIMIT 100
     `, [uid, lat, lng, radiusMeters]);
 
@@ -365,7 +365,7 @@ app.get(
         id: row.id,
         name: row.name,
         photoUrl: row.avatar_url,
-        rating: row.rating ?? 3.0,
+        rating: row.hoop_rank ?? 3.0,
         city: row.city,
         position: row.position,
         gamesPlayed,
@@ -406,7 +406,7 @@ app.get(
       id: u.id,
       name: u.name,
       photoUrl: u.avatar_url,
-      rating: Number(u.rating),
+      rating: Number(u.hoop_rank),
       position: u.position,
       height: u.height,
       weight: u.weight,
@@ -601,10 +601,10 @@ app.get(
     if (mode === "1v1") {
       // Individual rankings
       const result = await pool.query(
-        `SELECT id, name, avatar_url, rating, position, city
+        `SELECT id, name, avatar_url, hoop_rank, position, city
          FROM users
-         WHERE rating IS NOT NULL
-         ORDER BY rating DESC, name ASC
+         WHERE hoop_rank IS NOT NULL
+         ORDER BY hoop_rank DESC, name ASC
          LIMIT $1 OFFSET $2`,
         [limit, offset]
       );
@@ -616,7 +616,7 @@ app.get(
           id: u.id,
           name: u.name,
           photoUrl: u.avatar_url,
-          rating: Number(u.rating),
+          rating: Number(u.hoop_rank),
           position: u.position,
           city: u.city,
         })),
