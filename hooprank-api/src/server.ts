@@ -130,6 +130,19 @@ app.use(
 app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 app.use(morgan("dev"));
 
+// Request timing middleware - logs slow requests for performance monitoring
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    if (duration > 500) {
+      console.warn(`⚠️ Slow request: ${req.method} ${req.path} took ${duration}ms`);
+    }
+  });
+  next();
+});
+
+
 // ================================
 // Health Check Endpoint (for Railway/production monitoring)
 // ================================
@@ -369,29 +382,24 @@ app.get(
   "/users/:userId",
   asyncH(async (req, res) => {
     const { userId } = req.params;
-    const r = await pool.query(`select * from users where id = $1`, [userId]);
+
+    // Single optimized query combining user data + match stats
+    const r = await pool.query(`
+      SELECT u.*,
+        COUNT(m.id) FILTER (WHERE m.result IS NOT NULL) as matches_played,
+        COUNT(m.id) FILTER (WHERE m.result IS NOT NULL AND (m.result->>'winner') = $1) as wins
+      FROM users u
+      LEFT JOIN matches m ON (m.creator_id = $1 OR m.opponent_id = $1)
+      WHERE u.id = $1
+      GROUP BY u.id
+    `, [userId]);
+
     if (r.rowCount === 0) {
       return res.status(404).json({ error: "user_not_found" });
     }
     const u = r.rows[0];
-
-    // Calculate actual match stats
-    const statsResult = await pool.query(`
-      SELECT 
-        COUNT(*) FILTER (WHERE (creator_id = $1 OR opponent_id = $1) AND result IS NOT NULL) as matches_played,
-        COUNT(*) FILTER (
-          WHERE result IS NOT NULL AND (
-            (creator_id = $1 AND (result->>'winner') = $1) OR
-            (opponent_id = $1 AND (result->>'winner') = $1)
-          )
-        ) as wins
-      FROM matches
-      WHERE (creator_id = $1 OR opponent_id = $1)
-    `, [userId]);
-
-    const stats = statsResult.rows[0];
-    const matchesPlayed = parseInt(stats?.matches_played || '0');
-    const wins = parseInt(stats?.wins || '0');
+    const matchesPlayed = parseInt(u.matches_played || '0');
+    const wins = parseInt(u.wins || '0');
     const losses = matchesPlayed - wins;
 
     res.json({
@@ -411,6 +419,7 @@ app.get(
     });
   })
 );
+
 
 // POST /users/:userId/fcm-token - Register FCM token for push notifications
 app.post(
