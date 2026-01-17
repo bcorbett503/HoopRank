@@ -5,6 +5,7 @@ import '../services/mock_data.dart';
 import '../services/location_service.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
+import '../widgets/player_profile_sheet.dart';
 import '../state/app_state.dart';
 import '../models.dart';
 
@@ -960,31 +961,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               padding: const EdgeInsets.all(16),
                               child: Row(
                                 children: [
-                                  // Avatar
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isSent ? Colors.blue.shade200 : Colors.deepOrange.shade200,
-                                        width: 2,
+                                  // Avatar - clickable for profile
+                                  GestureDetector(
+                                    onTap: () => PlayerProfileSheet.showById(context, challenge.sender.id),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isSent ? Colors.blue.shade200 : Colors.deepOrange.shade200,
+                                          width: 2,
+                                        ),
                                       ),
-                                    ),
-                                    child: CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: isSent ? Colors.blue.shade50 : Colors.deepOrange.shade50,
-                                      backgroundImage: challenge.sender.photoUrl != null
-                                          ? NetworkImage(challenge.sender.photoUrl!)
-                                          : null,
-                                      child: challenge.sender.photoUrl == null
-                                          ? Text(
-                                              challenge.sender.name[0],
-                                              style: TextStyle(
-                                                color: isSent ? Colors.blue.shade700 : Colors.deepOrange,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 18,
-                                              ),
-                                            )
-                                          : null,
+                                      child: CircleAvatar(
+                                        radius: 24,
+                                        backgroundColor: isSent ? Colors.blue.shade50 : Colors.deepOrange.shade50,
+                                        backgroundImage: challenge.sender.photoUrl != null
+                                            ? NetworkImage(challenge.sender.photoUrl!)
+                                            : null,
+                                        child: challenge.sender.photoUrl == null
+                                            ? Text(
+                                                challenge.sender.name[0],
+                                                style: TextStyle(
+                                                  color: isSent ? Colors.blue.shade700 : Colors.deepOrange,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 18,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 14),
@@ -993,11 +997,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          challenge.sender.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
+                                        GestureDetector(
+                                          onTap: () => PlayerProfileSheet.showById(context, challenge.sender.id),
+                                          child: Text(
+                                            challenge.sender.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 16,
+                                              color: Colors.blue,
+                                              decoration: TextDecoration.underline,
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(height: 2),

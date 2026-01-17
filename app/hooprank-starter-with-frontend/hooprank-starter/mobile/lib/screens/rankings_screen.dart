@@ -535,10 +535,33 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   ),
                   child: const Text('Pending', style: TextStyle(fontSize: 10, color: Colors.orange)),
                 ),
+              // Quick action buttons
+              IconButton(
+                icon: const Icon(Icons.chat_bubble_outline, size: 20),
+                color: Colors.grey[400],
+                tooltip: 'Message',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ChatScreen(userId: player.id)),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.sports_basketball, size: 20),
+                color: Colors.deepOrange,
+                tooltip: 'Challenge',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
+                onPressed: () => _showChallengeDialog(player),
+              ),
               // Add to team button
               IconButton(
-                icon: const Icon(Icons.group_add, color: Colors.blue),
+                icon: const Icon(Icons.group_add, size: 20),
+                color: Colors.blue,
                 tooltip: 'Invite to team',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
                 onPressed: () => _showInviteToTeamDialog(player),
               ),
               Column(
