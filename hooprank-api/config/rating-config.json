@@ -3,9 +3,9 @@
     "startRating": 3.0,
     "floor": 1.0,
     "ceiling": 5.0,
-    "baseWin": 0.10,
-    "upsetBonus": 0.05,
-    "upsetPenalty": 0.05,
+    "baseWin": 0.25,
+    "upsetBonus": 0.10,
+    "upsetPenalty": 0.10,
     "ratingDiffThreshold": 0.5
   },
   "newOpponent": {
