@@ -1,0 +1,253 @@
+// =============================================================================
+// HoopRank Data Models
+// =============================================================================
+// This file defines the core data models used throughout the application.
+//
+// Model Hierarchy:
+//   User (base) - Authenticated identity with social/competitive stats
+//   └── Player  - Extends User with athletic profile details
+//
+// The API primarily returns User objects. Player objects are used when
+// detailed athletic stats (offense, defense, etc.) are needed for UI display.
+// =============================================================================
+
+/// Resilient number parsing helper
+/// Handles both num and String values from backend responses
+double _parseDouble(dynamic value, {double fallback = 0.0}) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? fallback;
+  return fallback;
+}
+
+int _parseInt(dynamic value, {int fallback = 0}) {
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? fallback;
+  return fallback;
+}
+
+/// Base identity model representing an authenticated user
+/// This is the primary model returned by API endpoints
+class User {
+  final String id;
+  final String name;
+  final String? photoUrl;
+  final String? team; // Used as zipcode/location fallback
+  final String? position; // 'G', 'F', 'C'
+  final double rating;
+  final int matchesPlayed;
+  final String? height;
+  final int wins;
+  final int losses;
+  final String? city;
+  // Community rating / contest tracking
+  final int gamesPlayed;
+  final int gamesContested;
+  final double contestRate;
+
+  User({
+    required this.id,
+    required this.name,
+    this.photoUrl,
+    this.team,
+    this.position,
+    this.rating = 3.0,
+    this.matchesPlayed = 0,
+    this.height,
+    this.wins = 0,
+    this.losses = 0,
+    this.city,
+    this.gamesPlayed = 0,
+    this.gamesContested = 0,
+    this.contestRate = 0.0,
+  });
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    final id = json['id']?.toString() ?? '';
+    if (id.isEmpty) {
+      throw FormatException('User id cannot be null or empty');
+    }
+
+    final gamesPlayed = _parseInt(json['gamesPlayed']);
+    final gamesContested = _parseInt(json['gamesContested']);
+    final contestRate = json['contestRate'] != null 
+        ? _parseDouble(json['contestRate']) 
+        : (gamesPlayed > 0 ? gamesContested / gamesPlayed : 0.0);
+
+    return User(
+      id: id,
+      name: json['name']?.toString() ?? 'Unknown',
+      photoUrl: json['photoUrl']?.toString(),
+      team: json['team']?.toString(),
+      position: json['position']?.toString(),
+      rating: _parseDouble(json['rating'], fallback: 3.0),
+      matchesPlayed: _parseInt(json['matchesPlayed']),
+      height: json['height']?.toString(),
+      wins: _parseInt(json['wins']),
+      losses: _parseInt(json['losses']),
+      city: json['city']?.toString(),
+      gamesPlayed: gamesPlayed,
+      gamesContested: gamesContested,
+      contestRate: contestRate,
+    );
+  }
+
+  /// Convert User to a full Player with default athletic stats
+  Player toPlayer({
+    String? slug,
+    int age = 25,
+    String weight = '180 lbs',
+    double offense = 75,
+    double defense = 75,
+    double shooting = 75,
+    double passing = 75,
+    double rebounding = 75,
+  }) {
+    return Player(
+      id: id,
+      slug: slug ?? id,
+      name: name,
+      team: team ?? city ?? 'Free Agent',
+      position: position ?? 'G',
+      age: age,
+      height: height ?? '6\'0"',
+      weight: weight,
+      zip: team,
+      rating: rating,
+      offense: offense,
+      defense: defense,
+      shooting: shooting,
+      passing: passing,
+      rebounding: rebounding,
+    );
+  }
+
+  @override
+  String toString() => 'User(id: $id, name: $name, rating: $rating)';
+}
+
+/// Extended player model with full athletic profile
+/// Used for match setup, detailed profile views, and mock data
+class Player {
+  final String id;
+  final String slug;
+  final String name;
+  final String team;
+  final String position; // 'G', 'F', 'C'
+  final int age;
+  final String height;
+  final String weight;
+  final String? zip;
+  final double rating;
+  final double offense;
+  final double defense;
+  final double shooting;
+  final double passing;
+  final double rebounding;
+
+  Player({
+    required this.id,
+    required this.slug,
+    required this.name,
+    required this.team,
+    required this.position,
+    required this.age,
+    required this.height,
+    required this.weight,
+    this.zip,
+    required this.rating,
+    required this.offense,
+    required this.defense,
+    required this.shooting,
+    required this.passing,
+    required this.rebounding,
+  });
+
+  /// Create Player from JSON with resilient parsing
+  factory Player.fromJson(Map<String, dynamic> json) {
+    return Player(
+      id: json['id']?.toString() ?? '',
+      slug: json['slug']?.toString() ?? json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Unknown',
+      team: json['team']?.toString() ?? 'Free Agent',
+      position: json['position']?.toString() ?? 'G',
+      age: _parseInt(json['age'], fallback: 25),
+      height: json['height']?.toString() ?? '6\'0"',
+      weight: json['weight']?.toString() ?? '180 lbs',
+      zip: json['zip']?.toString(),
+      rating: _parseDouble(json['rating'], fallback: 3.0),
+      offense: _parseDouble(json['offense'], fallback: 75),
+      defense: _parseDouble(json['defense'], fallback: 75),
+      shooting: _parseDouble(json['shooting'], fallback: 75),
+      passing: _parseDouble(json['passing'], fallback: 75),
+      rebounding: _parseDouble(json['rebounding'], fallback: 75),
+    );
+  }
+
+  /// Convert to a lightweight User object (for API compatibility)
+  User toUser() {
+    return User(
+      id: id,
+      name: name,
+      position: position,
+      rating: rating,
+      height: height,
+      team: zip,
+    );
+  }
+
+  @override
+  String toString() => 'Player(id: $id, name: $name, rating: $rating)';
+}
+
+/// Match record from the database
+class Match {
+  final String id;
+  final String challengerId;
+  final String opponentId;
+  final String status; // 'pending', 'accepted', 'completed', 'waiting', 'live', 'ended'
+  final DateTime? scheduledAt;
+  final String? courtId;
+  final String? winnerId;
+  final double? ratingDelta;
+
+  Match({
+    required this.id,
+    required this.challengerId,
+    required this.opponentId,
+    required this.status,
+    this.scheduledAt,
+    this.courtId,
+    this.winnerId,
+    this.ratingDelta,
+  });
+}
+
+/// Basketball court location
+class Court {
+  final String id;
+  final String name;
+  final double lat;
+  final double lng;
+  final String? address;
+  final String? king; // Player name who is "King of the Court"
+
+  Court({
+    required this.id,
+    required this.name,
+    required this.lat,
+    required this.lng,
+    this.address,
+    this.king,
+  });
+
+  factory Court.fromJson(Map<String, dynamic> json) {
+    return Court(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Unknown Court',
+      lat: _parseDouble(json['lat']),
+      lng: _parseDouble(json['lng']),
+      address: json['address']?.toString(),
+      king: json['king']?.toString(),
+    );
+  }
+}

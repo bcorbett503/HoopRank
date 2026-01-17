@@ -1,0 +1,96 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import '../models.dart';
+import 'mock_courts_data.dart';
+
+class CourtService {
+  static final CourtService _instance = CourtService._internal();
+  factory CourtService() => _instance;
+  CourtService._internal();
+
+  List<Court> _courts = [];
+  bool _isLoaded = false;
+
+  Future<void> loadCourts() async {
+    if (_isLoaded) return;
+
+    try {
+      // Use hardcoded mock data to avoid any asset loading issues
+      final List<Map<String, dynamic>> data = mockCourtsData;
+
+      // Mock list of players for "King of the Court"
+      final List<String> mockKings = [
+        'LeBron James', 'Steph Curry', 'Kevin Durant', 'Giannis Antetokounmpo',
+        'Luka Doncic', 'Jayson Tatum', 'Ja Morant', 'Devin Booker',
+        'Jimmy Butler', 'Nikola Jokic', 'Joel Embiid', 'Kawhi Leonard'
+      ];
+
+      _courts = data.map((json) {
+        String? king;
+        final id = (json['id'] as String?) ?? 'unknown';
+        if ((id.hashCode % 3) == 0) {
+          king = mockKings[id.hashCode % mockKings.length];
+        }
+
+        return Court(
+          id: id,
+          name: (json['name'] as String?) ?? 'Unknown Court',
+          lat: (json['lat'] as num).toDouble(),
+          lng: (json['lng'] as num).toDouble(),
+          address: (json['city'] as String?) ?? (json['address'] as String?),
+          king: king,
+        );
+      }).toList();
+
+      _isLoaded = true;
+      print('Loaded ${_courts.length} courts from mock data');
+    } catch (e, st) {
+      print('Error loading courts: $e\n$st');
+      _courts = [];
+    }
+  }
+
+  List<Court> getCourts() {
+    return _courts;
+  }
+
+  Court? getCourtById(String id) {
+    try {
+      return _courts.firstWhere((c) => c.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Helper to find courts near a location
+  List<Court> getCourtsNear(double lat, double lng, {double radiusKm = 50}) {
+    return _courts.where((court) {
+      final distanceInMeters = Geolocator.distanceBetween(lat, lng, court.lat, court.lng);
+      return distanceInMeters <= (radiusKm * 1000);
+    }).toList()
+      ..sort((a, b) {
+        final distA = Geolocator.distanceBetween(lat, lng, a.lat, a.lng);
+        final distB = Geolocator.distanceBetween(lat, lng, b.lat, b.lng);
+        return distA.compareTo(distB);
+      });
+  }
+
+  List<Court> getCourtsInBounds(double south, double west, double north, double east, {int limit = 100}) {
+    return _courts.where((court) {
+      return court.lat >= south &&
+             court.lat <= north &&
+             court.lng >= west &&
+             court.lng <= east;
+    }).take(limit).toList();
+  }
+
+  List<Court> searchCourts(String query) {
+    if (query.isEmpty) return _courts;
+    final lowerQuery = query.toLowerCase();
+    return _courts.where((court) {
+      return court.name.toLowerCase().contains(lowerQuery) ||
+             (court.address?.toLowerCase().contains(lowerQuery) ?? false);
+    }).toList();
+  }
+}
