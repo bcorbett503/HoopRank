@@ -85,8 +85,8 @@ async function getStreakData(pool: any, uid: string) {
 
 /** Get user's current rating from users table */
 async function getCurrentRating(pool: any, uid: string): Promise<number> {
-  const { rows } = await pool.query("SELECT rating FROM users WHERE id=$1", [uid]);
-  return rows.length > 0 ? Number(rows[0].rating || cfg.simpleRank.startRating) : cfg.simpleRank.startRating;
+  const { rows } = await pool.query("SELECT hoop_rank FROM users WHERE id=$1", [uid]);
+  return rows.length > 0 ? Number(rows[0].hoop_rank || cfg.simpleRank.startRating) : cfg.simpleRank.startRating;
 }
 
 export async function getUserRating(pool: any, uid: string) {
@@ -257,8 +257,8 @@ export async function finalizeAndRateMatch(pool: any, matchId: string, provision
   const loserStreak = await updateStreak(loser, loserFirstToday);
 
   // === STEP 6: Update users table ===
-  await pool.query("UPDATE users SET rating = $2 WHERE id = $1", [winner, newWinnerRating]);
-  await pool.query("UPDATE users SET rating = $2 WHERE id = $1", [loser, newLoserRating]);
+  await pool.query("UPDATE users SET hoop_rank = $2 WHERE id = $1", [winner, newWinnerRating]);
+  await pool.query("UPDATE users SET hoop_rank = $2 WHERE id = $1", [loser, newLoserRating]);
 
   // === STEP 7: Record history ===
   await pool.query(
@@ -339,8 +339,8 @@ export async function revertMatchRating(pool: any, matchId: string) {
   const bPrevRating = await getPrevRating(b);
 
   // Restore ratings
-  await pool.query("UPDATE users SET rating = $2 WHERE id = $1", [a, aPrevRating]);
-  await pool.query("UPDATE users SET rating = $2 WHERE id = $1", [b, bPrevRating]);
+  await pool.query("UPDATE users SET hoop_rank = $2 WHERE id = $1", [a, aPrevRating]);
+  await pool.query("UPDATE users SET hoop_rank = $2 WHERE id = $1", [b, bPrevRating]);
 
   // Delete the rank_history entries for this match
   await pool.query("DELETE FROM rank_history WHERE match_id = $1", [matchId]);
