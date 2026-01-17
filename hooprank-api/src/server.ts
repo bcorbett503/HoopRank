@@ -452,7 +452,7 @@ app.post(
   "/users/:userId/profile",
   asyncH(async (req, res) => {
     const { userId } = req.params;
-    const { position, height, weight, zip, lat, lng, locEnabled } = req.body;
+    const { name, position, height, weight, zip, lat, lng, locEnabled, age } = req.body;
 
     // Verify user exists
     const check = await pool.query(`select 1 from users where id = $1`, [userId]);
@@ -469,25 +469,27 @@ app.post(
       }
     }
 
-    // Update user - now includes city from zip lookup
+    // Update user - now includes name, city from zip lookup
     await pool.query(
       `update users set 
-       position = coalesce($2, position),
-       height = coalesce($3, height),
-       weight = coalesce($4, weight),
-       zip = coalesce($5, zip),
-       city = coalesce($9, city),
-       last_loc = case when $6::numeric is not null and $7::numeric is not null 
-                  then ST_SetSRID(ST_MakePoint($7::numeric, $6::numeric), 4326) 
+       name = coalesce($2, name),
+       position = coalesce($3, position),
+       height = coalesce($4, height),
+       weight = coalesce($5, weight),
+       zip = coalesce($6, zip),
+       city = coalesce($10, city),
+       last_loc = case when $7::numeric is not null and $8::numeric is not null 
+                  then ST_SetSRID(ST_MakePoint($8::numeric, $7::numeric), 4326) 
                   else last_loc end,
-       last_loc_at = case when $6::numeric is not null and $7::numeric is not null 
+       last_loc_at = case when $7::numeric is not null and $8::numeric is not null 
                      then now() 
                      else last_loc_at end,
-       loc_enabled = coalesce($8, loc_enabled),
+       loc_enabled = coalesce($9, loc_enabled),
        updated_at = now()
        where id = $1`,
       [
         userId,
+        name,
         position,
         height,
         weight ? parseInt(weight) : null,
