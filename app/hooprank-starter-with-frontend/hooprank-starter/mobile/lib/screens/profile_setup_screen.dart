@@ -90,8 +90,32 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _pickImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Color(0xFFFF6B35)),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Color(0xFFFF6B35)),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
       setState(() {
@@ -172,30 +196,56 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             Center(
               child: GestureDetector(
                 onTap: _pickImage,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF2C3E50),
-                    border: Border.all(color: const Color(0xFFFF6B35), width: 3),
-                  ),
-                  child: _imageFile != null
-                      ? ClipOval(
-                          child: Image.file(_imageFile!, fit: BoxFit.cover),
-                        )
-                      : (_profilePictureUrl != null && !_profilePictureUrl!.startsWith('/')) // Check if it's a network URL
-                          ? ClipOval(
-                              child: Image.network(_profilePictureUrl!, fit: BoxFit.cover),
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_a_photo, color: Colors.grey.shade600, size: 32),
-                                const SizedBox(height: 4),
-                                Text('Add Photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                              ],
-                            ),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 110,
+                      height: 110,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF2C3E50),
+                        border: Border.all(
+                          color: const Color(0xFFFF6B35),
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFF6B35).withOpacity(0.3),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: _imageFile != null
+                            ? Image.file(_imageFile!, fit: BoxFit.cover, width: 110, height: 110)
+                            : (_profilePictureUrl != null && !_profilePictureUrl!.startsWith('/'))
+                                ? Image.network(_profilePictureUrl!, fit: BoxFit.cover, width: 110, height: 110)
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.person, color: Colors.grey.shade600, size: 40),
+                                      const SizedBox(height: 4),
+                                      Text('Add Photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                                    ],
+                                  ),
+                      ),
+                    ),
+                    // Camera overlay icon
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF6B35),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF1A252F), width: 2),
+                        ),
+                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
