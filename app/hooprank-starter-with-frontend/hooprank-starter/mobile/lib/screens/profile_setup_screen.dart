@@ -134,6 +134,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
       await ProfileService.saveProfile(userId, data);
       ProfileService.applyProfileToPlayer(playerId, data);
+      
+      // Refresh user data from API to update the app state
+      await auth.refreshUser();
+      
       if (mounted) context.go('/play');
     }
   }

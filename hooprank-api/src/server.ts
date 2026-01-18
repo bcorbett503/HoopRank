@@ -378,6 +378,49 @@ app.get(
   })
 );
 
+// GET /users/me - Get current user's data (MUST be before /users/:userId)
+app.get(
+  "/users/me",
+  asyncH(async (req, res) => {
+    const userId = getUserId(req);
+
+    // Single optimized query combining user data + match stats
+    const r = await pool.query(`
+      SELECT u.*,
+        COUNT(m.id) FILTER (WHERE m.result IS NOT NULL) as matches_played,
+        COUNT(m.id) FILTER (WHERE m.result IS NOT NULL AND (m.result->>'winner') = $1) as wins
+      FROM users u
+      LEFT JOIN matches m ON (m.creator_id = $1 OR m.opponent_id = $1)
+      WHERE u.id = $1
+      GROUP BY u.id
+    `, [userId]);
+
+    if (r.rowCount === 0) {
+      return res.status(404).json({ error: "user_not_found" });
+    }
+    const u = r.rows[0];
+    const matchesPlayed = parseInt(u.matches_played || '0');
+    const wins = parseInt(u.wins || '0');
+    const losses = matchesPlayed - wins;
+
+    res.json({
+      id: u.id,
+      name: u.name,
+      photoUrl: u.avatar_url,
+      rating: Number(u.hoop_rank),
+      position: u.position,
+      height: u.height,
+      weight: u.weight,
+      city: u.city,
+      zip: u.zip,
+      team: null,
+      matchesPlayed,
+      wins,
+      losses,
+    });
+  })
+);
+
 app.get(
   "/users/:userId",
   asyncH(async (req, res) => {

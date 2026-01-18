@@ -253,37 +253,61 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             itemCount: eligibleTeams.length,
             itemBuilder: (context, index) {
               final team = eligibleTeams[index];
-              return ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: team['teamType'] == '3v3' ? Colors.blue : Colors.purple,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    team['teamType'] ?? '3v3',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: team['teamType'] == '3v3' ? Colors.blue : Colors.purple,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          team['teamType'] ?? '3v3',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(team['name'] ?? 'Team', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            Text('${team['memberCount'] ?? 1} members', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          try {
+                            await ApiService.inviteToTeam(team['id'], player.id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Invited ${player.name} to ${team['name']}!')),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to invite: $e')),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepOrange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                        child: const Text('Invite'),
+                      ),
+                    ],
                   ),
                 ),
-                title: Text(team['name'] ?? 'Team'),
-                subtitle: Text('${team['memberCount'] ?? 1} members'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  try {
-                    await ApiService.inviteToTeam(team['id'], player.id);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Invited ${player.name} to ${team['name']}!')),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to invite: $e')),
-                      );
-                    }
-                  }
-                },
               );
             },
           ),

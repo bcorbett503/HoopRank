@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../widgets/player_profile_sheet.dart';
 
@@ -271,12 +272,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       ),
       floatingActionButton: isOwner
           ? FloatingActionButton.extended(
-              onPressed: () {
-                // TODO: Navigate to invite players screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invite players from Rankings!')),
-                );
-              },
+              onPressed: () => context.go('/rankings'),
               backgroundColor: Colors.deepOrange,
               icon: const Icon(Icons.person_add),
               label: const Text('Invite'),
