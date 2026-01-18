@@ -907,6 +907,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     );
     if (myTeam.isEmpty) return;
 
+    final messageController = TextEditingController(text: 'Let\'s play!');
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -918,6 +920,18 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             Text('Your team: ${myTeam['name']}'),
             const SizedBox(height: 8),
             Text('Mode: ${opponentTeam['teamType']}'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: messageController,
+              decoration: InputDecoration(
+                labelText: 'Message (optional)',
+                hintText: 'Add a message to your challenge...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                filled: true,
+                fillColor: Colors.grey[800],
+              ),
+              maxLines: 2,
+            ),
             const SizedBox(height: 8),
             Text('They will receive a notification to accept or decline.', 
                 style: TextStyle(color: Colors.grey[600], fontSize: 12)),
@@ -932,9 +946,10 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                await ApiService.createTeamChallenge(
-                  challengerTeamId: myTeam['id'],
+                await ApiService.challengeTeam(
+                  teamId: myTeam['id'],
                   opponentTeamId: opponentTeam['id'],
+                  message: messageController.text.isNotEmpty ? messageController.text : null,
                 );
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
