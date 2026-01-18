@@ -192,9 +192,42 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create team: $e')),
-        );
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('team_name_taken') || errorStr.contains('already exists')) {
+          // Show friendly dialog for duplicate name
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                  SizedBox(width: 8),
+                  Text('Name Taken'),
+                ],
+              ),
+              content: Text(
+                'A $teamType team named "$name" already exists.\n\nPlease choose a different name for your team.',
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showCreateTeamDialog(); // Re-open the create dialog
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Choose New Name'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to create team. Please try again.')),
+          );
+        }
       }
     }
   }

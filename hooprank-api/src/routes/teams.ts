@@ -35,13 +35,13 @@ router.post(
             [uid]
         );
 
-        // Check if team name already exists (case-insensitive)
+        // Check if team name already exists within the same team type (case-insensitive)
         const existingTeam = await pool.query(
-            `SELECT id FROM teams WHERE LOWER(name) = LOWER($1)`,
-            [name]
+            `SELECT id FROM teams WHERE LOWER(name) = LOWER($1) AND team_type = $2`,
+            [name, teamType]
         );
         if (existingTeam.rowCount && existingTeam.rowCount > 0) {
-            return res.status(409).json({ error: "team_name_taken", message: "A team with this name already exists" });
+            return res.status(409).json({ error: "team_name_taken", message: `A ${teamType} team with this name already exists` });
         }
 
         // Note: Team group chat will be implemented separately
