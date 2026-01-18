@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../widgets/player_profile_sheet.dart';
 
@@ -36,6 +38,46 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     } catch (e) {
       print('Error loading team: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickTeamLogo() async {
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source != null) {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source);
+      if (picked != null) {
+        // Upload the image
+        final success = await ApiService.uploadImage(
+          type: 'team',
+          targetId: widget.teamId,
+          imageFile: File(picked.path),
+        );
+        if (success && mounted) {
+          _loadTeam(); // Refresh to show new logo
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Team logo updated!')),
+          );
+        }
+      }
     }
   }
 
@@ -161,6 +203,55 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 ),
                 child: Column(
                   children: [
+                    // Team Logo (editable for owners)
+                    GestureDetector(
+                      onTap: isOwner ? _pickTeamLogo : null,
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                              image: team['logoUrl'] != null
+                                  ? DecorationImage(
+                                      image: NetworkImage(team['logoUrl']),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                            ),
+                            child: team['logoUrl'] == null
+                                ? Center(
+                                    child: Text(
+                                      (team['name'] ?? 'T')[0].toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          if (isOwner)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: Colors.deepOrange,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -172,7 +263,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Text(
                       team['name'] ?? 'Team',
                       style: const TextStyle(

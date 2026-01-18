@@ -74,10 +74,32 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 // Team Logo Picker
                 GestureDetector(
                   onTap: () async {
-                    final picker = ImagePicker();
-                    final picked = await picker.pickImage(source: ImageSource.gallery);
-                    if (picked != null) {
-                      setDialogState(() => selectedImage = File(picked.path));
+                    // Show bottom sheet with camera/gallery options
+                    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+                      context: context,
+                      builder: (ctx) => SafeArea(
+                        child: Wrap(
+                          children: [
+                            ListTile(
+                              leading: const Icon(Icons.camera_alt),
+                              title: const Text('Take a Photo'),
+                              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.photo_library),
+                              title: const Text('Choose from Gallery'),
+                              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                    if (source != null) {
+                      final picker = ImagePicker();
+                      final picked = await picker.pickImage(source: source);
+                      if (picked != null) {
+                        setDialogState(() => selectedImage = File(picked.path));
+                      }
                     }
                   },
                   child: Container(
@@ -86,21 +108,48 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     decoration: BoxDecoration(
                       color: Colors.grey[200],
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.deepOrange.withOpacity(0.5)),
+                      border: Border.all(color: Colors.deepOrange.withOpacity(0.5), width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.deepOrange.withOpacity(0.3),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
                     ),
-                    child: selectedImage != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(selectedImage!, fit: BoxFit.cover),
+                    child: Stack(
+                      children: [
+                        if (selectedImage != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(selectedImage!, fit: BoxFit.cover, width: 80, height: 80),
                           )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_photo_alternate, color: Colors.grey[600], size: 28),
-                              const SizedBox(height: 4),
-                              Text('Logo', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                            ],
+                        else
+                          Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_photo_alternate, color: Colors.grey[600], size: 28),
+                                const SizedBox(height: 4),
+                                Text('Logo', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                              ],
+                            ),
                           ),
+                        // Camera icon overlay
+                        Positioned(
+                          bottom: 4,
+                          right: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.deepOrange,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
