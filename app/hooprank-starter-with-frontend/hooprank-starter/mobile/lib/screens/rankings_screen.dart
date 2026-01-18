@@ -112,6 +112,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               position: item['position']?.toString(),
               rating: rating,
               city: item['city']?.toString(),
+              team: item['team']?.toString(),
             ));
           }
         }
@@ -541,9 +542,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(player.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                    if (player.position != null || player.city != null)
-                      Text(player.position ?? player.city ?? '', 
-                          style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                    Text(player.team ?? 'No Team', 
+                        style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                   ],
                 ),
               ),

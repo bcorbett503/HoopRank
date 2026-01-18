@@ -666,12 +666,17 @@ app.get(
     const { mode, limit, offset } = RankingsQuery.parse(req.query);
 
     if (mode === "1v1") {
-      // Individual rankings
+      // Individual rankings with team info
       const result = await pool.query(
-        `SELECT id, name, avatar_url, hoop_rank, position, city
-         FROM users
-         WHERE hoop_rank IS NOT NULL
-         ORDER BY hoop_rank DESC, name ASC
+        `SELECT u.id, u.name, u.avatar_url, u.hoop_rank, u.position, u.city,
+           (SELECT t.name FROM teams t
+            JOIN team_members tm ON tm.team_id = t.id
+            WHERE tm.user_id = u.id AND tm.status = 'accepted'
+            ORDER BY tm.joined_at DESC NULLS LAST
+            LIMIT 1) as team_name
+         FROM users u
+         WHERE u.hoop_rank IS NOT NULL
+         ORDER BY u.hoop_rank DESC, u.name ASC
          LIMIT $1 OFFSET $2`,
         [limit, offset]
       );
@@ -686,6 +691,7 @@ app.get(
           rating: Number(u.hoop_rank),
           position: u.position,
           city: u.city,
+          team: u.team_name || null,
         })),
       });
     } else {
