@@ -6,6 +6,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../db/index.js";
 import { asyncH, getUserId } from "../middleware/index.js";
+import { sendPushNotification } from "../services/notifications.js";
 
 const router = Router();
 
@@ -241,6 +242,18 @@ router.post(
             `INSERT INTO team_members (team_id, user_id, role, status)
        VALUES ($1, $2, 'member', 'pending')`,
             [id, userId]
+        );
+
+        // Send push notification to the invited user
+        const teamResult = await pool.query(`SELECT name FROM teams WHERE id = $1`, [id]);
+        const inviterResult = await pool.query(`SELECT name FROM users WHERE id = $1`, [uid]);
+        const teamName = teamResult.rows[0]?.name || "a team";
+        const inviterName = inviterResult.rows[0]?.name || "Someone";
+        await sendPushNotification(
+            userId,
+            "🏀 Team Invite!",
+            `${inviterName} invited you to join ${teamName}`,
+            { type: "team_invite", teamId: id }
         );
 
         res.json({ success: true });

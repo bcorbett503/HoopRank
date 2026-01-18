@@ -1027,6 +1027,19 @@ returning * `,
       console.error("provisional rating failed", e);
     }
 
+    // Notify opponent that score was submitted
+    const otherId = uid === updated.creator_id ? updated.opponent_id : updated.creator_id;
+    if (otherId) {
+      const senderResult = await pool.query(`SELECT name FROM users WHERE id = $1`, [uid]);
+      const senderName = senderResult.rows[0]?.name || "Your opponent";
+      await sendPushNotification(
+        otherId,
+        "📊 Score Submitted",
+        `${senderName} submitted a score. Confirm or contest!`,
+        { type: "score_pending", matchId: id }
+      );
+    }
+
     res.json(updated);
   })
 );
@@ -2427,8 +2440,18 @@ app.post(
       );
       const matchId = matchResult.rows[0].id;
 
-      return { id, status: "accepted", matchId };
+      return { id, status: "accepted", matchId, fromId: ch.from_id };
     });
+
+    // Notify the challenger that their challenge was accepted
+    const accepterResult = await pool.query(`SELECT name FROM users WHERE id = $1`, [me]);
+    const accepterName = accepterResult.rows[0]?.name || "Your opponent";
+    await sendPushNotification(
+      out.fromId,
+      "✅ Challenge Accepted!",
+      `${accepterName} accepted your challenge! Game on! 🏀`,
+      { type: "challenge_accepted", matchId: out.matchId }
+    );
 
     res.json(out);
   })
@@ -2440,9 +2463,9 @@ app.post(
     const me = getUserId(req);
     const id = req.params.id;
 
-    await withTx(async (c) => {
+    const fromId = await withTx(async (c) => {
       const r0 = await c.query(
-        `select id, to_id, status from challenges where id=$1 for update`,
+        `select id, from_id, to_id, status from challenges where id=$1 for update`,
         [id]
       );
       if ((r0.rowCount ?? 0) === 0) throw Object.assign(new Error("not_found"), { http: 404 });
@@ -2451,7 +2474,18 @@ app.post(
       if (ch.status !== "pending") throw Object.assign(new Error("not_pending"), { http: 400 });
 
       await c.query(`update challenges set status='declined', updated_at=now() where id=$1`, [id]);
+      return ch.from_id;
     });
+
+    // Notify the challenger that their challenge was declined
+    const declinerResult = await pool.query(`SELECT name FROM users WHERE id = $1`, [me]);
+    const declinerName = declinerResult.rows[0]?.name || "A player";
+    await sendPushNotification(
+      fromId,
+      "❌ Challenge Declined",
+      `${declinerName} declined your challenge`,
+      { type: "challenge_declined", challengeId: id }
+    );
 
     res.json({ id, status: "declined" });
   })
