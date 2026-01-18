@@ -403,13 +403,19 @@ app.get(
     const wins = parseInt(u.wins || '0');
     const losses = matchesPlayed - wins;
 
-    // Get user's most recently joined team
+    // Get user's most recently joined team (either as member or owner)
     const teamResult = await pool.query(`
-      SELECT t.name
-      FROM teams t
-      JOIN team_members tm ON tm.team_id = t.id
-      WHERE tm.user_id = $1 AND tm.status = 'accepted'
-      ORDER BY tm.joined_at DESC NULLS LAST
+      SELECT name FROM (
+        SELECT t.name, COALESCE(tm.joined_at, t.created_at) as sort_date
+        FROM teams t
+        JOIN team_members tm ON tm.team_id = t.id
+        WHERE tm.user_id = $1 AND tm.status = 'accepted'
+        UNION
+        SELECT t.name, t.created_at as sort_date
+        FROM teams t
+        WHERE t.owner_id = $1
+      ) subq
+      ORDER BY sort_date DESC NULLS LAST
       LIMIT 1
     `, [userId]);
     const teamName = teamResult.rows[0]?.name || null;
@@ -456,13 +462,19 @@ app.get(
     const wins = parseInt(u.wins || '0');
     const losses = matchesPlayed - wins;
 
-    // Get user's most recently joined team
+    // Get user's most recently joined team (either as member or owner)
     const teamResult = await pool.query(`
-      SELECT t.name
-      FROM teams t
-      JOIN team_members tm ON tm.team_id = t.id
-      WHERE tm.user_id = $1 AND tm.status = 'accepted'
-      ORDER BY tm.joined_at DESC NULLS LAST
+      SELECT name FROM (
+        SELECT t.name, COALESCE(tm.joined_at, t.created_at) as sort_date
+        FROM teams t
+        JOIN team_members tm ON tm.team_id = t.id
+        WHERE tm.user_id = $1 AND tm.status = 'accepted'
+        UNION
+        SELECT t.name, t.created_at as sort_date
+        FROM teams t
+        WHERE t.owner_id = $1
+      ) subq
+      ORDER BY sort_date DESC NULLS LAST
       LIMIT 1
     `, [userId]);
     const teamName = teamResult.rows[0]?.name || null;
@@ -666,19 +678,29 @@ app.get(
     const { mode, limit, offset } = RankingsQuery.parse(req.query);
 
     if (mode === "1v1") {
-      // Individual rankings with team info
+      // Individual rankings with team info (includes both member and owner teams)
       const result = await pool.query(
         `SELECT u.id, u.name, u.avatar_url, u.hoop_rank, u.position, u.city,
-           (SELECT t.id FROM teams t
-            JOIN team_members tm ON tm.team_id = t.id
-            WHERE tm.user_id = u.id AND tm.status = 'accepted'
-            ORDER BY tm.joined_at DESC NULLS LAST
-            LIMIT 1) as team_id,
-           (SELECT t.name FROM teams t
-            JOIN team_members tm ON tm.team_id = t.id
-            WHERE tm.user_id = u.id AND tm.status = 'accepted'
-            ORDER BY tm.joined_at DESC NULLS LAST
-            LIMIT 1) as team_name
+           (SELECT id FROM (
+              SELECT t.id, t.name, COALESCE(tm.joined_at, t.created_at) as sort_date
+              FROM teams t
+              JOIN team_members tm ON tm.team_id = t.id
+              WHERE tm.user_id = u.id AND tm.status = 'accepted'
+              UNION
+              SELECT t.id, t.name, t.created_at as sort_date
+              FROM teams t
+              WHERE t.owner_id = u.id
+           ) sub ORDER BY sort_date DESC NULLS LAST LIMIT 1) as team_id,
+           (SELECT name FROM (
+              SELECT t.id, t.name, COALESCE(tm.joined_at, t.created_at) as sort_date
+              FROM teams t
+              JOIN team_members tm ON tm.team_id = t.id
+              WHERE tm.user_id = u.id AND tm.status = 'accepted'
+              UNION
+              SELECT t.id, t.name, t.created_at as sort_date
+              FROM teams t
+              WHERE t.owner_id = u.id
+           ) sub ORDER BY sort_date DESC NULLS LAST LIMIT 1) as team_name
          FROM users u
          WHERE u.hoop_rank IS NOT NULL
          ORDER BY u.hoop_rank DESC, u.name ASC
