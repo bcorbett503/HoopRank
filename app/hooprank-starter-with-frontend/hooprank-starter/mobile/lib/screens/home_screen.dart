@@ -26,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   double? _currentRating; // Fresh rating from API
   List<Map<String, dynamic>> _myTeams = []; // User's teams with ratings
   List<Map<String, dynamic>> _teamInvites = []; // Pending team invites
+  List<Map<String, dynamic>> _teamChallenges = []; // Pending team challenges (3v3/5v5)
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadLocalActivity();
     _loadMyTeams(); // Load user's teams for ratings
     _loadTeamInvites(); // Load pending team invites
+    _loadTeamChallenges(); // Load pending team challenges
     _updateLocation();
   }
 
@@ -80,6 +82,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _loadTeamChallenges() async {
+    try {
+      final challenges = await ApiService.getTeamChallenges();
+      if (mounted) {
+        setState(() => _teamChallenges = challenges);
+      }
+    } catch (e) {
+      debugPrint('Error loading team challenges: $e');
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -111,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadLocalActivity();
     _loadMyTeams();
     _loadTeamInvites();
+    _loadTeamChallenges();
     _loadCurrentRating();
   }
 
@@ -915,7 +929,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              if (_challenges.isEmpty)
+              if (_challenges.isEmpty && _teamChallenges.isEmpty)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -1106,6 +1120,126 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     }).toList(),
                   ),
                 ),
+
+              // Team Challenges Section (3v3/5v5)
+              if (_teamChallenges.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ...(_teamChallenges.map((challenge) {
+                  final challengerTeam = challenge['challengerTeam'] as Map<String, dynamic>?;
+                  final opponentTeam = challenge['opponentTeam'] as Map<String, dynamic>?;
+                  final matchId = challenge['matchId'] as String?;
+                  final matchType = challenge['matchType'] as String? ?? '3v3';
+                  final isSent = challenge['isSent'] == true;
+                  
+                  // Determine which team is "the other team" based on perspective
+                  final otherTeam = isSent ? opponentTeam : challengerTeam;
+                  final otherTeamName = otherTeam?['name'] ?? 'Unknown Team';
+                  
+                  return Card(
+                    color: matchType == '3v3' 
+                        ? Colors.blue.shade900.withOpacity(0.3)
+                        : Colors.purple.shade900.withOpacity(0.3),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: matchType == '3v3' ? Colors.blue.shade700 : Colors.purple.shade700, 
+                        width: 1
+                      ),
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: matchType == '3v3' ? Colors.blue : Colors.purple,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  matchType.toUpperCase(),
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  isSent 
+                                      ? 'Challenge sent to $otherTeamName'
+                                      : '$otherTeamName challenged you!',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                              ),
+                              if (isSent)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text('Sent', style: TextStyle(color: Colors.blue, fontSize: 12)),
+                                ),
+                            ],
+                          ),
+                          if (!isSent && matchId != null) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      try {
+                                        await ApiService.acceptTeamChallenge(matchId);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Accepted challenge from $otherTeamName!')),
+                                        );
+                                        _loadTeamChallenges();
+                                      } catch (e) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Error: $e')),
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Accept'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      try {
+                                        await ApiService.declineTeamChallenge(matchId);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Declined challenge from $otherTeamName')),
+                                        );
+                                        _loadTeamChallenges();
+                                      } catch (e) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Error: $e')),
+                                        );
+                                      }
+                                    },
+                                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                    child: const Text('Decline'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                })),
+              ],
               const SizedBox(height: 24),
 
               // Team Invites Section
