@@ -25,6 +25,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   
   // Players tab state
   List<User> _players = [];
+  Map<String, String> _playerTeamIds = {}; // Map player id -> team id
   Set<String> _pendingChallengeUserIds = {};
   bool _isLoadingPlayers = true;
   bool _isLocal = false;
@@ -94,6 +95,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             ? decoded 
             : (decoded['rankings'] as List?) ?? [];
         final List<User> players = [];
+        final Map<String, String> playerTeamIds = {};
         for (var item in jsonList) {
           final id = item['id']?.toString() ?? '';
           if (id.isNotEmpty) {
@@ -114,6 +116,11 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               city: item['city']?.toString(),
               team: item['team']?.toString(),
             ));
+            // Store teamId separately
+            final teamId = item['teamId']?.toString();
+            if (teamId != null) {
+              playerTeamIds[id] = teamId;
+            }
           }
         }
         
@@ -131,6 +138,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
         
         setState(() {
           _players = players;
+          _playerTeamIds = playerTeamIds;
           _pendingChallengeUserIds = pendingIds;
           _isLoadingPlayers = false;
         });
@@ -542,8 +550,24 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(player.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                    Text(player.team ?? 'No Team', 
-                        style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                    GestureDetector(
+                      onTap: _playerTeamIds[player.id] != null
+                          ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TeamDetailScreen(teamId: _playerTeamIds[player.id]!),
+                                ),
+                              )
+                          : null,
+                      child: Text(
+                        player.team ?? 'No Team',
+                        style: TextStyle(
+                          color: _playerTeamIds[player.id] != null ? Colors.blue : Colors.grey[400],
+                          fontSize: 13,
+                          decoration: _playerTeamIds[player.id] != null ? TextDecoration.underline : null,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

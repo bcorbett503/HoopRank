@@ -669,6 +669,11 @@ app.get(
       // Individual rankings with team info
       const result = await pool.query(
         `SELECT u.id, u.name, u.avatar_url, u.hoop_rank, u.position, u.city,
+           (SELECT t.id FROM teams t
+            JOIN team_members tm ON tm.team_id = t.id
+            WHERE tm.user_id = u.id AND tm.status = 'accepted'
+            ORDER BY tm.joined_at DESC NULLS LAST
+            LIMIT 1) as team_id,
            (SELECT t.name FROM teams t
             JOIN team_members tm ON tm.team_id = t.id
             WHERE tm.user_id = u.id AND tm.status = 'accepted'
@@ -692,6 +697,7 @@ app.get(
           position: u.position,
           city: u.city,
           team: u.team_name || null,
+          teamId: u.team_id || null,
         })),
       });
     } else {
