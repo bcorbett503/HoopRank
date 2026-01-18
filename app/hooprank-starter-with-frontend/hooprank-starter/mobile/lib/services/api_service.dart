@@ -686,15 +686,12 @@ class ApiService {
     required String opponentTeamId,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/teams/challenges'),
+      Uri.parse('$baseUrl/teams/$challengerTeamId/challenge/$opponentTeamId'),
       headers: {
         'x-user-id': _userId ?? '',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({
-        'challengerTeamId': challengerTeamId,
-        'opponentTeamId': opponentTeamId,
-      }),
+      body: jsonEncode({}),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
       return true;
