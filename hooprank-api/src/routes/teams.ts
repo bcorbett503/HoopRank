@@ -35,6 +35,15 @@ router.post(
             [uid]
         );
 
+        // Check if team name already exists (case-insensitive)
+        const existingTeam = await pool.query(
+            `SELECT id FROM teams WHERE LOWER(name) = LOWER($1)`,
+            [name]
+        );
+        if (existingTeam.rowCount && existingTeam.rowCount > 0) {
+            return res.status(409).json({ error: "team_name_taken", message: "A team with this name already exists" });
+        }
+
         // Note: Team group chat will be implemented separately
         // The current threads table schema is designed for 1:1 chats (user_a, user_b)
         // Team group chats require a different approach

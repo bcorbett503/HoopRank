@@ -28,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _profilePosition; // Fresh position from API
   String? _profileCity; // Fresh city from API
   String? _profileHeight; // Fresh height from API
+  String? _profileTeam; // Fresh team from API
 
   @override
   void initState() {
@@ -77,7 +78,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _profilePosition = profileData['position']?.toString();
             _profileCity = profileData['city']?.toString();
             _profileHeight = profileData['height']?.toString();
-            debugPrint('Parsed _profileName: $_profileName');
+            _profileTeam = profileData['team']?.toString();
+            debugPrint('Parsed _profileName: $_profileName, _profileTeam: $_profileTeam');
           }
           _isLoading = false;
         });
@@ -156,7 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const SizedBox(height: 12),
                             Text(_profileName ?? player.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                            Text('${player.team ?? 'No Team'} • ${_profilePosition ?? player.position ?? 'Unknown'}', style: const TextStyle(color: Colors.grey)),
+                            Text('${_profileTeam ?? player.team ?? 'No Team'} • ${_profilePosition ?? player.position ?? 'Unknown'}', style: const TextStyle(color: Colors.grey)),
                             const SizedBox(height: 12),
                             // Current HoopRank
                             Container(
