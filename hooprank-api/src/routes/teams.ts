@@ -106,6 +106,7 @@ router.get(
                 matchesPlayed: t.matches_played,
                 wins: t.wins,
                 losses: t.losses,
+                logoUrl: t.logo_url || null,
                 threadId: t.thread_id,
                 isOwner: t.role === "owner",
                 memberCount: Number(t.member_count),
@@ -137,6 +138,7 @@ router.get(
                 name: t.name,
                 teamType: t.team_type,
                 rating: Number(t.rating),
+                logoUrl: t.logo_url || null,
                 ownerName: t.owner_name,
             }))
         );
