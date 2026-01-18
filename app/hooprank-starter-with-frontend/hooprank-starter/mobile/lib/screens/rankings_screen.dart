@@ -226,10 +226,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   }
 
   void _showInviteToTeamDialog(User player) async {
-    // Refresh my teams before showing dialog to catch newly created teams
-    if (_myTeams.isEmpty) {
-      await _fetchMyTeams();
-    }
+    // Always refresh teams to catch newly created ones
+    await _fetchMyTeams();
     
     // Filter to teams where user is owner and team isn't full
     final eligibleTeams = _myTeams.where((t) => t['isOwner'] == true).toList();
