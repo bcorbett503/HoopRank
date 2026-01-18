@@ -169,11 +169,13 @@ app.post("/upload", async (req, res) => {
     } else if (type === 'team') {
       // Verify user owns or is member of the team
       const { rows } = await pool.query(
-        "SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2",
+        `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2
+         UNION
+         SELECT 1 FROM teams WHERE id = $1 AND owner_id = $2`,
         [targetId, uid]
       );
       if (rows.length === 0) {
-        return res.status(403).json({ error: "Not a member of this team" });
+        return res.status(403).json({ error: "Not a member or owner of this team" });
       }
       await pool.query("UPDATE teams SET logo_url = $2 WHERE id = $1", [targetId, imageData]);
       console.log(`Updated logo for team ${targetId}`);

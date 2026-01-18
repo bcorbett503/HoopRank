@@ -181,6 +181,7 @@ router.get(
             matchesPlayed: team.matches_played,
             wins: team.wins,
             losses: team.losses,
+            logoUrl: team.logo_url || null,
             threadId: team.thread_id,
             isOwner: team.my_role === "owner",
             isMember: !!team.my_role,
