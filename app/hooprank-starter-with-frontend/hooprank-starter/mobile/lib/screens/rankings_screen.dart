@@ -161,8 +161,16 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final rawTeams = (data['rankings'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        // Inject teamType from current filter if not present
+        final teamsWithType = rawTeams.map<Map<String, dynamic>>((t) {
+          if (t['teamType'] == null) {
+            return {...t, 'teamType': _teamFilter};
+          }
+          return t;
+        }).toList();
         setState(() {
-          _teams = (data['rankings'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          _teams = teamsWithType;
           _isLoadingTeams = false;
         });
       } else {
