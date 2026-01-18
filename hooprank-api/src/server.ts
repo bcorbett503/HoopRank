@@ -403,6 +403,17 @@ app.get(
     const wins = parseInt(u.wins || '0');
     const losses = matchesPlayed - wins;
 
+    // Get user's most recently joined team
+    const teamResult = await pool.query(`
+      SELECT t.name
+      FROM teams t
+      JOIN team_members tm ON tm.team_id = t.id
+      WHERE tm.user_id = $1 AND tm.status = 'accepted'
+      ORDER BY tm.joined_at DESC NULLS LAST
+      LIMIT 1
+    `, [userId]);
+    const teamName = teamResult.rows[0]?.name || null;
+
     res.json({
       id: u.id,
       name: u.name,
@@ -413,7 +424,7 @@ app.get(
       weight: u.weight,
       city: u.city,
       zip: u.zip,
-      team: null,
+      team: teamName,
       matchesPlayed,
       wins,
       losses,
@@ -445,6 +456,17 @@ app.get(
     const wins = parseInt(u.wins || '0');
     const losses = matchesPlayed - wins;
 
+    // Get user's most recently joined team
+    const teamResult = await pool.query(`
+      SELECT t.name
+      FROM teams t
+      JOIN team_members tm ON tm.team_id = t.id
+      WHERE tm.user_id = $1 AND tm.status = 'accepted'
+      ORDER BY tm.joined_at DESC NULLS LAST
+      LIMIT 1
+    `, [userId]);
+    const teamName = teamResult.rows[0]?.name || null;
+
     res.json({
       id: u.id,
       name: u.name,
@@ -455,7 +477,7 @@ app.get(
       weight: u.weight,
       city: u.city,
       zip: u.zip,
-      team: null,
+      team: teamName,
       matchesPlayed,
       wins,
       losses,
