@@ -140,16 +140,20 @@ class ApiService {
   /// [type] - 'profile' or 'team'
   /// [targetId] - userId or teamId
   /// [imageFile] - the image file to upload
-  static Future<bool> uploadImage({
+  /// Returns null on success, or an error message on failure
+  static Future<String?> uploadImage({
     required String type,
     required String targetId,
     required File imageFile,
   }) async {
     try {
+      debugPrint('uploadImage: type=$type, targetId=$targetId, userId=$_userId');
       final bytes = await imageFile.readAsBytes();
+      debugPrint('uploadImage: Read ${bytes.length} bytes from image');
       final base64Image = base64Encode(bytes);
       final mimeType = imageFile.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
       final dataUrl = 'data:$mimeType;base64,$base64Image';
+      debugPrint('uploadImage: Base64 data URL length: ${dataUrl.length}');
       
       final response = await http.post(
         Uri.parse('$baseUrl/upload'),
@@ -164,16 +168,19 @@ class ApiService {
         }),
       );
       
+      debugPrint('uploadImage: Response status=${response.statusCode}');
+      debugPrint('uploadImage: Response body=${response.body}');
+      
       if (response.statusCode == 200) {
         debugPrint('Image uploaded successfully for $type: $targetId');
-        return true;
+        return null; // Success
       } else {
-        debugPrint('Upload failed: ${response.body}');
-        return false;
+        debugPrint('Upload failed: status=${response.statusCode}, body=${response.body}');
+        return 'Status ${response.statusCode}: ${response.body}';
       }
     } catch (e) {
       debugPrint('Upload error: $e');
-      return false;
+      return 'Error: $e';
     }
   }
 

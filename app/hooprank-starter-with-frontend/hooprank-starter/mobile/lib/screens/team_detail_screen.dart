@@ -29,6 +29,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     setState(() => _isLoading = true);
     try {
       final team = await ApiService.getTeamDetail(widget.teamId);
+      debugPrint('Team loaded: logoUrl = ${team?['logoUrl']}');
       if (mounted) {
         setState(() {
           _team = team;
@@ -65,17 +66,25 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       final picker = ImagePicker();
       final picked = await picker.pickImage(source: source);
       if (picked != null) {
-        // Upload the image
-        final success = await ApiService.uploadImage(
+        debugPrint('Team logo: Picked image at ${picked.path}');
+        // Upload the image - returns null on success, error message on failure
+        final error = await ApiService.uploadImage(
           type: 'team',
           targetId: widget.teamId,
           imageFile: File(picked.path),
         );
-        if (success && mounted) {
-          _loadTeam(); // Refresh to show new logo
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Team logo updated!')),
-          );
+        debugPrint('Team logo: Upload error = $error');
+        if (mounted) {
+          if (error == null) {
+            _loadTeam(); // Refresh to show new logo
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Team logo updated!')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Upload failed: $error'), backgroundColor: Colors.red, duration: const Duration(seconds: 8)),
+            );
+          }
         }
       }
     }

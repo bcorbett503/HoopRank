@@ -135,13 +135,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (userId != null && playerId != null) {
       // Upload image if a new one was selected
       if (_imageFile != null) {
-        final uploaded = await ApiService.uploadImage(
+        final error = await ApiService.uploadImage(
           type: 'profile',
           targetId: userId,
           imageFile: _imageFile!,
         );
-        if (uploaded) {
+        if (error == null) {
           debugPrint('Profile photo uploaded successfully');
+        } else {
+          debugPrint('Profile photo upload failed: $error');
         }
       }
       
