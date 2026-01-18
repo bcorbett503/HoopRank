@@ -67,7 +67,9 @@ class AuthState extends ChangeNotifier {
   Future<void> refreshUser() async {
     if (_currentUser == null) return;
     try {
+      debugPrint('Refreshing user data...');
       final updatedUser = await ApiService.getMe();
+      debugPrint('Got updated user: ${updatedUser?.name}');
       if (updatedUser != null) {
         _currentUser = updatedUser;
         notifyListeners();
@@ -83,6 +85,7 @@ class AuthState extends ChangeNotifier {
           'rating': updatedUser.rating,
           'matchesPlayed': updatedUser.matchesPlayed,
         }));
+        debugPrint('User state updated to: ${_currentUser?.name}');
       }
     } catch (e) {
       debugPrint('Failed to refresh user: $e');

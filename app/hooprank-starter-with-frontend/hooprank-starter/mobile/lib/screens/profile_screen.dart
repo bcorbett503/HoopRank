@@ -24,6 +24,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _matchesPlayed = 0;
   int _wins = 0;
   int _losses = 0;
+  String? _profileName; // Fresh name from API
+  String? _profilePosition; // Fresh position from API
+  String? _profileCity; // Fresh city from API
+  String? _profileHeight; // Fresh height from API
 
   @override
   void initState() {
@@ -33,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadData() async {
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    debugPrint('Loading profile for userId: $userId');
     if (userId == null) return;
 
     setState(() => _isLoading = true);
@@ -47,6 +52,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) {
         final profileData = results[3] as Map<String, dynamic>?;
+        debugPrint('Profile data loaded: $profileData');
+        debugPrint('Profile name from API: ${profileData?['name']}');
         setState(() {
           _stats = results[0] as Map<String, dynamic>?;
           _history = (results[1] as List<Map<String, dynamic>>?) ?? [];
@@ -65,6 +72,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _losses = (profileData['losses'] is num) 
                 ? (profileData['losses'] as num).toInt() 
                 : int.tryParse(profileData['losses']?.toString() ?? '') ?? 0;
+            // Parse profile info
+            _profileName = profileData['name']?.toString();
+            _profilePosition = profileData['position']?.toString();
+            _profileCity = profileData['city']?.toString();
+            _profileHeight = profileData['height']?.toString();
+            debugPrint('Parsed _profileName: $_profileName');
           }
           _isLoading = false;
         });
@@ -136,14 +149,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   : null,
                               child: player.photoUrl == null
                                   ? Text(
-                                      player.name.isNotEmpty ? player.name[0] : '?',
+                                      (_profileName ?? player.name).isNotEmpty ? (_profileName ?? player.name)[0] : '?',
                                       style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
                                     )
                                   : null,
                             ),
                             const SizedBox(height: 12),
-                            Text(player.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                            Text('${player.team ?? 'No Team'} • ${player.position ?? 'Unknown'}', style: const TextStyle(color: Colors.grey)),
+                            Text(_profileName ?? player.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                            Text('${player.team ?? 'No Team'} • ${_profilePosition ?? player.position ?? 'Unknown'}', style: const TextStyle(color: Colors.grey)),
                             const SizedBox(height: 12),
                             // Current HoopRank
                             Container(
