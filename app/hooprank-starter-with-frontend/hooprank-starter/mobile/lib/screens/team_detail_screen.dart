@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -88,6 +89,21 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
         }
       }
     }
+  }
+
+  /// Helper to get image provider from logo URL (handles base64 data URLs and http URLs)
+  ImageProvider _getLogoImage(String logoUrl) {
+    if (logoUrl.startsWith('data:')) {
+      // It's a base64 data URL like "data:image/jpeg;base64,/9j/4AAQ..."
+      final parts = logoUrl.split(',');
+      if (parts.length == 2) {
+        final base64Data = parts[1];
+        final bytes = base64Decode(base64Data);
+        return MemoryImage(bytes);
+      }
+    }
+    // Fallback to NetworkImage for regular URLs
+    return NetworkImage(logoUrl);
   }
 
   Future<void> _leaveTeam() async {
@@ -226,7 +242,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                               border: Border.all(color: Colors.white, width: 3),
                               image: team['logoUrl'] != null
                                   ? DecorationImage(
-                                      image: NetworkImage(team['logoUrl']),
+                                      image: _getLogoImage(team['logoUrl']),
                                       fit: BoxFit.cover,
                                     )
                                   : null,
