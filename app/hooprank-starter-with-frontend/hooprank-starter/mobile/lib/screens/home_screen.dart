@@ -1199,15 +1199,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         final result = await ApiService.acceptTeamChallenge(matchId);
                                         _loadTeamChallenges();
                                         
-                                        // Navigate to team match setup
-                                        if (mounted && result != null) {
-                                          // For team matches, navigate to score entry directly
-                                          context.push('/match/setup', extra: {
-                                            'matchId': matchId,
-                                            'matchType': matchType,
-                                            'opponentTeamName': otherTeamName,
-                                            'isTeamMatch': true,
-                                          });
+                                        // Set up MatchState for team match
+                                        if (mounted && result) {
+                                          final matchState = Provider.of<MatchState>(context, listen: false);
+                                          matchState.reset();
+                                          matchState.matchId = matchId;
+                                          matchState.mode = matchType;
+                                          // For received challenges: user is opponent team, other is challenger
+                                          final myTeam = opponentTeam; // User received the challenge
+                                          matchState.myTeamName = myTeam?['name'] ?? 'Your Team';
+                                          matchState.opponentTeamName = otherTeamName;
+                                          
+                                          // Navigate to match setup for team match
+                                          context.push('/match/setup');
                                         }
                                       } catch (e) {
                                         ScaffoldMessenger.of(context).showSnackBar(

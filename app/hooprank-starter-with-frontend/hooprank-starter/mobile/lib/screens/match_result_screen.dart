@@ -72,7 +72,13 @@ class MatchResultScreen extends StatelessWidget {
                       '${r.userScore} — ${r.oppScore}',
                       style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
                     ),
-                    Text('${me?.name ?? 'You'} vs ${opp?.name ?? 'Opponent'}', style: const TextStyle(color: Colors.grey)),
+                    // For team matches, show team names; for 1v1, show player names
+                    Text(
+                      isTeamMatch 
+                          ? '${r.myTeamName ?? 'Your Team'} vs ${r.opponentTeamName ?? 'Opponent Team'}'
+                          : '${me?.name ?? 'You'} vs ${opp?.name ?? 'Opponent'}',
+                      style: const TextStyle(color: Colors.grey),
+                    ),
                   ],
                 ),
               ),

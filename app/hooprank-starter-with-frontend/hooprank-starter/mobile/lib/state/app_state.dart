@@ -137,6 +137,10 @@ class MatchState extends ChangeNotifier {
   Court? court;
   String mode = '1v1';
   String? matchId; // Backend match ID
+  
+  // Team match info
+  String? myTeamName;
+  String? opponentTeamName;
 
   // Live
   DateTime? startedAt;
@@ -220,6 +224,8 @@ class MatchState extends ChangeNotifier {
     court = null;
     mode = '1v1';
     matchId = null;
+    myTeamName = null;
+    opponentTeamName = null;
     startedAt = null;
     seconds = 0;
     active = false;
