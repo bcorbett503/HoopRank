@@ -726,6 +726,10 @@ app.get(
       });
     } else {
       // Team rankings (3v3 or 5v5)
+      // Get user ID to exclude user's own teams
+      const uid = req.headers["x-user-id"] as string | undefined;
+
+      // Exclude teams where user is owner or accepted member
       const result = await pool.query(
         `SELECT t.id, t.name, t.rating, t.matches_played, t.wins, t.losses,
            (SELECT COUNT(*) FROM team_members WHERE team_id = t.id AND status = 'accepted') as member_count,
@@ -733,9 +737,13 @@ app.get(
          FROM teams t
          JOIN users u ON u.id = t.owner_id
          WHERE t.team_type = $1
+           AND ($4::text IS NULL OR t.owner_id != $4)
+           AND ($4::text IS NULL OR t.id NOT IN (
+             SELECT team_id FROM team_members WHERE user_id = $4 AND status = 'accepted'
+           ))
          ORDER BY t.rating DESC, t.name ASC
          LIMIT $2 OFFSET $3`,
-        [mode, limit, offset]
+        [mode, limit, offset, uid || null]
       );
 
       res.json({

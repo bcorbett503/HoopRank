@@ -495,6 +495,21 @@ router.post(
 
         const teamType = teamResult.rows[0].team_type;
 
+        // Cannot challenge your own team
+        if (id === opponentTeamId) {
+            return res.status(400).json({ error: "cannot_challenge_own_team", message: "You cannot challenge your own team" });
+        }
+
+        // Check if user is on the opponent team (owner or member)
+        const memberCheck = await pool.query(
+            `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 AND status = 'accepted'
+             UNION SELECT 1 FROM teams WHERE id = $1 AND owner_id = $2`,
+            [opponentTeamId, uid]
+        );
+        if (memberCheck.rowCount && memberCheck.rowCount > 0) {
+            return res.status(400).json({ error: "cannot_challenge_own_team", message: "You cannot challenge a team you're on" });
+        }
+
         // Verify opponent team exists and is same type
         const opponentResult = await pool.query(
             `SELECT team_type, owner_id FROM teams WHERE id = $1`,
