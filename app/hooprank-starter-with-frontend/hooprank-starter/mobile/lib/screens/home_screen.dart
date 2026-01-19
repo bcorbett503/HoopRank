@@ -1196,11 +1196,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   child: ElevatedButton(
                                     onPressed: () async {
                                       try {
-                                        await ApiService.acceptTeamChallenge(matchId);
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Accepted challenge from $otherTeamName!')),
-                                        );
+                                        final result = await ApiService.acceptTeamChallenge(matchId);
                                         _loadTeamChallenges();
+                                        
+                                        // Navigate to team match setup
+                                        if (mounted && result != null) {
+                                          // For team matches, navigate to score entry directly
+                                          context.push('/match/setup', extra: {
+                                            'matchId': matchId,
+                                            'matchType': matchType,
+                                            'opponentTeamName': otherTeamName,
+                                            'isTeamMatch': true,
+                                          });
+                                        }
                                       } catch (e) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(content: Text('Error: $e')),

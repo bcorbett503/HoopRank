@@ -469,6 +469,19 @@ router.post(
             return res.status(400).json({ error: "team_type_mismatch" });
         }
 
+        // Check for existing pending challenge between these teams
+        const existingChallenge = await pool.query(
+            `SELECT id FROM matches 
+             WHERE status = 'challenge_pending'
+               AND match_type = $1
+               AND ((creator_team_id = $2 AND opponent_team_id = $3) 
+                    OR (creator_team_id = $3 AND opponent_team_id = $2))`,
+            [teamType, id, opponentTeamId]
+        );
+        if (existingChallenge.rowCount && existingChallenge.rowCount > 0) {
+            return res.status(409).json({ error: "challenge_already_pending", message: "A challenge is already pending between these teams" });
+        }
+
         // Create challenge as a match with pending status
         const matchResult = await pool.query(
             `INSERT INTO matches (
