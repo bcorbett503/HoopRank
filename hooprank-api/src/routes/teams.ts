@@ -460,9 +460,9 @@ router.post(
             }
 
             await pool.query(
-                `INSERT INTO messages (thread_id, sender_id, content, message_type, match_id)
-                 VALUES ($1, $2, $3, 'team_challenge', $4)`,
-                [threadId, uid, message, matchResult.rows[0].id]
+                `INSERT INTO messages (thread_id, from_id, to_id, body)
+                 VALUES ($1, $2, $3, $4)`,
+                [threadId, uid, opponentResult.rows[0].owner_id, `[Team Challenge] ${message}`]
             );
         }
 
