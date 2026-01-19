@@ -338,11 +338,13 @@ app.get(
     );
 
     if (userResult.rowCount === 0 || !userResult.rows[0].lat || !userResult.rows[0].lng) {
+      console.log(`[nearby] User ${uid} has no lat/lng, returning empty`);
       return res.json([]); // No location available
     }
 
     const { lat, lng } = userResult.rows[0];
     const radiusMeters = radiusMiles * 1609.34;
+    console.log(`[nearby] User ${uid} at lat=${lat}, lng=${lng}, radius=${radiusMeters}m`);
 
     const r = await pool.query(`
       SELECT id, name, avatar_url, hoop_rank, city, position, lat, lng, games_played, games_contested
@@ -358,6 +360,8 @@ app.get(
       ORDER BY hoop_rank DESC
       LIMIT 100
     `, [uid, lat, lng, radiusMeters]);
+
+    console.log(`[nearby] Found ${r.rows.length} nearby users:`, r.rows.map(u => `${u.name} at ${u.lat},${u.lng}`));
 
     const users = r.rows.map(row => {
       const gamesPlayed = row.games_played || 0;
