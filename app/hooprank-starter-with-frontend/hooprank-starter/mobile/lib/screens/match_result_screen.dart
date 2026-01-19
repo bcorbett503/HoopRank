@@ -76,12 +76,17 @@ class MatchResultScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             // Rating section - show estimated or actual
+            // For team matches, show "Team Rating" label
+            final isTeamMatch = r.mode == '3v3' || r.mode == '5v5';
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    const Text('Your HoopRank', style: TextStyle(color: Colors.grey)),
+                    Text(
+                      isTeamMatch ? 'Team Rating (${r.mode})' : 'Your HoopRank',
+                      style: const TextStyle(color: Colors.grey),
+                    ),
                     const SizedBox(height: 8),
                     if (hasRatingChange) ...[
                       // Show actual rating change after confirmation
