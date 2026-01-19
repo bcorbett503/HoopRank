@@ -17,6 +17,10 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
   bool _isSubmitting = false;
   String? _error;
 
+  bool _isTeamMatch(MatchState match) {
+    return match.mode == '3v3' || match.mode == '5v5';
+  }
+
   Future<void> _submit() async {
     final userScore = int.tryParse(_userScoreCtrl.text);
     final oppScore = int.tryParse(_oppScoreCtrl.text);
@@ -29,6 +33,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     final match = context.read<MatchState>();
     final auth = context.read<AuthState>();
     final matchId = match.matchId;
+    final isTeamMatch = _isTeamMatch(match);
     
     if (matchId == null) {
       // Fallback to mock flow if no match ID
@@ -42,33 +47,56 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     });
 
     try {
-      // Submit score to backend
-      final result = await ApiService.submitScore(
-        matchId: matchId,
-        myScore: userScore,
-        opponentScore: oppScore,
-      );
+      if (isTeamMatch) {
+        // Submit team match score - uses team endpoint that updates team ratings
+        await ApiService.submitTeamScore(
+          matchId: matchId,
+          myTeamScore: userScore,
+          opponentTeamScore: oppScore,
+        );
+        
+        if (!mounted) return;
+        match.setScores(userScore, oppScore);
+        
+        // For team matches, just show estimated rating change
+        // The actual team rating update happens on the backend
+        final won = userScore > oppScore;
+        final delta = won ? 0.1 : -0.1;
+        match.setOutcome(
+          deltaVal: delta,
+          rBefore: 3.0,
+          rAfter: 3.0 + delta,
+          rkBefore: 0,
+          rkAfter: 0,
+        );
+      } else {
+        // Submit 1v1 score
+        await ApiService.submitScore(
+          matchId: matchId,
+          myScore: userScore,
+          opponentScore: oppScore,
+        );
 
-      if (!mounted) return;
+        if (!mounted) return;
+        match.setScores(userScore, oppScore);
 
-      match.setScores(userScore, oppScore);
-
-      // Get updated rating from backend
-      final userId = auth.currentUser?.id;
-      if (userId != null) {
-        final ratingInfo = await ApiService.getUserRating(userId);
-        if (ratingInfo != null && mounted) {
-          final newRating = (ratingInfo['hoopRank'] as num?)?.toDouble() ?? 3.0;
-          final oldRating = auth.currentUser?.rating ?? 3.0;
-          final delta = newRating - oldRating;
-          
-          match.setOutcome(
-            deltaVal: delta,
-            rBefore: oldRating,
-            rAfter: newRating,
-            rkBefore: 0, // Will be calculated on backend
-            rkAfter: 0,
-          );
+        // Get updated user rating from backend
+        final userId = auth.currentUser?.id;
+        if (userId != null) {
+          final ratingInfo = await ApiService.getUserRating(userId);
+          if (ratingInfo != null && mounted) {
+            final newRating = (ratingInfo['hoopRank'] as num?)?.toDouble() ?? 3.0;
+            final oldRating = auth.currentUser?.rating ?? 3.0;
+            final delta = newRating - oldRating;
+            
+            match.setOutcome(
+              deltaVal: delta,
+              rBefore: oldRating,
+              rAfter: newRating,
+              rkBefore: 0,
+              rkAfter: 0,
+            );
+          }
         }
       }
 
@@ -88,20 +116,18 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     final match = context.read<MatchState>();
     final auth = context.read<AuthState>();
     final me = auth.currentUser;
-    final opp = match.opponent;
-
-    if (me == null || opp == null) return;
 
     match.setScores(userScore, oppScore);
 
     // Simple mock delta calculation
     final won = userScore > oppScore;
     final delta = won ? 0.15 : -0.1;
+    final currentRating = me?.rating ?? 3.0;
     
     match.setOutcome(
       deltaVal: delta,
-      rBefore: me.rating,
-      rAfter: me.rating + delta,
+      rBefore: currentRating,
+      rAfter: currentRating + delta,
       rkBefore: 1,
       rkAfter: 1,
     );
@@ -115,6 +141,15 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     final auth = context.read<AuthState>();
     final me = auth.currentUser;
     final opp = match.opponent;
+    final isTeamMatch = _isTeamMatch(match);
+
+    // For team matches, show team names instead of player names
+    final myDisplayName = isTeamMatch 
+        ? (match.myTeamName ?? 'Your Team')
+        : (me?.name ?? 'You');
+    final oppDisplayName = isTeamMatch 
+        ? (match.opponentTeamName ?? 'Opponent Team')
+        : (opp?.name ?? 'Opponent');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Enter final score')),
@@ -122,6 +157,20 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Show match type indicator for team matches
+            if (isTeamMatch)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: match.mode == '3v3' ? Colors.blue.shade700 : Colors.purple.shade700,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  '${match.mode} Team Match',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
             if (_error != null)
               Container(
                 width: double.infinity,
@@ -141,8 +190,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         children: [
-                          const Text('You', style: TextStyle(color: Colors.grey)),
-                          Text(me?.name ?? 'You', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                          Text(isTeamMatch ? 'Your Team' : 'You', style: const TextStyle(color: Colors.grey)),
+                          Text(myDisplayName, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _userScoreCtrl,
@@ -162,8 +211,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         children: [
-                          const Text('Opponent', style: TextStyle(color: Colors.grey)),
-                          Text(opp?.name ?? 'Opponent', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                          Text(isTeamMatch ? 'Opponent Team' : 'Opponent', style: const TextStyle(color: Colors.grey)),
+                          Text(oppDisplayName, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _oppScoreCtrl,
