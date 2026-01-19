@@ -145,6 +145,45 @@ router.get(
     })
 );
 
+// =============================================================================
+// Team Challenges - MUST be before /teams/:id routes!
+// =============================================================================
+
+// GET /teams/challenges - Get pending team challenges for user
+router.get(
+    "/teams/challenges",
+    asyncH(async (req, res) => {
+        const uid = getUserId(req);
+
+        // Get challenges where user owns either the challenger or challenged team
+        const result = await pool.query(
+            `SELECT m.id, m.match_type, m.status, m.created_at,
+                    t1.id as challenger_team_id, t1.name as challenger_team_name, t1.owner_id as challenger_owner_id,
+                    t2.id as opponent_team_id, t2.name as opponent_team_name, t2.owner_id as opponent_owner_id,
+                    u.name as challenger_name
+             FROM matches m
+             JOIN teams t1 ON t1.id = m.creator_team_id
+             JOIN teams t2 ON t2.id = m.opponent_team_id
+             JOIN users u ON u.id = m.creator_id
+             WHERE m.status = 'challenge_pending'
+               AND (t1.owner_id = $1 OR t2.owner_id = $1)
+             ORDER BY m.created_at DESC`,
+            [uid]
+        );
+
+        res.json(result.rows.map(r => ({
+            matchId: r.id,
+            matchType: r.match_type,
+            status: r.status,
+            createdAt: r.created_at,
+            challengerTeam: { id: r.challenger_team_id, name: r.challenger_team_name },
+            opponentTeam: { id: r.opponent_team_id, name: r.opponent_team_name },
+            challengerName: r.challenger_name,
+            isSent: r.challenger_owner_id === uid,
+        })));
+    })
+);
+
 // GET /teams/:id - Get team details
 router.get(
     "/teams/:id",
@@ -471,41 +510,6 @@ router.post(
             teamType,
             createdAt: matchResult.rows[0].created_at,
         });
-    })
-);
-
-// GET /teams/challenges - Get pending team challenges for user
-router.get(
-    "/teams/challenges",
-    asyncH(async (req, res) => {
-        const uid = getUserId(req);
-
-        // Get challenges where user owns either the challenger or challenged team
-        const result = await pool.query(
-            `SELECT m.id, m.match_type, m.status, m.created_at,
-                    t1.id as challenger_team_id, t1.name as challenger_team_name, t1.owner_id as challenger_owner_id,
-                    t2.id as opponent_team_id, t2.name as opponent_team_name, t2.owner_id as opponent_owner_id,
-                    u.name as challenger_name
-             FROM matches m
-             JOIN teams t1 ON t1.id = m.creator_team_id
-             JOIN teams t2 ON t2.id = m.opponent_team_id
-             JOIN users u ON u.id = m.creator_id
-             WHERE m.status = 'challenge_pending'
-               AND (t1.owner_id = $1 OR t2.owner_id = $1)
-             ORDER BY m.created_at DESC`,
-            [uid]
-        );
-
-        res.json(result.rows.map(r => ({
-            matchId: r.id,
-            matchType: r.match_type,
-            status: r.status,
-            createdAt: r.created_at,
-            challengerTeam: { id: r.challenger_team_id, name: r.challenger_team_name },
-            opponentTeam: { id: r.opponent_team_id, name: r.opponent_team_name },
-            challengerName: r.challenger_name,
-            isSent: r.challenger_owner_id === uid,
-        })));
     })
 );
 

@@ -84,7 +84,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _loadTeamChallenges() async {
     try {
+      debugPrint('Loading team challenges for user: ${ApiService.userId}');
       final challenges = await ApiService.getTeamChallenges();
+      debugPrint('Team challenges received: ${challenges.length}');
+      debugPrint('Team challenges data: $challenges');
       if (mounted) {
         setState(() => _teamChallenges = challenges);
       }
