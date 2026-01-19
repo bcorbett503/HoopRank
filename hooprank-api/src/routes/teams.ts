@@ -58,15 +58,20 @@ router.post(
             });
         }
 
-        // Note: Team group chat will be implemented separately
-        // The current threads table schema is designed for 1:1 chats (user_a, user_b)
-        // Team group chats require a different approach
+        // Create group chat thread for the team
+        const threadResult = await pool.query(
+            `INSERT INTO threads (is_group, group_name)
+             VALUES (true, $1)
+             RETURNING id`,
+            [`${name} (${teamType})`]
+        );
+        const threadId = threadResult.rows[0].id;
 
         const result = await pool.query(
-            `INSERT INTO teams (owner_id, name, team_type)
-       VALUES ($1, $2, $3)
+            `INSERT INTO teams (owner_id, name, team_type, thread_id)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, name, team_type, rating, mmr, matches_played, wins, losses, thread_id, created_at`,
-            [uid, name, teamType]
+            [uid, name, teamType, threadId]
         );
 
         const team = result.rows[0];
@@ -76,6 +81,19 @@ router.post(
             `INSERT INTO team_members (team_id, user_id, role, status, joined_at)
        VALUES ($1, $2, 'owner', 'accepted', now())`,
             [team.id, uid]
+        );
+
+        // Add owner to thread participants
+        await pool.query(
+            `INSERT INTO thread_participants (thread_id, user_id)
+             VALUES ($1, $2)`,
+            [threadId, uid]
+        );
+
+        // Update thread with team_id
+        await pool.query(
+            `UPDATE threads SET team_id = $1 WHERE id = $2`,
+            [team.id, threadId]
         );
 
         res.status(201).json({
@@ -769,5 +787,110 @@ router.post(
         });
     })
 );
+// =============================================================================
+// Team Group Chat
+// =============================================================================
+
+// GET /teams/:id/messages - Get team chat messages
+router.get(
+    "/teams/:id/messages",
+    asyncH(async (req, res) => {
+        const { id } = req.params;
+        const uid = getUserId(req);
+
+        // Verify user is a team member
+        const memberCheck = await pool.query(
+            `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 AND status = 'accepted'`,
+            [id, uid]
+        );
+        if (memberCheck.rowCount === 0) {
+            return res.status(403).json({ error: "not_team_member" });
+        }
+
+        // Get thread_id for this team
+        const teamResult = await pool.query(
+            `SELECT thread_id FROM teams WHERE id = $1`,
+            [id]
+        );
+        if (!teamResult.rows[0]?.thread_id) {
+            return res.json([]); // No thread yet
+        }
+        const threadId = teamResult.rows[0].thread_id;
+
+        // Get messages with sender info
+        const messagesResult = await pool.query(
+            `SELECT m.id, m.from_id as "senderId", m.body as content, m.created_at as "createdAt",
+                    u.name as "senderName", u.avatar_url as "senderPhotoUrl"
+             FROM messages m
+             JOIN users u ON u.id = m.from_id
+             WHERE m.thread_id = $1
+             ORDER BY m.created_at ASC
+             LIMIT 100`,
+            [threadId]
+        );
+
+        res.json(messagesResult.rows);
+    })
+);
+
+// POST /teams/:id/messages - Send message to team chat
+const TeamMessageSchema = z.object({
+    content: z.string().min(1).max(2000),
+});
+
+router.post(
+    "/teams/:id/messages",
+    asyncH(async (req, res) => {
+        const { id } = req.params;
+        const uid = getUserId(req);
+        const { content } = TeamMessageSchema.parse(req.body);
+
+        // Verify user is a team member
+        const memberCheck = await pool.query(
+            `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 AND status = 'accepted'`,
+            [id, uid]
+        );
+        if (memberCheck.rowCount === 0) {
+            return res.status(403).json({ error: "not_team_member" });
+        }
+
+        // Get thread_id for this team
+        const teamResult = await pool.query(
+            `SELECT thread_id FROM teams WHERE id = $1`,
+            [id]
+        );
+        if (!teamResult.rows[0]?.thread_id) {
+            return res.status(400).json({ error: "no_team_thread" });
+        }
+        const threadId = teamResult.rows[0].thread_id;
+
+        // Insert message (to_id is null for group messages)
+        const messageResult = await pool.query(
+            `INSERT INTO messages (thread_id, from_id, body)
+             VALUES ($1, $2, $3)
+             RETURNING id, from_id as "senderId", body as content, created_at as "createdAt"`,
+            [threadId, uid, content]
+        );
+
+        // Update thread last_message_at
+        await pool.query(
+            `UPDATE threads SET last_message_at = now() WHERE id = $1`,
+            [threadId]
+        );
+
+        // Get sender info
+        const userResult = await pool.query(
+            `SELECT name, avatar_url FROM users WHERE id = $1`,
+            [uid]
+        );
+
+        res.status(201).json({
+            ...messageResult.rows[0],
+            senderName: userResult.rows[0]?.name,
+            senderPhotoUrl: userResult.rows[0]?.avatar_url,
+        });
+    })
+);
 
 export default router;
+

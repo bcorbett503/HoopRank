@@ -2002,6 +2002,38 @@ app.delete(
   })
 );
 
+// GET /messages/team-chats - Get user's team chat threads
+app.get(
+  "/messages/team-chats",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+
+    // Get teams the user is an accepted member of, with their thread info
+    const result = await pool.query(
+      `SELECT t.id as team_id, t.name as team_name, t.team_type, t.thread_id,
+              th.last_message_at,
+              (SELECT m.body FROM messages m WHERE m.thread_id = th.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
+              (SELECT u.name FROM messages m JOIN users u ON u.id = m.from_id WHERE m.thread_id = th.id ORDER BY m.created_at DESC LIMIT 1) as last_sender_name
+       FROM teams t
+       JOIN team_members tm ON tm.team_id = t.id
+       LEFT JOIN threads th ON th.id = t.thread_id
+       WHERE tm.user_id = $1 AND tm.status = 'accepted'
+       ORDER BY th.last_message_at DESC NULLS LAST`,
+      [uid]
+    );
+
+    res.json(result.rows.map(row => ({
+      teamId: row.team_id,
+      teamName: row.team_name,
+      teamType: row.team_type,
+      threadId: row.thread_id,
+      lastMessage: row.last_message || null,
+      lastSenderName: row.last_sender_name || null,
+      lastMessageAt: row.last_message_at || null,
+    })));
+  })
+);
+
 // GET /messages/conversations/:userId
 app.get(
   "/messages/conversations/:userId",
