@@ -35,6 +35,9 @@ class MatchResultScreen extends StatelessWidget {
     
     // Check if we have rating change data (only after opponent confirms)
     final hasRatingChange = r.delta != null && r.ratingAfter != null;
+    
+    // Detect team matches for proper rating label
+    final isTeamMatch = r.mode == '3v3' || r.mode == '5v5';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Result')),
@@ -77,7 +80,6 @@ class MatchResultScreen extends StatelessWidget {
             const SizedBox(height: 16),
             // Rating section - show estimated or actual
             // For team matches, show "Team Rating" label
-            final isTeamMatch = r.mode == '3v3' || r.mode == '5v5';
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
