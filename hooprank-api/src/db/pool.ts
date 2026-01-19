@@ -12,6 +12,27 @@ export const pool = new Pool({
     connectionTimeoutMillis: 5000, // Increased from 2000 for reliability
 });
 
+// Auto-migration: Add missing columns on startup (runs once)
+let migrationRan = false;
+export async function runAutoMigrations() {
+    if (migrationRan) return;
+    migrationRan = true;
+    try {
+        // Add score columns for team matches if they don't exist
+        await pool.query(`
+            ALTER TABLE matches 
+            ADD COLUMN IF NOT EXISTS score_creator INTEGER,
+            ADD COLUMN IF NOT EXISTS score_opponent INTEGER
+        `);
+        console.log("Auto-migration: score columns checked/added");
+    } catch (e) {
+        console.error("Auto-migration failed (non-fatal):", e);
+    }
+}
+
+// Run migration on pool initialization
+runAutoMigrations().catch(() => { });
+
 
 // Transaction helper for atomic operations
 export async function withTx<T>(fn: (c: import("pg").PoolClient) => Promise<T>): Promise<T> {
