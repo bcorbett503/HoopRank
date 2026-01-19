@@ -44,6 +44,20 @@ router.post(
             return res.status(409).json({ error: "team_name_taken", message: `A ${teamType} team with this name already exists` });
         }
 
+        // Check if user is already on a team of this type (owner or member)
+        const existingMembership = await pool.query(
+            `SELECT t.id, t.name FROM teams t
+             JOIN team_members tm ON tm.team_id = t.id
+             WHERE tm.user_id = $1 AND t.team_type = $2 AND tm.status = 'accepted'`,
+            [uid, teamType]
+        );
+        if (existingMembership.rowCount && existingMembership.rowCount > 0) {
+            return res.status(409).json({
+                error: "already_on_team",
+                message: `You are already on a ${teamType} team: ${existingMembership.rows[0].name}. Leave that team first.`
+            });
+        }
+
         // Note: Team group chat will be implemented separately
         // The current threads table schema is designed for 1:1 chats (user_a, user_b)
         // Team group chats require a different approach
@@ -317,6 +331,30 @@ router.post(
     asyncH(async (req, res) => {
         const { id } = req.params;
         const uid = getUserId(req);
+
+        // Get the team type first
+        const teamTypeResult = await pool.query(
+            `SELECT team_type FROM teams WHERE id = $1`,
+            [id]
+        );
+        if (teamTypeResult.rowCount === 0) {
+            return res.status(404).json({ error: "team_not_found" });
+        }
+        const teamType = teamTypeResult.rows[0].team_type;
+
+        // Check if user is already on a team of this type
+        const existingMembership = await pool.query(
+            `SELECT t.id, t.name FROM teams t
+             JOIN team_members tm ON tm.team_id = t.id
+             WHERE tm.user_id = $1 AND t.team_type = $2 AND tm.status = 'accepted'`,
+            [uid, teamType]
+        );
+        if (existingMembership.rowCount && existingMembership.rowCount > 0) {
+            return res.status(409).json({
+                error: "already_on_team",
+                message: `You are already on a ${teamType} team: ${existingMembership.rows[0].name}. Leave that team first.`
+            });
+        }
 
         const result = await pool.query(
             `UPDATE team_members 
