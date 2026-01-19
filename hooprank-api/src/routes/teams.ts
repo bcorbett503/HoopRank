@@ -685,79 +685,60 @@ router.post(
         const winnerId = creatorScore > opponentScore ? match.creator_id : match.opponent_id;
         const winnerTeamId = creatorScore > opponentScore ? match.creator_team_id : match.opponent_team_id;
 
-        // If already has a score submission, check if it matches for confirmation
-        if (match.score_creator !== null) {
-            // Second submission - check if scores match
-            if (match.score_creator === creatorScore && match.score_opponent === opponentScore) {
-                // Scores match - finalize the match and update team ratings
-                await pool.query(
-                    `UPDATE matches 
-                     SET status = 'completed', winner_id = $2, updated_at = now()
-                     WHERE id = $1`,
-                    [matchId, winnerId]
-                );
+        // Auto-complete match on first submission (MVP flow - no confirmation required)
+        // Update match status
+        await pool.query(
+            `UPDATE matches 
+             SET score_creator = $2, score_opponent = $3,
+                 status = 'completed', winner_id = $4, updated_at = now()
+             WHERE id = $1`,
+            [matchId, creatorScore, opponentScore, winnerId]
+        );
 
-                // Update team ratings using ELO-like system
-                const K = 32;
-                const creatorRating = Number(match.creator_rating);
-                const opponentRating = Number(match.opponent_rating);
+        // Update team ratings using ELO-like system
+        const K = 32;
+        const creatorRating = Number(match.creator_rating);
+        const opponentRating = Number(match.opponent_rating);
 
-                const expectedCreator = 1 / (1 + Math.pow(10, (opponentRating - creatorRating) / 400));
-                const actualCreator = creatorScore > opponentScore ? 1 : 0;
+        const expectedCreator = 1 / (1 + Math.pow(10, (opponentRating - creatorRating) / 400));
+        const actualCreator = creatorScore > opponentScore ? 1 : 0;
 
-                const creatorRatingChange = K * (actualCreator - expectedCreator);
-                const newCreatorRating = Math.max(0, Math.min(5, creatorRating + creatorRatingChange / 100));
-                const newOpponentRating = Math.max(0, Math.min(5, opponentRating - creatorRatingChange / 100));
+        const creatorRatingChange = K * (actualCreator - expectedCreator);
+        const newCreatorRating = Math.max(0, Math.min(5, creatorRating + creatorRatingChange / 100));
+        const newOpponentRating = Math.max(0, Math.min(5, opponentRating - creatorRatingChange / 100));
 
-                // Update creator team
-                await pool.query(
-                    `UPDATE teams SET 
-                        rating = $2,
-                        matches_played = matches_played + 1,
-                        wins = wins + $3,
-                        losses = losses + $4,
-                        updated_at = now()
-                     WHERE id = $1`,
-                    [match.creator_team_id, newCreatorRating, actualCreator, 1 - actualCreator]
-                );
+        // Update creator team
+        await pool.query(
+            `UPDATE teams SET 
+                rating = $2,
+                matches_played = matches_played + 1,
+                wins = wins + $3,
+                losses = losses + $4,
+                updated_at = now()
+             WHERE id = $1`,
+            [match.creator_team_id, newCreatorRating, actualCreator, 1 - actualCreator]
+        );
 
-                // Update opponent team
-                await pool.query(
-                    `UPDATE teams SET 
-                        rating = $2,
-                        matches_played = matches_played + 1,
-                        wins = wins + $3,
-                        losses = losses + $4,
-                        updated_at = now()
-                     WHERE id = $1`,
-                    [match.opponent_team_id, newOpponentRating, 1 - actualCreator, actualCreator]
-                );
+        // Update opponent team
+        await pool.query(
+            `UPDATE teams SET 
+                rating = $2,
+                matches_played = matches_played + 1,
+                wins = wins + $3,
+                losses = losses + $4,
+                updated_at = now()
+             WHERE id = $1`,
+            [match.opponent_team_id, newOpponentRating, 1 - actualCreator, actualCreator]
+        );
 
-                res.json({
-                    success: true,
-                    status: 'completed',
-                    winnerTeamId,
-                    creatorRatingChange: creatorRatingChange / 100,
-                });
-            } else {
-                // Scores don't match - mark as disputed
-                await pool.query(
-                    `UPDATE matches SET status = 'disputed', updated_at = now() WHERE id = $1`,
-                    [matchId]
-                );
-                res.json({ success: true, status: 'disputed' });
-            }
-        } else {
-            // First score submission
-            await pool.query(
-                `UPDATE matches 
-                 SET score_creator = $2, score_opponent = $3, 
-                     status = 'pending_confirmation', updated_at = now()
-                 WHERE id = $1`,
-                [matchId, creatorScore, opponentScore]
-            );
-            res.json({ success: true, status: 'pending_confirmation' });
-        }
+        res.json({
+            success: true,
+            status: 'completed',
+            winnerTeamId,
+            creatorRatingChange: creatorRatingChange / 100,
+            newCreatorRating,
+            newOpponentRating,
+        });
     })
 );
 
