@@ -246,6 +246,19 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     // Always refresh teams to catch newly created ones
     await _fetchMyTeams();
     
+    // Fetch player's existing team memberships
+    final playerTeams = await ApiService.getUserTeams(player.id);
+    final playerTeamTypes = playerTeams.map((t) => t['teamType'] as String?).toSet();
+    
+    // Check if player is already on both 3v3 and 5v5 teams
+    final hasAll3v3 = playerTeamTypes.contains('3v3');
+    final hasAll5v5 = playerTeamTypes.contains('5v5');
+    final playerIsOnBothTypes = hasAll3v3 && hasAll5v5;
+    
+    // Build team names string for message
+    final teamNamesList = playerTeams.map((t) => '${t['name']} (${t['teamType']})').toList();
+    final teamsMessage = teamNamesList.join(' and ');
+    
     // Filter to teams where user is owner and team isn't full
     final eligibleTeams = _myTeams.where((t) => t['isOwner'] == true).toList();
     
@@ -253,6 +266,15 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Create a team first to invite players')),
+      );
+      return;
+    }
+    
+    // If player is already on both team types, show message
+    if (playerIsOnBothTypes) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${player.name} is already on $teamsMessage')),
       );
       return;
     }
@@ -268,6 +290,16 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             itemCount: eligibleTeams.length,
             itemBuilder: (context, index) {
               final team = eligibleTeams[index];
+              final teamType = team['teamType'] as String?;
+              
+              // Check if player is already on a team of this type
+              final existingTeamOfType = playerTeams.firstWhere(
+                (t) => t['teamType'] == teamType,
+                orElse: () => <String, dynamic>{},
+              );
+              final isAlreadyOnTeamType = existingTeamOfType.isNotEmpty;
+              final existingTeamName = existingTeamOfType['name'] ?? '';
+              
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Padding(
@@ -296,29 +328,38 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                         ),
                       ),
                       ElevatedButton(
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          try {
-                            await ApiService.inviteToTeam(team['id'], player.id);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Invited ${player.name} to ${team['name']}!')),
-                              );
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Failed to invite: $e')),
-                              );
-                            }
-                          }
-                        },
+                        onPressed: isAlreadyOnTeamType
+                            ? () {
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('${player.name} is already on a $teamType team: $existingTeamName'),
+                                  ),
+                                );
+                              }
+                            : () async {
+                                Navigator.pop(ctx);
+                                try {
+                                  await ApiService.inviteToTeam(team['id'], player.id);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Invited ${player.name} to ${team['name']}!')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Failed to invite: $e')),
+                                    );
+                                  }
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepOrange,
+                          backgroundColor: isAlreadyOnTeamType ? Colors.grey : Colors.deepOrange,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         ),
-                        child: const Text('Invite'),
+                        child: Text(isAlreadyOnTeamType ? 'On Team' : 'Invite'),
                       ),
                     ],
                   ),

@@ -1,0 +1,304 @@
+﻿[32m[Nest] 15268  - [39m11/22/2025, 8:41:23 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 15268  - [39m11/22/2025, 8:41:23 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +10ms[39m
+[32m[Nest] 15268  - [39m11/22/2025, 8:41:23 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 15268  - [39m11/22/2025, 8:41:23 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 15268  - [39m11/22/2025, 8:41:23 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 15268  - [39m11/22/2025, 8:41:23 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[Firebase] Skipping initialization - using dev-token authentication
+[32m[Nest] 15268  - [39m11/22/2025, 8:41:23 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mFirebaseModule dependencies initialized[39m[38;5;3m +31ms[39m
+node : [31m[Nest] 15268 
+ - [39m11/22/2025, 
+8:41:23 PM [31m  
+ERROR[39m 
+[38;5;3m[TypeOrmModule] 
+[39m[31mUnable to 
+connect to the database. 
+Retrying (1)...[39m
+At line:1 char:1
++ node dist/main.js 2>&1 
+| Out-File -Encoding 
+utf8 error.txt
++ ~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo       
+       : NotSpecified:   
+  ([31m[Nest] 152...i   
+ ng (1)...[39m:Strin    
+g) [], RemoteExcepti    
+on
+    + FullyQualifiedErro 
+   rId : NativeCommandE  
+  rror
+ 
+Error: The server does 
+not support SSL 
+connections
+    at 
+Socket.<anonymous> (C:\Us
+ers\brett\OneDrive\Deskto
+p\WebWorking\HoopRank\app
+\hooprank-starter-with-fr
+ontend\hooprank-starter\b
+ackend\node_modules\pg\li
+b\connection.js:76:37)
+    at 
+Object.onceWrapper 
+(node:events:633:26)
+    at Socket.emit 
+(node:events:518:28)
+    at addChunk (node:int
+ernal/streams/readable:56
+1:12)
+    at readableAddChunkPu
+shByteMode (node:internal
+/streams/readable:512:3)
+    at Readable.push (nod
+e:internal/streams/readab
+le:392:5)
+    at TCP.onStreamRead (
+node:internal/stream_base
+_commons:189:23)
+[31m[Nest] 15268  - 
+[39m11/22/2025, 8:41:26 
+PM [31m  ERROR[39m 
+[38;5;3m[TypeOrmModule] 
+[39m[31mUnable to 
+connect to the database. 
+Retrying (2)...[39m
+Error: The server does 
+not support SSL 
+connections
+    at 
+Socket.<anonymous> (C:\Us
+ers\brett\OneDrive\Deskto
+p\WebWorking\HoopRank\app
+\hooprank-starter-with-fr
+ontend\hooprank-starter\b
+ackend\node_modules\pg\li
+b\connection.js:76:37)
+    at 
+Object.onceWrapper 
+(node:events:633:26)
+    at Socket.emit 
+(node:events:518:28)
+    at addChunk (node:int
+ernal/streams/readable:56
+1:12)
+    at readableAddChunkPu
+shByteMode (node:internal
+/streams/readable:512:3)
+    at Readable.push (nod
+e:internal/streams/readab
+le:392:5)
+    at TCP.onStreamRead (
+node:internal/stream_base
+_commons:189:23)
+[31m[Nest] 15268  - 
+[39m11/22/2025, 8:41:29 
+PM [31m  ERROR[39m 
+[38;5;3m[TypeOrmModule] 
+[39m[31mUnable to 
+connect to the database. 
+Retrying (3)...[39m
+Error: The server does 
+not support SSL 
+connections
+    at 
+Socket.<anonymous> (C:\Us
+ers\brett\OneDrive\Deskto
+p\WebWorking\HoopRank\app
+\hooprank-starter-with-fr
+ontend\hooprank-starter\b
+ackend\node_modules\pg\li
+b\connection.js:76:37)
+    at 
+Object.onceWrapper 
+(node:events:633:26)
+    at Socket.emit 
+(node:events:518:28)
+    at addChunk (node:int
+ernal/streams/readable:56
+1:12)
+    at readableAddChunkPu
+shByteMode (node:internal
+/streams/readable:512:3)
+    at Readable.push (nod
+e:internal/streams/readab
+le:392:5)
+    at TCP.onStreamRead (
+node:internal/stream_base
+_commons:189:23)
+[31m[Nest] 15268  - 
+[39m11/22/2025, 8:41:32 
+PM [31m  ERROR[39m 
+[38;5;3m[TypeOrmModule] 
+[39m[31mUnable to 
+connect to the database. 
+Retrying (4)...[39m
+Error: The server does 
+not support SSL 
+connections
+    at 
+Socket.<anonymous> (C:\Us
+ers\brett\OneDrive\Deskto
+p\WebWorking\HoopRank\app
+\hooprank-starter-with-fr
+ontend\hooprank-starter\b
+ackend\node_modules\pg\li
+b\connection.js:76:37)
+    at 
+Object.onceWrapper 
+(node:events:633:26)
+    at Socket.emit 
+(node:events:518:28)
+    at addChunk (node:int
+ernal/streams/readable:56
+1:12)
+    at readableAddChunkPu
+shByteMode (node:internal
+/streams/readable:512:3)
+    at Readable.push (nod
+e:internal/streams/readab
+le:392:5)
+    at TCP.onStreamRead (
+node:internal/stream_base
+_commons:189:23)
+[31m[Nest] 15268  - 
+[39m11/22/2025, 8:41:35 
+PM [31m  ERROR[39m 
+[38;5;3m[TypeOrmModule] 
+[39m[31mUnable to 
+connect to the database. 
+Retrying (5)...[39m
+Error: The server does 
+not support SSL 
+connections
+    at 
+Socket.<anonymous> (C:\Us
+ers\brett\OneDrive\Deskto
+p\WebWorking\HoopRank\app
+\hooprank-starter-with-fr
+ontend\hooprank-starter\b
+ackend\node_modules\pg\li
+b\connection.js:76:37)
+    at 
+Object.onceWrapper 
+(node:events:633:26)
+    at Socket.emit 
+(node:events:518:28)
+    at addChunk (node:int
+ernal/streams/readable:56
+1:12)
+    at readableAddChunkPu
+shByteMode (node:internal
+/streams/readable:512:3)
+    at Readable.push (nod
+e:internal/streams/readab
+le:392:5)
+    at TCP.onStreamRead (
+node:internal/stream_base
+_commons:189:23)
+[31m[Nest] 15268  - 
+[39m11/22/2025, 8:41:38 
+PM [31m  ERROR[39m 
+[38;5;3m[TypeOrmModule] 
+[39m[31mUnable to 
+connect to the database. 
+Retrying (6)...[39m
+Error: The server does 
+not support SSL 
+connections
+    at 
+Socket.<anonymous> (C:\Us
+ers\brett\OneDrive\Deskto
+p\WebWorking\HoopRank\app
+\hooprank-starter-with-fr
+ontend\hooprank-starter\b
+ackend\node_modules\pg\li
+b\connection.js:76:37)
+    at 
+Object.onceWrapper 
+(node:events:633:26)
+    at Socket.emit 
+(node:events:518:28)
+    at addChunk (node:int
+ernal/streams/readable:56
+1:12)
+    at readableAddChunkPu
+shByteMode (node:internal
+/streams/readable:512:3)
+    at Readable.push (nod
+e:internal/streams/readab
+le:392:5)
+    at TCP.onStreamRead (
+node:internal/stream_base
+_commons:189:23)
+[31m[Nest] 15268  - 
+[39m11/22/2025, 8:41:41 
+PM [31m  ERROR[39m 
+[38;5;3m[TypeOrmModule] 
+[39m[31mUnable to 
+connect to the database. 
+Retrying (7)...[39m
+Error: The server does 
+not support SSL 
+connections
+    at 
+Socket.<anonymous> (C:\Us
+ers\brett\OneDrive\Deskto
+p\WebWorking\HoopRank\app
+\hooprank-starter-with-fr
+ontend\hooprank-starter\b
+ackend\node_modules\pg\li
+b\connection.js:76:37)
+    at 
+Object.onceWrapper 
+(node:events:633:26)
+    at Socket.emit 
+(node:events:518:28)
+    at addChunk (node:int
+ernal/streams/readable:56
+1:12)
+    at readableAddChunkPu
+shByteMode (node:internal
+/streams/readable:512:3)
+    at Readable.push (nod
+e:internal/streams/readab
+le:392:5)
+    at TCP.onStreamRead (
+node:internal/stream_base
+_commons:189:23)
+[31m[Nest] 15268  - 
+[39m11/22/2025, 8:41:44 
+PM [31m  ERROR[39m 
+[38;5;3m[TypeOrmModule] 
+[39m[31mUnable to 
+connect to the database. 
+Retrying (8)...[39m
+Error: The server does 
+not support SSL 
+connections
+    at 
+Socket.<anonymous> (C:\Us
+ers\brett\OneDrive\Deskto
+p\WebWorking\HoopRank\app
+\hooprank-starter-with-fr
+ontend\hooprank-starter\b
+ackend\node_modules\pg\li
+b\connection.js:76:37)
+    at 
+Object.onceWrapper 
+(node:events:633:26)
+    at Socket.emit 
+(node:events:518:28)
+    at addChunk (node:int
+ernal/streams/readable:56
+1:12)
+    at readableAddChunkPu
+shByteMode (node:internal
+/streams/readable:512:3)
+    at Readable.push (nod
+e:internal/streams/readab
+le:392:5)
+    at TCP.onStreamRead (
+node:internal/stream_base
+_commons:189:23)

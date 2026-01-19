@@ -1,0 +1,17 @@
+[
+  {
+    "id": "m1",
+    "courtId": "c1",
+    "hostId": "u1",
+    "guestId": "u2",
+    "teamA": [
+      "u1"
+    ],
+    "teamB": [
+      "u2"
+    ],
+    "format": "1v1",
+    "status": "accepted",
+    "createdAt": "2025-09-01T10:00:00Z"
+  }
+]

@@ -1,0 +1,26 @@
+openapi: 3.0.3
+info:
+  title: HoopRank API
+  version: 0.1.1
+paths:
+  /api/v1/users/{id}:
+    get:
+      summary: Get user profile
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses: { '200': { description: OK } }
+  /api/v1/matches:
+    post:
+      summary: Create match (QR/direct invite)
+      responses: { '200': { description: OK } }
+  /api/v1/matches/{id}/accept:
+    post:
+      summary: Accept match
+      responses: { '200': { description: OK } }
+  /api/v1/matches/{id}/complete:
+    post:
+      summary: Complete match, returns provisional delta
+      responses: { '200': { description: OK } }

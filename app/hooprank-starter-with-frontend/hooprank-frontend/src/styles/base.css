@@ -1,0 +1,54 @@
+:root {
+  --brand: #ff6b00;
+  --brand-600: #ff6b00;
+  --brand-300: #ffae00;
+  --text: #0f172a;
+  --muted: #475569;
+  --bg: #ffffff;
+  --bg-elev: #ffffff;
+  --border: #e2e8f0;
+  --success: #16a34a;
+  --danger: #dc2626;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --text:#e5e7eb; --muted:#94a3b8; --bg:#0b1220; --bg-elev:#0f172a; --border:#1f2937; }
+}
+*{box-sizing:border-box} html,body,#root{height:100%}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,Apple Color Emoji,Segoe UI Emoji;background:radial-gradient(1200px 600px at 50% -20%, rgba(255,107,0,.08), transparent 60%),var(--bg);color:var(--text)}
+a{color:inherit;text-decoration:none} button{font:inherit}
+input,select{font:inherit;color:inherit;background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.container{max-width:1100px;margin:0 auto;padding:24px}
+.card{background:var(--bg-elev);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elev);cursor:pointer;transition:transform .02s ease, box-shadow .2s ease}
+.btn:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)} .btn:active{transform:translateY(1px)}
+.btn.primary{background:linear-gradient(180deg,var(--brand-300),var(--brand-600));color:#fff;border:none}
+.btn.ghost{background:transparent} .btn.block{width:100%}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-elev)}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:12px 10px;border-bottom:1px solid var(--border);text-align:left}
+.table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.hstack{display:flex;align-items:center;gap:12px} .vstack{display:flex;flex-direction:column;gap:12px}
+.muted{color:var(--muted)} .small{font-size:12px} .divider{height:1px;background:var(--border);margin:12px 0}
+.avatar{width:36px;height:36px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#fff;background:var(--brand-600)}
+.hero{padding:32px 0 16px 0} .hero h1{font-size:clamp(28px,4vw,40px);line-height:1.1;margin:0 0 12px 0}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-4{grid-column:span 4}.col-6{grid-column:span 6}
+@media (max-width:900px){.col-8{grid-column:span 12}.col-4{grid-column:span 12}.col-6{grid-column:span 12}}
+.navbar{position:sticky;top:0;z-index:50;backdrop-filter:saturate(1.2) blur(8px);background:color-mix(in srgb, var(--bg), transparent 5%);border-bottom:1px solid var(--border)}
+.navbar .inner{max-width:1100px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px;justify-content:space-between}
+.nav-links{display:flex;gap:14px;align-items:center} .nav-links a{padding:8px 10px;border-radius:10px}
+.nav-links a.active{background:var(--bg-elev);border:1px solid var(--border)}
+footer{padding:24px;text-align:center;color:var(--muted)}
+
+/* Play basketball button */
+.playball{width:120px;height:120px;border-radius:999px;border:none;background:radial-gradient(circle at 30% 30%,#ffae00 0%,#ff6b00 60%,#c84e00 100%);box-shadow:inset 0 0 0 2px rgba(0,0,0,.1),0 12px 24px rgba(0,0,0,.2);font-size:56px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .05s ease, box-shadow .2s ease;position:relative}
+.playball:hover{box-shadow:inset 0 0 0 2px rgba(0,0,0,.1),0 18px 36px rgba(0,0,0,.25)} .playball:active{transform:translateY(1px) scale(.99)}
+/* Hardwood style button */
+.btn.hardwood{background:linear-gradient(180deg,#c58c5a 0%,#8b5a2b 100%);color:#fff;border:1px solid rgba(0,0,0,.2);text-shadow:0 1px 0 rgba(0,0,0,.2)}
+.btn.hardwood:disabled{opacity:.5;cursor:not-allowed;box-shadow:none} .btn.hardwood:not(:disabled):hover{box-shadow:0 6px 18px rgba(139,90,43,.4)}
+/* Mini map */
+.mini-map{margin-top:8px;width:100%;height:120px;border-radius:10px;border:1px solid var(--border);background:linear-gradient(0deg,rgba(0,0,0,.05) 1px,transparent 1px) 0 0/100% 12px,linear-gradient(90deg,rgba(0,0,0,.05) 1px,transparent 1px) 0 0/12px 100%,linear-gradient(180deg,#dff1ff,#c1e1ff);position:relative}
+.mini-map .pin{position:absolute;left:18px;top:18px;width:10px;height:10px;border-radius:999px;background:var(--brand-600);box-shadow:0 0 0 8px rgba(255,107,0,.2)}
+/* SR only */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

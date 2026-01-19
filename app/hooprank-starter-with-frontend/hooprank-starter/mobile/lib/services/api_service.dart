@@ -632,6 +632,19 @@ class ApiService {
     return response.statusCode == 200;
   }
 
+  /// Get a user's team memberships (for checking before invite)
+  static Future<List<Map<String, dynamic>>> getUserTeams(String userId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/teams/user/$userId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data['teams'] ?? []);
+    }
+    return [];
+  }
+
   /// Remove member from team (owner only)
   static Future<bool> removeTeamMember(String teamId, String userId) async {
     final response = await http.delete(

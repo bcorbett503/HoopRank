@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "655663987178",
+    "project_id": "hooprank-503",
+    "storage_bucket": "hooprank-503.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:655663987178:android:0aeacd36cbca8c7479da93",
+        "android_client_info": {
+          "package_name": "beta.hooprank.android"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "655663987178-31df6cfq28rn2gikrnb7lmm1dg2t28d4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "beta.hooprank.android",
+            "certificate_hash": "5b6140c8497665304878d47a8d111633886d97b18"
+          }
+        },
+        {
+          "client_id": "655663987178-l56nacnq6dmas1qu3qjktt04nubqqpg7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtPMA0ze_BUhENT3zcjoLoIrrOeAVLCjo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "655663987178-l56nacnq6dmas1qu3qjktt04nubqqpg7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

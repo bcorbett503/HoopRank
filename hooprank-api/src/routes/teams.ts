@@ -159,6 +159,34 @@ router.get(
     })
 );
 
+// GET /teams/user/:userId - Get teams for a specific user (for checking before invite)
+router.get(
+    "/teams/user/:userId",
+    asyncH(async (req, res) => {
+        const { userId } = req.params;
+
+        // Get teams where user is owner or accepted member
+        const result = await pool.query(
+            `SELECT t.id, t.name, t.team_type, t.rating
+             FROM teams t
+             JOIN team_members tm ON tm.team_id = t.id
+             WHERE tm.user_id = $1 AND tm.status = 'accepted'
+             ORDER BY t.team_type`,
+            [userId]
+        );
+
+        res.json({
+            userId,
+            teams: result.rows.map((t) => ({
+                id: t.id,
+                name: t.name,
+                teamType: t.team_type,
+                rating: Number(t.rating),
+            })),
+        });
+    })
+);
+
 // =============================================================================
 // Team Challenges - MUST be before /teams/:id routes!
 // =============================================================================

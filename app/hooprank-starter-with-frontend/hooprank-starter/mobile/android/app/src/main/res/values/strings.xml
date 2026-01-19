@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HoopRank</string>
+    <string name="facebook_app_id">3166274956866749</string>
+    <string name="facebook_client_token">168dd1d311a34d0b17a15c48e616f9f7</string>
+    <string name="fb_login_protocol_scheme">fb3166274956866749</string>
+</resources>
