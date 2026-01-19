@@ -9,17 +9,19 @@
 import https from 'https';
 
 // In-memory cache for zip code lookups
-const zipCache: Map<string, { city: string; state: string; timestamp: number }> = new Map();
+const zipCache: Map<string, { city: string; state: string; lat: number; lng: number; timestamp: number }> = new Map();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface ZipLookupResult {
     city: string;
     state: string;
     stateAbbr: string;
+    lat: number;
+    lng: number;
 }
 
 /**
- * Look up city and state from a US zip code
+ * Look up city, state, and coordinates from a US zip code
  * Uses Zippopotam.us free API with caching
  */
 export async function lookupZipCode(zip: string): Promise<ZipLookupResult | null> {
@@ -35,6 +37,8 @@ export async function lookupZipCode(zip: string): Promise<ZipLookupResult | null
             city: cached.city,
             state: cached.state,
             stateAbbr: cached.state,
+            lat: cached.lat,
+            lng: cached.lng,
         };
     }
 
@@ -52,16 +56,23 @@ export async function lookupZipCode(zip: string): Promise<ZipLookupResult | null
                     const json = JSON.parse(data);
                     const place = json.places?.[0];
                     if (place) {
+                        const lat = parseFloat(place['latitude']) || 0;
+                        const lng = parseFloat(place['longitude']) || 0;
+
                         const result = {
                             city: place['place name'],
                             state: place['state'],
                             stateAbbr: place['state abbreviation'],
+                            lat,
+                            lng,
                         };
 
                         // Cache the result
                         zipCache.set(zipCode, {
                             city: result.city,
                             state: result.stateAbbr,
+                            lat,
+                            lng,
                             timestamp: Date.now(),
                         });
 
@@ -95,3 +106,4 @@ export async function lookupZipCode(zip: string): Promise<ZipLookupResult | null
 export function formatCityState(city: string, state: string): string {
     return `${city}, ${state}`;
 }
+

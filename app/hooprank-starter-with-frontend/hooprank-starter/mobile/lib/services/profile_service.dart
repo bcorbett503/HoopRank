@@ -7,7 +7,7 @@ import 'mock_data.dart';
 class ProfileData {
   final String firstName;
   final String lastName;
-  final int age;
+  final DateTime? birthdate;
   final String zip;
   final int heightFt;
   final int heightIn;
@@ -18,7 +18,7 @@ class ProfileData {
   ProfileData({
     required this.firstName,
     required this.lastName,
-    required this.age,
+    this.birthdate,
     required this.zip,
     required this.heightFt,
     required this.heightIn,
@@ -27,10 +27,22 @@ class ProfileData {
     this.visibility = 'public',
   });
 
+  // Calculate age from birthdate
+  int get age {
+    if (birthdate == null) return 0;
+    final now = DateTime.now();
+    int age = now.year - birthdate!.year;
+    if (now.month < birthdate!.month || 
+        (now.month == birthdate!.month && now.day < birthdate!.day)) {
+      age--;
+    }
+    return age;
+  }
+
   Map<String, dynamic> toJson() => {
         'firstName': firstName,
         'lastName': lastName,
-        'age': age,
+        'birthdate': birthdate?.toIso8601String(),
         'zip': zip,
         'heightFt': heightFt,
         'heightIn': heightIn,
@@ -42,11 +54,13 @@ class ProfileData {
   factory ProfileData.fromJson(Map<String, dynamic> json) => ProfileData(
         firstName: json['firstName'] ?? '',
         lastName: json['lastName'] ?? '',
-        age: json['age'],
-        zip: json['zip'],
-        heightFt: json['heightFt'],
-        heightIn: json['heightIn'],
-        position: json['position'],
+        birthdate: json['birthdate'] != null 
+            ? DateTime.tryParse(json['birthdate']) 
+            : null,
+        zip: json['zip'] ?? '',
+        heightFt: json['heightFt'] ?? 6,
+        heightIn: json['heightIn'] ?? 0,
+        position: json['position'] ?? 'G',
         profilePictureUrl: json['profilePictureUrl'],
         visibility: json['visibility'] ?? 'public',
       );
@@ -73,10 +87,20 @@ class ProfileService {
         final data = await ApiService.getProfile(userId);
         if (data == null) return null;
         
+        // Parse birthdate or calculate from age
+        DateTime? birthdate;
+        if (data['birthdate'] != null) {
+          birthdate = DateTime.tryParse(data['birthdate']);
+        } else if (data['age'] != null) {
+          // Fallback: estimate birthdate from age
+          final age = data['age'] as int;
+          birthdate = DateTime(DateTime.now().year - age, 1, 1);
+        }
+        
         return ProfileData(
           firstName: data['name']?.split(' ')[0] ?? '',
           lastName: data['name']?.split(' ').skip(1).join(' ') ?? '',
-          age: data['age'] ?? 0,
+          birthdate: birthdate,
           zip: data['zip'] ?? '',
           heightFt: int.tryParse(data['height']?.split("'")[0] ?? '0') ?? 0,
           heightIn: int.tryParse(data['height']?.split("'")[1]?.replaceAll('"', '') ?? '0') ?? 0,
@@ -102,7 +126,8 @@ class ProfileService {
     try {
       await ApiService.updateProfile(userId, {
         'name': '${data.firstName} ${data.lastName}',
-        'age': data.age,
+        'birthdate': data.birthdate?.toIso8601String(),
+        'age': data.age, // Keep age for backward compatibility
         'zip': data.zip,
         'height': "${data.heightFt}'${data.heightIn}\"",
         'position': data.position,
@@ -153,3 +178,4 @@ class ProfileService {
     ];
   }
 }
+

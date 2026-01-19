@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../services/mock_data.dart';
@@ -19,7 +20,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController _firstNameCtrl = TextEditingController();
   final TextEditingController _lastNameCtrl = TextEditingController();
   final TextEditingController _zipCtrl = TextEditingController();
-  int _age = 18;
+  DateTime? _birthdate;
   int _ft = 6;
   int _inch = 0;
   String _pos = 'G';
@@ -53,7 +54,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         setState(() {
           _firstNameCtrl.text = existing.firstName;
           _lastNameCtrl.text = existing.lastName;
-          _age = existing.age.clamp(13, 65);
+          _birthdate = existing.birthdate;
           _zipCtrl.text = existing.zip;
           _ft = existing.heightFt.clamp(4, 7);
           _inch = existing.heightIn.clamp(0, 11);
@@ -72,7 +73,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         setState(() {
           _firstNameCtrl.text = nameParts.isNotEmpty ? nameParts[0] : '';
           _lastNameCtrl.text = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-          _age = p.age.clamp(13, 65);
+          // Calculate birthdate from age if available
+          final age = p.age.clamp(13, 65);
+          _birthdate = DateTime(DateTime.now().year - age, 1, 1);
           _zipCtrl.text = p.zip ?? '';
           // Parse height "6'4""
           final parts = p.height.split("'");
@@ -150,7 +153,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       final data = ProfileData(
         firstName: _firstNameCtrl.text.trim(),
         lastName: _lastNameCtrl.text.trim(),
-        age: _age,
+        birthdate: _birthdate,
         zip: _zipCtrl.text.trim(),
         heightFt: _ft,
         heightIn: _inch,
@@ -166,6 +169,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       
       if (mounted) context.go('/play');
     }
+  }
+
+  int _calculateAge(DateTime birthdate) {
+    final now = DateTime.now();
+    int age = now.year - birthdate.year;
+    if (now.month < birthdate.month || 
+        (now.month == birthdate.month && now.day < birthdate.day)) {
+      age--;
+    }
+    return age;
   }
 
   @override
@@ -320,17 +333,52 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const Text('Player Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
 
-            // Age
-            const Text('Age', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            Slider(
-              value: _age.toDouble(),
-              min: 13,
-              max: 65,
-              divisions: 52,
-              label: _age.toString(),
-              onChanged: (val) => setState(() => _age = val.toInt()),
+            // Birthdate
+            const Text('Birthday', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _birthdate ?? DateTime(DateTime.now().year - 25, 1, 1),
+                  firstDate: DateTime(1940),
+                  lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)),
+                  helpText: 'Select your birthday',
+                );
+                if (picked != null) {
+                  setState(() => _birthdate = picked);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _birthdate != null 
+                          ? DateFormat('MMMM d, yyyy').format(_birthdate!)
+                          : 'Select your birthday',
+                      style: TextStyle(
+                        color: _birthdate != null ? Colors.white : Colors.grey,
+                      ),
+                    ),
+                    const Icon(Icons.calendar_today, color: Colors.grey),
+                  ],
+                ),
+              ),
             ),
-            Text('$_age years old', style: const TextStyle(fontWeight: FontWeight.bold)),
+            if (_birthdate != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '${_calculateAge(_birthdate!)} years old',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             const SizedBox(height: 16),
 
             // ZIP
