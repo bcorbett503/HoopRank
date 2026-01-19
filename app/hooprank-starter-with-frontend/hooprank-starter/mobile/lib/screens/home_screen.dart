@@ -1209,9 +1209,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                           final myTeam = opponentTeam; // User received the challenge
                                           matchState.myTeamName = myTeam?['name'] ?? 'Your Team';
                                           matchState.opponentTeamName = otherTeamName;
+                                          matchState.startMatch(); // Mark as active
                                           
-                                          // Navigate to match setup for team match
-                                          context.push('/match/setup');
+                                          // Navigate to score entry for team match (skip setup since teams are already set)
+                                          context.push('/match/score');
                                         }
                                       } catch (e) {
                                         ScaffoldMessenger.of(context).showSnackBar(
