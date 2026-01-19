@@ -347,7 +347,7 @@ app.get(
     console.log(`[nearby] User ${uid} at lat=${lat}, lng=${lng}, radius=${radiusMeters}m`);
 
     const r = await pool.query(`
-      SELECT id, name, avatar_url, hoop_rank, city, position, lat, lng, games_played, games_contested
+      SELECT id, name, avatar_url, hoop_rank, city, position, lat, lng, games_played, games_contested, birthdate
       FROM users
       WHERE id != $1
         AND lat IS NOT NULL
@@ -367,6 +367,19 @@ app.get(
       const gamesPlayed = row.games_played || 0;
       const gamesContested = row.games_contested || 0;
       const contestRate = gamesPlayed > 0 ? gamesContested / gamesPlayed : 0;
+
+      // Calculate age from birthdate
+      let age: number | null = null;
+      if (row.birthdate) {
+        const birthdate = new Date(row.birthdate);
+        const today = new Date();
+        age = today.getFullYear() - birthdate.getFullYear();
+        const monthDiff = today.getMonth() - birthdate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthdate.getDate())) {
+          age--;
+        }
+      }
+
       return {
         id: row.id,
         name: row.name,
@@ -377,6 +390,7 @@ app.get(
         gamesPlayed,
         gamesContested,
         contestRate,
+        age,
       };
     });
 
@@ -559,7 +573,7 @@ app.post(
       }
     }
 
-    // Update user - now includes name, city, and lat/lng from zip lookup
+    // Update user - now includes name, city, lat/lng from zip lookup, and birthdate
     await pool.query(
       `update users set 
        name = coalesce($2, name),
@@ -570,6 +584,7 @@ app.post(
        city = coalesce($10, city),
        lat = coalesce($11, lat),
        lng = coalesce($12, lng),
+       birthdate = coalesce($13, birthdate),
        last_loc = case when $7::numeric is not null and $8::numeric is not null 
                   then ST_SetSRID(ST_MakePoint($8::numeric, $7::numeric), 4326) 
                   else last_loc end,
@@ -591,7 +606,8 @@ app.post(
         locEnabled,
         city,
         zipLat,
-        zipLng
+        zipLng,
+        birthdate || null
       ]
     );
 
@@ -697,7 +713,7 @@ app.get(
     if (mode === "1v1") {
       // Individual rankings with team info (includes both member and owner teams)
       const result = await pool.query(
-        `SELECT u.id, u.name, u.avatar_url, u.hoop_rank, u.position, u.city,
+        `SELECT u.id, u.name, u.avatar_url, u.hoop_rank, u.position, u.city, u.birthdate,
            (SELECT id FROM (
               SELECT t.id, t.name, COALESCE(tm.joined_at, t.created_at) as sort_date
               FROM teams t
@@ -727,17 +743,32 @@ app.get(
 
       res.json({
         mode: "1v1",
-        rankings: result.rows.map((u, idx) => ({
-          rank: offset + idx + 1,
-          id: u.id,
-          name: u.name,
-          photoUrl: u.avatar_url,
-          rating: Number(u.hoop_rank),
-          position: u.position,
-          city: u.city,
-          team: u.team_name || null,
-          teamId: u.team_id || null,
-        })),
+        rankings: result.rows.map((u, idx) => {
+          // Calculate age from birthdate
+          let age: number | null = null;
+          if (u.birthdate) {
+            const birthdate = new Date(u.birthdate);
+            const today = new Date();
+            age = today.getFullYear() - birthdate.getFullYear();
+            const monthDiff = today.getMonth() - birthdate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthdate.getDate())) {
+              age--;
+            }
+          }
+
+          return {
+            rank: offset + idx + 1,
+            id: u.id,
+            name: u.name,
+            photoUrl: u.avatar_url,
+            rating: Number(u.hoop_rank),
+            position: u.position,
+            city: u.city,
+            team: u.team_name || null,
+            teamId: u.team_id || null,
+            age,
+          };
+        }),
       });
     } else {
       // Team rankings (3v3 or 5v5)

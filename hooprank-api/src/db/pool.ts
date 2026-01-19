@@ -29,13 +29,14 @@ export async function runAutoMigrations() {
         `);
         console.log("Auto-migration: team match columns checked/added");
 
-        // Add lat/lng columns to users table if they don't exist
+        // Add lat/lng and birthdate columns to users table if they don't exist
         await pool.query(`
             ALTER TABLE users 
             ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION,
-            ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION
+            ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION,
+            ADD COLUMN IF NOT EXISTS birthdate DATE
         `);
-        console.log("Auto-migration: lat/lng columns checked/added");
+        console.log("Auto-migration: lat/lng/birthdate columns checked/added");
 
         // Backfill lat/lng for users with ZIP but no coordinates (runs once per restart)
         const usersToUpdate = await pool.query(`
