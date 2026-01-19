@@ -18,13 +18,16 @@ export async function runAutoMigrations() {
     if (migrationRan) return;
     migrationRan = true;
     try {
-        // Add score columns for team matches if they don't exist
+        // Add columns for team matches if they don't exist
         await pool.query(`
             ALTER TABLE matches 
             ADD COLUMN IF NOT EXISTS score_creator INTEGER,
-            ADD COLUMN IF NOT EXISTS score_opponent INTEGER
+            ADD COLUMN IF NOT EXISTS score_opponent INTEGER,
+            ADD COLUMN IF NOT EXISTS winner_id TEXT,
+            ADD COLUMN IF NOT EXISTS creator_team_id UUID,
+            ADD COLUMN IF NOT EXISTS opponent_team_id UUID
         `);
-        console.log("Auto-migration: score columns checked/added");
+        console.log("Auto-migration: team match columns checked/added");
     } catch (e) {
         console.error("Auto-migration failed (non-fatal):", e);
     }
