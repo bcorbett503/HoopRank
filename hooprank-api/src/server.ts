@@ -531,7 +531,7 @@ app.post(
   "/users/:userId/profile",
   asyncH(async (req, res) => {
     const { userId } = req.params;
-    const { name, position, height, weight, zip, lat, lng, locEnabled, age } = req.body;
+    const { name, position, height, weight, zip, lat, lng, locEnabled, age, birthdate } = req.body;
 
     // Verify user exists
     const check = await pool.query(`select 1 from users where id = $1`, [userId]);
@@ -539,16 +539,23 @@ app.post(
       return res.status(404).json({ error: "user_not_found" });
     }
 
-    // Lookup city from zip code if zip is provided
+    // Lookup city and coordinates from zip code if zip is provided
     let city: string | null = null;
+    let zipLat: number | null = lat || null;
+    let zipLng: number | null = lng || null;
     if (zip) {
       const zipResult = await lookupZipCode(zip);
       if (zipResult) {
         city = formatCityState(zipResult.city, zipResult.stateAbbr);
+        // Use ZIP coordinates if no GPS coordinates provided
+        if (!lat && !lng && zipResult.lat && zipResult.lng) {
+          zipLat = zipResult.lat;
+          zipLng = zipResult.lng;
+        }
       }
     }
 
-    // Update user - now includes name, city from zip lookup
+    // Update user - now includes name, city, and lat/lng from zip lookup
     await pool.query(
       `update users set 
        name = coalesce($2, name),
@@ -557,6 +564,8 @@ app.post(
        weight = coalesce($5, weight),
        zip = coalesce($6, zip),
        city = coalesce($10, city),
+       lat = coalesce($11, lat),
+       lng = coalesce($12, lng),
        last_loc = case when $7::numeric is not null and $8::numeric is not null 
                   then ST_SetSRID(ST_MakePoint($8::numeric, $7::numeric), 4326) 
                   else last_loc end,
@@ -573,14 +582,16 @@ app.post(
         height,
         weight ? parseInt(weight) : null,
         zip,
-        lat,
-        lng,
+        zipLat,
+        zipLng,
         locEnabled,
-        city
+        city,
+        zipLat,
+        zipLng
       ]
     );
 
-    res.json({ success: true, city });
+    res.json({ success: true, city, lat: zipLat, lng: zipLng });
   })
 );
 

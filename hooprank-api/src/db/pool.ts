@@ -28,6 +28,41 @@ export async function runAutoMigrations() {
             ADD COLUMN IF NOT EXISTS opponent_team_id UUID
         `);
         console.log("Auto-migration: team match columns checked/added");
+
+        // Backfill lat/lng for users with ZIP but no coordinates (runs once per restart)
+        const usersToUpdate = await pool.query(`
+            SELECT id, zip FROM users 
+            WHERE zip IS NOT NULL AND zip != '' 
+            AND (lat IS NULL OR lng IS NULL)
+            LIMIT 20
+        `);
+
+        if (usersToUpdate.rowCount && usersToUpdate.rowCount > 0) {
+            console.log(`Backfilling ${usersToUpdate.rowCount} users with locations from ZIP...`);
+            for (const user of usersToUpdate.rows) {
+                try {
+                    const zip = user.zip.substring(0, 5);
+                    const response = await fetch(`https://api.zippopotam.us/us/${zip}`);
+                    if (response.ok) {
+                        const data = await response.json() as { places?: Array<{ latitude: string; longitude: string; 'place name': string; 'state abbreviation': string }> };
+                        const place = data.places?.[0];
+                        if (place) {
+                            const lat = parseFloat(place.latitude);
+                            const lng = parseFloat(place.longitude);
+                            const city = `${place['place name']}, ${place['state abbreviation']}`;
+
+                            await pool.query(`
+                                UPDATE users SET lat = $2, lng = $3, city = $4 WHERE id = $1
+                            `, [user.id, lat, lng, city]);
+                            console.log(`Updated ${user.id}: ${zip} -> ${lat}, ${lng}`);
+                        }
+                    }
+                    await new Promise(r => setTimeout(r, 100)); // Throttle API
+                } catch (e) {
+                    console.error(`Backfill error for ${user.id}:`, e);
+                }
+            }
+        }
     } catch (e) {
         console.error("Auto-migration failed (non-fatal):", e);
     }
