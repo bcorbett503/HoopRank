@@ -558,19 +558,25 @@ app.post(
     }
 
     // Lookup city and coordinates from zip code if zip is provided
+    // ZIP coordinates are preferred over GPS because they represent the user's actual home location
+    // (GPS from emulators/devices often gives wrong location like Google HQ)
     let city: string | null = null;
-    let zipLat: number | null = lat || null;
-    let zipLng: number | null = lng || null;
+    let zipLat: number | null = null;
+    let zipLng: number | null = null;
     if (zip) {
       const zipResult = await lookupZipCode(zip);
       if (zipResult) {
         city = formatCityState(zipResult.city, zipResult.stateAbbr);
-        // Use ZIP coordinates if no GPS coordinates provided
-        if (!lat && !lng && zipResult.lat && zipResult.lng) {
-          zipLat = zipResult.lat;
-          zipLng = zipResult.lng;
-        }
+        // Always use ZIP coordinates for location-based features
+        zipLat = zipResult.lat;
+        zipLng = zipResult.lng;
+        console.log(`[profile] ZIP ${zip} resolved to ${city} at ${zipLat},${zipLng}`);
       }
+    }
+    // Fall back to GPS if no zip provided
+    if (!zipLat && !zipLng && lat && lng) {
+      zipLat = lat;
+      zipLng = lng;
     }
 
     // Update user - now includes name, city, lat/lng from zip lookup, and birthdate
@@ -772,7 +778,7 @@ app.get(
       });
     } else {
       // Team rankings (3v3 or 5v5)
-      // Get user ID to exclude user's own teams
+      // Get user ID to exclude user's own teams (for challenge flow)
       const uid = req.headers["x-user-id"] as string | undefined;
 
       // Exclude teams where user is owner or accepted member
@@ -1356,7 +1362,100 @@ app.get(
   })
 );
 
+// GET /activity/global - Most recent completed matches app-wide (no location filter)
+app.get(
+  "/activity/global",
+  asyncH(async (req, res) => {
+    const limitParam = req.query.limit;
+    const limit = Math.min(Math.max(parseInt(String(limitParam)) || 3, 1), 10);
+
+    // Get most recent completed matches with scores
+    const query = `
+      SELECT
+        m.id as match_id,
+        m.created_at,
+        m.updated_at,
+        m.score,
+        m.result,
+        m.creator_id,
+        m.opponent_id,
+        m.team_a_id,
+        m.team_b_id,
+        m.match_type,
+        u1.id as p1_id,
+        u1.name as p1_name,
+        u1.avatar_url as p1_avatar,
+        u1.hoop_rank as p1_rating,
+        u1.city as p1_city,
+        u2.id as p2_id,
+        u2.name as p2_name,
+        u2.avatar_url as p2_avatar,
+        u2.hoop_rank as p2_rating,
+        u2.city as p2_city,
+        ta.name as team_a_name,
+        tb.name as team_b_name
+      FROM matches m
+      LEFT JOIN users u1 ON u1.id = m.creator_id
+      LEFT JOIN users u2 ON u2.id = m.opponent_id
+      LEFT JOIN teams ta ON ta.id = m.team_a_id
+      LEFT JOIN teams tb ON tb.id = m.team_b_id
+      WHERE m.score IS NOT NULL
+        AND m.status = 'ended'
+      ORDER BY m.updated_at DESC
+      LIMIT $1
+    `;
+
+    const gamesResult = await pool.query(query, [limit]);
+
+    const activity = gamesResult.rows.map(row => {
+      const isTeamMatch = row.team_a_id && row.team_b_id;
+      const p1Score = row.score ? row.score[row.p1_id] : null;
+      const p2Score = row.score ? row.score[row.p2_id] : null;
+
+      let winnerId = null;
+      let eventType = '1v1';
+
+      if (isTeamMatch) {
+        eventType = row.match_type || 'team';
+      } else if (p1Score !== null && p2Score !== null) {
+        winnerId = p1Score > p2Score ? row.p1_id : (p2Score > p1Score ? row.p2_id : null);
+      }
+
+      return {
+        matchId: row.match_id,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        eventType,
+        player1: row.p1_id ? {
+          id: row.p1_id,
+          name: row.p1_name,
+          avatarUrl: row.p1_avatar,
+          rating: row.p1_rating,
+          city: row.p1_city,
+        } : null,
+        player2: row.p2_id ? {
+          id: row.p2_id,
+          name: row.p2_name,
+          avatarUrl: row.p2_avatar,
+          rating: row.p2_rating,
+          city: row.p2_city,
+        } : null,
+        teamA: row.team_a_name || null,
+        teamB: row.team_b_name || null,
+        score: {
+          player1: p1Score,
+          player2: p2Score,
+        },
+        winnerId,
+      };
+    });
+
+    res.json(activity);
+  })
+);
+
 // GET /users - List all users (for players screen)
+
 app.get(
   "/users",
   asyncH(async (req, res) => {
