@@ -288,44 +288,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
               textCapitalization: TextCapitalization.words,
             ),
-            const SizedBox(height: 16),
-
-            // Profile Visibility
-            const Text('Profile Visibility', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  RadioListTile<String>(
-                    title: const Text('Public'),
-                    subtitle: const Text('Anyone can see your profile', style: TextStyle(fontSize: 12)),
-                    value: 'public',
-                    groupValue: _visibility,
-                    onChanged: (val) => setState(() => _visibility = val!),
-                  ),
-                  const Divider(height: 1),
-                  RadioListTile<String>(
-                    title: const Text('Friends Only'),
-                    subtitle: const Text('Only your friends can see your profile', style: TextStyle(fontSize: 12)),
-                    value: 'friends',
-                    groupValue: _visibility,
-                    onChanged: (val) => setState(() => _visibility = val!),
-                  ),
-                  const Divider(height: 1),
-                  RadioListTile<String>(
-                    title: const Text('Private'),
-                    subtitle: const Text('Only you can see your profile', style: TextStyle(fontSize: 12)),
-                    value: 'private',
-                    groupValue: _visibility,
-                    onChanged: (val) => setState(() => _visibility = val!),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 24),
 
             const Divider(),
@@ -344,6 +306,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   firstDate: DateTime(1940),
                   lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)),
                   helpText: 'Select your birthday',
+                  initialEntryMode: DatePickerEntryMode.input,
                 );
                 if (picked != null) {
                   setState(() => _birthdate = picked);
@@ -447,39 +410,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   ),
                 );
               }).toList(),
-            ),
-            const SizedBox(height: 32),
-            
-            // Push Notifications (Optional)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                border: Border.all(color: Colors.blue.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Icon(Icons.notifications, color: Colors.blue),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Push Notifications', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('Get notified about match invites and results', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      // TODO: Request push notification permission
-                      // In a real app: FirebaseMessaging.instance.requestPermission()
-                    },
-                    child: const Text('Enable'),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 32),
 

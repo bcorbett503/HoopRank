@@ -107,6 +107,15 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               rating = double.tryParse(ratingValue) ?? 0.0;
             }
             
+            // Parse age from API response
+            int? age;
+            final ageValue = item['age'];
+            if (ageValue is int) {
+              age = ageValue;
+            } else if (ageValue is num) {
+              age = ageValue.toInt();
+            }
+            
             players.add(User(
               id: id,
               name: item['name']?.toString() ?? 'Unknown',
@@ -115,6 +124,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               rating: rating,
               city: item['city']?.toString(),
               team: item['team']?.toString(),
+              age: age,
             ));
             // Store teamId separately
             final teamId = item['teamId']?.toString();
@@ -202,6 +212,26 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       if (_rankFilter != 'All') {
         final minRating = double.parse(_rankFilter.replaceAll('+', ''));
         if (p.rating < minRating) return false;
+      }
+      
+      // Age filter - exclude users without age data when filter is active
+      if (_ageFilter != 'All') {
+        if (p.age == null) return false; // No age data = exclude when filtering
+        final age = p.age!;
+        switch (_ageFilter) {
+          case '13-18':
+            if (age < 13 || age > 18) return false;
+            break;
+          case '18-25':
+            if (age < 18 || age > 25) return false;
+            break;
+          case '26-35':
+            if (age < 26 || age > 35) return false;
+            break;
+          case '35+':
+            if (age < 35) return false;
+            break;
+        }
       }
       
       return true;

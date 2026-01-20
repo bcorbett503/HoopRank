@@ -688,86 +688,27 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
     );
   }
 
-  /// Build community rating row showing contest behavior
+  /// Build matches contested row showing contest count
   Widget _buildCommunityRatingRow(User player) {
-    final contestRate = player.contestRate;
-    final gamesPlayed = player.gamesPlayed;
-    
-    // Not enough games to determine
-    if (gamesPlayed < 3) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Icon(Icons.people, size: 20, color: Colors.grey[600]),
-            const SizedBox(width: 12),
-            Text(
-              'Community Rating',
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
-            ),
-            const Spacer(),
-            Text(
-              'New Player',
-              style: TextStyle(color: Colors.grey[500], fontSize: 14),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    // Determine rating tier and styling
-    final String label;
-    final Color color;
-    final IconData icon;
-    
-    if (contestRate <= 0.05) {
-      // 0-5%: Fair player
-      label = 'Fair Player';
-      color = Colors.green;
-      icon = Icons.verified;
-    } else if (contestRate <= 0.15) {
-      // 5-15%: Occasionally contests
-      label = 'Occasionally contests';
-      color = Colors.orange;
-      icon = Icons.warning_outlined;
-    } else {
-      // >15%: Frequently contests  
-      label = 'Frequently contests';
-      color = Colors.red;
-      icon = Icons.report_outlined;
-    }
+    final contestedCount = player.gamesContested;
     
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(Icons.people, size: 20, color: Colors.grey[600]),
+          Icon(Icons.gavel, size: 20, color: Colors.grey[600]),
           const SizedBox(width: 12),
           Text(
-            'Community Rating',
+            'Matches Contested',
             style: TextStyle(color: Colors.grey[600], fontSize: 14),
           ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 14, color: color),
-                const SizedBox(width: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+          Text(
+            contestedCount.toString(),
+            style: TextStyle(
+              color: contestedCount > 0 ? Colors.orange : Colors.grey[500],
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import '../state/app_state.dart';
 import '../models.dart';
-import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 
@@ -40,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final firebaseUser = credential.user!;
       final userId = firebaseUser.uid;
 
-      // Try to authenticate with backend (if available)
+      // Try to authenticate with backend (required)
       try {
         final idToken = await firebaseUser.getIdToken();
         if (idToken != null) {
@@ -52,37 +51,27 @@ class _LoginScreenState extends State<LoginScreen> {
             photoUrl: firebaseUser.photoURL,
             provider: provider,
           );
-          auth.login(user);
+          await auth.login(user);
+          
+          // Let the router handle redirect based on user.isProfileComplete
+          // The router will redirect to /profile/setup if incomplete, or /play if complete
+          if (mounted) {
+            context.go('/play'); // Router will intercept and redirect appropriately
+          }
         }
       } catch (e) {
-        // Backend not available - use Firebase UID as player ID
-        debugPrint('Backend not available: $e');
-        // Create a temporary user object
+        debugPrint('Backend auth failed: $e');
+        // Create a temporary user object with incomplete profile
         final user = User(
           id: userId,
           name: firebaseUser.displayName ?? 'New User',
           photoUrl: firebaseUser.photoURL,
+          // position is null, so isProfileComplete will be false
         );
-        auth.login(user);
-      }
-
-      // Check if profile exists locally and is complete
-      final profile = await ProfileService.getProfile(userId);
-      
-      final isProfileComplete = profile != null && 
-          profile.position.isNotEmpty && 
-          profile.zip.isNotEmpty;
-
-      if (!isProfileComplete && mounted) {
-        // No profile or incomplete - go to setup
-        context.go('/profile/setup');
-      } else {
-        // Profile exists - apply it and go home
-        if (profile != null) {
-          ProfileService.applyProfileToPlayer(userId, profile);
-        }
+        await auth.login(user);
+        
         if (mounted) {
-          context.go('/play');
+          context.go('/play'); // Router will redirect to /profile/setup
         }
       }
     } catch (e) {

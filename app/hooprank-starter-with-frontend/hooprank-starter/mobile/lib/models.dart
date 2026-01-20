@@ -43,6 +43,7 @@ class User {
   final int gamesPlayed;
   final int gamesContested;
   final double contestRate;
+  final int? age;
 
   User({
     required this.id,
@@ -59,6 +60,7 @@ class User {
     this.gamesPlayed = 0,
     this.gamesContested = 0,
     this.contestRate = 0.0,
+    this.age,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -88,6 +90,7 @@ class User {
       gamesPlayed: gamesPlayed,
       gamesContested: gamesContested,
       contestRate: contestRate,
+      age: json['age'] != null ? _parseInt(json['age']) : null,
     );
   }
 
@@ -120,6 +123,10 @@ class User {
       rebounding: rebounding,
     );
   }
+
+  /// Check if the user has completed profile setup
+  /// Profile is considered complete when they have set their position
+  bool get isProfileComplete => position != null && position!.isNotEmpty;
 
   @override
   String toString() => 'User(id: $id, name: $name, rating: $rating)';

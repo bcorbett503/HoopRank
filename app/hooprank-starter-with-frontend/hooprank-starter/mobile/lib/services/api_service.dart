@@ -515,6 +515,26 @@ class ApiService {
     return [];
   }
 
+  /// Get global activity feed (most recent completed matches app-wide)
+  static Future<List<Map<String, dynamic>>> getGlobalActivity({int limit = 3}) async {
+    debugPrint('>>> getGlobalActivity: calling $baseUrl/activity/global?limit=$limit');
+    final response = await http.get(
+      Uri.parse('$baseUrl/activity/global?limit=$limit'),
+      headers: {
+        'x-user-id': _userId ?? '',
+      },
+    );
+
+    debugPrint('>>> getGlobalActivity: status=${response.statusCode}, body=${response.body}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data is List) {
+        return data.cast<Map<String, dynamic>>();
+      }
+    }
+    return [];
+  }
+
   // ===================
   // Teams API
   // ===================

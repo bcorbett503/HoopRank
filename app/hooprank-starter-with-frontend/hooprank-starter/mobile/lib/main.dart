@@ -77,16 +77,35 @@ class HoopRankApp extends StatelessWidget {
       initialLocation: '/play',
       refreshListenable: authState,
       redirect: (context, state) {
-        final loggedIn = authState.currentUser != null;
+        final user = authState.currentUser;
+        final loggedIn = user != null;
         final isLoggingIn = state.uri.toString() == '/login';
         final isProfileSetup = state.uri.toString() == '/profile/setup';
 
-        if (!loggedIn && !isLoggingIn) return '/login';
+        debugPrint('ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}, position=${user?.position}');
+
+        // Not logged in - redirect to login (unless already there)
+        if (!loggedIn && !isLoggingIn) {
+          debugPrint('ROUTER: -> /login (not logged in)');
+          return '/login';
+        }
         
-        // Don't redirect away from login - let the login screen handle profile setup navigation
-        // The login screen will navigate to /profile/setup or / after checking profile status
-        if (loggedIn && isLoggingIn) return null;
+        // Logged in but profile not complete - force profile setup (except if already on setup or login)
+        if (loggedIn && !user.isProfileComplete && !isProfileSetup && !isLoggingIn) {
+          debugPrint('ROUTER: -> /profile/setup (profile incomplete)');
+          return '/profile/setup';
+        }
         
+        // Note: We intentionally do NOT redirect away from /profile/setup when profile is complete
+        // This allows users to edit their profile by visiting /profile/setup
+        
+        // Profile complete and on login screen - go to home
+        if (loggedIn && user.isProfileComplete && isLoggingIn) {
+          debugPrint('ROUTER: -> /play (profile complete, leaving login)');
+          return '/play';
+        }
+        
+        debugPrint('ROUTER: -> null (no redirect)');
         return null;
       },
       routes: [

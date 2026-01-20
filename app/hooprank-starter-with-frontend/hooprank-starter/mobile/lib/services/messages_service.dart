@@ -84,6 +84,71 @@ class ChallengeRequest {
   bool get isReceived => direction == 'received';
 }
 
+// Team group chat message
+class TeamMessage {
+  final String id;
+  final String senderId;
+  final String content;
+  final DateTime createdAt;
+  final String? senderName;
+  final String? senderPhotoUrl;
+
+  TeamMessage({
+    required this.id,
+    required this.senderId,
+    required this.content,
+    required this.createdAt,
+    this.senderName,
+    this.senderPhotoUrl,
+  });
+
+  factory TeamMessage.fromJson(Map<String, dynamic> json) {
+    return TeamMessage(
+      id: json['id'],
+      senderId: json['senderId'],
+      content: json['content'],
+      createdAt: DateTime.parse(json['createdAt']),
+      senderName: json['senderName'],
+      senderPhotoUrl: json['senderPhotoUrl'],
+    );
+  }
+}
+
+// Team group chat thread
+class TeamConversation {
+  final String teamId;
+  final String teamName;
+  final String teamType; // '3v3' or '5v5'
+  final String? threadId;
+  final String? lastMessage;
+  final String? lastSenderName;
+  final DateTime? lastMessageAt;
+
+  TeamConversation({
+    required this.teamId,
+    required this.teamName,
+    required this.teamType,
+    this.threadId,
+    this.lastMessage,
+    this.lastSenderName,
+    this.lastMessageAt,
+  });
+
+  factory TeamConversation.fromJson(Map<String, dynamic> json) {
+    return TeamConversation(
+      teamId: json['teamId'],
+      teamName: json['teamName'],
+      teamType: json['teamType'],
+      threadId: json['threadId'],
+      lastMessage: json['lastMessage'],
+      lastSenderName: json['lastSenderName'],
+      lastMessageAt: json['lastMessageAt'] != null 
+          ? DateTime.parse(json['lastMessageAt']) 
+          : null,
+    );
+  }
+}
+
 class MessagesService {
   String get baseUrl => ApiService.baseUrl; // Use same URL as ApiService
   final _storage = const FlutterSecureStorage();
@@ -256,6 +321,66 @@ class MessagesService {
       return Message.fromJson(json.decode(response.body));
     } else {
       throw Exception('Failed (${response.statusCode}): ${response.body}');
+    }
+  }
+
+  // === Team Group Chat Methods ===
+
+  /// Get list of team chats the user is a member of
+  Future<List<TeamConversation>> getTeamChats(String userId) async {
+    final token = await _getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/messages/team-chats'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'x-user-id': userId,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => TeamConversation.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load team chats');
+    }
+  }
+
+  /// Get messages for a specific team chat
+  Future<List<TeamMessage>> getTeamMessages(String userId, String teamId) async {
+    final token = await _getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/teams/$teamId/messages'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'x-user-id': userId,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => TeamMessage.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load team messages');
+    }
+  }
+
+  /// Send a message to a team chat
+  Future<TeamMessage> sendTeamMessage(String userId, String teamId, String content) async {
+    final token = await _getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/messages'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'x-user-id': userId,
+      },
+      body: json.encode({'content': content}),
+    );
+
+    if (response.statusCode == 201) {
+      return TeamMessage.fromJson(json.decode(response.body));
+    } else {
+      throw Exception('Failed to send team message');
     }
   }
 }

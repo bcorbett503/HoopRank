@@ -42,6 +42,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _updateLocation();
   }
 
+  /// Safely parse rating that could be String or num
+  double _parseRating(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
   Future<void> _loadCurrentRating() async {
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
@@ -167,7 +174,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _loadLocalActivity() async {
     try {
-      final activity = await ApiService.getLocalActivity();
+      // Use global activity feed (3 most recent matches app-wide)
+      final activity = await ApiService.getGlobalActivity(limit: 3);
+      print('>>> Activity feed returned ${activity.length} items: $activity');
       if (mounted) {
         setState(() {
           _localActivity = activity;
@@ -175,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('Error loading local activity: $e');
+      print('Error loading activity: $e');
       if (mounted) {
         setState(() => _isLoadingActivity = false);
       }
@@ -898,6 +907,78 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () async {
+                                    // Show confirmation dialog
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        backgroundColor: Colors.grey[900],
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        title: Row(
+                                          children: [
+                                            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                                            const SizedBox(width: 8),
+                                            const Text('Contest Score?'),
+                                          ],
+                                        ),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Are you sure you want to contest this score?',
+                                              style: TextStyle(fontWeight: FontWeight.bold),
+                                            ),
+                                            const SizedBox(height: 16),
+                                            Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Icon(Icons.notifications, color: Colors.grey[400], size: 18),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    '$opponentName will be notified of this contest.',
+                                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Icon(Icons.history, color: Colors.grey[400], size: 18),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    'This will be logged on your profile.',
+                                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                            child: const Text('Contest'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    
+                                    if (confirmed != true) return;
+                                    
                                     try {
                                       await ApiService.contestScore(matchId);
                                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1368,7 +1449,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Recent activity from players in your area',
+                'Recent matches from HoopRank',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
               const SizedBox(height: 12),
@@ -1388,12 +1469,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       Icon(Icons.sports_basketball, size: 48, color: Colors.grey[600]),
                       const SizedBox(height: 12),
                       const Text(
-                        'No games in your area yet',
+                        'No recent matches yet',
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Be the first to play and show up here!',
+                        'Play a match and show up here!',
                         style: TextStyle(color: Colors.grey[500], fontSize: 13),
                       ),
                       const SizedBox(height: 16),
@@ -1460,7 +1541,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             Text(
-                                              '⭐ ${(p1['rating'] ?? 0).toStringAsFixed(1)}',
+                                              '⭐ ${_parseRating(p1['rating']).toStringAsFixed(1)}',
                                               style: const TextStyle(color: Colors.grey, fontSize: 11),
                                             ),
                                           ],
@@ -1507,7 +1588,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               textAlign: TextAlign.end,
                                             ),
                                             Text(
-                                              '⭐ ${(p2['rating'] ?? 0).toStringAsFixed(1)}',
+                                              '⭐ ${_parseRating(p2['rating']).toStringAsFixed(1)}',
                                               style: const TextStyle(color: Colors.grey, fontSize: 11),
                                             ),
                                           ],
