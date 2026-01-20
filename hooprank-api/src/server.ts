@@ -1379,9 +1379,6 @@ app.get(
         m.result,
         m.creator_id,
         m.opponent_id,
-        m.team_a_id,
-        m.team_b_id,
-        m.match_type,
         u1.id as p1_id,
         u1.name as p1_name,
         u1.avatar_url as p1_avatar,
@@ -1391,14 +1388,10 @@ app.get(
         u2.name as p2_name,
         u2.avatar_url as p2_avatar,
         u2.hoop_rank as p2_rating,
-        u2.city as p2_city,
-        ta.name as team_a_name,
-        tb.name as team_b_name
+        u2.city as p2_city
       FROM matches m
       LEFT JOIN users u1 ON u1.id = m.creator_id
       LEFT JOIN users u2 ON u2.id = m.opponent_id
-      LEFT JOIN teams ta ON ta.id = m.team_a_id
-      LEFT JOIN teams tb ON tb.id = m.team_b_id
       WHERE m.score IS NOT NULL
         AND m.status = 'ended'
       ORDER BY m.updated_at DESC
@@ -1408,16 +1401,11 @@ app.get(
     const gamesResult = await pool.query(query, [limit]);
 
     const activity = gamesResult.rows.map(row => {
-      const isTeamMatch = row.team_a_id && row.team_b_id;
       const p1Score = row.score ? row.score[row.p1_id] : null;
       const p2Score = row.score ? row.score[row.p2_id] : null;
 
       let winnerId = null;
-      let eventType = '1v1';
-
-      if (isTeamMatch) {
-        eventType = row.match_type || 'team';
-      } else if (p1Score !== null && p2Score !== null) {
+      if (p1Score !== null && p2Score !== null) {
         winnerId = p1Score > p2Score ? row.p1_id : (p2Score > p1Score ? row.p2_id : null);
       }
 
@@ -1425,7 +1413,7 @@ app.get(
         matchId: row.match_id,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
-        eventType,
+        eventType: '1v1',
         player1: row.p1_id ? {
           id: row.p1_id,
           name: row.p1_name,
@@ -1440,8 +1428,6 @@ app.get(
           rating: row.p2_rating,
           city: row.p2_city,
         } : null,
-        teamA: row.team_a_name || null,
-        teamB: row.team_b_name || null,
         score: {
           player1: p1Score,
           player2: p2Score,
