@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>655663987178-qgoutu8s8j72hij1p81orau0qst05mo4.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.655663987178-qgoutu8s8j72hij1p81orau0qst05mo4</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDpxXOVbelRrNUhMTJPiZ_19VCm0GcZxHM</string>
+	<key>GCM_SENDER_ID</key>
+	<string>655663987178</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.bcorbett.hooprank</string>
+	<key>PROJECT_ID</key>
+	<string>hooprank-503</string>
+	<key>STORAGE_BUCKET</key>
+	<string>hooprank-503.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<true/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<false/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:655663987178:ios:7e69d581a05f0b0c79da93</string>
+</dict>
+</plist>

@@ -16,6 +16,82 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
+  bool _showEmailLogin = false;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loginWithEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    final auth = context.read<AuthState>();
+    try {
+      final credential = await AuthService.signInWithEmail(email, password);
+
+      if (credential == null || credential.user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final firebaseUser = credential.user!;
+      final userId = firebaseUser.uid;
+
+      try {
+        final idToken = await firebaseUser.getIdToken();
+        if (idToken != null) {
+          final user = await ApiService.authenticate(
+            idToken,
+            uid: userId,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName ?? email.split('@').first,
+            photoUrl: firebaseUser.photoURL,
+            provider: 'email',
+          );
+          await auth.login(user);
+          
+          if (mounted) {
+            context.go('/play');
+          }
+        }
+      } catch (e) {
+        debugPrint('Backend auth failed: $e');
+        final user = User(
+          id: userId,
+          name: firebaseUser.displayName ?? email.split('@').first,
+          photoUrl: firebaseUser.photoURL,
+        );
+        await auth.login(user);
+        
+        if (mounted) {
+          context.go('/play');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: ${e.toString().contains('wrong-password') ? 'Invalid password' : e.toString().contains('user-not-found') ? 'User not found' : 'Please try again'}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _loginWithProvider(String provider) async {
     setState(() => _isLoading = true);
@@ -149,7 +225,73 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+                  
+                  // Email/Password Login (expandable)
+                  TextButton(
+                    onPressed: () => setState(() => _showEmailLogin = !_showEmailLogin),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _showEmailLogin ? Icons.expand_less : Icons.expand_more,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _showEmailLogin ? 'Hide email login' : 'Sign in with email',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  if (_showEmailLogin) ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: const Icon(Icons.lock_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                      ),
+                      onSubmitted: (_) => _loginWithEmail(),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _loginWithEmail,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF6B35),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Sign In'),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
                   
                   const Text(
                     'By continuing, you agree to our Terms of Service and Privacy Policy',

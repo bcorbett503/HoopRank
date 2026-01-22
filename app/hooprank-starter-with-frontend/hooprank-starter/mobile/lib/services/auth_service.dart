@@ -34,6 +34,19 @@ class AuthService {
     }
   }
 
+  // Sign in with Email/Password (for App Review demo account)
+  static Future<UserCredential?> signInWithEmail(String email, String password) async {
+    try {
+      return await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    } catch (e) {
+      print('Error signing in with email: $e');
+      rethrow;
+    }
+  }
+
   // Sign in with Facebook
   static Future<UserCredential?> signInWithFacebook() async {
     try {

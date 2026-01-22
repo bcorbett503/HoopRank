@@ -250,10 +250,10 @@ class HoopRankApp extends StatelessWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
-        cardTheme: CardTheme(
-          color: const Color(0xFF2C3E50),
+        cardTheme: const CardThemeData(
+          color: Color(0xFF2C3E50),
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
         ),
       ),
       routerConfig: router,
