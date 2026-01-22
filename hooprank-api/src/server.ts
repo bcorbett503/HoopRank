@@ -2346,6 +2346,16 @@ app.post(
       };
     });
 
+    // Send push notification for regular messages
+    const senderResult = await pool.query(`SELECT name FROM users WHERE id = $1`, [body.senderId]);
+    const senderName = senderResult.rows[0]?.name || "Someone";
+    await sendPushNotification(
+      body.receiverId,
+      "💬 New Message",
+      `${senderName} sent you a message`,
+      { type: "message", senderId: body.senderId }
+    );
+
     res.status(201).json(result);
   })
 );
