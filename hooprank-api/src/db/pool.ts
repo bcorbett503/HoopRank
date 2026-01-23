@@ -38,6 +38,13 @@ export async function runAutoMigrations() {
         `);
         console.log("Auto-migration: lat/lng/birthdate columns checked/added");
 
+        // Add fcm_token column for push notifications
+        await pool.query(`
+            ALTER TABLE users 
+            ADD COLUMN IF NOT EXISTS fcm_token TEXT
+        `);
+        console.log("Auto-migration: fcm_token column checked/added");
+
         // Backfill lat/lng for users with ZIP but no coordinates (runs once per restart)
         const usersToUpdate = await pool.query(`
             SELECT id, zip FROM users 
