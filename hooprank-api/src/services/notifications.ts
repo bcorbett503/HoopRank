@@ -71,6 +71,15 @@ export async function sendPushNotification(
                     priority: "high" as const,
                 },
             },
+            apns: {
+                payload: {
+                    aps: {
+                        badge: 1,
+                        sound: "default",
+                        "content-available": 1,
+                    },
+                },
+            },
         };
 
         await firebaseAdmin.messaging().send(message);

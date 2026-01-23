@@ -365,6 +365,28 @@ class ApiService {
     }
   }
 
+  /// Get count of unread messages for badge display
+  static Future<int> getUnreadMessageCount() async {
+    if (_userId == null || _userId!.isEmpty) return 0;
+    
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/messages/unread-count'),
+        headers: {
+          'x-user-id': _userId!,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['unreadCount'] ?? 0;
+      }
+    } catch (e) {
+      debugPrint('Failed to get unread count: $e');
+    }
+    return 0;
+  }
+
   /// Get a specific match by ID
   static Future<Map<String, dynamic>?> getMatch(String matchId) async {
     final response = await http.get(

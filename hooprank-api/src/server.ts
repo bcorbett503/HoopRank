@@ -2182,6 +2182,24 @@ t.id as thread_id,
   })
 );
 
+// GET /messages/unread-count - Get count of unread messages for badge display
+app.get(
+  "/messages/unread-count",
+  asyncH(async (req, res) => {
+    const userId = getUserId(req);
+
+    // Count unread messages where the user is the recipient
+    const result = await pool.query(
+      `SELECT COUNT(*) as count FROM messages 
+       WHERE to_id = $1 AND read = false`,
+      [userId]
+    );
+
+    const count = Number(result.rows[0]?.count || 0);
+    res.json({ unreadCount: count });
+  })
+);
+
 // DELETE /threads/:threadId - delete a conversation thread
 app.delete(
   "/threads/:threadId",
@@ -2233,6 +2251,13 @@ or(from_id = $2 and to_id = $1)
     `;
 
     const r = await pool.query(q, [userId, otherUserId]);
+
+    // Mark messages from the other user as read
+    await pool.query(
+      `UPDATE messages SET read = true 
+       WHERE from_id = $1 AND to_id = $2 AND read = false`,
+      [otherUserId, userId]
+    );
 
     const messages = r.rows.map((row) => ({
       id: row.id,
