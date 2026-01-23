@@ -2143,7 +2143,8 @@ t.id as thread_id,
   m.to_id,
   m.body,
   m.created_at,
-  m.read
+  m.read,
+  (SELECT COUNT(*) FROM messages WHERE thread_id = t.id AND to_id = $1 AND read = false) as unread_count
       from threads t
       join users u on u.id = (case when t.user_a = $1 then t.user_b else t.user_a end)
       left join lateral(
@@ -2176,6 +2177,7 @@ t.id as thread_id,
           createdAt: row.created_at,
         }
         : null,
+      unreadCount: Number(row.unread_count || 0),
     }));
 
     res.json(conversations);
