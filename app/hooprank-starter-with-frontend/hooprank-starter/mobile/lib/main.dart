@@ -25,6 +25,7 @@ import 'screens/match_result_screen.dart';
 import 'screens/messages_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/network_test_screen.dart';
+import 'screens/map_screen.dart';
 import 'services/notification_service.dart';
 
 // Background message handler - must be top-level function
@@ -189,13 +190,13 @@ class HoopRankApp extends StatelessWidget {
               ],
             ),
 
-            // Profile
+            // Courts (replaced Profile)
             StatefulShellBranch(
               navigatorKey: _shellNavigatorProfileKey,
               routes: [
                 GoRoute(
-                  path: '/profile',
-                  builder: (context, state) => const ProfileScreen(),
+                  path: '/courts',
+                  builder: (context, state) => const MapScreen(),
                 ),
               ],
             ),
@@ -216,6 +217,10 @@ class HoopRankApp extends StatelessWidget {
         GoRoute(
           path: '/test',
           builder: (context, state) => const NetworkTestScreen(),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) => const ProfileScreen(),
         ),
       ],
     );

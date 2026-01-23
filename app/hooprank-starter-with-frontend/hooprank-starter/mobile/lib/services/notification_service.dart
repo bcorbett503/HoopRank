@@ -15,6 +15,26 @@ class NotificationService {
   
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
+  
+  /// Callbacks to notify when a push notification is received (for screen refreshes)
+  static final List<VoidCallback> _onNotificationCallbacks = [];
+  
+  /// Register a callback to be called when a push notification is received
+  static void addOnNotificationListener(VoidCallback callback) {
+    _onNotificationCallbacks.add(callback);
+  }
+  
+  /// Remove a previously registered callback
+  static void removeOnNotificationListener(VoidCallback callback) {
+    _onNotificationCallbacks.remove(callback);
+  }
+  
+  /// Notify all registered listeners (call this when push notification arrives)
+  static void _notifyListeners() {
+    for (final callback in _onNotificationCallbacks) {
+      callback();
+    }
+  }
 
   /// Initialize notification service - call once on app start
   Future<void> initialize() async {
@@ -90,6 +110,9 @@ class NotificationService {
 
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('Foreground message: ${message.notification?.title}');
+    
+    // Notify listeners to refresh (e.g., home screen)
+    _notifyListeners();
     
     // Show local notification
     if (message.notification != null) {

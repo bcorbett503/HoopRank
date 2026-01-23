@@ -229,14 +229,21 @@ class Match {
   });
 }
 
-/// Basketball court location
+/// Basketball court location with Kings for each game mode
 class Court {
   final String id;
   final String name;
   final double lat;
   final double lng;
   final String? address;
-  final String? king; // Player name who is "King of the Court"
+  final bool isSignature; // Signature courts are high-traffic/famous venues
+  // King of the Court for each mode
+  final String? king1v1;
+  final double? king1v1Rating;
+  final String? king3v3;
+  final double? king3v3Rating;
+  final String? king5v5;
+  final double? king5v5Rating;
 
   Court({
     required this.id,
@@ -244,8 +251,20 @@ class Court {
     required this.lat,
     required this.lng,
     this.address,
-    this.king,
+    this.isSignature = false,
+    this.king1v1,
+    this.king1v1Rating,
+    this.king3v3,
+    this.king3v3Rating,
+    this.king5v5,
+    this.king5v5Rating,
   });
+
+  /// Legacy getter for backwards compatibility
+  String? get king => king1v1;
+
+  /// Check if court has any Kings
+  bool get hasKings => king1v1 != null || king3v3 != null || king5v5 != null;
 
   factory Court.fromJson(Map<String, dynamic> json) {
     return Court(
@@ -254,7 +273,13 @@ class Court {
       lat: _parseDouble(json['lat']),
       lng: _parseDouble(json['lng']),
       address: json['address']?.toString(),
-      king: json['king']?.toString(),
+      isSignature: json['signature'] == true || json['isSignature'] == true,
+      king1v1: json['king1v1']?.toString() ?? json['king']?.toString(),
+      king1v1Rating: json['king1v1Rating'] != null ? _parseDouble(json['king1v1Rating']) : null,
+      king3v3: json['king3v3']?.toString(),
+      king3v3Rating: json['king3v3Rating'] != null ? _parseDouble(json['king3v3Rating']) : null,
+      king5v5: json['king5v5']?.toString(),
+      king5v5Rating: json['king5v5Rating'] != null ? _parseDouble(json['king5v5Rating']) : null,
     );
   }
 }

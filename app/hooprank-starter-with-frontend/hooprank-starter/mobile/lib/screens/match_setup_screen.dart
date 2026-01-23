@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
 import '../state/app_state.dart';
 import '../services/api_service.dart';
+import '../services/court_service.dart';
 import '../models.dart';
 
 class MatchSetupScreen extends StatefulWidget {
@@ -16,11 +18,76 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
   String _search = '';
   List<User> _players = [];
   bool _isLoading = true;
+  
+  // Court detection
+  Court? _nearestCourt;
+  bool _isLoadingCourt = true;
+  String? _courtError;
 
   @override
   void initState() {
     super.initState();
     _loadPlayers();
+    _detectNearbyCourt();
+  }
+
+  Future<void> _detectNearbyCourt() async {
+    setState(() {
+      _isLoadingCourt = true;
+      _courtError = null;
+    });
+    
+    try {
+      // Check location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      
+      if (permission == LocationPermission.denied || 
+          permission == LocationPermission.deniedForever) {
+        setState(() {
+          _courtError = 'Location permission required';
+          _isLoadingCourt = false;
+        });
+        return;
+      }
+      
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      
+      // Load courts if not loaded
+      await CourtService().loadCourts();
+      
+      // Find courts within 200 meters (tight radius)
+      final courts = CourtService().getCourtsNear(
+        position.latitude,
+        position.longitude,
+        radiusKm: 0.2, // 200 meters
+      );
+      
+      if (mounted) {
+        setState(() {
+          _nearestCourt = courts.isNotEmpty ? courts.first : null;
+          _isLoadingCourt = false;
+        });
+        
+        // Update MatchState with selected court
+        if (_nearestCourt != null) {
+          Provider.of<MatchState>(context, listen: false).setCourt(_nearestCourt!);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error detecting court: $e');
+      if (mounted) {
+        setState(() {
+          _courtError = 'Could not detect location';
+          _isLoadingCourt = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadPlayers() async {
@@ -38,6 +105,64 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
       debugPrint('Error loading players: $e');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Widget _buildCourtRow() {
+    if (_isLoadingCourt) {
+      return Row(
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 8),
+          Text('Detecting nearby court...', style: TextStyle(color: Colors.grey[500])),
+        ],
+      );
+    }
+    
+    if (_courtError != null) {
+      return Row(
+        children: [
+          Icon(Icons.location_off, size: 18, color: Colors.grey[500]),
+          const SizedBox(width: 8),
+          Text(_courtError!, style: TextStyle(color: Colors.grey[500])),
+          const Spacer(),
+          TextButton(
+            onPressed: _detectNearbyCourt,
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    }
+    
+    if (_nearestCourt != null) {
+      return Row(
+        children: [
+          Image.asset('assets/court_marker.jpg', width: 24, height: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _nearestCourt!.name,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Icon(Icons.check_circle, size: 18, color: Colors.green[400]),
+        ],
+      );
+    }
+    
+    // No courts nearby
+    return Row(
+      children: [
+        Icon(Icons.location_searching, size: 18, color: Colors.grey[500]),
+        const SizedBox(width: 8),
+        Text('No courts nearby', style: TextStyle(color: Colors.grey[500])),
+      ],
+    );
   }
 
   @override
@@ -63,7 +188,17 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('Mode: 1 v 1', style: TextStyle(color: Colors.grey)),
-                  const Divider(),
+                  const SizedBox(height: 8),
+                  // Court detection row
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[850],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: _buildCourtRow(),
+                  ),
+                  const Divider(height: 24),
                   // Only show player picker if opponent not already set
                   if (match.opponent == null) ...[
                     const Text('Choose opponent', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -205,3 +340,4 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     );
   }
 }
+

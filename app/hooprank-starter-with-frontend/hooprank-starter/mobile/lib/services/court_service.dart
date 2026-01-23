@@ -16,32 +16,58 @@ class CourtService {
     if (_isLoaded) return;
 
     try {
-      // Use hardcoded mock data to avoid any asset loading issues
+      // Use hardcoded mock data (from OSM Overpass)
       final List<Map<String, dynamic>> data = mockCourtsData;
 
-      // Mock list of players for "King of the Court"
-      final List<String> mockKings = [
-        'LeBron James', 'Steph Curry', 'Kevin Durant', 'Giannis Antetokounmpo',
-        'Luka Doncic', 'Jayson Tatum', 'Ja Morant', 'Devin Booker',
-        'Jimmy Butler', 'Nikola Jokic', 'Joel Embiid', 'Kawhi Leonard'
-      ];
-
       _courts = data.map((json) {
-        String? king;
         final id = (json['id'] as String?) ?? 'unknown';
-        if ((id.hashCode % 3) == 0) {
-          king = mockKings[id.hashCode % mockKings.length];
-        }
+        final name = (json['name'] as String?) ?? 'Basketball Court';
+        final hash = id.hashCode.abs();
+        
+        // Determine if this is a signature court
+        // Signature courts have special names or are well-known venues
+        final nameUpper = name.toUpperCase();
+        final isSignature = nameUpper.contains('ARENA') ||
+            nameUpper.contains('CENTER') ||
+            nameUpper.contains('CENTRE') ||
+            nameUpper.contains('GYMNASIUM') ||
+            nameUpper.contains('STADIUM') ||
+            nameUpper.contains('COLISEUM') ||
+            nameUpper.contains('GYM') ||
+            nameUpper.contains('FIELDHOUSE') ||
+            nameUpper.contains('OLYMPIC CLUB') ||
+            (hash % 15 == 0); // Also include ~7% of other courts for demo
 
         return Court(
           id: id,
-          name: (json['name'] as String?) ?? 'Unknown Court',
+          name: name,
           lat: (json['lat'] as num).toDouble(),
           lng: (json['lng'] as num).toDouble(),
           address: (json['city'] as String?) ?? (json['address'] as String?),
-          king: king,
+          isSignature: isSignature,
+          // Kings will be populated from real backend data when available
         );
       }).toList();
+
+      // Add The Olympic Club San Francisco as a featured signature court
+      // Located at 524 Post Street, San Francisco
+      final olympicClub = Court(
+        id: 'olympic_club_sf',
+        name: 'The Olympic Club',
+        lat: 37.7878,
+        lng: -122.4099,
+        address: '524 Post Street, San Francisco, CA',
+        isSignature: true,
+        king1v1: 'Brett Corbett',
+        king1v1Rating: 4.95,
+        king3v3: 'Brett Corbett',
+        king3v3Rating: 4.90,
+        king5v5: 'Brett Corbett',
+        king5v5Rating: 4.85,
+      );
+      
+      // Insert at the beginning so it appears prominently
+      _courts.insert(0, olympicClub);
 
       _isLoaded = true;
       print('Loaded ${_courts.length} courts from mock data');

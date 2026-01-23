@@ -9,6 +9,9 @@ class ScaffoldWithNavBar extends StatefulWidget {
   }) : super(key: key ?? const ValueKey<String>('ScaffoldWithNavBar'));
 
   final StatefulNavigationShell navigationShell;
+  
+  /// Static callback to refresh the badge from anywhere (e.g., after reading messages)
+  static void Function()? refreshBadge;
 
   @override
   State<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
@@ -16,18 +19,28 @@ class ScaffoldWithNavBar extends StatefulWidget {
 
 class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
   int _unreadCount = 0;
+  bool _hasLoadedInitially = false;
 
   @override
   void initState() {
     super.initState();
     _loadUnreadCount();
+    ScaffoldWithNavBar.refreshBadge = _loadUnreadCount;
+  }
+  
+  @override
+  void dispose() {
+    ScaffoldWithNavBar.refreshBadge = null;
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(ScaffoldWithNavBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Refresh unread count when returning to nav bar
-    _loadUnreadCount();
+    // Only refresh on first load, not every widget update (was causing stale data issue)
+    if (!_hasLoadedInitially) {
+      _loadUnreadCount();
+    }
   }
 
   Future<void> _loadUnreadCount() async {
@@ -36,6 +49,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
       if (mounted) {
         setState(() {
           _unreadCount = count;
+          _hasLoadedInitially = true;
         });
       }
     } catch (e) {
@@ -44,15 +58,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
   }
 
   void _onTap(BuildContext context, int index) {
-    // If navigating to messages tab, clear badge after a delay
-    if (index == 1) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          setState(() => _unreadCount = 0);
-        }
-      });
-    }
-    
+    // If navigating to messages tab, badge will be refreshed when they exit a chat
     widget.navigationShell.goBranch(
       index,
       initialLocation: index == widget.navigationShell.currentIndex,
@@ -81,7 +87,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
           ),
           const NavigationDestination(icon: Icon(Icons.sports_basketball), label: 'Play'),
           const NavigationDestination(icon: Icon(Icons.groups), label: 'Teams'),
-          const NavigationDestination(icon: Icon(Icons.person), label: 'Profile'),
+          const NavigationDestination(icon: Icon(Icons.place), label: 'Courts'),
         ],
       ),
     );

@@ -164,6 +164,19 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     });
   }
 
+  Widget _kingBadge(String mode, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(mode, style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -225,16 +238,61 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                         ),
                         MarkerLayer(
                           markers: _courts.map((court) {
+                            // Signature courts get the crown marker and are larger
+                            final isSignature = court.isSignature;
+                            final hasKings = court.hasKings;
+                            
+                            // Determine marker image and size (circular, so use same width/height)
+                            String markerAsset;
+                            double markerSize;
+                            
+                            if (isSignature) {
+                              // Signature courts: crown marker, larger size
+                              markerAsset = 'assets/court_marker_signature_crown.jpg';
+                              markerSize = 36;
+                            } else if (hasKings) {
+                              // Courts with kings: king marker
+                              markerAsset = 'assets/court_marker_king.jpg';
+                              markerSize = 28;
+                            } else {
+                              // Regular courts
+                              markerAsset = 'assets/court_marker.jpg';
+                              markerSize = 22;
+                            }
+                            
                             return Marker(
                               point: LatLng(court.lat, court.lng),
-                              width: 40,
-                              height: 40,
+                              width: markerSize,
+                              height: markerSize,
                               child: GestureDetector(
                                 onTap: () => widget.onCourtSelected(court),
-                                child: const Icon(
-                                  Icons.location_on,
-                                  color: Colors.red,
-                                  size: 40,
+                                child: Container(
+                                  width: markerSize,
+                                  height: markerSize,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isSignature 
+                                          ? Colors.amber 
+                                          : (hasKings ? Colors.orange : Colors.white),
+                                      width: isSignature ? 2.5 : 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.3),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipOval(
+                                    child: Image.asset(
+                                      markerAsset,
+                                      width: markerSize,
+                                      height: markerSize,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
                                 ),
                               ),
                             );
@@ -298,27 +356,80 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                   itemCount: _courts.length,
                   itemBuilder: (context, index) {
                     final court = _courts[index];
+                    
+                    // Determine which marker image to use for the list
+                    String listMarkerAsset;
+                    double listMarkerSize;
+                    Color borderColor;
+                    
+                    if (court.isSignature) {
+                      listMarkerAsset = 'assets/court_marker_signature_crown.jpg';
+                      listMarkerSize = 44;
+                      borderColor = Colors.amber;
+                    } else if (court.hasKings) {
+                      listMarkerAsset = 'assets/court_marker_king.jpg';
+                      listMarkerSize = 40;
+                      borderColor = Colors.orange;
+                    } else {
+                      listMarkerAsset = 'assets/court_marker.jpg';
+                      listMarkerSize = 36;
+                      borderColor = Colors.grey.shade400;
+                    }
+                    
                     return ListTile(
-                      leading: const Icon(Icons.sports_basketball, color: Colors.orange),
-                      title: Text(court.name),
+                      leading: Container(
+                        width: listMarkerSize,
+                        height: listMarkerSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: borderColor, width: 2),
+                        ),
+                        child: ClipOval(
+                          child: Image.asset(
+                            listMarkerAsset,
+                            width: listMarkerSize,
+                            height: listMarkerSize,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(court.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                          if (court.isSignature)
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                              ),
+                              child: const Text('★ Signature', 
+                                style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
+                            ),
+                        ],
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(court.address ?? 'No address'),
-                          if (court.king != null)
+                          if (court.address != null)
+                            Text(court.address!, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                 style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                          if (court.hasKings)
                             Padding(
                               padding: const EdgeInsets.only(top: 4.0),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.emoji_events, size: 16, color: Colors.amber),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'King: ${court.king}',
-                                    style: const TextStyle(
-                                      color: Colors.amber,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  const Text('👑 ', style: TextStyle(fontSize: 12)),
+                                  if (court.king1v1 != null)
+                                    _kingBadge('1v1', Colors.deepOrange),
+                                  if (court.king3v3 != null)
+                                    _kingBadge('3v3', Colors.blue),
+                                  if (court.king5v5 != null)
+                                    _kingBadge('5v5', Colors.purple),
                                 ],
                               ),
                             ),

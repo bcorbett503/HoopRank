@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../services/messages_service.dart';
 import '../widgets/player_profile_sheet.dart';
+import '../widgets/scaffold_with_nav_bar.dart';
 import 'chat_screen.dart';
 import 'team_chat_screen.dart';
 
@@ -268,9 +269,10 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
           onTap: () => PlayerProfileSheet.showById(context, conversation.user.id),
           child: Text(
             conversation.user.name,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.blue,
               decoration: TextDecoration.underline,
+              fontWeight: conversation.hasUnread ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ),
@@ -282,21 +284,43 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
           overflow: TextOverflow.ellipsis,
           style: conversation.lastMessage?.isChallenge == true
               ? const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)
-              : null,
+              : TextStyle(
+                  fontWeight: conversation.hasUnread ? FontWeight.w600 : FontWeight.normal,
+                  color: conversation.hasUnread ? Colors.white : Colors.grey,
+                ),
         ),
-        trailing: conversation.lastMessage != null
-            ? Text(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (conversation.hasUnread) ...[
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: Colors.blue,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (conversation.lastMessage != null)
+              Text(
                 _formatDate(conversation.lastMessage!.createdAt),
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
-              )
-            : null,
+              ),
+          ],
+        ),
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ChatScreen(otherUser: conversation.user),
             ),
-          ).then((_) => _loadAllConversations());
+          ).then((_) {
+            _loadAllConversations();
+            // Refresh the unread badge after reading messages
+            ScaffoldWithNavBar.refreshBadge?.call();
+          });
         },
       ),
     );

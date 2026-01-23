@@ -53,16 +53,20 @@ class Conversation {
   final String? threadId;
   final User user;
   final Message? lastMessage;
+  final int unreadCount;
 
-  Conversation({this.threadId, required this.user, this.lastMessage});
+  Conversation({this.threadId, required this.user, this.lastMessage, this.unreadCount = 0});
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
     return Conversation(
       threadId: json['threadId'],
       user: User.fromJson(json['user']),
       lastMessage: json['lastMessage'] != null ? Message.fromJson(json['lastMessage']) : null,
+      unreadCount: json['unreadCount'] ?? 0,
     );
   }
+  
+  bool get hasUnread => unreadCount > 0;
 }
 
 class ChallengeRequest {

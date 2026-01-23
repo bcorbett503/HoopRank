@@ -5,6 +5,7 @@ import '../services/mock_data.dart';
 import '../services/location_service.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../state/app_state.dart';
 import '../models.dart';
@@ -32,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Register for push notification refresh
+    NotificationService.addOnNotificationListener(_refreshAll);
     _loadCurrentRating(); // Fetch fresh rating from API
     _loadChallenges();
     _loadPendingConfirmations();
@@ -105,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    NotificationService.removeOnNotificationListener(_refreshAll);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -693,6 +697,48 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _declineChallenge(ChallengeRequest challenge) async {
+    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+    
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Decline Challenge?'),
+        content: Text('Decline the challenge from ${challenge.sender.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Yes, Decline'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      try {
+        await _messagesService.declineChallenge(userId, challenge.message.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Declined challenge from ${challenge.sender.name}')),
+          );
+          _loadChallenges();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _acceptChallenge(ChallengeRequest challenge) async {
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
@@ -747,11 +793,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text('HoopRank'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() => _isLoadingChallenges = true);
-              _loadChallenges();
+          // Profile avatar button (replaced refresh)
+          Consumer<AuthState>(
+            builder: (context, auth, _) {
+              final photoUrl = auth.currentUser?.photoUrl;
+              return GestureDetector(
+                onTap: () => context.push('/profile'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                    child: photoUrl == null
+                        ? const Icon(Icons.person, size: 18)
+                        : null,
+                  ),
+                ),
+              );
             },
           ),
           IconButton(
@@ -1172,15 +1230,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         ),
                                       ),
                                     )
-                                  else
+                                  else ...[
+                                    // Accept button
                                     Expanded(
                                       flex: 1,
                                       child: Material(
                                         color: Colors.deepOrange.withOpacity(0.1),
-                                        borderRadius: const BorderRadius.only(bottomRight: Radius.circular(16)),
+                                        borderRadius: BorderRadius.zero,
                                         child: InkWell(
                                           onTap: () => _acceptChallenge(challenge),
-                                          borderRadius: const BorderRadius.only(bottomRight: Radius.circular(16)),
+                                          borderRadius: BorderRadius.zero,
                                           child: Container(
                                             padding: const EdgeInsets.symmetric(vertical: 12),
                                             child: Row(
@@ -1195,6 +1254,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         ),
                                       ),
                                     ),
+                                    // Divider between accept and decline
+                                    Container(width: 1, height: 24, color: Colors.grey[200]),
+                                    // Decline button (red X) on the right
+                                    SizedBox(
+                                      width: 44,
+                                      child: InkWell(
+                                        onTap: () => _declineChallenge(challenge),
+                                        borderRadius: const BorderRadius.only(bottomRight: Radius.circular(16)),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          child: Icon(Icons.close, size: 18, color: Colors.red[400]),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter/services.dart';
 
 class AuthService {
@@ -43,6 +44,54 @@ class AuthService {
       );
     } catch (e) {
       print('Error signing in with email: $e');
+      rethrow;
+    }
+  }
+
+  // Sign in with Apple
+  static Future<UserCredential?> signInWithApple() async {
+    try {
+      // Request Apple credential
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // Create OAuth credential for Firebase
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      // Sign in to Firebase with the Apple credential
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
+
+      // Apple only returns the name on first sign-in, so update it if provided
+      if (appleCredential.givenName != null || appleCredential.familyName != null) {
+        final displayName = [
+          appleCredential.givenName,
+          appleCredential.familyName,
+        ].where((n) => n != null).join(' ');
+        
+        if (displayName.isNotEmpty) {
+          await userCredential.user?.updateDisplayName(displayName);
+        }
+      }
+
+      return userCredential;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        return null; // User canceled
+      }
+      print('Apple Sign-In Authorization Error: ${e.message}');
+      rethrow;
+    } on PlatformException catch (e) {
+      print('Apple Sign-In Platform Error: ${e.message}');
+      rethrow;
+    } catch (e) {
+      print('Error signing in with Apple: $e');
       rethrow;
     }
   }
