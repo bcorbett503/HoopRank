@@ -18,11 +18,31 @@ import { NotificationsModule } from './notifications/notifications.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    TypeOrmModule.forRoot({
-      type: 'better-sqlite3',
-      database: 'hooprank.db',
-      entities: [User, Court, Match, Message],
-      synchronize: true, // Auto-create tables (dev only)
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+
+        if (databaseUrl) {
+          // Production: Use PostgreSQL
+          return {
+            type: 'postgres',
+            url: databaseUrl,
+            entities: [User, Court, Match, Message],
+            synchronize: false, // Don't auto-sync in production
+            ssl: false, // Railway internal connection doesn't need SSL
+          };
+        } else {
+          // Development: Use SQLite
+          return {
+            type: 'better-sqlite3',
+            database: 'hooprank.db',
+            entities: [User, Court, Match, Message],
+            synchronize: true,
+          } as any;
+        }
+      },
     }),
     MatchesModule,
     UsersModule,
@@ -33,3 +53,4 @@ import { NotificationsModule } from './notifications/notifications.module';
   ],
 })
 export class AppModule { }
+
