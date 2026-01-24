@@ -56,6 +56,9 @@ export class User {
     @Column({ default: 0 })
     matchesPlayed: number;
 
+    @Column({ nullable: true })
+    fcmToken: string;
+
     @CreateDateColumn()
     createdAt: Date;
 

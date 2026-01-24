@@ -11,6 +11,7 @@ import { Match } from './matches/match.entity';
 import { Message } from './messages/message.entity';
 import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { MessagesModule } from './messages/messages.module';
     CourtsModule,
     MessagesModule,
     FirebaseModule,
+    NotificationsModule,
   ],
 })
 export class AppModule { }
