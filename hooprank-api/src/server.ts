@@ -3091,6 +3091,39 @@ app.use(((err: any, _req, res, _next) => {
   res.status(http).json({ error: err.message ?? "internal_error" });
 }) as ErrorRequestHandler);
 
-app.listen(PORT, () => {
-  console.log(`HoopRank API listening on http://0.0.0.0:${PORT}`);
+// Ensure follow tables exist (auto-migration)
+async function ensureFollowTables() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_followed_courts (
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        court_id TEXT NOT NULL,
+        alerts_enabled BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (user_id, court_id)
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_followed_players (
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        player_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (user_id, player_id)
+      )
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_followed_courts_user ON user_followed_courts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_followed_players_user ON user_followed_players(user_id);
+    `);
+    console.log("✓ Follow tables ensured");
+  } catch (e) {
+    console.error("Error ensuring follow tables:", e);
+  }
+}
+
+// Start server
+ensureFollowTables().then(() => {
+  app.listen(PORT, () => {
+    console.log(`HoopRank API listening on http://0.0.0.0:${PORT}`);
+  });
 });
