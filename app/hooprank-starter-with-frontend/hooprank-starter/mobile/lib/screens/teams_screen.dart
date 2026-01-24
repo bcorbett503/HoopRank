@@ -308,6 +308,109 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     }
   }
 
+  void _showCreateChallengeSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.sports_basketball, color: Colors.green, size: 24),
+                SizedBox(width: 8),
+                Text(
+                  'Create Team Challenge',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Select game type to find opponents',
+              style: TextStyle(color: Colors.grey[400], fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            // 3v3 option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  '3v3',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+              title: const Text('3v3 Challenge'),
+              subtitle: const Text('Find 3v3 teams to play'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.pop(ctx);
+                // Navigate to Team Rankings with 3v3 and Local filter
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const _TeamRankingsWithFilter(teamType: '3v3'),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            // 5v5 option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.purple,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  '5v5',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+              title: const Text('5v5 Challenge'),
+              subtitle: const Text('Find 5v5 teams to play'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.pop(ctx);
+                // Navigate to Team Rankings with 5v5 and Local filter
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const _TeamRankingsWithFilter(teamType: '5v5'),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey[400],
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Cancel'),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -351,11 +454,29 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 _buildInvitesTab(),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateTeamDialog,
-        backgroundColor: Colors.deepOrange,
-        icon: const Icon(Icons.add),
-        label: const Text('Create Team'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Create Challenge button
+          if (_myTeams.isNotEmpty)
+            FloatingActionButton.extended(
+              heroTag: 'createChallenge',
+              onPressed: _showCreateChallengeSheet,
+              backgroundColor: Colors.green,
+              icon: const Icon(Icons.sports_basketball),
+              label: const Text('Create Challenge'),
+            ),
+          if (_myTeams.isNotEmpty) const SizedBox(height: 12),
+          // Create Team button
+          FloatingActionButton.extended(
+            heroTag: 'createTeam',
+            onPressed: _showCreateTeamDialog,
+            backgroundColor: Colors.deepOrange,
+            icon: const Icon(Icons.add),
+            label: const Text('Create Team'),
+          ),
+        ],
       ),
     );
   }
@@ -576,6 +697,128 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Helper widget to show Team Rankings filtered by team type and Local
+class _TeamRankingsWithFilter extends StatefulWidget {
+  final String teamType;
+  
+  const _TeamRankingsWithFilter({required this.teamType});
+
+  @override
+  State<_TeamRankingsWithFilter> createState() => _TeamRankingsWithFilterState();
+}
+
+class _TeamRankingsWithFilterState extends State<_TeamRankingsWithFilter> {
+  List<Map<String, dynamic>> _teams = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTeams();
+  }
+
+  Future<void> _loadTeams() async {
+    setState(() => _isLoading = true);
+    try {
+      // Load teams of the specified type, filtered by local
+      final teams = await ApiService.getTeamRankings(
+        teamType: widget.teamType,
+        scope: 'local',
+      );
+      if (mounted) {
+        setState(() {
+          _teams = teams;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading teams: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${widget.teamType} Teams - Local'),
+        backgroundColor: widget.teamType == '3v3' ? Colors.blue : Colors.purple,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _teams.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.groups, size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No ${widget.teamType} teams nearby',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Be the first to challenge!',
+                        style: TextStyle(color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadTeams,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _teams.length,
+                    itemBuilder: (context, index) {
+                      final team = _teams[index];
+                      final rating = (team['rating'] as num?)?.toDouble() ?? 3.0;
+                      final wins = team['wins'] ?? 0;
+                      final losses = team['losses'] ?? 0;
+                      
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: widget.teamType == '3v3' 
+                                ? Colors.blue.withOpacity(0.2) 
+                                : Colors.purple.withOpacity(0.2),
+                            child: Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                color: widget.teamType == '3v3' ? Colors.blue : Colors.purple,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            team['name'] ?? 'Team',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text('⭐ ${rating.toStringAsFixed(2)} • $wins W - $losses L'),
+                          trailing: ElevatedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Challenge sent to ${team['name']}!')),
+                              );
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                            child: const Text('Challenge'),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
     );
   }
 }

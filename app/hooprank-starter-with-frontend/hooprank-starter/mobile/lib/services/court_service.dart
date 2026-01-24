@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models.dart';
 import 'mock_courts_data.dart';
+import 'indoor_gyms_data.dart';
 
 class CourtService {
   static final CourtService _instance = CourtService._internal();
@@ -16,16 +17,19 @@ class CourtService {
     if (_isLoaded) return;
 
     try {
-      // Use hardcoded mock data (from OSM Overpass)
-      final List<Map<String, dynamic>> data = mockCourtsData;
+      // Load outdoor basketball courts
+      final List<Map<String, dynamic>> outdoorData = mockCourtsData;
+      
+      // Load indoor venues (gyms, schools, rec centers)
+      final List<Map<String, dynamic>> indoorData = indoorGymsData;
 
-      _courts = data.map((json) {
+      // Process outdoor courts
+      final outdoorCourts = outdoorData.map((json) {
         final id = (json['id'] as String?) ?? 'unknown';
         final name = (json['name'] as String?) ?? 'Basketball Court';
         final hash = id.hashCode.abs();
         
         // Determine if this is a signature court
-        // Signature courts have special names or are well-known venues
         final nameUpper = name.toUpperCase();
         final isSignature = nameUpper.contains('ARENA') ||
             nameUpper.contains('CENTER') ||
@@ -36,7 +40,7 @@ class CourtService {
             nameUpper.contains('GYM') ||
             nameUpper.contains('FIELDHOUSE') ||
             nameUpper.contains('OLYMPIC CLUB') ||
-            (hash % 15 == 0); // Also include ~7% of other courts for demo
+            (hash % 15 == 0);
 
         return Court(
           id: id,
@@ -45,12 +49,33 @@ class CourtService {
           lng: (json['lng'] as num).toDouble(),
           address: (json['city'] as String?) ?? (json['address'] as String?),
           isSignature: isSignature,
-          // Kings will be populated from real backend data when available
+          isIndoor: false,
         );
       }).toList();
+      
+      // Process indoor venues
+      final indoorCourts = indoorData.map((json) {
+        final id = (json['id'] as String?) ?? 'unknown';
+        final name = (json['name'] as String?) ?? 'Indoor Court';
+        final category = (json['category'] as String?) ?? 'other';
+        
+        // All indoor venues are signature courts
+        return Court(
+          id: id,
+          name: name,
+          lat: (json['lat'] as num).toDouble(),
+          lng: (json['lng'] as num).toDouble(),
+          address: (json['city'] as String?) ?? (json['address'] as String?),
+          isSignature: true,
+          isIndoor: true,
+        );
+      }).toList();
+      
+      // Merge both datasets
+      _courts = [...outdoorCourts, ...indoorCourts];
 
       // Add The Olympic Club San Francisco as a featured signature court
-      // Located at 524 Post Street, San Francisco
+      const brettUserId = '3zIDc7PjlYYksXxZp6nH6EbILeh1';
       final olympicClub = Court(
         id: 'olympic_club_sf',
         name: 'The Olympic Club',
@@ -58,24 +83,26 @@ class CourtService {
         lng: -122.4099,
         address: '524 Post Street, San Francisco, CA',
         isSignature: true,
+        isIndoor: true,
         king1v1: 'Brett Corbett',
+        king1v1Id: brettUserId,
         king1v1Rating: 4.95,
-        king3v3: 'Brett Corbett',
-        king3v3Rating: 4.90,
-        king5v5: 'Brett Corbett',
-        king5v5Rating: 4.85,
       );
       
       // Insert at the beginning so it appears prominently
       _courts.insert(0, olympicClub);
 
       _isLoaded = true;
-      print('Loaded ${_courts.length} courts from mock data');
+      print('Loaded ${_courts.length} courts (${outdoorCourts.length} outdoor, ${indoorCourts.length} indoor)');
     } catch (e, st) {
       print('Error loading courts: $e\n$st');
       _courts = [];
     }
   }
+
+
+  /// Get all loaded courts
+  List<Court> get courts => _courts;
 
   List<Court> getCourts() {
     return _courts;

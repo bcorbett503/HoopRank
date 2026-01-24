@@ -8,7 +8,10 @@ import '../services/messages_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../state/app_state.dart';
+import '../state/check_in_state.dart';
 import '../models.dart';
+import '../services/court_service.dart';
+import 'map_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -421,6 +424,87 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _has3v3Team() => _myTeams.any((t) => t['teamType'] == '3v3');
   bool _has5v5Team() => _myTeams.any((t) => t['teamType'] == '5v5');
 
+  void _showStatusUpdateDialog(BuildContext context, CheckInState checkInState) {
+    final user = Provider.of<AuthState>(context, listen: false).currentUser;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _StatusComposerSheet(
+        checkInState: checkInState,
+        userName: user?.name ?? 'Unknown',
+        userPhotoUrl: user?.photoUrl,
+        initialStatus: checkInState.getMyStatus(),
+      ),
+    );
+  }
+
+  void _showQuickChallengeSheet(BuildContext context, String playerId, String playerName) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Challenge $playerName',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Send a 1v1 challenge request',
+              style: TextStyle(color: Colors.grey[400], fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  // Navigate to match flow
+                  context.go('/play');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Challenge sent to $playerName!')),
+                  );
+                },
+                icon: const Icon(Icons.sports_basketball),
+                label: const Text('Send 1v1 Challenge'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepOrange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey[400],
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Cancel'),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showTeamChallengeFlow(String teamType) {
     final myTeam = _myTeams.firstWhere(
       (t) => t['teamType'] == teamType,
@@ -813,6 +897,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'View Tutorial',
+            onPressed: () async {
+              final auth = Provider.of<AuthState>(context, listen: false);
+              await auth.resetOnboarding();
+              if (context.mounted) {
+                context.go('/onboarding');
+              }
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               final auth = Provider.of<AuthState>(context, listen: false);
@@ -872,15 +967,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        ElevatedButton.icon(
-                          onPressed: _showStartGameModeDialog,
-                          icon: const Icon(Icons.play_arrow, size: 18),
-                          label: const Text('Start a Game'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.deepOrange,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          ),
+                        // Status update button
+                        Consumer<CheckInState>(
+                          builder: (context, checkInState, _) {
+                            final currentStatus = checkInState.getMyStatus();
+                            return GestureDetector(
+                              onTap: () => _showStatusUpdateDialog(context, checkInState),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      currentStatus != null ? Icons.edit_note : Icons.add_comment,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      currentStatus ?? "What are you up to?",
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(currentStatus != null ? 1.0 : 0.8),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -1325,14 +1445,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
-                                  isSent 
-                                      ? 'Challenge sent to $otherTeamName'
-                                      : '$otherTeamName challenged you!',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isSent 
+                                          ? 'Challenge sent to $otherTeamName'
+                                          : '$otherTeamName challenged you!',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    if (otherTeam?['rating'] != null)
+                                      Text(
+                                        '⭐ ${_parseRating(otherTeam!['rating']).toStringAsFixed(2)}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                                      ),
+                                  ],
                                 ),
                               ),
-                              if (isSent)
+                              if (isSent && matchId != null)
+                                IconButton(
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Cancel Challenge?'),
+                                        content: Text('Cancel your team challenge to $otherTeamName?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: const Text('No'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                            child: const Text('Yes, Cancel'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      try {
+                                        await ApiService.declineTeamChallenge(matchId);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Challenge to $otherTeamName cancelled')),
+                                        );
+                                        _loadTeamChallenges();
+                                      } catch (e) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Error: $e')),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+                                  tooltip: 'Cancel Challenge',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                )
+                              else if (isSent)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
@@ -1510,192 +1680,491 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 24),
               ],
 
-              // Local Activity Feed Section
+              // Followed Courts Section
               Row(
                 children: [
-                  Icon(Icons.stadium, color: Colors.deepOrange, size: 24),
+                  Icon(Icons.favorite, color: Colors.red, size: 24),
                   const SizedBox(width: 8),
                   const Text(
-                    'Feed',
+                    'Followed Courts',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               const Text(
-                'Recent matches from HoopRank',
+                'Activity at courts you follow',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
               const SizedBox(height: 12),
-              if (_isLoadingActivity)
-                const Center(child: CircularProgressIndicator())
-              else if (_localActivity.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[850],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[700]!, width: 1),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.sports_basketball, size: 48, color: Colors.grey[600]),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'No recent matches yet',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              Consumer<CheckInState>(
+                builder: (context, checkInState, _) {
+                  // Check if there are any followed courts first
+                  if (checkInState.followedCourts.isEmpty) {
+                    // Empty state - no courts followed
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[700]!, width: 1),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Play a match and show up here!',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => context.go('/rankings'),
-                        icon: const Icon(Icons.search, size: 18),
-                        label: const Text('Find Players'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepOrange,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                ...(_localActivity.map((game) {
-                  final p1 = game['player1'] as Map<String, dynamic>;
-                  final p2 = game['player2'] as Map<String, dynamic>;
-                  final score = game['score'] as Map<String, dynamic>;
-                  final winnerId = game['winnerId'];
-                  
-                  return Card(
-                    color: Colors.grey[850],
-                    margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Match header with players
-                          Row(
-                            children: [
-                              // Player 1
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _showChallengeDialog(p1),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 20,
-                                        backgroundImage: p1['avatarUrl'] != null
-                                            ? NetworkImage(p1['avatarUrl'])
-                                            : null,
-                                        child: p1['avatarUrl'] == null
-                                            ? Text((p1['name'] ?? '?')[0].toUpperCase())
-                                            : null,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              p1['name'] ?? 'Player 1',
-                                              style: TextStyle(
-                                                fontWeight: winnerId == p1['id'] ? FontWeight.bold : FontWeight.normal,
-                                                color: winnerId == p1['id'] ? Colors.green : Colors.white,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            Text(
-                                              '⭐ ${_parseRating(p1['rating']).toStringAsFixed(1)}',
-                                              style: const TextStyle(color: Colors.grey, fontSize: 11),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              // Score
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.deepOrange.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '${score['player1'] ?? 0} - ${score['player2'] ?? 0}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.deepOrange,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              // Player 2
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _showChallengeDialog(p2),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              p2['name'] ?? 'Player 2',
-                                              style: TextStyle(
-                                                fontWeight: winnerId == p2['id'] ? FontWeight.bold : FontWeight.normal,
-                                                color: winnerId == p2['id'] ? Colors.green : Colors.white,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.end,
-                                            ),
-                                            Text(
-                                              '⭐ ${_parseRating(p2['rating']).toStringAsFixed(1)}',
-                                              style: const TextStyle(color: Colors.grey, fontSize: 11),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      CircleAvatar(
-                                        radius: 20,
-                                        backgroundImage: p2['avatarUrl'] != null
-                                            ? NetworkImage(p2['avatarUrl'])
-                                            : null,
-                                        child: p2['avatarUrl'] == null
-                                            ? Text((p2['name'] ?? '?')[0].toUpperCase())
-                                            : null,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
+                          Icon(Icons.location_on_outlined, size: 48, color: Colors.grey[600]),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No courts followed yet',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                           ),
-                          const SizedBox(height: 8),
-                          // Location info
-                          if (p1['city'] != null || p2['city'] != null)
-                            Text(
-                              '📍 ${p1['city'] ?? p2['city'] ?? ''}',
-                              style: const TextStyle(color: Colors.grey, fontSize: 11),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Follow courts to see activity here',
+                            style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () => context.go('/courts'),
+                            icon: const Icon(Icons.map, size: 18),
+                            label: const Text('Find Courts to Follow'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             ),
+                          ),
                         ],
                       ),
-                    ),
+                    );
+                  }
+                  
+                  // Use FutureBuilder to load court data with names
+                  return FutureBuilder<List<FollowedCourtInfo>>(
+                    future: checkInState.getFollowedCourtsWithActivity(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+                      
+                      final followedCourts = snapshot.data!;
+                      // Filter out unknown courts (ones that couldn't be resolved)
+                      final validCourts = followedCourts.where((c) => c.courtName != 'Unknown Court').toList();
+                      if (validCourts.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      // Show individual court cards
+                      return Column(
+                        children: validCourts.map((courtInfo) {
+
+
+                      return Card(
+                        color: Colors.grey[850],
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: InkWell(
+                          onTap: () {
+                            // Look up court and show details sheet directly
+                            final court = CourtService().getCourtById(courtInfo.courtId);
+                            if (court != null) {
+                              CourtDetailsSheet.show(context, court);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Court header
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            courtInfo.courtName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 15,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (courtInfo.checkInCount > 0)
+                                            Text(
+                                              '${courtInfo.checkInCount} player${courtInfo.checkInCount == 1 ? '' : 's'} checked in',
+                                              style: TextStyle(
+                                                color: Colors.green[400],
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Alert bell indicator
+                                    Consumer<CheckInState>(
+                                      builder: (context, checkInState, _) {
+                                        final hasAlert = checkInState.isAlertEnabled(courtInfo.courtId);
+                                        return GestureDetector(
+                                          onTap: () => checkInState.toggleAlert(courtInfo.courtId),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                                            child: Icon(
+                                              hasAlert ? Icons.notifications_active : Icons.notifications_none,
+                                              color: hasAlert ? Colors.orange : Colors.grey[500],
+                                              size: 20,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    Icon(Icons.chevron_right, color: Colors.grey[600]),
+                                  ],
+                                ),
+                                // Recent activity
+                                if (courtInfo.recentActivity.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  const Divider(height: 1),
+                                  const SizedBox(height: 10),
+                                  ...courtInfo.recentActivity.take(2).map((activity) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 6),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle,
+                                            color: Colors.green[400],
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: activity.playerId != null
+                                                ? GestureDetector(
+                                                    onTap: () => PlayerProfileSheet.showById(context, activity.playerId!),
+                                                    child: Text.rich(
+                                                      TextSpan(
+                                                        children: [
+                                                          TextSpan(
+                                                            text: activity.playerName ?? 'Someone',
+                                                            style: TextStyle(
+                                                              color: Colors.blue[300],
+                                                              fontSize: 13,
+                                                              decoration: TextDecoration.underline,
+                                                            ),
+                                                          ),
+                                                          TextSpan(
+                                                            text: ' checked in',
+                                                            style: TextStyle(
+                                                              color: Colors.grey[400],
+                                                              fontSize: 13,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    activity.description,
+                                                    style: TextStyle(
+                                                      color: Colors.grey[400],
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                          ),
+                                          Text(
+                                            activity.timeAgo,
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+
+                                ] else ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'No recent check-ins',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                      );
+                    },
                   );
-                })),
+                },
+              ),
+
+              const SizedBox(height: 24),
+              
+              // Followed Players Section
+              const Row(
+                children: [
+                  Icon(Icons.people, color: Colors.blue, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'Followed Players',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Players you follow',
+                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              Consumer<CheckInState>(
+                builder: (context, checkInState, _) {
+                  final followedPlayerIds = checkInState.followedPlayers.toList();
+                  
+                  if (followedPlayerIds.isEmpty) {
+                    // Empty state - no players followed
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[700]!, width: 1),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.person_add_alt_1, size: 48, color: Colors.grey[600]),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No players followed yet',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Tap the ❤️ on any player profile to follow them',
+                            style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () => context.go('/rankings'),
+                            icon: const Icon(Icons.leaderboard, size: 18),
+                            label: const Text('Browse Players'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  
+                  // Use FutureBuilder to load player info with activities
+                  return FutureBuilder<List<FollowedPlayerInfo>>(
+                    future: checkInState.getFollowedPlayersInfo(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+                      
+                      final players = snapshot.data!;
+                      if (players.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      return Column(
+                        children: players.take(5).map((player) {
+                          return Card(
+                            color: Colors.grey[850],
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: InkWell(
+                              onTap: () => PlayerProfileSheet.showById(context, player.playerId),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Player header row
+                                    Row(
+                                      children: [
+                                        // Avatar
+                                        CircleAvatar(
+                                          radius: 22,
+                                          backgroundImage: player.photoUrl != null 
+                                              ? NetworkImage(player.photoUrl!) 
+                                              : null,
+                                          backgroundColor: Colors.blue.withOpacity(0.2),
+                                          child: player.photoUrl == null
+                                              ? Text(
+                                                  player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
+                                                  style: const TextStyle(color: Colors.blue),
+                                                )
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        // Name and rating
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                player.name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 15,
+                                                ),
+                                              ),
+                                              Text(
+                                                '⭐ ${player.rating.toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  color: Colors.grey[400],
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Action icons (like Rankings page)
+                                        // Message button
+                                        IconButton(
+                                          onPressed: () {
+                                            context.go('/messages');
+                                          },
+                                          icon: Icon(Icons.chat_bubble_outline, 
+                                            color: Colors.grey[400], 
+                                            size: 20,
+                                          ),
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        ),
+                                        // Challenge button
+                                        IconButton(
+                                          onPressed: () {
+                                            // Start a 1v1 challenge flow
+                                            _showQuickChallengeSheet(context, player.playerId, player.name);
+                                          },
+                                          icon: Icon(Icons.sports_basketball, 
+                                            color: Colors.deepOrange, 
+                                            size: 20,
+                                          ),
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        ),
+                                        // Follow heart (to unfollow)
+                                        IconButton(
+                                          onPressed: () => checkInState.unfollowPlayer(player.playerId),
+                                          icon: const Icon(Icons.favorite, color: Colors.red, size: 20),
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        ),
+                                      ],
+                                    ),
+                                    
+                                    // Activity feed (if any activities)
+                                    if (player.recentActivity.isNotEmpty) ...[
+                                      const SizedBox(height: 10),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[800],
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: player.recentActivity.take(3).map((activity) {
+                                            return Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 4),
+                                              child: Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    activity.icon ?? '•',
+                                                    style: const TextStyle(fontSize: 14),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          activity.description,
+                                                          style: const TextStyle(
+                                                            fontSize: 13,
+                                                            height: 1.3,
+                                                          ),
+                                                          maxLines: 2,
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
+                                                        Text(
+                                                          activity.timeAgo,
+                                                          style: TextStyle(
+                                                            color: Colors.grey[500],
+                                                            fontSize: 11,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      // No recent activity message
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'No recent activity',
+                                        style: TextStyle(
+                                          color: Colors.grey[500],
+                                          fontSize: 12,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  );
+                },
+              ),
+
               const SizedBox(height: 32),
             ],
           ),
@@ -1840,6 +2309,411 @@ class _TeamSelectionSheetState extends State<_TeamSelectionSheet> {
                     ),
         ),
       ],
+    );
+  }
+}
+
+/// Enhanced status composer with @-mention support for tagging players and courts
+class _StatusComposerSheet extends StatefulWidget {
+  final CheckInState checkInState;
+  final String userName;
+  final String? userPhotoUrl;
+  final String? initialStatus;
+
+  const _StatusComposerSheet({
+    required this.checkInState,
+    required this.userName,
+    this.userPhotoUrl,
+    this.initialStatus,
+  });
+
+  @override
+  State<_StatusComposerSheet> createState() => _StatusComposerSheetState();
+}
+
+class _StatusComposerSheetState extends State<_StatusComposerSheet> {
+  late TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+  
+  // Tagged entities
+  final List<Map<String, String>> _taggedPlayers = [];
+  final List<Map<String, String>> _taggedCourts = [];
+  
+  // Autocomplete state
+  bool _showAutocomplete = false;
+  String _searchQuery = '';
+  String _searchType = 'player'; // 'player' or 'court'
+  int _mentionStartIndex = -1;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialStatus ?? '');
+    _controller.addListener(_onTextChanged);
+  }
+  
+  @override
+  void dispose() {
+    _controller.removeListener(_onTextChanged);
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+  
+  void _onTextChanged() {
+    final text = _controller.text;
+    final cursorPos = _controller.selection.baseOffset;
+    
+    if (cursorPos < 0 || cursorPos > text.length) {
+      _hideAutocomplete();
+      return;
+    }
+    
+    // Look backwards for @ symbol
+    int atIndex = -1;
+    for (int i = cursorPos - 1; i >= 0; i--) {
+      if (text[i] == '@') {
+        atIndex = i;
+        break;
+      } else if (text[i] == ' ' || text[i] == '\n') {
+        break;
+      }
+    }
+    
+    if (atIndex >= 0) {
+      final query = text.substring(atIndex + 1, cursorPos).toLowerCase();
+      setState(() {
+        _showAutocomplete = true;
+        _searchQuery = query;
+        _mentionStartIndex = atIndex;
+      });
+    } else {
+      _hideAutocomplete();
+    }
+  }
+  
+  void _hideAutocomplete() {
+    if (_showAutocomplete) {
+      setState(() {
+        _showAutocomplete = false;
+        _searchQuery = '';
+        _mentionStartIndex = -1;
+      });
+    }
+  }
+  
+  List<Map<String, dynamic>> _getPlayerSuggestions() {
+    final players = <Map<String, dynamic>>[];
+    
+    // Add followed players
+    for (final playerId in widget.checkInState.followedPlayers) {
+      final name = widget.checkInState.getPlayerName(playerId);
+      if (name.toLowerCase().contains(_searchQuery)) {
+        players.add({'id': playerId, 'name': name, 'type': 'player'});
+      }
+    }
+    
+    // Add mock suggestions if empty
+    if (players.isEmpty && _searchQuery.isEmpty) {
+      players.addAll([
+        {'id': 'demo_player_1', 'name': 'Marcus Johnson', 'type': 'player'},
+        {'id': 'demo_player_2', 'name': 'Sarah Chen', 'type': 'player'},
+        {'id': 'demo_player_3', 'name': 'Mike Williams', 'type': 'player'},
+      ]);
+    }
+    
+    return players.take(5).toList();
+  }
+  
+  List<Map<String, dynamic>> _getCourtSuggestions() {
+    final courts = <Map<String, dynamic>>[];
+    final courtService = CourtService();
+    
+    // Add followed courts
+    for (final courtId in widget.checkInState.followedCourts) {
+      final court = courtService.getCourtById(courtId);
+      if (court != null && court.name.toLowerCase().contains(_searchQuery)) {
+        courts.add({'id': courtId, 'name': court.name, 'type': 'court'});
+      }
+    }
+    
+    // If no matches from followed, search all courts
+    if (courts.isEmpty && _searchQuery.length >= 2) {
+      for (final court in courtService.courts.take(50)) {
+        if (court.name.toLowerCase().contains(_searchQuery)) {
+          courts.add({'id': court.id, 'name': court.name, 'type': 'court'});
+          if (courts.length >= 5) break;
+        }
+      }
+    }
+    
+    return courts.take(5).toList();
+  }
+  
+  void _insertMention(Map<String, dynamic> item) {
+    final text = _controller.text;
+    final cursorPos = _controller.selection.baseOffset;
+    
+    // Replace @query with @name
+    final beforeMention = text.substring(0, _mentionStartIndex);
+    final afterMention = cursorPos < text.length ? text.substring(cursorPos) : '';
+    final mentionText = '@${item['name']} ';
+    
+    final newText = beforeMention + mentionText + afterMention;
+    _controller.text = newText;
+    _controller.selection = TextSelection.collapsed(
+      offset: beforeMention.length + mentionText.length,
+    );
+    
+    // Add to tagged list
+    setState(() {
+      if (item['type'] == 'player') {
+        if (!_taggedPlayers.any((p) => p['id'] == item['id'])) {
+          _taggedPlayers.add({'id': item['id'] as String, 'name': item['name'] as String});
+        }
+      } else {
+        if (!_taggedCourts.any((c) => c['id'] == item['id'])) {
+          _taggedCourts.add({'id': item['id'] as String, 'name': item['name'] as String});
+        }
+      }
+    });
+    
+    _hideAutocomplete();
+  }
+  
+  void _removeTag(String type, String id) {
+    setState(() {
+      if (type == 'player') {
+        _taggedPlayers.removeWhere((p) => p['id'] == id);
+      } else {
+        _taggedCourts.removeWhere((c) => c['id'] == id);
+      }
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 20,
+        right: 20,
+        top: 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  "What's your status?",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
+                iconSize: 20,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Use @ to tag players and courts',
+            style: TextStyle(color: Colors.grey[400], fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          
+          // Text input - larger
+          TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            autofocus: true,
+            maxLength: 100,
+            maxLines: 3,
+            minLines: 2,
+            decoration: InputDecoration(
+              hintText: 'Looking for games at @Olympic Club... 🏀',
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              filled: true,
+              fillColor: Colors.grey[800],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.all(16),
+            ),
+          ),
+          
+          // Autocomplete dropdown
+          if (_showAutocomplete) ...[
+            const SizedBox(height: 4),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 180),
+              decoration: BoxDecoration(
+                color: Colors.grey[850],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[700]!),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Type toggle
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _searchType = 'player'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _searchType == 'player' ? Colors.deepOrange.withOpacity(0.3) : null,
+                              borderRadius: const BorderRadius.only(topLeft: Radius.circular(11)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person, size: 16, color: _searchType == 'player' ? Colors.deepOrange : Colors.grey),
+                                const SizedBox(width: 4),
+                                Text('Players', style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: _searchType == 'player' ? Colors.deepOrange : Colors.grey,
+                                )),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _searchType = 'court'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _searchType == 'court' ? Colors.blue.withOpacity(0.3) : null,
+                              borderRadius: const BorderRadius.only(topRight: Radius.circular(11)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.location_on, size: 16, color: _searchType == 'court' ? Colors.blue : Colors.grey),
+                                const SizedBox(width: 4),
+                                Text('Courts', style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: _searchType == 'court' ? Colors.blue : Colors.grey,
+                                )),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Divider(height: 1, color: Colors.grey[700]),
+                  // Suggestions
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      children: (_searchType == 'player' ? _getPlayerSuggestions() : _getCourtSuggestions())
+                          .map((item) => ListTile(
+                                dense: true,
+                                leading: CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: item['type'] == 'player' 
+                                      ? Colors.deepOrange.withOpacity(0.3) 
+                                      : Colors.blue.withOpacity(0.3),
+                                  child: Icon(
+                                    item['type'] == 'player' ? Icons.person : Icons.location_on,
+                                    size: 14,
+                                    color: item['type'] == 'player' ? Colors.deepOrange : Colors.blue,
+                                  ),
+                                ),
+                                title: Text(item['name'] as String, style: const TextStyle(fontSize: 14)),
+                                onTap: () => _insertMention(item),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
+          // Tagged chips
+          if (_taggedPlayers.isNotEmpty || _taggedCourts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                ..._taggedPlayers.map((p) => Chip(
+                  avatar: const Icon(Icons.person, size: 16, color: Colors.deepOrange),
+                  label: Text(p['name']!, style: const TextStyle(fontSize: 12)),
+                  backgroundColor: Colors.deepOrange.withOpacity(0.2),
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: () => _removeTag('player', p['id']!),
+                )),
+                ..._taggedCourts.map((c) => Chip(
+                  avatar: const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                  label: Text(c['name']!, style: const TextStyle(fontSize: 12)),
+                  backgroundColor: Colors.blue.withOpacity(0.2),
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: () => _removeTag('court', c['id']!),
+                )),
+              ],
+            ),
+          ],
+          
+          const SizedBox(height: 16),
+          
+          // Action buttons
+          Row(
+            children: [
+              if (widget.initialStatus != null)
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      widget.checkInState.clearMyStatus();
+                      Navigator.pop(context);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Clear Status'),
+                  ),
+                ),
+              if (widget.initialStatus != null) const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (_controller.text.isNotEmpty) {
+                      widget.checkInState.setMyStatus(
+                        _controller.text,
+                        userName: widget.userName,
+                        photoUrl: widget.userPhotoUrl,
+                      );
+                    }
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Post Status'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 }

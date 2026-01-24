@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
+import '../state/check_in_state.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
@@ -637,14 +638,23 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                                   builder: (_) => TeamDetailScreen(teamId: _playerTeamIds[player.id]!),
                                 ),
                               )
-                          : null,
-                      child: Text(
-                        player.team ?? 'No Team',
-                        style: TextStyle(
-                          color: _playerTeamIds[player.id] != null ? Colors.blue : Colors.grey[400],
-                          fontSize: 13,
-                          decoration: _playerTeamIds[player.id] != null ? TextDecoration.underline : null,
-                        ),
+                          : () => _showInviteToTeamDialog(player),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            player.team ?? 'No Team',
+                            style: TextStyle(
+                              color: _playerTeamIds[player.id] != null ? Colors.blue : Colors.grey[400],
+                              fontSize: 13,
+                              decoration: _playerTeamIds[player.id] != null ? TextDecoration.underline : null,
+                            ),
+                          ),
+                          if (player.team == null) ...[
+                            const SizedBox(width: 4),
+                            Icon(Icons.add_circle_outline, size: 14, color: Colors.grey[500]),
+                          ],
+                        ],
                       ),
                     ),
                   ],
@@ -680,14 +690,22 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 padding: EdgeInsets.zero,
                 onPressed: () => _showChallengeDialog(player),
               ),
-              // Add to team button
-              IconButton(
-                icon: const Icon(Icons.group_add, size: 20),
-                color: Colors.blue,
-                tooltip: 'Invite to team',
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                padding: EdgeInsets.zero,
-                onPressed: () => _showInviteToTeamDialog(player),
+              // Follow heart button
+              Consumer<CheckInState>(
+                builder: (context, checkInState, _) {
+                  final isFollowing = checkInState.isFollowingPlayer(player.id);
+                  return IconButton(
+                    icon: Icon(
+                      isFollowing ? Icons.favorite : Icons.favorite_border,
+                      size: 20,
+                    ),
+                    color: isFollowing ? Colors.red : Colors.grey[400],
+                    tooltip: isFollowing ? 'Unfollow' : 'Follow',
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => checkInState.toggleFollowPlayer(player.id),
+                  );
+                },
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,

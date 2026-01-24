@@ -696,6 +696,24 @@ class ApiService {
     return response.statusCode == 200;
   }
 
+  /// Get team rankings by type and scope
+  static Future<List<Map<String, dynamic>>> getTeamRankings({
+    required String teamType,
+    String scope = 'global',
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/rankings?mode=$teamType&scope=$scope'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data is List) {
+        return data.cast<Map<String, dynamic>>();
+      }
+    }
+    return [];
+  }
+
   // ===================
   // Team Challenges & Matches
   // ===================
@@ -794,6 +812,82 @@ class ApiService {
       return jsonDecode(response.body);
     }
     throw Exception('Failed to submit score: ${response.body}');
+  }
+
+  // ===================
+  // Follow API (Courts & Players)
+  // ===================
+
+  /// Get all user's follows (courts + players)
+  static Future<Map<String, dynamic>> getFollows() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/users/me/follows'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    return {'courts': [], 'players': []};
+  }
+
+  /// Follow a court
+  static Future<bool> followCourt(String courtId, {bool alertsEnabled = false}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users/me/follows/courts'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'courtId': courtId,
+        'alertsEnabled': alertsEnabled,
+      }),
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Unfollow a court
+  static Future<bool> unfollowCourt(String courtId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Set court alert preference
+  static Future<bool> setCourtAlert(String courtId, bool enabled) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}/alerts'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'enabled': enabled}),
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Follow a player
+  static Future<bool> followPlayer(String playerId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users/me/follows/players'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'playerId': playerId}),
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Unfollow a player
+  static Future<bool> unfollowPlayer(String playerId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/users/me/follows/players/$playerId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
   }
 }
 

@@ -328,6 +328,41 @@ class MessagesService {
     }
   }
 
+  /// Send a challenge to another player
+  Future<void> sendChallenge(String senderId, String receiverId, String message) async {
+    final token = await _getToken();
+    
+    print('=== SENDING CHALLENGE ===');
+    print('senderId: $senderId');
+    print('receiverId: $receiverId');
+    print('message: $message');
+    
+    final body = <String, dynamic>{
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'content': message,
+      'isChallenge': true,
+    };
+    
+    final response = await http.post(
+      Uri.parse('$baseUrl/messages'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'x-user-id': senderId,
+      },
+      body: json.encode(body),
+    );
+
+    print('Challenge response status: ${response.statusCode}');
+    print('Challenge response body: ${response.body}');
+
+    if (response.statusCode != 201) {
+      final errorBody = json.decode(response.body);
+      throw Exception(errorBody['message'] ?? errorBody['error'] ?? 'Failed to send challenge');
+    }
+  }
+
   // === Team Group Chat Methods ===
 
   /// Get list of team chats the user is a member of

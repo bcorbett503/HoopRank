@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/api_service.dart';
+import '../state/check_in_state.dart';
 
 /// A clickable player name that shows their profile when tapped
 class ClickablePlayerName extends StatelessWidget {
@@ -391,6 +393,20 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             ),
                           ],
                         ),
+                      ),
+                      // Follow heart icon
+                      Consumer<CheckInState>(
+                        builder: (context, checkInState, _) {
+                          final isFollowing = checkInState.isFollowingPlayer(player.id);
+                          return IconButton(
+                            onPressed: () => checkInState.toggleFollowPlayer(player.id),
+                            icon: Icon(
+                              isFollowing ? Icons.favorite : Icons.favorite_border,
+                              color: isFollowing ? Colors.red : Colors.grey,
+                              size: 28,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

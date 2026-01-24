@@ -13,8 +13,10 @@ import '../services/auth_service.dart';
 
 class AuthState extends ChangeNotifier {
   User? _currentUser;
+  bool _onboardingComplete = false;
 
   User? get currentUser => _currentUser;
+  bool get onboardingComplete => _onboardingComplete;
 
   AuthState() {
     _init();
@@ -22,6 +24,10 @@ class AuthState extends ChangeNotifier {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Check if onboarding has been completed
+    _onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+    
     final raw = prefs.getString('hooprank:user');
     if (raw != null) {
       try {
@@ -30,12 +36,26 @@ class AuthState extends ChangeNotifier {
         ApiService.setUserId(_currentUser!.id);
         // Register FCM token for existing session
         _registerFcmToken();
-        notifyListeners();
       } catch (e) {
         // Handle corruption
         await prefs.remove('hooprank:user');
       }
     }
+    notifyListeners();
+  }
+  
+  Future<void> completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_complete', true);
+    _onboardingComplete = true;
+    notifyListeners();
+  }
+  
+  Future<void> resetOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_complete', false);
+    _onboardingComplete = false;
+    notifyListeners();
   }
 
   Future<void> login(User user, {String? token}) async {

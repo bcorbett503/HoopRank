@@ -7,11 +7,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 
 import 'state/app_state.dart';
+import 'state/check_in_state.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
 import 'screens/home_screen.dart';
 import 'screens/rankings_screen.dart';
-import 'screens/players_screen.dart';
-import 'screens/player_detail_screen.dart';
+
 import 'screens/matches_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
@@ -26,6 +26,7 @@ import 'screens/messages_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/network_test_screen.dart';
 import 'screens/map_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/notification_service.dart';
 
 // Background message handler - must be top-level function
@@ -52,6 +53,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthState()),
         ChangeNotifierProvider(create: (_) => MatchState()),
+        ChangeNotifierProvider(create: (_) => CheckInState()),
       ],
       child: const HoopRankApp(),
     ),
@@ -62,18 +64,44 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorHomeKey = GlobalKey<NavigatorState>(debugLabel: 'shellHome');
 final _shellNavigatorTeamsKey = GlobalKey<NavigatorState>(debugLabel: 'shellTeams');
 final _shellNavigatorRankingsKey = GlobalKey<NavigatorState>(debugLabel: 'shellRankings');
-final _shellNavigatorPlayersKey = GlobalKey<NavigatorState>(debugLabel: 'shellPlayers');
+
 final _shellNavigatorMessagesKey = GlobalKey<NavigatorState>(debugLabel: 'shellMessages');
 final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(debugLabel: 'shellProfile');
 
-class HoopRankApp extends StatelessWidget {
+class HoopRankApp extends StatefulWidget {
   const HoopRankApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final authState = context.watch<AuthState>();
+  State<HoopRankApp> createState() => _HoopRankAppState();
+}
 
-    final router = GoRouter(
+class _HoopRankAppState extends State<HoopRankApp> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    final authState = context.read<AuthState>();
+    final checkInState = context.read<CheckInState>();
+    
+    // Initialize CheckInState when user changes
+    authState.addListener(() {
+      final user = authState.currentUser;
+      if (user != null) {
+        checkInState.initialize(user.id);
+      }
+    });
+    
+    // Initialize now if user already logged in
+    if (authState.currentUser != null) {
+      checkInState.initialize(authState.currentUser!.id);
+    }
+    
+    _router = _createRouter(authState);
+  }
+
+  GoRouter _createRouter(AuthState authState) {
+    return GoRouter(
       navigatorKey: _rootNavigatorKey,
       initialLocation: '/play',
       refreshListenable: authState,
@@ -82,8 +110,9 @@ class HoopRankApp extends StatelessWidget {
         final loggedIn = user != null;
         final isLoggingIn = state.uri.toString() == '/login';
         final isProfileSetup = state.uri.toString() == '/profile/setup';
+        final isOnboarding = state.uri.toString() == '/onboarding';
 
-        debugPrint('ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}, position=${user?.position}');
+        debugPrint('ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}, onboardingComplete=${authState.onboardingComplete}');
 
         // Not logged in - redirect to login (unless already there)
         if (!loggedIn && !isLoggingIn) {
@@ -97,8 +126,11 @@ class HoopRankApp extends StatelessWidget {
           return '/profile/setup';
         }
         
-        // Note: We intentionally do NOT redirect away from /profile/setup when profile is complete
-        // This allows users to edit their profile by visiting /profile/setup
+        // Profile complete but onboarding not done - show onboarding (unless already there)
+        if (loggedIn && user.isProfileComplete && !authState.onboardingComplete && !isOnboarding && !isProfileSetup) {
+          debugPrint('ROUTER: -> /onboarding (first time user)');
+          return '/onboarding';
+        }
         
         // Profile complete and on login screen - go to home
         if (loggedIn && user.isProfileComplete && isLoggingIn) {
@@ -206,6 +238,14 @@ class HoopRankApp extends StatelessWidget {
           path: '/matches',
           builder: (context, state) => const MatchesScreen(),
         ),
+        // Player profile - navigate to chat which shows profile and allows messaging
+        GoRoute(
+          path: '/players/:id',
+          builder: (context, state) {
+            final playerId = state.pathParameters['id'] ?? '';
+            return ChatScreen(userId: playerId);
+          },
+        ),
         GoRoute(
           path: '/login',
           builder: (context, state) => const LoginScreen(),
@@ -222,9 +262,18 @@ class HoopRankApp extends StatelessWidget {
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
         ),
+        GoRoute(
+          path: '/onboarding',
+          builder: (context, state) => OnboardingScreen(
+            onComplete: () => context.go('/play'),
+          ),
+        ),
       ],
     );
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'HoopRank',
       debugShowCheckedModeBanner: false,
@@ -261,7 +310,7 @@ class HoopRankApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
         ),
       ),
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }

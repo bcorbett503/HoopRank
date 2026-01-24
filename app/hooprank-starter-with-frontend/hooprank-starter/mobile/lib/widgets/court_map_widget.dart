@@ -2,22 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/court_service.dart';
+import '../state/check_in_state.dart';
 
 class CourtMapWidget extends StatefulWidget {
   final Function(Court) onCourtSelected;
   final double? limitDistanceKm;
+  final String? initialCourtId;
 
   const CourtMapWidget({
     super.key,
     required this.onCourtSelected,
     this.limitDistanceKm,
+    this.initialCourtId,
   });
 
   @override
   State<CourtMapWidget> createState() => _CourtMapWidgetState();
 }
+
 
 class _CourtMapWidgetState extends State<CourtMapWidget> {
   final MapController _mapController = MapController();
@@ -26,6 +31,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   bool _isLoading = true;
   LatLng _initialCenter = const LatLng(38.0194, -122.5376); // Default to San Rafael
   double _currentZoom = 10.0;
+  bool _showActiveOnly = false; // Filter for courts with same-day activity
 
   bool _noCourtsFound = false;
 
@@ -33,6 +39,24 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   void initState() {
     super.initState();
     _initializeMap();
+  }
+
+  @override
+  void didUpdateWidget(covariant CourtMapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Handle navigation to a new court
+    if (widget.initialCourtId != null && widget.initialCourtId != oldWidget.initialCourtId) {
+      _navigateToCourt(widget.initialCourtId!);
+    }
+  }
+  
+  void _navigateToCourt(String courtId) {
+    final targetCourt = CourtService().getCourtById(courtId);
+    if (targetCourt != null) {
+      final target = LatLng(targetCourt.lat, targetCourt.lng);
+      _mapController.move(target, 15.0);
+      widget.onCourtSelected(targetCourt);
+    }
   }
 
   @override
@@ -74,8 +98,24 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
         _courts = CourtService().getCourts();
         _isLoading = false;
       });
+      
+      // Handle initial court selection from query params
+      if (widget.initialCourtId != null) {
+        final targetCourt = CourtService().getCourtById(widget.initialCourtId!);
+        if (targetCourt != null) {
+          // Move map to the target court
+          _initialCenter = LatLng(targetCourt.lat, targetCourt.lng);
+          _currentZoom = 15.0;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _mapController.move(_initialCenter, _currentZoom);
+            // Auto-select the court to show its details
+            widget.onCourtSelected(targetCourt);
+          });
+        }
+      }
     }
   }
+
 
   Future<Position> _determinePosition() async {
     bool serviceEnabled;
@@ -116,9 +156,27 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   }
 
   void _onSearchChanged(String query) {
+    List<Court> filteredCourts = CourtService().searchCourts(query);
+    
+    // Apply active filter if enabled
+    if (_showActiveOnly) {
+      final checkInState = Provider.of<CheckInState>(context, listen: false);
+      filteredCourts = filteredCourts.where((court) {
+        return checkInState.hasCheckIns(court.id);
+      }).toList();
+    }
+    
     setState(() {
-      _courts = CourtService().searchCourts(query);
+      _courts = filteredCourts;
     });
+  }
+  
+  void _toggleActiveFilter() {
+    setState(() {
+      _showActiveOnly = !_showActiveOnly;
+    });
+    // Re-run search with current query
+    _onSearchChanged(_searchController.text);
   }
 
   void _updateCourtsForMapCenter() {
@@ -241,6 +299,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                             // Signature courts get the crown marker and are larger
                             final isSignature = court.isSignature;
                             final hasKings = court.hasKings;
+                            // Check if court has active check-ins
+                            final checkInState = Provider.of<CheckInState>(context, listen: false);
+                            final hasCheckIns = checkInState.hasCheckIns(court.id);
                             
                             // Determine marker image and size (circular, so use same width/height)
                             String markerAsset;
@@ -272,12 +333,20 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: isSignature 
-                                          ? Colors.amber 
-                                          : (hasKings ? Colors.orange : Colors.white),
-                                      width: isSignature ? 2.5 : 2,
+                                      color: hasCheckIns
+                                          ? Colors.green  // Active courts with check-ins
+                                          : (isSignature 
+                                              ? Colors.amber 
+                                              : (hasKings ? Colors.orange : Colors.white)),
+                                      width: hasCheckIns ? 3 : (isSignature ? 2.5 : 2),
                                     ),
                                     boxShadow: [
+                                      if (hasCheckIns)
+                                        BoxShadow(
+                                          color: Colors.green.withOpacity(0.5),
+                                          blurRadius: 8,
+                                          spreadRadius: 2,
+                                        ),
                                       BoxShadow(
                                         color: Colors.black.withOpacity(0.3),
                                         blurRadius: 4,
@@ -307,15 +376,75 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                       child: Card(
                         elevation: 4,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            hintText: 'Search courts...',
-                            prefixIcon: Icon(Icons.search),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          ),
-                          onChanged: _onSearchChanged,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Search courts...',
+                                  prefixIcon: Icon(Icons.search),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                ),
+                                onChanged: _onSearchChanged,
+                              ),
+                            ),
+                            // Active filter toggle
+                            Consumer<CheckInState>(
+                              builder: (context, checkInState, _) {
+                                final activeCount = checkInState.activeCourts.length;
+                                return GestureDetector(
+                                  onTap: _toggleActiveFilter,
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: _showActiveOnly ? Colors.green : Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.local_fire_department,
+                                          size: 16,
+                                          color: _showActiveOnly ? Colors.white : Colors.grey[700],
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Active',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: _showActiveOnly ? Colors.white : Colors.grey[700],
+                                          ),
+                                        ),
+                                        if (activeCount > 0) ...[
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: _showActiveOnly ? Colors.green[800] : Colors.grey[400],
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              '$activeCount',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: _showActiveOnly ? Colors.white : Colors.grey[700],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -434,6 +563,39 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                               ),
                             ),
                         ],
+                      ),
+                      trailing: Consumer<CheckInState>(
+                        builder: (context, checkInState, _) {
+                          final isFollowing = checkInState.isFollowing(court.id);
+                          final hasAlert = checkInState.isAlertEnabled(court.id);
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Bell for alerts
+                              IconButton(
+                                icon: Icon(
+                                  hasAlert ? Icons.notifications_active : Icons.notifications_none,
+                                  size: 20,
+                                ),
+                                color: hasAlert ? Colors.orange : Colors.grey[500],
+                                onPressed: () => checkInState.toggleAlert(court.id),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              ),
+                              // Heart for follow
+                              IconButton(
+                                icon: Icon(
+                                  isFollowing ? Icons.favorite : Icons.favorite_border,
+                                  size: 22,
+                                ),
+                                color: isFollowing ? Colors.red : Colors.grey[500],
+                                onPressed: () => checkInState.toggleFollow(court.id),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                       onTap: () => widget.onCourtSelected(court),
                     );

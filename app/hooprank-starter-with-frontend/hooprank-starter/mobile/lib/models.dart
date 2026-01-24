@@ -229,6 +229,37 @@ class Match {
   });
 }
 
+/// Represents a player checked in at a court
+class CheckedInPlayer {
+  final String id;
+  final String name;
+  final double rating;
+  final String? photoUrl;
+  final DateTime checkedInAt;
+
+  CheckedInPlayer({
+    required this.id,
+    required this.name,
+    required this.rating,
+    this.photoUrl,
+    required this.checkedInAt,
+  });
+
+  /// Returns how long ago the player checked in as a human-readable string
+  String get checkedInAgo {
+    final diff = DateTime.now().difference(checkedInAt);
+    if (diff.inDays > 0) {
+      return '${diff.inDays}d ago';
+    } else if (diff.inHours > 0) {
+      return '${diff.inHours}h ago';
+    } else if (diff.inMinutes > 0) {
+      return '${diff.inMinutes}m ago';
+    } else {
+      return 'just now';
+    }
+  }
+}
+
 /// Basketball court location with Kings for each game mode
 class Court {
   final String id;
@@ -237,12 +268,16 @@ class Court {
   final double lng;
   final String? address;
   final bool isSignature; // Signature courts are high-traffic/famous venues
-  // King of the Court for each mode
+  final bool isIndoor; // Indoor venues (gyms, schools, rec centers)
+  // King of the Court for each mode (name, rating, and user ID for challenges)
   final String? king1v1;
+  final String? king1v1Id;
   final double? king1v1Rating;
   final String? king3v3;
+  final String? king3v3Id;
   final double? king3v3Rating;
   final String? king5v5;
+  final String? king5v5Id;
   final double? king5v5Rating;
 
   Court({
@@ -252,19 +287,55 @@ class Court {
     required this.lng,
     this.address,
     this.isSignature = false,
+    this.isIndoor = false,
     this.king1v1,
+    this.king1v1Id,
     this.king1v1Rating,
     this.king3v3,
+    this.king3v3Id,
     this.king3v3Rating,
     this.king5v5,
+    this.king5v5Id,
     this.king5v5Rating,
   });
+
 
   /// Legacy getter for backwards compatibility
   String? get king => king1v1;
 
   /// Check if court has any Kings
   bool get hasKings => king1v1 != null || king3v3 != null || king5v5 != null;
+
+  /// Copy with method to update king data from API
+  Court copyWithKings({
+    String? king1v1,
+    String? king1v1Id,
+    double? king1v1Rating,
+    String? king3v3,
+    String? king3v3Id,
+    double? king3v3Rating,
+    String? king5v5,
+    String? king5v5Id,
+    double? king5v5Rating,
+  }) {
+    return Court(
+      id: id,
+      name: name,
+      lat: lat,
+      lng: lng,
+      address: address,
+      isSignature: isSignature,
+      king1v1: king1v1 ?? this.king1v1,
+      king1v1Id: king1v1Id ?? this.king1v1Id,
+      king1v1Rating: king1v1Rating ?? this.king1v1Rating,
+      king3v3: king3v3 ?? this.king3v3,
+      king3v3Id: king3v3Id ?? this.king3v3Id,
+      king3v3Rating: king3v3Rating ?? this.king3v3Rating,
+      king5v5: king5v5 ?? this.king5v5,
+      king5v5Id: king5v5Id ?? this.king5v5Id,
+      king5v5Rating: king5v5Rating ?? this.king5v5Rating,
+    );
+  }
 
   factory Court.fromJson(Map<String, dynamic> json) {
     return Court(
@@ -275,10 +346,13 @@ class Court {
       address: json['address']?.toString(),
       isSignature: json['signature'] == true || json['isSignature'] == true,
       king1v1: json['king1v1']?.toString() ?? json['king']?.toString(),
+      king1v1Id: json['king1v1Id']?.toString(),
       king1v1Rating: json['king1v1Rating'] != null ? _parseDouble(json['king1v1Rating']) : null,
       king3v3: json['king3v3']?.toString(),
+      king3v3Id: json['king3v3Id']?.toString(),
       king3v3Rating: json['king3v3Rating'] != null ? _parseDouble(json['king3v3Rating']) : null,
       king5v5: json['king5v5']?.toString(),
+      king5v5Id: json['king5v5Id']?.toString(),
       king5v5Rating: json['king5v5Rating'] != null ? _parseDouble(json['king5v5Rating']) : null,
     );
   }

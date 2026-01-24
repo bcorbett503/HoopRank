@@ -703,6 +703,147 @@ app.put(
 );
 
 /* =========================
+ * User Follows (Courts & Players)
+ * =======================*/
+
+// GET /users/me/follows - Get all follows (courts + players)
+app.get(
+  "/users/me/follows",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+
+    // Get followed courts
+    const courtsResult = await pool.query(
+      `SELECT court_id, alerts_enabled, created_at 
+       FROM user_followed_courts 
+       WHERE user_id = $1 
+       ORDER BY created_at DESC`,
+      [uid]
+    );
+
+    // Get followed players
+    const playersResult = await pool.query(
+      `SELECT player_id, created_at 
+       FROM user_followed_players 
+       WHERE user_id = $1 
+       ORDER BY created_at DESC`,
+      [uid]
+    );
+
+    res.json({
+      courts: courtsResult.rows.map(r => ({
+        courtId: r.court_id,
+        alertsEnabled: r.alerts_enabled,
+        createdAt: r.created_at,
+      })),
+      players: playersResult.rows.map(r => ({
+        playerId: r.player_id,
+        createdAt: r.created_at,
+      })),
+    });
+  })
+);
+
+// POST /users/me/follows/courts - Follow a court
+app.post(
+  "/users/me/follows/courts",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { courtId, alertsEnabled } = req.body;
+
+    if (!courtId) {
+      return res.status(400).json({ error: "courtId required" });
+    }
+
+    await pool.query(
+      `INSERT INTO user_followed_courts (user_id, court_id, alerts_enabled)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, court_id) DO UPDATE SET alerts_enabled = $3`,
+      [uid, courtId, alertsEnabled ?? false]
+    );
+
+    res.json({ success: true });
+  })
+);
+
+// DELETE /users/me/follows/courts/:courtId - Unfollow a court
+app.delete(
+  "/users/me/follows/courts/:courtId",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { courtId } = req.params;
+
+    await pool.query(
+      `DELETE FROM user_followed_courts WHERE user_id = $1 AND court_id = $2`,
+      [uid, courtId]
+    );
+
+    res.json({ success: true });
+  })
+);
+
+// PUT /users/me/follows/courts/:courtId/alerts - Toggle court alerts
+app.put(
+  "/users/me/follows/courts/:courtId/alerts",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { courtId } = req.params;
+    const { enabled } = req.body;
+
+    await pool.query(
+      `UPDATE user_followed_courts SET alerts_enabled = $3 WHERE user_id = $1 AND court_id = $2`,
+      [uid, courtId, enabled ?? false]
+    );
+
+    res.json({ success: true });
+  })
+);
+
+// POST /users/me/follows/players - Follow a player
+app.post(
+  "/users/me/follows/players",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { playerId } = req.body;
+
+    if (!playerId) {
+      return res.status(400).json({ error: "playerId required" });
+    }
+
+    // Don't allow following yourself
+    if (playerId === uid) {
+      return res.status(400).json({ error: "cannot_follow_self" });
+    }
+
+    await pool.query(
+      `INSERT INTO user_followed_players (user_id, player_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, player_id) DO NOTHING`,
+      [uid, playerId]
+    );
+
+    res.json({ success: true });
+  })
+);
+
+// DELETE /users/me/follows/players/:playerId - Unfollow a player
+app.delete(
+  "/users/me/follows/players/:playerId",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { playerId } = req.params;
+
+    await pool.query(
+      `DELETE FROM user_followed_players WHERE user_id = $1 AND player_id = $2`,
+      [uid, playerId]
+    );
+
+    res.json({ success: true });
+  })
+);
+
+
+/* =========================
  * Rankings (with mode filter)
  * =======================*/
 const RankingsQuery = z.object({
