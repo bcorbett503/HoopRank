@@ -10,7 +10,7 @@ import { User } from './users/user.entity';
 import { Court } from './courts/court.entity';
 import { Match } from './matches/match.entity';
 import { Message } from './messages/message.entity';
-import { PlayerStatus, StatusLike, StatusComment } from './statuses/status.entity';
+import { PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn } from './statuses/status.entity';
 import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -31,7 +31,7 @@ import { NotificationsModule } from './notifications/notifications.module';
           return {
             type: 'postgres',
             url: databaseUrl,
-            entities: [User, Court, Match, Message, PlayerStatus, StatusLike, StatusComment],
+            entities: [User, Court, Match, Message, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
             synchronize: false, // Don't auto-sync in production
             ssl: false, // Railway internal connection doesn't need SSL
           };
@@ -40,7 +40,7 @@ import { NotificationsModule } from './notifications/notifications.module';
           return {
             type: 'better-sqlite3',
             database: 'hooprank.db',
-            entities: [User, Court, Match, Message, PlayerStatus, StatusLike, StatusComment],
+            entities: [User, Court, Match, Message, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
             synchronize: true,
           } as any;
         }

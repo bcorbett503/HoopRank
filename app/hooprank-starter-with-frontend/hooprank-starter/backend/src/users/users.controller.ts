@@ -36,20 +36,18 @@ export class UsersController {
 
   @Get('me/follows')
   async getFollows(@Headers('x-user-id') userId: string) {
-    const userIdNum = parseInt(userId, 10);
-    if (isNaN(userIdNum)) {
+    if (!userId) {
       return { courts: [], players: [] };
     }
-    return this.usersService.getFollows(userIdNum);
+    return this.usersService.getFollows(userId);
   }
 
   @Get('me/follows/activity')
   async getFollowedActivity(@Headers('x-user-id') userId: string) {
-    const userIdNum = parseInt(userId, 10);
-    if (isNaN(userIdNum)) {
+    if (!userId) {
       return { courtActivity: [], playerActivity: [] };
     }
-    return this.usersService.getFollowedActivity(userIdNum);
+    return this.usersService.getFollowedActivity(userId);
   }
 
   @Post('me/follows/courts')
@@ -57,14 +55,13 @@ export class UsersController {
     @Headers('x-user-id') userId: string,
     @Body() body: { courtId: string; alertsEnabled?: boolean },
   ) {
-    const userIdNum = parseInt(userId, 10);
-    if (isNaN(userIdNum)) {
-      return { success: false, error: 'Invalid user ID' };
+    if (!userId) {
+      return { success: false, error: 'User ID required' };
     }
-    await this.usersService.followCourt(userIdNum, body.courtId);
+    await this.usersService.followCourt(userId, body.courtId);
     // If alerts requested, also enable alerts
     if (body.alertsEnabled) {
-      await this.notificationsService.enableCourtAlert(userIdNum, body.courtId);
+      await this.notificationsService.enableCourtAlert(userId, body.courtId);
     }
     return { success: true };
   }
@@ -74,13 +71,12 @@ export class UsersController {
     @Headers('x-user-id') userId: string,
     @Param('courtId') courtId: string,
   ) {
-    const userIdNum = parseInt(userId, 10);
-    if (isNaN(userIdNum)) {
-      return { success: false, error: 'Invalid user ID' };
+    if (!userId) {
+      return { success: false, error: 'User ID required' };
     }
-    await this.usersService.unfollowCourt(userIdNum, courtId);
+    await this.usersService.unfollowCourt(userId, courtId);
     // Also disable alerts when unfollowing
-    await this.notificationsService.disableCourtAlert(userIdNum, courtId);
+    await this.notificationsService.disableCourtAlert(userId, courtId);
     return { success: true };
   }
 
@@ -90,15 +86,14 @@ export class UsersController {
     @Param('courtId') courtId: string,
     @Body() body: { enabled: boolean },
   ) {
-    const userIdNum = parseInt(userId, 10);
-    if (isNaN(userIdNum)) {
-      return { success: false, error: 'Invalid user ID' };
+    if (!userId) {
+      return { success: false, error: 'User ID required' };
     }
 
     if (body.enabled) {
-      await this.notificationsService.enableCourtAlert(userIdNum, courtId);
+      await this.notificationsService.enableCourtAlert(userId, courtId);
     } else {
-      await this.notificationsService.disableCourtAlert(userIdNum, courtId);
+      await this.notificationsService.disableCourtAlert(userId, courtId);
     }
     return { success: true };
   }
@@ -108,12 +103,10 @@ export class UsersController {
     @Headers('x-user-id') userId: string,
     @Body() body: { playerId: string },
   ) {
-    const userIdNum = parseInt(userId, 10);
-    const followedIdNum = parseInt(body.playerId, 10);
-    if (isNaN(userIdNum) || isNaN(followedIdNum)) {
-      return { success: false, error: 'Invalid user ID' };
+    if (!userId || !body.playerId) {
+      return { success: false, error: 'User ID and Player ID required' };
     }
-    await this.usersService.followPlayer(userIdNum, followedIdNum);
+    await this.usersService.followPlayer(userId, body.playerId);
     return { success: true };
   }
 
@@ -122,12 +115,10 @@ export class UsersController {
     @Headers('x-user-id') userId: string,
     @Param('playerId') playerId: string,
   ) {
-    const userIdNum = parseInt(userId, 10);
-    const followedIdNum = parseInt(playerId, 10);
-    if (isNaN(userIdNum) || isNaN(followedIdNum)) {
-      return { success: false, error: 'Invalid user ID' };
+    if (!userId || !playerId) {
+      return { success: false, error: 'User ID and Player ID required' };
     }
-    await this.usersService.unfollowPlayer(userIdNum, followedIdNum);
+    await this.usersService.unfollowPlayer(userId, playerId);
     return { success: true };
   }
 
@@ -136,11 +127,10 @@ export class UsersController {
     @Headers('x-user-id') userId: string,
     @Body() body: { token: string },
   ) {
-    const userIdNum = parseInt(userId, 10);
-    if (isNaN(userIdNum)) {
-      return { success: false, error: 'Invalid user ID' };
+    if (!userId) {
+      return { success: false, error: 'User ID required' };
     }
-    await this.notificationsService.saveFcmToken(userIdNum, body.token);
+    await this.notificationsService.saveFcmToken(userId, body.token);
     return { success: true };
   }
 
@@ -177,4 +167,3 @@ export class UsersController {
     return this.usersService.getMatches(id);
   }
 }
-

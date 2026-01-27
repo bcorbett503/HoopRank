@@ -31,11 +31,10 @@ export class CourtsController {
         @Param('id') courtId: string,
         @Headers('x-user-id') userId: string,
     ) {
-        const userIdNum = parseInt(userId, 10);
-        if (isNaN(userIdNum)) {
-            return { success: false, error: 'Invalid user ID' };
+        if (!userId) {
+            return { success: false, error: 'User ID required' };
         }
-        const checkIn = await this.courtsService.checkIn(userIdNum, courtId);
+        const checkIn = await this.courtsService.checkIn(userId, courtId);
         return { success: true, checkIn };
     }
 
@@ -44,11 +43,10 @@ export class CourtsController {
         @Param('id') courtId: string,
         @Headers('x-user-id') userId: string,
     ) {
-        const userIdNum = parseInt(userId, 10);
-        if (isNaN(userIdNum)) {
-            return { success: false, error: 'Invalid user ID' };
+        if (!userId) {
+            return { success: false, error: 'User ID required' };
         }
-        await this.courtsService.checkOut(userIdNum, courtId);
+        await this.courtsService.checkOut(userId, courtId);
         return { success: true };
     }
 }

@@ -11,22 +11,20 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Body() body: { content: string; imageUrl?: string; scheduledAt?: string },
     ) {
-        const userIdNum = parseInt(userId, 10);
-        if (isNaN(userIdNum)) {
-            return { success: false, error: 'Invalid user ID' };
+        if (!userId) {
+            return { success: false, error: 'User ID required' };
         }
-        const status = await this.statusesService.createStatus(userIdNum, body.content, body.imageUrl, body.scheduledAt);
+        const status = await this.statusesService.createStatus(userId, body.content, body.imageUrl, body.scheduledAt);
         return { success: true, status };
     }
 
     // Get feed of statuses from followed users
     @Get('feed')
     async getFeed(@Headers('x-user-id') userId: string) {
-        const userIdNum = parseInt(userId, 10);
-        if (isNaN(userIdNum)) {
+        if (!userId) {
             return [];
         }
-        return this.statusesService.getFeed(userIdNum);
+        return this.statusesService.getFeed(userId);
     }
 
     // Get unified feed (statuses + check-ins + matches)
@@ -35,11 +33,10 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Query('filter') filter: string = 'all',
     ) {
-        const userIdNum = parseInt(userId, 10);
-        if (isNaN(userIdNum)) {
+        if (!userId) {
             return [];
         }
-        return this.statusesService.getUnifiedFeed(userIdNum, filter || 'all');
+        return this.statusesService.getUnifiedFeed(userId, filter || 'all');
     }
 
     // Get single status with details
@@ -58,12 +55,10 @@ export class StatusesController {
         @Param('userId') targetUserId: string,
         @Headers('x-user-id') viewerId: string,
     ) {
-        const targetUserIdNum = parseInt(targetUserId, 10);
-        const viewerIdNum = parseInt(viewerId, 10);
-        if (isNaN(targetUserIdNum)) {
+        if (!targetUserId) {
             return [];
         }
-        return this.statusesService.getUserPosts(targetUserIdNum, isNaN(viewerIdNum) ? undefined : viewerIdNum);
+        return this.statusesService.getUserPosts(targetUserId, viewerId || undefined);
     }
 
     // Delete a status
@@ -72,12 +67,11 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Param('id') id: string,
     ) {
-        const userIdNum = parseInt(userId, 10);
         const statusId = parseInt(id, 10);
-        if (isNaN(userIdNum) || isNaN(statusId)) {
+        if (!userId || isNaN(statusId)) {
             return { success: false, error: 'Invalid ID' };
         }
-        const deleted = await this.statusesService.deleteStatus(userIdNum, statusId);
+        const deleted = await this.statusesService.deleteStatus(userId, statusId);
         return { success: deleted };
     }
 
@@ -87,12 +81,11 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Param('id') id: string,
     ) {
-        const userIdNum = parseInt(userId, 10);
         const statusId = parseInt(id, 10);
-        if (isNaN(userIdNum) || isNaN(statusId)) {
+        if (!userId || isNaN(statusId)) {
             return { success: false, error: 'Invalid ID' };
         }
-        await this.statusesService.likeStatus(userIdNum, statusId);
+        await this.statusesService.likeStatus(userId, statusId);
         return { success: true };
     }
 
@@ -102,12 +95,11 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Param('id') id: string,
     ) {
-        const userIdNum = parseInt(userId, 10);
         const statusId = parseInt(id, 10);
-        if (isNaN(userIdNum) || isNaN(statusId)) {
+        if (!userId || isNaN(statusId)) {
             return { success: false, error: 'Invalid ID' };
         }
-        await this.statusesService.unlikeStatus(userIdNum, statusId);
+        await this.statusesService.unlikeStatus(userId, statusId);
         return { success: true };
     }
 
@@ -128,12 +120,11 @@ export class StatusesController {
         @Param('id') id: string,
         @Body() body: { content: string },
     ) {
-        const userIdNum = parseInt(userId, 10);
         const statusId = parseInt(id, 10);
-        if (isNaN(userIdNum) || isNaN(statusId)) {
+        if (!userId || isNaN(statusId)) {
             return { success: false, error: 'Invalid ID' };
         }
-        const comment = await this.statusesService.addComment(userIdNum, statusId, body.content);
+        const comment = await this.statusesService.addComment(userId, statusId, body.content);
         return { success: true, comment };
     }
 
@@ -153,12 +144,11 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Param('commentId') commentId: string,
     ) {
-        const userIdNum = parseInt(userId, 10);
         const commentIdNum = parseInt(commentId, 10);
-        if (isNaN(userIdNum) || isNaN(commentIdNum)) {
+        if (!userId || isNaN(commentIdNum)) {
             return { success: false, error: 'Invalid ID' };
         }
-        const deleted = await this.statusesService.deleteComment(userIdNum, commentIdNum);
+        const deleted = await this.statusesService.deleteComment(userId, commentIdNum);
         return { success: deleted };
     }
 
@@ -170,12 +160,11 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Param('id') id: string,
     ) {
-        const userIdNum = parseInt(userId, 10);
         const statusId = parseInt(id, 10);
-        if (isNaN(userIdNum) || isNaN(statusId)) {
+        if (!userId || isNaN(statusId)) {
             return { success: false, error: 'Invalid ID' };
         }
-        await this.statusesService.markAttending(userIdNum, statusId);
+        await this.statusesService.markAttending(userId, statusId);
         return { success: true };
     }
 
@@ -185,12 +174,11 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Param('id') id: string,
     ) {
-        const userIdNum = parseInt(userId, 10);
         const statusId = parseInt(id, 10);
-        if (isNaN(userIdNum) || isNaN(statusId)) {
+        if (!userId || isNaN(statusId)) {
             return { success: false, error: 'Invalid ID' };
         }
-        await this.statusesService.removeAttending(userIdNum, statusId);
+        await this.statusesService.removeAttending(userId, statusId);
         return { success: true };
     }
 

@@ -12,6 +12,10 @@ export class NotificationsService {
         private dataSource: DataSource,
     ) { }
 
+    private get isPostgres(): boolean {
+        return !!process.env.DATABASE_URL;
+    }
+
     /**
      * Send push notification to all users who have alerts enabled for a court
      */
@@ -22,12 +26,17 @@ export class NotificationsService {
         activityType: 'check_in' | 'game_started' = 'check_in',
     ): Promise<void> {
         // Get all users with alerts enabled for this court
-        const result = await this.dataSource.query(`
-      SELECT u.fcm_token, u.id, u.name 
-      FROM users u
-      JOIN user_court_alerts a ON u.id = a.user_id
-      WHERE a.court_id = $1 AND u.fcm_token IS NOT NULL
-    `, [courtId]);
+        const query = this.isPostgres
+            ? `SELECT u.fcm_token, u.id, u.name 
+               FROM users u
+               JOIN user_court_alerts a ON u.id = a.user_id
+               WHERE a.court_id = $1 AND u.fcm_token IS NOT NULL`
+            : `SELECT u."fcmToken" as fcm_token, u.id, u.name 
+               FROM users u
+               JOIN user_court_alerts a ON u.id = a.user_id
+               WHERE a.court_id = ? AND u."fcmToken" IS NOT NULL`;
+
+        const result = await this.dataSource.query(query, [courtId]);
 
         if (result.length === 0) {
             console.log(`No users to notify for court ${courtId}`);
@@ -81,10 +90,13 @@ export class NotificationsService {
                 });
 
                 if (invalidTokens.length > 0) {
-                    await this.dataSource.query(`
-            UPDATE users SET fcm_token = NULL WHERE fcm_token = ANY($1)
-          `, [invalidTokens]);
-                    console.log(`Removed ${invalidTokens.length} invalid tokens`);
+                    // Note: This cleanup only works on PostgreSQL
+                    if (this.isPostgres) {
+                        await this.dataSource.query(`
+                            UPDATE users SET fcm_token = NULL WHERE fcm_token = ANY($1)
+                        `, [invalidTokens]);
+                        console.log(`Removed ${invalidTokens.length} invalid tokens`);
+                    }
                 }
             }
         } catch (error) {
@@ -95,37 +107,46 @@ export class NotificationsService {
     /**
      * Save FCM token for a user
      */
-    async saveFcmToken(userId: number, token: string): Promise<void> {
+    async saveFcmToken(userId: string, token: string): Promise<void> {
         await this.usersRepository.update(userId, { fcmToken: token });
     }
 
     /**
      * Enable court alert for a user
      */
-    async enableCourtAlert(userId: number, courtId: string): Promise<void> {
-        await this.dataSource.query(`
-      INSERT INTO user_court_alerts (user_id, court_id)
-      VALUES ($1, $2)
-      ON CONFLICT (user_id, court_id) DO NOTHING
-    `, [userId, courtId]);
+    async enableCourtAlert(userId: string, courtId: string): Promise<void> {
+        if (this.isPostgres) {
+            await this.dataSource.query(`
+                INSERT INTO user_court_alerts (user_id, court_id)
+                VALUES ($1, $2)
+                ON CONFLICT (user_id, court_id) DO NOTHING
+            `, [userId, courtId]);
+        } else {
+            await this.dataSource.query(`
+                INSERT OR IGNORE INTO user_court_alerts (user_id, court_id)
+                VALUES (?, ?)
+            `, [userId, courtId]);
+        }
     }
 
     /**
      * Disable court alert for a user
      */
-    async disableCourtAlert(userId: number, courtId: string): Promise<void> {
-        await this.dataSource.query(`
-      DELETE FROM user_court_alerts WHERE user_id = $1 AND court_id = $2
-    `, [userId, courtId]);
+    async disableCourtAlert(userId: string, courtId: string): Promise<void> {
+        const query = this.isPostgres
+            ? `DELETE FROM user_court_alerts WHERE user_id = $1 AND court_id = $2`
+            : `DELETE FROM user_court_alerts WHERE user_id = ? AND court_id = ?`;
+        await this.dataSource.query(query, [userId, courtId]);
     }
 
     /**
      * Get all court alerts for a user
      */
-    async getUserCourtAlerts(userId: number): Promise<string[]> {
-        const result = await this.dataSource.query(`
-      SELECT court_id FROM user_court_alerts WHERE user_id = $1
-    `, [userId]);
+    async getUserCourtAlerts(userId: string): Promise<string[]> {
+        const query = this.isPostgres
+            ? `SELECT court_id FROM user_court_alerts WHERE user_id = $1`
+            : `SELECT court_id FROM user_court_alerts WHERE user_id = ?`;
+        const result = await this.dataSource.query(query, [userId]);
         return result.map((r: any) => r.court_id);
     }
 }
