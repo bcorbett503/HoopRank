@@ -245,7 +245,7 @@ export class StatusesService {
                         false as "isLikedByMe",
                         0 as "attendeeCount",
                         false as "isAttendingByMe"
-                    FROM court_check_ins ci
+                    FROM check_ins ci
                     JOIN users u ON ci.user_id = u.id
                     LEFT JOIN courts fc ON ci.court_id = fc.id::text
                     WHERE ci.court_id IN (SELECT court_id FROM followed_courts)
@@ -266,7 +266,7 @@ export class StatusesService {
                         NULL as "scheduledAt",
                         m.court_id::text as "courtId",
                         fc.name as "courtName",
-                        m.score::text as "matchScore",
+                        m.rating_diff_json::text as "matchScore",
                         m.status as "matchStatus",
                         0 as "likeCount",
                         0 as "commentCount",
@@ -339,7 +339,7 @@ export class StatusesService {
                         false as "isLikedByMe",
                         0 as "attendeeCount",
                         false as "isAttendingByMe"
-                    FROM court_check_ins ci
+                    FROM check_ins ci
                     JOIN users u ON ci.user_id = u.id
                     LEFT JOIN courts fc ON ci.court_id = fc.id::text
                     WHERE ci.court_id IN (SELECT court_id FROM followed_courts)
@@ -360,7 +360,7 @@ export class StatusesService {
                         NULL as "scheduledAt",
                         m.court_id::text as "courtId",
                         fc.name as "courtName",
-                        m.score::text as "matchScore",
+                        m.rating_diff_json::text as "matchScore",
                         m.status as "matchStatus",
                         0 as "likeCount",
                         0 as "commentCount",
@@ -373,7 +373,7 @@ export class StatusesService {
                     WHERE (
                         m.court_id::text IN (SELECT court_id FROM followed_courts)
                         OR m.creator_id::integer IN (SELECT followed_id FROM followed_players)
-                        OR m.opponent_id::integer IN (SELECT followed_id FROM followed_players)
+                        OR m.guest_id::integer IN (SELECT followed_id FROM followed_players)
                     )
                     AND m.created_at > NOW() - INTERVAL '7 days'
                 ) combined

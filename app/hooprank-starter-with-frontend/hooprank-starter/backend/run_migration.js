@@ -104,6 +104,7 @@ async function migrate() {
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
         image_url TEXT,
+        scheduled_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
@@ -138,6 +139,18 @@ async function migrate() {
       );
     `);
     console.log('Created status_comments table');
+
+    // 12. Create event_attendees table for tracking event attendance
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS event_attendees (
+        id SERIAL PRIMARY KEY,
+        status_id INTEGER NOT NULL REFERENCES player_statuses(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(status_id, user_id)
+      );
+    `);
+    console.log('Created event_attendees table');
 
     // 12. Create indexes
     await client.query('CREATE INDEX IF NOT EXISTS idx_followed_courts_user ON user_followed_courts(user_id);');
