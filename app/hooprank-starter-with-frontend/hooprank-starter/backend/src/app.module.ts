@@ -33,7 +33,7 @@ import { HealthController } from './health.controller';
             type: 'postgres',
             url: databaseUrl,
             entities: [User, Court, Match, Message, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
-            synchronize: true, // TEMPORARY: Enable to create missing tables, disable after schema sync
+            synchronize: false, // Disabled for production - use migrations instead
             ssl: false, // Railway internal connection doesn't need SSL
           };
         } else {
