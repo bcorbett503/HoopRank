@@ -1,5 +1,5 @@
 # Base image
-FROM node:18-alpine As development
+FROM node:20-alpine As development
 
 WORKDIR /usr/src/app
 
@@ -11,7 +11,7 @@ COPY . .
 
 RUN npm run build
 
-FROM node:18-alpine as production
+FROM node:20-alpine as production
 
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
