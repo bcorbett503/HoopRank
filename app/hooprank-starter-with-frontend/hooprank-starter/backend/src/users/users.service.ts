@@ -11,169 +11,210 @@ export class UsersService {
     private dataSource: DataSource,
   ) { }
 
-  async findOrCreate(firebaseUid: string, email: string): Promise<User> {
-    let user = await this.usersRepository.findOne({ where: { firebaseUid } });
+  /**
+   * Find user by auth provider ID or create a new one.
+   * Production uses auth_provider + auth_token for authentication.
+   */
+  async findOrCreate(authToken: string, email: string): Promise<User> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      // Check if user exists by auth_token
+      const existing = await this.dataSource.query(
+        `SELECT * FROM users WHERE auth_token = $1 LIMIT 1`,
+        [authToken]
+      );
+
+      if (existing.length > 0) {
+        return existing[0];
+      }
+
+      // Create new user
+      const result = await this.dataSource.query(`
+        INSERT INTO users (id, email, auth_token, name, hoop_rank, reputation, loc_enabled, created_at, updated_at)
+        VALUES ($1, $2, $3, 'New Player', 3.0, 5.0, false, NOW(), NOW())
+        RETURNING *
+      `, [authToken, email, authToken]);
+
+      return result[0];
+    }
+
+    // SQLite fallback
+    let user = await this.usersRepository.findOne({ where: { authToken } });
     if (!user) {
       user = this.usersRepository.create({
-        firebaseUid,
+        id: authToken, // Use authToken as ID for consistency
+        authToken,
         email,
-        // Default stats
-        rating: 2.5,
-        offense: 2.5,
-        defense: 2.5,
-        shooting: 2.5,
-        passing: 2.5,
-        rebounding: 2.5,
-      });
+        name: 'New Player',
+        hoopRank: 3.0,
+        reputation: 5.0,
+      } as Partial<User>);
       await this.usersRepository.save(user);
     }
     return user;
   }
 
-  async seed(): Promise<string> {
-    const mockPlayers = [
-      {
-        firebaseUid: 'mock-player-1',
-        email: 'lebron@example.com',
-        name: 'LeBron James',
-        photoUrl: 'https://upload.wikimedia.org/wikipedia/commons/c/cf/LeBron_James_crop_2020.jpg',
-        rating: 5.0,
-        position: 'F',
-        height: "6'9\"",
-        weight: '250 lbs',
-        age: 39,
-        matchesPlayed: 1400,
-      },
-      {
-        firebaseUid: 'mock-player-2',
-        email: 'curry@example.com',
-        name: 'Stephen Curry',
-        photoUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b8/Stephen_Curry_2016_June_16.jpg',
-        rating: 4.9,
-        position: 'G',
-        height: "6'2\"",
-        weight: '185 lbs',
-        age: 36,
-        matchesPlayed: 900,
-      },
-      {
-        firebaseUid: 'mock-player-3',
-        email: 'durant@example.com',
-        name: 'Kevin Durant',
-        photoUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b9/Kevin_Durant_2018_June_08.jpg',
-        rating: 4.9,
-        position: 'F',
-        height: "6'10\"",
-        weight: '240 lbs',
-        age: 35,
-        matchesPlayed: 1000,
-      },
-      {
-        firebaseUid: 'mock-player-4',
-        email: 'jokic@example.com',
-        name: 'Nikola Jokic',
-        photoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/1c/Nikola_Joki%C4%87_2019.jpg',
-        rating: 5.0,
-        position: 'C',
-        height: "6'11\"",
-        weight: '284 lbs',
-        age: 29,
-        matchesPlayed: 600,
-      },
-      {
-        firebaseUid: 'mock-player-5',
-        email: 'luka@example.com',
-        name: 'Luka Doncic',
-        photoUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b8/Luka_Doncic_2021.jpg',
-        rating: 4.8,
-        position: 'G',
-        height: "6'7\"",
-        weight: '230 lbs',
-        age: 25,
-        matchesPlayed: 400,
-      },
-    ];
-
-    for (const player of mockPlayers) {
-      const existing = await this.findOrCreate(player.firebaseUid, player.email);
-      await this.updateProfile(existing.id, {
-        name: player.name,
-        photoUrl: player.photoUrl,
-        rating: player.rating,
-        position: player.position,
-        height: player.height,
-        weight: player.weight,
-        age: player.age,
-        matchesPlayed: player.matchesPlayed,
-      });
-    }
-    return 'Seeded successfully';
-  }
-
   async findOne(id: string): Promise<User | null> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      const result = await this.dataSource.query(`SELECT * FROM users WHERE id = $1 LIMIT 1`, [id]);
+      return result.length > 0 ? result[0] : null;
+    }
+
     return this.usersRepository.findOne({ where: { id } });
   }
 
   async getAll(): Promise<User[]> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      return await this.dataSource.query(`SELECT * FROM users ORDER BY hoop_rank DESC LIMIT 100`);
+    }
+
     return this.usersRepository.find();
   }
 
-  async updateProfile(id: string, data: Partial<User>): Promise<User> {
+  async updateProfile(id: string, data: Partial<any>): Promise<User> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      // Build dynamic update query
+      const updates: string[] = [];
+      const values: any[] = [];
+      let paramIndex = 1;
+
+      // Map camelCase to snake_case for production columns
+      const columnMap: Record<string, string> = {
+        name: 'name',
+        email: 'email',
+        avatarUrl: 'avatar_url',
+        hoopRank: 'hoop_rank',
+        position: 'position',
+        height: 'height',
+        weight: 'weight',
+        city: 'city',
+        gamesPlayed: 'games_played',
+        fcmToken: 'fcm_token',
+      };
+
+      for (const [key, value] of Object.entries(data)) {
+        const column = columnMap[key];
+        if (column && value !== undefined) {
+          updates.push(`${column} = $${paramIndex++}`);
+          values.push(value);
+        }
+      }
+
+      if (updates.length > 0) {
+        updates.push(`updated_at = NOW()`);
+        values.push(id);
+        await this.dataSource.query(
+          `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
+          values
+        );
+      }
+
+      const result = await this.dataSource.query(`SELECT * FROM users WHERE id = $1`, [id]);
+      if (result.length === 0) throw new Error('User not found');
+      return result[0];
+    }
+
+    // SQLite fallback  
     await this.usersRepository.update(id, data);
     const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user) {
-      throw new Error('User not found');
-    }
+    if (!user) throw new Error('User not found');
     return user;
   }
 
   async get(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { id } });
+    return this.findOne(id);
   }
 
   async setRating(id: string, rating: number): Promise<void> {
-    await this.usersRepository.update(id, { rating });
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      await this.dataSource.query(
+        `UPDATE users SET hoop_rank = $1, updated_at = NOW() WHERE id = $2`,
+        [rating, id]
+      );
+    } else {
+      await this.usersRepository.update(id, { hoopRank: rating });
+    }
   }
 
   async addFriend(userId: string, friendId: string): Promise<void> {
-    const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });
-    const friend = await this.usersRepository.findOne({ where: { id: friendId } });
+    const isPostgres = !!process.env.DATABASE_URL;
 
-    if (user && friend) {
-      user.friends = [...(user.friends || []), friend];
-      await this.usersRepository.save(user);
+    if (isPostgres) {
+      await this.dataSource.query(`
+        INSERT INTO friendships (user_id, friend_id, created_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (user_id, friend_id) DO NOTHING
+      `, [userId, friendId]);
+    } else {
+      const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });
+      const friend = await this.usersRepository.findOne({ where: { id: friendId } });
+      if (user && friend) {
+        user.friends = [...(user.friends || []), friend];
+        await this.usersRepository.save(user);
+      }
     }
   }
 
   async removeFriend(userId: string, friendId: string): Promise<void> {
-    const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });
+    const isPostgres = !!process.env.DATABASE_URL;
 
-    if (user) {
-      user.friends = user.friends.filter(f => f.id !== friendId);
-      await this.usersRepository.save(user);
+    if (isPostgres) {
+      await this.dataSource.query(
+        `DELETE FROM friendships WHERE user_id = $1 AND friend_id = $2`,
+        [userId, friendId]
+      );
+    } else {
+      const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });
+      if (user) {
+        user.friends = user.friends.filter(f => f.id !== friendId);
+        await this.usersRepository.save(user);
+      }
     }
   }
 
   async getFriends(userId: string): Promise<User[]> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      return await this.dataSource.query(`
+        SELECT u.* FROM users u
+        JOIN friendships f ON f.friend_id = u.id
+        WHERE f.user_id = $1
+      `, [userId]);
+    }
+
     const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });
     return user?.friends || [];
   }
 
   async getMatches(userId: string): Promise<any[]> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      return await this.dataSource.query(`
+        SELECT m.*, c.name as court_name, c.city as court_city
+        FROM matches m
+        LEFT JOIN courts c ON m.court_id = c.id
+        WHERE m.creator_id = $1 OR m.opponent_id = $1
+        ORDER BY m.created_at DESC
+      `, [userId]);
+    }
+
     const user = await this.usersRepository.findOne({
       where: { id: userId },
-      relations: ['hostedMatches', 'guestMatches', 'hostedMatches.court', 'guestMatches.court']
+      relations: ['createdMatches', 'opponentMatches', 'createdMatches.court', 'opponentMatches.court']
     });
-
     if (!user) return [];
-
-    const matches = [...(user.hostedMatches || []), ...(user.guestMatches || [])];
-    // Sort by date desc
-    return matches.sort((a, b) => {
-      const dateA = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
-      const dateB = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
-      return dateB - dateA;
-    });
+    return [...(user.createdMatches || []), ...(user.opponentMatches || [])];
   }
 
   // ==================== FOLLOW METHODS ====================
@@ -229,13 +270,11 @@ export class UsersService {
   async getFollows(userId: string): Promise<{ courts: any[]; players: any[] }> {
     const isPostgres = !!process.env.DATABASE_URL;
 
-    // Get followed courts
     const courtsQuery = isPostgres
       ? `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`
       : `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = ?`;
     const courts = await this.dataSource.query(courtsQuery, [userId]);
 
-    // Get followed players
     const playersQuery = isPostgres
       ? `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = $1`
       : `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = ?`;
@@ -245,8 +284,6 @@ export class UsersService {
   }
 
   async getFollowedActivity(userId: string): Promise<{ courtActivity: any[]; playerActivity: any[] }> {
-    // Simplified for now - just return empty arrays
-    // Full implementation would require dialect-aware date handling
     return { courtActivity: [], playerActivity: [] };
   }
 }

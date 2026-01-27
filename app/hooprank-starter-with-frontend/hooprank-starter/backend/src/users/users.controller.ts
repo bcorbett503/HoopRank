@@ -19,11 +19,6 @@ export class UsersController {
     return this.usersService.findOrCreate(uid, email);
   }
 
-  @Post('seed')
-  async seed() {
-    return this.usersService.seed();
-  }
-
   @Get()
   findAll() {
     return this.usersService.getAll();

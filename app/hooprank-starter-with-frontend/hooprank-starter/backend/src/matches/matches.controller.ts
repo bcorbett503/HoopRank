@@ -13,19 +13,23 @@ export class MatchesController {
 
   @Post()
   async create(@Body() body: CreateMatchDto & { message?: string }): Promise<Match> {
-    const scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : undefined;
-    const match = await this.matches.create(body.hostId, body.guestId, scheduledAt, body.courtId);
+    // Use creatorId/opponentId - mapped from hostId/guestId in DTO
+    const creatorId = body.hostId || (body as any).creatorId;
+    const opponentId = body.guestId || (body as any).opponentId;
+    const match = await this.matches.create(creatorId, opponentId, body.courtId);
 
-    if (body.message && body.guestId) {
-      await this.messages.sendMessage(body.hostId, body.guestId, body.message, match.id);
+    if (body.message && opponentId) {
+      await this.messages.sendMessage(creatorId, opponentId, body.message, match.id);
     }
 
     return match;
   }
 
   @Post(':id/accept')
-  async accept(@Param('id') id: string, @Body() body: { guestId: string }): Promise<Match> {
-    return await this.matches.accept(id, body.guestId);
+  async accept(@Param('id') id: string, @Body() body: { guestId?: string; opponentId?: string }): Promise<Match> {
+    const opponentId = body.guestId || body.opponentId;
+    if (!opponentId) throw new Error('opponentId required');
+    return await this.matches.accept(id, opponentId);
   }
 
   @Post(':id/complete')
