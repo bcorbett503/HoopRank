@@ -15,6 +15,7 @@ import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthController } from './health.controller';
+import { SnakeNamingStrategy } from './snake-naming.strategy';
 
 @Module({
   imports: [
@@ -28,13 +29,14 @@ import { HealthController } from './health.controller';
         const databaseUrl = configService.get<string>('DATABASE_URL');
 
         if (databaseUrl) {
-          // Production: Use PostgreSQL
+          // Production: Use PostgreSQL with snake_case naming
           return {
             type: 'postgres',
             url: databaseUrl,
             entities: [User, Court, Match, Message, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
             synchronize: false, // Disabled for production - use migrations instead
             ssl: false, // Railway internal connection doesn't need SSL
+            namingStrategy: new SnakeNamingStrategy(),
           };
         } else {
           // Development: Use SQLite

@@ -1,48 +1,78 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryColumn, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Court } from '../courts/court.entity';
 
+/**
+ * Match entity mapped to production PostgreSQL schema.
+ * Production uses creator_id/opponent_id instead of hostId/guestId.
+ */
 @Entity('matches')
 export class Match {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryColumn({ type: 'uuid' })
     id: string;
 
-    @Column({ default: 'pending' })
+    @Column({ type: 'text', default: 'pending' })
     status: string; // 'pending' | 'accepted' | 'completed' | 'cancelled'
 
-    @Column({ nullable: true })
-    scheduledAt: Date;
+    @Column({ name: 'match_type', type: 'varchar', default: '1v1' })
+    matchType: string;
 
-    @Column('simple-json', { nullable: true })
-    ratingDiff: Record<string, number>;
+    @ManyToOne(() => User, { nullable: false })
+    @JoinColumn({ name: 'creator_id' })
+    creator: User;
 
-    @ManyToOne(() => User, (user) => user.hostedMatches, { nullable: true })
-    host: User;
-
-    @Column({ nullable: true })
-    hostId: string;
-
-    @ManyToOne(() => User, (user) => user.guestMatches, { nullable: true })
-    guest: User;
-
-    @Column({ nullable: true })
-    guestId: string;
+    @Column({ name: 'creator_id', type: 'text' })
+    creatorId: string;
 
     @ManyToOne(() => User, { nullable: true })
+    @JoinColumn({ name: 'opponent_id' })
+    opponent: User;
+
+    @Column({ name: 'opponent_id', type: 'text', nullable: true })
+    opponentId: string;
+
+    @ManyToOne(() => User, { nullable: true })
+    @JoinColumn({ name: 'winner_id' })
     winner: User;
 
-    @Column({ nullable: true })
+    @Column({ name: 'winner_id', type: 'text', nullable: true })
     winnerId: string;
 
     @ManyToOne(() => Court, (court) => court.matches, { nullable: true })
+    @JoinColumn({ name: 'court_id' })
     court: Court;
 
-    @Column({ nullable: true })
+    @Column({ name: 'court_id', type: 'uuid', nullable: true })
     courtId: string;
 
-    @CreateDateColumn()
+    @Column({ name: 'score_creator', type: 'int', nullable: true })
+    scoreCreator: number;
+
+    @Column({ name: 'score_opponent', type: 'int', nullable: true })
+    scoreOpponent: number;
+
+    @Column({ name: 'timer_start', type: 'timestamptz', nullable: true })
+    timerStart: Date;
+
+    @Column({ type: 'jsonb', nullable: true })
+    score: any;
+
+    @Column({ type: 'jsonb', nullable: true })
+    result: any;
+
+    @Column({ name: 'started_by', type: 'jsonb', default: '{}' })
+    startedBy: any;
+
+    @Column({ type: 'text', array: true, nullable: true })
+    participants: string[];
+
+    @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 
-    @UpdateDateColumn()
+    @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
+
+    // Legacy compatibility - map to old names for existing code
+    get hostId(): string { return this.creatorId; }
+    get guestId(): string | undefined { return this.opponentId; }
 }

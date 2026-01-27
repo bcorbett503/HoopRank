@@ -1,44 +1,35 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryColumn, OneToMany } from 'typeorm';
 import { Match } from '../matches/match.entity';
 
+/**
+ * Court entity mapped to production PostgreSQL schema.
+ * Production uses PostGIS geography type for location (geog column).
+ */
 @Entity('courts')
 export class Court {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryColumn({ type: 'uuid' })
     id: string;
 
-    @Column()
+    @Column({ type: 'text' })
     name: string;
 
-    @Column('float', { nullable: true })
-    lat: number;
-
-    @Column('float', { nullable: true })
-    lng: number;
-
-    @Column({ nullable: true })
-    address: string;
-
-    // Extended metadata fields
-    @Column({ nullable: true })
+    @Column({ type: 'text', nullable: true })
     city: string;
 
-    @Column({ name: 'num_courts', type: 'int', default: 1 })
-    numCourts: number;
-
-    @Column({ type: 'boolean', default: false })
-    lit: boolean;
-
-    @Column({ type: 'boolean', default: false })
+    @Column({ type: 'boolean', nullable: true })
     indoor: boolean;
 
-    @Column({ type: 'float', nullable: true })
-    score: number;
+    @Column({ type: 'int', nullable: true })
+    rims: number;
 
-    @Column({ nullable: true })
+    @Column({ type: 'text', nullable: true })
     source: string;
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-    createdAt: Date;
+    @Column({ type: 'boolean', default: false })
+    signature: boolean;
+
+    // Note: geog is PostGIS geography type - handled via raw queries in service
+    // We don't map it directly as TypeORM doesn't natively support PostGIS
 
     @OneToMany(() => Match, (match) => match.court)
     matches: Match[];

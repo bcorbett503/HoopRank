@@ -25,38 +25,73 @@ export class CourtsService {
     // For production: DATABASE_URL="..." npx ts-node scripts/seed-courts.ts
 
     async findAll(): Promise<Court[]> {
+        // Use raw query to extract lat/lng from PostGIS geog column for production
+        if (this.dialect.isPostgres) {
+            const courts = await this.dataSource.query(`
+                SELECT 
+                    id, name, city, indoor, rims, source, signature,
+                    ST_Y(geog::geometry) as lat,
+                    ST_X(geog::geometry) as lng
+                FROM courts
+                ORDER BY name ASC
+                LIMIT 500
+            `);
+            return courts;
+        }
+
+        // SQLite fallback for local development
         const courts = await this.courtsRepository.find({
             order: { name: 'ASC' }
         });
-        // TODO: optimize king calculation to not be N+1
-        return Promise.all(courts.map(async c => ({
-            ...c,
-            king: await this.calculateKing(c.id)
-        })));
+        return courts;
     }
 
     async findById(id: string): Promise<Court | undefined> {
+        if (this.dialect.isPostgres) {
+            const results = await this.dataSource.query(`
+                SELECT 
+                    id, name, city, indoor, rims, source, signature,
+                    ST_Y(geog::geometry) as lat,
+                    ST_X(geog::geometry) as lng
+                FROM courts
+                WHERE id = $1
+            `, [id]);
+            if (results.length === 0) return undefined;
+            return { ...results[0], king: await this.calculateKing(id) } as any;
+        }
+
         const court = await this.courtsRepository.findOne({ where: { id } });
         if (!court) return undefined;
         return { ...court, king: await this.calculateKing(id) } as any;
     }
 
-    async searchByLocation(lat: number, lng: number, radiusMiles: number = 25): Promise<Court[]> {
-        // Simple distance calculation using Haversine approximation
-        // 1 degree of latitude ≈ 69 miles
-        const latDelta = radiusMiles / 69;
-        const lngDelta = radiusMiles / (69 * Math.cos(lat * Math.PI / 180));
+    async searchByLocation(minLat: number, maxLat: number, minLng: number, maxLng: number): Promise<Court[]> {
+        if (this.dialect.isPostgres) {
+            // Use PostGIS spatial query for production
+            const courts = await this.dataSource.query(`
+                SELECT 
+                    id, name, city, indoor, rims, source, signature,
+                    ST_Y(geog::geometry) as lat,
+                    ST_X(geog::geometry) as lng
+                FROM courts
+                WHERE geog && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+                ORDER BY name ASC
+                LIMIT 100
+            `, [minLng, minLat, maxLng, maxLat]);
+            return courts;
+        }
 
+        // SQLite fallback - use simple bounding box
         return this.courtsRepository.createQueryBuilder('court')
             .where('court.lat BETWEEN :latMin AND :latMax', {
-                latMin: lat - latDelta,
-                latMax: lat + latDelta
+                latMin: minLat,
+                latMax: maxLat
             })
             .andWhere('court.lng BETWEEN :lngMin AND :lngMax', {
-                lngMin: lng - lngDelta,
-                lngMax: lng + lngDelta
+                lngMin: minLng,
+                lngMax: maxLng
             })
-            .orderBy('court.score', 'DESC', 'NULLS LAST')
+            .orderBy('court.name', 'ASC')
             .limit(100)
             .getMany();
     }
@@ -120,7 +155,7 @@ export class CourtsService {
                 ci.id,
                 ci.user_id as "userId",
                 u.name as "userName",
-                u."photoUrl" as "userPhotoUrl",
+                u.avatar_url as "userPhotoUrl",
                 ci.checked_in_at as "checkedInAt",
                 ci.checked_out_at as "checkedOutAt"
             FROM check_ins ci
@@ -140,7 +175,7 @@ export class CourtsService {
                 ci.id,
                 ci.user_id as "userId",
                 u.name as "userName",
-                u."photoUrl" as "userPhotoUrl",
+                u.avatar_url as "userPhotoUrl",
                 ci.checked_in_at as "checkedInAt"
             FROM check_ins ci
             LEFT JOIN users u ON ${d.cast('ci.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
@@ -163,7 +198,7 @@ export class CourtsService {
 
         const matchCount = await this.dataSource.query(`
             SELECT COUNT(*) as count FROM matches 
-            WHERE ${d.cast('"courtId"', 'TEXT')} = ${d.param()}
+            WHERE ${d.cast('court_id', 'TEXT')} = ${d.param()}
         `, [courtId]);
 
         return {

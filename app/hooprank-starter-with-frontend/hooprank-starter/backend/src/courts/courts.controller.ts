@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Param, Headers, Query, BadRequestException } from '@nestjs/common';
 import { CourtsService } from './courts.service';
 import { Court } from './court.entity';
 
@@ -7,7 +7,22 @@ export class CourtsController {
     constructor(private readonly courtsService: CourtsService) { }
 
     @Get()
-    async findAll(): Promise<Court[]> {
+    async findAll(
+        @Query('minLat') minLat?: string,
+        @Query('maxLat') maxLat?: string,
+        @Query('minLng') minLng?: string,
+        @Query('maxLng') maxLng?: string,
+    ): Promise<Court[]> {
+        // If bbox parameters provided, use geographic search
+        if (minLat && maxLat && minLng && maxLng) {
+            return this.courtsService.searchByLocation(
+                parseFloat(minLat),
+                parseFloat(maxLat),
+                parseFloat(minLng),
+                parseFloat(maxLng)
+            );
+        }
+        // Otherwise return all courts
         return this.courtsService.findAll();
     }
 

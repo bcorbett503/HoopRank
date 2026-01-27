@@ -1,78 +1,96 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToMany, JoinTable, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryColumn, CreateDateColumn, UpdateDateColumn, ManyToMany, JoinTable, OneToMany } from 'typeorm';
 import { Match } from '../matches/match.entity';
 
+/**
+ * User entity mapped to production PostgreSQL schema.
+ * Production uses snake_case columns and text type for id.
+ */
 @Entity('users')
 export class User {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryColumn({ type: 'text' })
     id: string;
 
-    @Column({ unique: true, nullable: true })
-    firebaseUid: string;
-
-    @Column({ unique: true, nullable: true })
+    @Column({ type: 'text', nullable: true })
     email: string;
 
-    @Column({ nullable: true })
+    @Column({ type: 'text', nullable: true })
+    username: string;
+
+    @Column({ type: 'text' })
     name: string;
 
-    @Column({ nullable: true })
-    photoUrl: string;
+    @Column({ type: 'date', nullable: true })
+    dob: Date;
 
-    // Profile fields
-    @Column({ nullable: true })
-    team: string;
+    @Column({ name: 'avatar_url', type: 'text', nullable: true })
+    avatarUrl: string;
 
-    @Column({ nullable: true })
+    @Column({ name: 'hoop_rank', type: 'numeric', precision: 2, scale: 1, default: 3.0 })
+    hoopRank: number;
+
+    @Column({ type: 'numeric', precision: 2, scale: 1, default: 5.0 })
+    reputation: number;
+
+    @Column({ type: 'text', nullable: true })
     position: string;
 
-    @Column({ nullable: true })
+    @Column({ type: 'text', nullable: true })
     height: string;
 
-    @Column({ nullable: true })
-    weight: string;
+    @Column({ type: 'int', nullable: true })
+    weight: number;
 
-    @Column({ nullable: true })
-    age: number;
+    @Column({ type: 'text', nullable: true })
+    zip: string;
 
-    // Stats (simplified for now)
-    @Column('float', { default: 0 })
-    rating: number;
+    @Column({ name: 'loc_enabled', type: 'boolean', default: false })
+    locEnabled: boolean;
 
-    @Column('float', { default: 0 })
-    offense: number;
+    @Column({ type: 'text', nullable: true })
+    city: string;
 
-    @Column('float', { default: 0 })
-    defense: number;
+    @Column({ name: 'games_played', type: 'int', nullable: true })
+    gamesPlayed: number;
 
-    @Column('float', { default: 0 })
-    shooting: number;
+    @Column({ name: 'games_contested', type: 'int', nullable: true })
+    gamesContested: number;
 
-    @Column('float', { default: 0 })
-    passing: number;
+    @Column({ type: 'float', nullable: true })
+    lat: number;
 
-    @Column('float', { default: 0 })
-    rebounding: number;
+    @Column({ type: 'float', nullable: true })
+    lng: number;
 
-    @Column({ default: 0 })
-    matchesPlayed: number;
+    @Column({ type: 'date', nullable: true })
+    birthdate: Date;
 
-    @Column({ nullable: true })
+    @Column({ name: 'fcm_token', type: 'text', nullable: true })
     fcmToken: string;
 
-    @CreateDateColumn()
+    @Column({ name: 'auth_token', type: 'text', nullable: true })
+    authToken: string;
+
+    @Column({ name: 'auth_provider', type: 'text', nullable: true })
+    authProvider: string;
+
+    @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 
-    @UpdateDateColumn()
+    @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
 
     // Relations
     @ManyToMany(() => User, (user) => user.friends)
-    @JoinTable()
+    @JoinTable({
+        name: 'friendships',
+        joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+        inverseJoinColumn: { name: 'friend_id', referencedColumnName: 'id' }
+    })
     friends: User[];
 
-    @OneToMany(() => Match, (match) => match.host)
-    hostedMatches: Match[];
+    @OneToMany(() => Match, (match) => match.creator)
+    createdMatches: Match[];
 
-    @OneToMany(() => Match, (match) => match.guest)
-    guestMatches: Match[];
+    @OneToMany(() => Match, (match) => match.opponent)
+    opponentMatches: Match[];
 }
