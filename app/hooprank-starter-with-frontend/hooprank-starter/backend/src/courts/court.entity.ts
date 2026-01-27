@@ -37,7 +37,7 @@ export class Court {
     @Column({ nullable: true })
     source: string;
 
-    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 
     @OneToMany(() => Match, (match) => match.court)
