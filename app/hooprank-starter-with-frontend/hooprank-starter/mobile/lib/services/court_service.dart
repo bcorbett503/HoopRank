@@ -100,6 +100,8 @@ class CourtService {
     }
   }
 
+  /// Check if courts are loaded
+  bool get isLoaded => _isLoaded;
 
   /// Get all loaded courts
   List<Court> get courts => _courts;

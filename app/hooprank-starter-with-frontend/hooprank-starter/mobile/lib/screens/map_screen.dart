@@ -334,24 +334,51 @@ class _MapScreenState extends State<MapScreen> {
                     ],
                   ),
                 ),
-                // Follow button (heart)
+                // Follow button (heart) and Alert bell
                 Consumer<CheckInState>(
                   builder: (context, checkInState, _) {
                     final isFollowing = checkInState.isFollowing(court.id);
-                    return IconButton(
-                      onPressed: () async {
-                        if (isFollowing) {
-                          await checkInState.unfollowCourt(court.id);
-                        } else {
-                          await checkInState.followCourt(court.id);
-                        }
-                      },
-                      icon: Icon(
-                        isFollowing ? Icons.favorite : Icons.favorite_border,
-                        color: isFollowing ? Colors.red : Colors.grey[400],
-                        size: 28,
-                      ),
-                      tooltip: isFollowing ? 'Unfollow' : 'Follow',
+                    final hasAlert = checkInState.isAlertEnabled(court.id);
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Heart for follow
+                        IconButton(
+                          onPressed: () async {
+                            if (isFollowing) {
+                              await checkInState.unfollowCourt(court.id);
+                            } else {
+                              await checkInState.followCourt(court.id);
+                            }
+                          },
+                          icon: Icon(
+                            isFollowing ? Icons.favorite : Icons.favorite_border,
+                            color: isFollowing ? Colors.red : Colors.grey[400],
+                            size: 28,
+                          ),
+                          tooltip: isFollowing ? 'Unfollow' : 'Follow',
+                        ),
+                        // Bell for alerts
+                        IconButton(
+                          onPressed: () async {
+                            await checkInState.toggleAlert(court.id);
+                            if (checkInState.isAlertEnabled(court.id)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('🔔 You\'ll be notified when players check in at ${court.name}'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                          icon: Icon(
+                            hasAlert ? Icons.notifications_active : Icons.notifications_none,
+                            color: hasAlert ? Colors.orange : Colors.grey[400],
+                            size: 26,
+                          ),
+                          tooltip: hasAlert ? 'Disable alerts' : 'Get alerts',
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -619,120 +646,129 @@ class _MapScreenState extends State<MapScreen> {
                             final player = players[index];
                             final isTopPlayer = index == 0;
                             
-                            return Material(
-                              color: isTopPlayer 
-                                  ? Colors.green.withOpacity(0.1)
-                                  : Colors.grey[850],
-                              borderRadius: BorderRadius.circular(12),
-                              child: InkWell(
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  PlayerProfileSheet.showById(context, player.id);
-                                },
-                                borderRadius: BorderRadius.circular(12),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Row(
-                                    children: [
-                                      // Rank badge
-                                      Container(
-                                        width: 28,
-                                        height: 28,
-                                        decoration: BoxDecoration(
-                                          color: isTopPlayer 
-                                              ? Colors.green 
-                                              : Colors.grey[700],
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            '${index + 1}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: isTopPlayer ? Colors.green.withOpacity(0.05) : Colors.grey[900],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isTopPlayer ? Colors.green.withOpacity(0.3) : Colors.white.withOpacity(0.05)
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    PlayerProfileSheet.showById(context, player.id);
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Row(
+                                      children: [
+                                        // Rank badge
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: isTopPlayer 
+                                                ? Colors.green.withOpacity(0.2) 
+                                                : Colors.white.withOpacity(0.05),
+                                            shape: BoxShape.circle,
+                                            border: isTopPlayer ? Border.all(color: Colors.green.withOpacity(0.5)) : null,
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '${index + 1}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                                color: isTopPlayer ? Colors.green : Colors.white54,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Avatar
-                                      CircleAvatar(
-                                        radius: 22,
-                                        backgroundImage: player.photoUrl != null
-                                            ? NetworkImage(player.photoUrl!)
-                                            : null,
-                                        backgroundColor: Colors.grey[700],
-                                        child: player.photoUrl == null
-                                            ? Text(
-                                                player.name.isNotEmpty 
-                                                    ? player.name[0].toUpperCase() 
-                                                    : '?',
+                                        const SizedBox(width: 12),
+                                        // Avatar
+                                        CircleAvatar(
+                                          radius: 22,
+                                          backgroundImage: player.photoUrl != null
+                                              ? NetworkImage(player.photoUrl!)
+                                              : null,
+                                          backgroundColor: Colors.blue.withOpacity(0.2),
+                                          child: player.photoUrl == null
+                                              ? Text(
+                                                  player.name.isNotEmpty 
+                                                      ? player.name[0].toUpperCase() 
+                                                      : '?',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                    color: Colors.blue,
+                                                  ),
+                                                )
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Name and check-in time
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                player.name,
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
-                                                  fontSize: 18,
+                                                  fontSize: 16,
+                                                  color: Colors.white,
                                                 ),
-                                              )
-                                            : null,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Name and check-in time
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              player.name,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 15,
                                               ),
-                                            ),
-                                            Text(
-                                              'Checked in ${player.checkedInAgo}',
-                                              style: TextStyle(
-                                                color: Colors.grey[500],
-                                                fontSize: 12,
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Checked in ${player.checkedInAgo}',
+                                                style: const TextStyle(
+                                                  color: Colors.white30,
+                                                  fontSize: 12,
+                                                ),
                                               ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      // Rating
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber.withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.star,
+                                        // Rating
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Colors.amber.withOpacity(0.2)),
+                                          ),
+                                          child: Text(
+                                            player.rating.toStringAsFixed(1),
+                                            style: const TextStyle(
                                               color: Colors.amber,
-                                              size: 14,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
                                             ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              player.rating.toStringAsFixed(2),
-                                              style: const TextStyle(
-                                                color: Colors.amber,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ],
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Icon(
-                                        Icons.chevron_right,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ],
+                                        const SizedBox(width: 8),
+                                        const Icon(
+                                          Icons.chevron_right,
+                                          color: Colors.white30,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),

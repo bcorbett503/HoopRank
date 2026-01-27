@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Court } from './court.entity';
@@ -13,7 +13,8 @@ export class CourtsService implements OnModuleInit {
         @InjectRepository(Court)
         private courtsRepository: Repository<Court>,
         private readonly matchesService: MatchesService,
-        private readonly usersService: UsersService
+        private readonly usersService: UsersService,
+        private dataSource: DataSource,
     ) { }
 
     async onModuleInit() {
@@ -67,5 +68,70 @@ export class CourtsService implements OnModuleInit {
 
         // Temporary: return undefined to avoid breaking
         return undefined;
+    }
+
+    // ==================== CHECK-IN METHODS ====================
+
+    async checkIn(userId: number, courtId: string): Promise<any> {
+        // First check-out from any existing check-ins at other courts
+        await this.dataSource.query(`
+            UPDATE court_check_ins 
+            SET checked_out_at = NOW() 
+            WHERE user_id = $1 AND checked_out_at IS NULL
+        `, [userId]);
+
+        // Create new check-in
+        const result = await this.dataSource.query(`
+            INSERT INTO court_check_ins (user_id, court_id, checked_in_at)
+            VALUES ($1, $2, NOW())
+            RETURNING id, checked_in_at as "checkedInAt"
+        `, [userId, courtId]);
+
+        return result[0];
+    }
+
+    async checkOut(userId: number, courtId: string): Promise<void> {
+        await this.dataSource.query(`
+            UPDATE court_check_ins 
+            SET checked_out_at = NOW() 
+            WHERE user_id = $1 AND court_id = $2 AND checked_out_at IS NULL
+        `, [userId, courtId]);
+    }
+
+    async getCourtActivity(courtId: string, hoursBack: number = 24): Promise<any[]> {
+        const result = await this.dataSource.query(`
+            SELECT 
+                ci.id,
+                ci.user_id as "userId",
+                u.display_name as "userName",
+                u.avatar_url as "userPhotoUrl",
+                ci.checked_in_at as "checkedInAt",
+                ci.checked_out_at as "checkedOutAt"
+            FROM court_check_ins ci
+            JOIN users u ON ci.user_id = u.id
+            WHERE ci.court_id = $1 
+              AND ci.checked_in_at > NOW() - INTERVAL '${hoursBack} hours'
+            ORDER BY ci.checked_in_at DESC
+            LIMIT 50
+        `, [courtId]);
+
+        return result;
+    }
+
+    async getActiveCheckIns(courtId: string): Promise<any[]> {
+        const result = await this.dataSource.query(`
+            SELECT 
+                ci.id,
+                ci.user_id as "userId",
+                u.display_name as "userName",
+                u.avatar_url as "userPhotoUrl",
+                ci.checked_in_at as "checkedInAt"
+            FROM court_check_ins ci
+            JOIN users u ON ci.user_id = u.id
+            WHERE ci.court_id = $1 AND ci.checked_out_at IS NULL
+            ORDER BY ci.checked_in_at DESC
+        `, [courtId]);
+
+        return result;
     }
 }

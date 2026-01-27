@@ -509,11 +509,12 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Search by name...',
-              prefixIcon: const Icon(Icons.search),
+              hintStyle: TextStyle(color: Colors.white30),
+              prefixIcon: const Icon(Icons.search, color: Colors.white54),
               filled: true,
-              fillColor: Theme.of(context).cardColor,
+              fillColor: Colors.white.withOpacity(0.05),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
             ),
@@ -606,117 +607,153 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   Widget _buildPlayerCard(User player) {
     final hasPending = _pendingChallengeUserIds.contains(player.id);
     
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: InkWell(
-        onTap: () => _showPlayerProfile(player),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.deepOrange.withOpacity(0.2),
-                backgroundImage: player.photoUrl != null ? NetworkImage(player.photoUrl!) : null,
-                child: player.photoUrl == null
-                    ? Text(player.name[0].toUpperCase(), 
-                        style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold))
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(player.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                    GestureDetector(
-                      onTap: _playerTeamIds[player.id] != null
-                          ? () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => TeamDetailScreen(teamId: _playerTeamIds[player.id]!),
-                                ),
-                              )
-                          : () => _showInviteToTeamDialog(player),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            player.team ?? 'No Team',
-                            style: TextStyle(
-                              color: _playerTeamIds[player.id] != null ? Colors.blue : Colors.grey[400],
-                              fontSize: 13,
-                              decoration: _playerTeamIds[player.id] != null ? TextDecoration.underline : null,
-                            ),
-                          ),
-                          if (player.team == null) ...[
-                            const SizedBox(width: 4),
-                            Icon(Icons.add_circle_outline, size: 14, color: Colors.grey[500]),
-                          ],
-                        ],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showPlayerProfile(player),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.blue.withOpacity(0.2),
+                  backgroundImage: player.photoUrl != null ? NetworkImage(player.photoUrl!) : null,
+                  child: player.photoUrl == null
+                      ? Text(player.name.isNotEmpty ? player.name[0].toUpperCase() : '?', 
+                          style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold))
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        player.name, 
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)
                       ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: _playerTeamIds[player.id] != null
+                            ? () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => TeamDetailScreen(teamId: _playerTeamIds[player.id]!),
+                                  ),
+                                )
+                            : () => _showInviteToTeamDialog(player),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              player.team ?? 'No Team',
+                              style: TextStyle(
+                                color: _playerTeamIds[player.id] != null ? Colors.blue[300] : Colors.white30,
+                                fontSize: 13,
+                                fontWeight: _playerTeamIds[player.id] != null ? FontWeight.w500 : FontWeight.normal,
+                              ),
+                            ),
+                            if (player.team == null) ...[
+                              const SizedBox(width: 4),
+                              Icon(Icons.add_circle_outline, size: 14, color: Colors.white30),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (hasPending)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: const Text('Pending', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold)),
+                  ),
+                // Quick action buttons
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline, size: 20),
+                      color: Colors.white30,
+                      tooltip: 'Message',
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ChatScreen(userId: player.id)),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.sports_basketball, size: 20),
+                      color: Colors.deepOrange,
+                      tooltip: 'Challenge',
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showChallengeDialog(player),
+                    ),
+                    // Follow heart button
+                    Consumer<CheckInState>(
+                      builder: (context, checkInState, _) {
+                        final isFollowing = checkInState.isFollowingPlayer(player.id);
+                        return IconButton(
+                          icon: Icon(
+                            isFollowing ? Icons.favorite : Icons.favorite_border,
+                            size: 20,
+                          ),
+                          color: isFollowing ? Colors.blueAccent : Colors.white30,
+                          tooltip: isFollowing ? 'Unfollow' : 'Follow',
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          padding: EdgeInsets.zero,
+                          onPressed: () => checkInState.toggleFollowPlayer(player.id),
+                        );
+                      },
                     ),
                   ],
                 ),
-              ),
-              if (hasPending)
-                Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text('Pending', style: TextStyle(fontSize: 10, color: Colors.orange)),
-                ),
-              // Quick action buttons
-              IconButton(
-                icon: const Icon(Icons.chat_bubble_outline, size: 20),
-                color: Colors.grey[400],
-                tooltip: 'Message',
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                padding: EdgeInsets.zero,
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ChatScreen(userId: player.id)),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.sports_basketball, size: 20),
-                color: Colors.deepOrange,
-                tooltip: 'Challenge',
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                padding: EdgeInsets.zero,
-                onPressed: () => _showChallengeDialog(player),
-              ),
-              // Follow heart button
-              Consumer<CheckInState>(
-                builder: (context, checkInState, _) {
-                  final isFollowing = checkInState.isFollowingPlayer(player.id);
-                  return IconButton(
-                    icon: Icon(
-                      isFollowing ? Icons.favorite : Icons.favorite_border,
-                      size: 20,
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        player.rating.toStringAsFixed(1), 
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber)
+                      ),
                     ),
-                    color: isFollowing ? Colors.red : Colors.grey[400],
-                    tooltip: isFollowing ? 'Unfollow' : 'Follow',
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    padding: EdgeInsets.zero,
-                    onPressed: () => checkInState.toggleFollowPlayer(player.id),
-                  );
-                },
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(player.rating.toStringAsFixed(2), 
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  Text(_getRankLabel(player.rating), 
-                      style: const TextStyle(fontSize: 11, color: Colors.deepOrange)),
-                ],
-              ),
-            ],
+                    const SizedBox(height: 2),
+                    Text(_getRankLabel(player.rating), 
+                        style: const TextStyle(fontSize: 10, color: Colors.white30)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -738,11 +775,12 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Search teams by name...',
-              prefixIcon: const Icon(Icons.search),
+              hintStyle: TextStyle(color: Colors.white30),
+              prefixIcon: const Icon(Icons.search, color: Colors.white54),
               filled: true,
-              fillColor: Theme.of(context).cardColor,
+              fillColor: Colors.white.withOpacity(0.05),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
             ),
@@ -841,56 +879,109 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     final wins = team['wins'] ?? 0;
     final losses = team['losses'] ?? 0;
     
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: InkWell(
-        onTap: () => _showTeamActionSheet(team),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Rank number
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: rank <= 3 ? Colors.amber : Colors.grey[700],
-                  shape: BoxShape.circle,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showTeamActionSheet(team),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Rank number
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: rank <= 3 ? Colors.amber.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                    shape: BoxShape.circle,
+                    border: rank <= 3 ? Border.all(color: Colors.amber.withOpacity(0.5)) : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '#$rank', 
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold, 
+                        fontSize: 12,
+                        color: rank <= 3 ? Colors.amber : Colors.white54
+                      )
+                    ),
+                  ),
                 ),
-                child: Center(
-                  child: Text('#$rank', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                const SizedBox(width: 16),
+                // Team type badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _teamFilter == '3v3' ? Colors.blue.withOpacity(0.2) : Colors.purple.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _teamFilter == '3v3' ? Colors.blue.withOpacity(0.3) : Colors.purple.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    _teamFilter, 
+                    style: TextStyle(
+                      color: _teamFilter == '3v3' ? Colors.blue[300] : Colors.purple[200], 
+                      fontWeight: FontWeight.bold, 
+                      fontSize: 11
+                    )
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              // Team type badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _teamFilter == '3v3' ? Colors.blue : Colors.purple,
-                  borderRadius: BorderRadius.circular(4),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        team['name'] ?? 'Team', 
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${team['memberCount'] ?? 1} members • ${team['ownerName'] ?? 'Unknown'}', 
+                        style: const TextStyle(color: Colors.white30, fontSize: 12)
+                      ),
+                    ],
+                  ),
                 ),
-                child: Text(_teamFilter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(team['name'] ?? 'Team', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                    Text('${team['memberCount'] ?? 1} members • ${team['ownerName'] ?? 'Unknown'}', 
-                        style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        rating.toStringAsFixed(2), 
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$wins W - $losses L', 
+                      style: const TextStyle(fontSize: 11, color: Colors.white30)
+                    ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(rating.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  Text('$wins W - $losses L', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -87,10 +87,27 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
-      return Center(child: Text('Error: $_error'));
+      return Center(child: Text('Error: $_error', style: const TextStyle(color: Colors.red)));
     }
     if (_teamChats.isEmpty && _conversations.isEmpty) {
-      return const Center(child: Text('No messages yet'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.white.withOpacity(0.1)),
+            const SizedBox(height: 16),
+            const Text(
+              'No messages yet',
+              style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Start a conversation from the Rankings page',
+              style: TextStyle(color: Colors.white30, fontSize: 13),
+            ),
+          ],
+        ),
+      );
     }
     
     return RefreshIndicator(
@@ -100,103 +117,167 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
           // Team chats section (pinned at top)
           if (_teamChats.isNotEmpty) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.groups, size: 18, color: Colors.deepOrange),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Team Chats',
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.deepOrange.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.groups, size: 14, color: Colors.deepOrange),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'TEAM CHATS',
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2, // Consistent with Followed Players header
+                      color: Colors.white70,
                     ),
                   ),
                 ],
               ),
             ),
             ..._teamChats.map((teamChat) => _buildTeamChatTile(teamChat)),
-            const Divider(),
+            const SizedBox(height: 12),
           ],
           
           // Individual conversations section
           if (_teamChats.isNotEmpty && _conversations.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Text(
-                'Direct Messages',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
-                ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                   Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.person, size: 14, color: Colors.blue),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'DIRECT MESSAGES',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
               ),
             ),
           ..._conversations.asMap().entries.map((entry) => 
             _buildConversationTile(entry.value, entry.key)
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
   Widget _buildTeamChatTile(TeamConversation teamChat) {
-    return ListTile(
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: teamChat.teamType == '3v3' ? Colors.blue : Colors.purple,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.groups, color: Colors.white, size: 20),
-            Text(
-              teamChat.teamType,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TeamChatScreen(
+                  teamId: teamChat.teamId,
+                  teamName: teamChat.teamName,
+                  teamType: teamChat.teamType,
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
-      title: Text(
-        teamChat.teamName,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        teamChat.lastMessage != null
-            ? '${teamChat.lastSenderName ?? 'Team'}: ${teamChat.lastMessage}'
-            : 'Start chatting with your team!',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: teamChat.lastMessage == null
-            ? TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic)
-            : null,
-      ),
-      trailing: teamChat.lastMessageAt != null
-          ? Text(
-              _formatDate(teamChat.lastMessageAt!),
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            )
-          : const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TeamChatScreen(
-              teamId: teamChat.teamId,
-              teamName: teamChat.teamName,
-              teamType: teamChat.teamType,
+            ).then((_) => _loadAllConversations());
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: teamChat.teamType == '3v3' ? Colors.blue.withOpacity(0.2) : Colors.purple.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: teamChat.teamType == '3v3' ? Colors.blue.withOpacity(0.3) : Colors.purple.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.groups, color: teamChat.teamType == '3v3' ? Colors.blue : Colors.purple, size: 20),
+                      Text(
+                        teamChat.teamType,
+                        style: TextStyle(
+                          color: teamChat.teamType == '3v3' ? Colors.blue : Colors.purple,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        teamChat.teamName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        teamChat.lastMessage != null
+                            ? '${teamChat.lastSenderName ?? 'Team'}: ${teamChat.lastMessage}'
+                            : 'Start chatting with your team!',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: teamChat.lastMessage == null ? Colors.white30 : Colors.white70,
+                          fontStyle: teamChat.lastMessage == null ? FontStyle.italic : null,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (teamChat.lastMessageAt != null)
+                  Text(
+                    _formatDate(teamChat.lastMessageAt!),
+                    style: const TextStyle(fontSize: 12, color: Colors.white30),
+                  )
+                else
+                  const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white30),
+              ],
             ),
           ),
-        ).then((_) => _loadAllConversations());
-      },
+        ),
+      ),
     );
   }
 
@@ -205,7 +286,11 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
       key: Key(conversation.threadId ?? conversation.user.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        color: Colors.red,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.red.shade900.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(16),
+        ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         child: const Icon(Icons.delete, color: Colors.white),
@@ -253,75 +338,120 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
           }
         }
       },
-      child: ListTile(
-        leading: GestureDetector(
-          onTap: () => PlayerProfileSheet.showById(context, conversation.user.id),
-          child: CircleAvatar(
-            backgroundImage: conversation.user.photoUrl != null
-                ? NetworkImage(conversation.user.photoUrl!)
-                : null,
-            child: conversation.user.photoUrl == null
-                ? Text(conversation.user.name[0])
-                : null,
-          ),
-        ),
-        title: GestureDetector(
-          onTap: () => PlayerProfileSheet.showById(context, conversation.user.id),
-          child: Text(
-            conversation.user.name,
-            style: TextStyle(
-              color: Colors.blue,
-              decoration: TextDecoration.underline,
-              fontWeight: conversation.hasUnread ? FontWeight.bold : FontWeight.normal,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
-          ),
-        ),
-        subtitle: Text(
-          conversation.lastMessage?.isChallenge == true
-              ? '⚔️ Challenge: ${conversation.lastMessage?.content}'
-              : (conversation.lastMessage?.content ?? 'No messages'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: conversation.lastMessage?.isChallenge == true
-              ? const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)
-              : TextStyle(
-                  fontWeight: conversation.hasUnread ? FontWeight.w600 : FontWeight.normal,
-                  color: conversation.hasUnread ? Colors.white : Colors.grey,
-                ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (conversation.hasUnread) ...[
-              Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(
-                  color: Colors.blue,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-            if (conversation.lastMessage != null)
-              Text(
-                _formatDate(conversation.lastMessage!.createdAt),
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
           ],
         ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(otherUser: conversation.user),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(otherUser: conversation.user),
+                ),
+              ).then((_) {
+                _loadAllConversations();
+                // Refresh the unread badge after reading messages
+                ScaffoldWithNavBar.refreshBadge?.call();
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => PlayerProfileSheet.showById(context, conversation.user.id),
+                    child: CircleAvatar(
+                      radius: 24,
+                      backgroundImage: conversation.user.photoUrl != null
+                          ? NetworkImage(conversation.user.photoUrl!)
+                          : null,
+                      backgroundColor: Colors.blue.withOpacity(0.2),
+                      child: conversation.user.photoUrl == null
+                          ? Text(
+                              conversation.user.name.isNotEmpty ? conversation.user.name[0] : '?',
+                              style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () => PlayerProfileSheet.showById(context, conversation.user.id),
+                          child: Text(
+                            conversation.user.name,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: conversation.hasUnread ? FontWeight.bold : FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          conversation.lastMessage?.isChallenge == true
+                              ? '⚔️ Challenge: ${conversation.lastMessage?.content}'
+                              : (conversation.lastMessage?.content ?? 'No messages'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: conversation.lastMessage?.isChallenge == true
+                              ? const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 13)
+                              : TextStyle(
+                                  fontWeight: conversation.hasUnread ? FontWeight.w600 : FontWeight.normal,
+                                  color: conversation.hasUnread ? Colors.white : Colors.white54,
+                                  fontSize: 13,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (conversation.lastMessage != null)
+                        Text(
+                          _formatDate(conversation.lastMessage!.createdAt),
+                          style: TextStyle(
+                            fontSize: 12, 
+                            color: conversation.hasUnread ? Colors.blueAccent : Colors.white30,
+                            fontWeight: conversation.hasUnread ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      if (conversation.hasUnread) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Colors.blueAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ).then((_) {
-            _loadAllConversations();
-            // Refresh the unread badge after reading messages
-            ScaffoldWithNavBar.refreshBadge?.call();
-          });
-        },
+          ),
+        ),
       ),
     );
   }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { User } from './user.entity';
 
 @Injectable()
@@ -8,6 +8,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    private dataSource: DataSource,
   ) { }
 
   async findOrCreate(firebaseUid: string, email: string): Promise<User> {
@@ -173,5 +174,104 @@ export class UsersService {
       const dateB = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
       return dateB - dateA;
     });
+  }
+
+  // ==================== FOLLOW METHODS ====================
+
+  async followCourt(userId: number, courtId: string): Promise<void> {
+    await this.dataSource.query(`
+      INSERT INTO user_followed_courts (user_id, court_id)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id, court_id) DO NOTHING
+    `, [userId, courtId]);
+  }
+
+  async unfollowCourt(userId: number, courtId: string): Promise<void> {
+    await this.dataSource.query(`
+      DELETE FROM user_followed_courts WHERE user_id = $1 AND court_id = $2
+    `, [userId, courtId]);
+  }
+
+  async followPlayer(followerId: number, followedId: number): Promise<void> {
+    await this.dataSource.query(`
+      INSERT INTO user_followed_players (follower_id, followed_id)
+      VALUES ($1, $2)
+      ON CONFLICT (follower_id, followed_id) DO NOTHING
+    `, [followerId, followedId]);
+  }
+
+  async unfollowPlayer(followerId: number, followedId: number): Promise<void> {
+    await this.dataSource.query(`
+      DELETE FROM user_followed_players WHERE follower_id = $1 AND followed_id = $2
+    `, [followerId, followedId]);
+  }
+
+  async getFollows(userId: number): Promise<{ courts: any[]; players: any[] }> {
+    // Get followed courts
+    const courts = await this.dataSource.query(`
+      SELECT fc.court_id as "courtId", 
+             CASE WHEN ca.court_id IS NOT NULL THEN true ELSE false END as "alertsEnabled"
+      FROM user_followed_courts fc
+      LEFT JOIN user_court_alerts ca ON fc.user_id = ca.user_id AND fc.court_id = ca.court_id
+      WHERE fc.user_id = $1
+    `, [userId]);
+
+    // Get followed players
+    const players = await this.dataSource.query(`
+      SELECT fp.followed_id as "playerId", u.name, u.photo_url as "photoUrl"
+      FROM user_followed_players fp
+      JOIN users u ON fp.followed_id = u.id
+      WHERE fp.follower_id = $1
+    `, [userId]);
+
+    return { courts, players };
+  }
+
+  async getFollowedActivity(userId: number): Promise<{ courtActivity: any[]; playerActivity: any[] }> {
+    // Get activity from followed courts (last 24 hours)
+    const courtActivity = await this.dataSource.query(`
+      SELECT 
+        ci.id,
+        ci.court_id as "courtId",
+        ci.user_id as "userId",
+        u.display_name as "userName",
+        u.avatar_url as "userPhotoUrl",
+        ci.checked_in_at as "checkedInAt",
+        ci.checked_out_at as "checkedOutAt",
+        'check_in' as "activityType"
+      FROM court_check_ins ci
+      JOIN users u ON ci.user_id = u.id
+      WHERE ci.court_id IN (
+        SELECT court_id FROM user_followed_courts WHERE user_id = $1
+      )
+      AND ci.checked_in_at > NOW() - INTERVAL '24 hours'
+      ORDER BY ci.checked_in_at DESC
+      LIMIT 50
+    `, [userId]);
+
+    // Get recent matches from followed players (last 7 days)
+    const playerActivity = await this.dataSource.query(`
+      SELECT 
+        m.id as "matchId",
+        m.host_id as "hostId",
+        m.guest_id as "guestId",
+        host.display_name as "hostName",
+        host.avatar_url as "hostPhotoUrl",
+        guest.display_name as "guestName",
+        guest.avatar_url as "guestPhotoUrl",
+        m.status,
+        m.created_at as "createdAt",
+        'match' as "activityType"
+      FROM matches m
+      JOIN users host ON m.host_id = host.id
+      JOIN users guest ON m.guest_id = guest.id
+      WHERE (m.host_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id = $1)
+         OR m.guest_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id = $1))
+      AND m.created_at > NOW() - INTERVAL '7 days'
+      ORDER BY m.created_at DESC
+      LIMIT 50
+    `, [userId]);
+
+    return { courtActivity, playerActivity };
   }
 }

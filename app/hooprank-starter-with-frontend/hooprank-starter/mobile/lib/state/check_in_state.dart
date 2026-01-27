@@ -401,6 +401,9 @@ class CheckInState extends ChangeNotifier {
     
     await _saveUserCheckIns();
     notifyListeners();
+    
+    // Sync to backend
+    ApiService.checkInToCourt(courtId);
   }
   
   /// Check out current user from a court
@@ -416,6 +419,9 @@ class CheckInState extends ChangeNotifier {
     
     await _saveUserCheckIns();
     notifyListeners();
+    
+    // Sync to backend
+    ApiService.checkOutFromCourt(courtId);
   }
   
   /// Get all courts the current user is checked into
@@ -718,6 +724,9 @@ class CheckInState extends ChangeNotifier {
     }
     
     notifyListeners();
+    
+    // Sync to backend
+    ApiService.createStatus(status);
   }
   
   /// Clear current user's status

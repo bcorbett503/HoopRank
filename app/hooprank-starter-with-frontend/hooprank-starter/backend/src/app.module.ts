@@ -5,10 +5,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MatchesModule } from './matches/matches.module';
 import { UsersModule } from './users/users.module';
 import { CourtsModule } from './courts/courts.module';
+import { StatusesModule } from './statuses/statuses.module';
 import { User } from './users/user.entity';
 import { Court } from './courts/court.entity';
 import { Match } from './matches/match.entity';
 import { Message } from './messages/message.entity';
+import { PlayerStatus, StatusLike, StatusComment } from './statuses/status.entity';
 import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -29,7 +31,7 @@ import { NotificationsModule } from './notifications/notifications.module';
           return {
             type: 'postgres',
             url: databaseUrl,
-            entities: [User, Court, Match, Message],
+            entities: [User, Court, Match, Message, PlayerStatus, StatusLike, StatusComment],
             synchronize: false, // Don't auto-sync in production
             ssl: false, // Railway internal connection doesn't need SSL
           };
@@ -38,7 +40,7 @@ import { NotificationsModule } from './notifications/notifications.module';
           return {
             type: 'better-sqlite3',
             database: 'hooprank.db',
-            entities: [User, Court, Match, Message],
+            entities: [User, Court, Match, Message, PlayerStatus, StatusLike, StatusComment],
             synchronize: true,
           } as any;
         }
@@ -47,6 +49,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     MatchesModule,
     UsersModule,
     CourtsModule,
+    StatusesModule,
     MessagesModule,
     FirebaseModule,
     NotificationsModule,

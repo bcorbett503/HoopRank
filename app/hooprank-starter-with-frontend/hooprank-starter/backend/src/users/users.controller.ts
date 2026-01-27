@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Headers, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { User } from './user.entity';
@@ -40,12 +40,48 @@ export class UsersController {
     if (isNaN(userIdNum)) {
       return { courts: [], players: [] };
     }
-    const courtAlerts = await this.notificationsService.getUserCourtAlerts(userIdNum);
-    // For now, return alerts as the followed courts with alerts enabled
-    return {
-      courts: courtAlerts.map(courtId => ({ courtId, alertsEnabled: true })),
-      players: [],
-    };
+    return this.usersService.getFollows(userIdNum);
+  }
+
+  @Get('me/follows/activity')
+  async getFollowedActivity(@Headers('x-user-id') userId: string) {
+    const userIdNum = parseInt(userId, 10);
+    if (isNaN(userIdNum)) {
+      return { courtActivity: [], playerActivity: [] };
+    }
+    return this.usersService.getFollowedActivity(userIdNum);
+  }
+
+  @Post('me/follows/courts')
+  async followCourt(
+    @Headers('x-user-id') userId: string,
+    @Body() body: { courtId: string; alertsEnabled?: boolean },
+  ) {
+    const userIdNum = parseInt(userId, 10);
+    if (isNaN(userIdNum)) {
+      return { success: false, error: 'Invalid user ID' };
+    }
+    await this.usersService.followCourt(userIdNum, body.courtId);
+    // If alerts requested, also enable alerts
+    if (body.alertsEnabled) {
+      await this.notificationsService.enableCourtAlert(userIdNum, body.courtId);
+    }
+    return { success: true };
+  }
+
+  @Delete('me/follows/courts/:courtId')
+  async unfollowCourt(
+    @Headers('x-user-id') userId: string,
+    @Param('courtId') courtId: string,
+  ) {
+    const userIdNum = parseInt(userId, 10);
+    if (isNaN(userIdNum)) {
+      return { success: false, error: 'Invalid user ID' };
+    }
+    await this.usersService.unfollowCourt(userIdNum, courtId);
+    // Also disable alerts when unfollowing
+    await this.notificationsService.disableCourtAlert(userIdNum, courtId);
+    return { success: true };
   }
 
   @Put('me/follows/courts/:courtId/alerts')
@@ -64,6 +100,34 @@ export class UsersController {
     } else {
       await this.notificationsService.disableCourtAlert(userIdNum, courtId);
     }
+    return { success: true };
+  }
+
+  @Post('me/follows/players')
+  async followPlayer(
+    @Headers('x-user-id') userId: string,
+    @Body() body: { playerId: string },
+  ) {
+    const userIdNum = parseInt(userId, 10);
+    const followedIdNum = parseInt(body.playerId, 10);
+    if (isNaN(userIdNum) || isNaN(followedIdNum)) {
+      return { success: false, error: 'Invalid user ID' };
+    }
+    await this.usersService.followPlayer(userIdNum, followedIdNum);
+    return { success: true };
+  }
+
+  @Delete('me/follows/players/:playerId')
+  async unfollowPlayer(
+    @Headers('x-user-id') userId: string,
+    @Param('playerId') playerId: string,
+  ) {
+    const userIdNum = parseInt(userId, 10);
+    const followedIdNum = parseInt(playerId, 10);
+    if (isNaN(userIdNum) || isNaN(followedIdNum)) {
+      return { success: false, error: 'Invalid user ID' };
+    }
+    await this.usersService.unfollowPlayer(userIdNum, followedIdNum);
     return { success: true };
   }
 

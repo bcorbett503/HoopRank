@@ -889,5 +889,235 @@ class ApiService {
     );
     return response.statusCode == 200;
   }
+
+  // ===================
+  // Check-in API
+  // ===================
+
+  /// Check in to a court
+  static Future<Map<String, dynamic>?> checkInToCourt(String courtId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/check-in'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    }
+    return null;
+  }
+
+  /// Check out from a court
+  static Future<bool> checkOutFromCourt(String courtId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/check-out'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Get activity for a specific court
+  static Future<List<Map<String, dynamic>>> getCourtActivity(String courtId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/activity'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// Get active check-ins for a court
+  static Future<List<Map<String, dynamic>>> getActiveCheckIns(String courtId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/check-ins'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// Get activity from all followed courts and players
+  static Future<Map<String, dynamic>> getFollowedActivity() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/users/me/follows/activity'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    return {'courtActivity': [], 'playerActivity': []};
+  }
+
+  // ===================
+  // Status API (Likes & Comments)
+  // ===================
+
+  /// Create a new status with optional image
+  static Future<Map<String, dynamic>?> createStatus(String content, {String? imageUrl}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/statuses'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'content': content,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    }
+    return null;
+  }
+
+  /// Get status feed (followed users + own statuses)
+  static Future<List<Map<String, dynamic>>> getStatusFeed() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/statuses/feed'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// Get unified feed (statuses + check-ins + matches for followed players/courts)
+  static Future<List<Map<String, dynamic>>> getUnifiedFeed({String filter = 'all'}) async {
+    debugPrint('UNIFIED_FEED: calling /statuses/unified-feed?filter=$filter userId=$_userId');
+    final response = await http.get(
+      Uri.parse('$baseUrl/statuses/unified-feed?filter=$filter'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    debugPrint('UNIFIED_FEED: status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 500))}');
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      debugPrint('UNIFIED_FEED: parsed ${data.length} items');
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// Like a status
+  static Future<bool> likeStatus(int statusId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/statuses/$statusId/like'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  /// Unlike a status
+  static Future<bool> unlikeStatus(int statusId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/statuses/$statusId/like'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Get likes for a status
+  static Future<List<Map<String, dynamic>>> getStatusLikes(int statusId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/statuses/$statusId/likes'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// Add a comment to a status
+  static Future<Map<String, dynamic>?> addStatusComment(int statusId, String content) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/statuses/$statusId/comments'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'content': content}),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    }
+    return null;
+  }
+
+  /// Get comments for a status
+  static Future<List<Map<String, dynamic>>> getStatusComments(int statusId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/statuses/$statusId/comments'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// Delete a comment
+  static Future<bool> deleteStatusComment(int commentId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/statuses/comments/$commentId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Get all posts by a specific user
+  static Future<List<Map<String, dynamic>>> getUserPosts(String targetUserId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/statuses/user/$targetUserId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  // ========== Event Attendance (I'm IN) ==========
+
+  /// Mark as attending an event
+  static Future<bool> markAttending(int statusId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/statuses/$statusId/attend'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  /// Remove attendance from event
+  static Future<bool> removeAttending(int statusId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/statuses/$statusId/attend'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Get attendees for an event
+  static Future<List<Map<String, dynamic>>> getAttendees(int statusId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/statuses/$statusId/attendees'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
 }
 

@@ -19,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _stats;
   List<Map<String, dynamic>> _history = [];
   List<Map<String, dynamic>> _recentMatches = [];
+  List<Map<String, dynamic>> _userPosts = []; // User's status posts
   bool _isLoading = true;
   double? _currentRating; // Fresh rating from API
   int _matchesPlayed = 0;
@@ -49,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ApiService.getUserRankHistory(userId),
         ApiService.getUserMatchHistory(userId),
         ApiService.getProfile(userId), // Fetch fresh rating and stats
+        ApiService.getUserPosts(userId), // Fetch user's posts
       ]);
 
       if (mounted) {
@@ -59,6 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _stats = results[0] as Map<String, dynamic>?;
           _history = (results[1] as List<Map<String, dynamic>>?) ?? [];
           _recentMatches = (results[2] as List<Map<String, dynamic>>?) ?? [];
+          _userPosts = (results[4] as List<Map<String, dynamic>>?) ?? [];
           // Parse rating and stats from profile data
           if (profileData != null) {
             _currentRating = (profileData['rating'] is num)
@@ -189,30 +192,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // HoopRank Graph
-                    const Text('HoopRank History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    // All Posts Section
+                    const Text('All Posts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            SizedBox(
-                              height: 200,
-                              child: _history.isEmpty
-                                  ? const Center(child: Text('No history yet'))
-                                  : HoopRankGraph(
-                                      spots: _history.asMap().entries.map((e) {
-                                        final hr = e.value['hoop_rank'];
-                                        final hrValue = (hr is num) ? hr.toDouble() : (double.tryParse(hr?.toString() ?? '') ?? 3.0);
-                                        return FlSpot(e.key.toDouble(), hrValue);
-                                      }).toList(),
-                                    ),
-                            ),
-                          ],
+                    if (_userPosts.isEmpty)
+                      const Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(
+                            child: Text('No posts yet. Share an update!', style: TextStyle(color: Colors.grey)),
+                          ),
                         ),
-                      ),
-                    ),
+                      )
+                    else
+                      ...(_userPosts.map((post) => _buildPostCard(post))),
                     const SizedBox(height: 24),
 
                     // Recent Matches
@@ -350,6 +343,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(width: 8),
             // Date
             Text(dateStr, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostCard(Map<String, dynamic> post) {
+    final content = post['content']?.toString() ?? '';
+    final createdAt = post['createdAt'];
+    final likeCount = post['likeCount'] ?? 0;
+    final commentCount = post['commentCount'] ?? 0;
+    
+    // Format date
+    String timeAgo = '';
+    if (createdAt != null) {
+      try {
+        final date = DateTime.parse(createdAt.toString());
+        final diff = DateTime.now().difference(date);
+        if (diff.inDays > 0) {
+          timeAgo = '${diff.inDays}d ago';
+        } else if (diff.inHours > 0) {
+          timeAgo = '${diff.inHours}h ago';
+        } else if (diff.inMinutes > 0) {
+          timeAgo = '${diff.inMinutes}m ago';
+        } else {
+          timeAgo = 'just now';
+        }
+      } catch (_) {}
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(content, style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.favorite, size: 16, color: Colors.grey[500]),
+                const SizedBox(width: 4),
+                Text('$likeCount', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                const SizedBox(width: 16),
+                Icon(Icons.chat_bubble_outline, size: 16, color: Colors.grey[500]),
+                const SizedBox(width: 4),
+                Text('$commentCount', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                const Spacer(),
+                Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              ],
+            ),
           ],
         ),
       ),

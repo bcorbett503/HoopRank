@@ -454,29 +454,44 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 _buildInvitesTab(),
               ],
             ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Create Challenge button
-          if (_myTeams.isNotEmpty)
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Create Challenge button (Bottom Left)
+            if (_myTeams.isNotEmpty)
+              FloatingActionButton.extended(
+                heroTag: 'createChallenge',
+                onPressed: _showCreateChallengeSheet,
+                backgroundColor: Colors.green,
+                icon: const Icon(Icons.sports_basketball),
+                label: const Text('Create Challenge'),
+              )
+            else
+              const SizedBox(), // Spacer to keep Create Team on right if needed, or remove to center/left it? 
+              // Actually, using Spacer() between them below handles positioning.
+              // If I want Create Team to STAY right even if Challenge is missing:
+              // Row(children: [Spacer(), CreateTeam]) works.
+            
+            if (_myTeams.isEmpty && false) const SizedBox(), // explicit NO-OP
+
+            // Spacer is NOT needed if using MainAxisAlignment.spaceBetween with 2 items.
+            // But if 1 item (Create Team), spaceBetween aligns it to start (Left).
+            // So we need:
+            if (_myTeams.isEmpty) const Spacer(), // Push Create Team to right
+
+            // Create Team button (Bottom Right)
             FloatingActionButton.extended(
-              heroTag: 'createChallenge',
-              onPressed: _showCreateChallengeSheet,
-              backgroundColor: Colors.green,
-              icon: const Icon(Icons.sports_basketball),
-              label: const Text('Create Challenge'),
+              heroTag: 'createTeam',
+              onPressed: _showCreateTeamDialog,
+              backgroundColor: Colors.deepOrange,
+              icon: const Icon(Icons.add),
+              label: const Text('Create Team'),
             ),
-          if (_myTeams.isNotEmpty) const SizedBox(height: 12),
-          // Create Team button
-          FloatingActionButton.extended(
-            heroTag: 'createTeam',
-            onPressed: _showCreateTeamDialog,
-            backgroundColor: Colors.deepOrange,
-            icon: const Icon(Icons.add),
-            label: const Text('Create Team'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -487,16 +502,16 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.groups, size: 64, color: Colors.grey[400]),
+            Icon(Icons.groups, size: 64, color: Colors.white.withOpacity(0.1)),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'No teams yet',
-              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 18, color: Colors.white54, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'Create a team to start playing 3v3 or 5v5',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: Colors.white30),
             ),
           ],
         ),
@@ -522,77 +537,104 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     final memberCount = team['memberCount'] ?? 1;
     final pendingCount = team['pendingCount'] ?? 0;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TeamDetailScreen(teamId: team['id']),
-            ),
-          ).then((_) => _loadData());
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  // Team type badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: teamType == '3v3' ? Colors.blue : Colors.purple,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      teamType,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      team['name'] ?? 'Team',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  if (isOwner)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.amber[100],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text('Owner', style: TextStyle(fontSize: 12, color: Colors.amber)),
-                    ),
-                ],
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TeamDetailScreen(teamId: team['id']),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildStatChip(Icons.star, rating.toStringAsFixed(1)),
-                  const SizedBox(width: 12),
-                  _buildStatChip(Icons.people, '$memberCount'),
-                  const SizedBox(width: 12),
-                  _buildStatChip(Icons.emoji_events, '$wins W - $losses L'),
-                  if (pendingCount > 0) ...[
-                    const Spacer(),
+            ).then((_) => _loadData());
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // Team type badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.orange[100],
-                        borderRadius: BorderRadius.circular(4),
+                        color: teamType == '3v3' ? Colors.blue.withOpacity(0.2) : Colors.purple.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: teamType == '3v3' ? Colors.blue.withOpacity(0.3) : Colors.purple.withOpacity(0.3),
+                        ),
                       ),
-                      child: Text('$pendingCount pending', style: TextStyle(fontSize: 12, color: Colors.orange[800])),
+                      child: Text(
+                        teamType,
+                        style: TextStyle(
+                          color: teamType == '3v3' ? Colors.blue[300] : Colors.purple[200], 
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 11
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        team['name'] ?? 'Team',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                    if (isOwner)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                        ),
+                        child: const Text('Owner', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
+                      ),
                   ],
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildStatChip(Icons.star, rating.toStringAsFixed(1)),
+                    const SizedBox(width: 12),
+                    _buildStatChip(Icons.people, '$memberCount'),
+                    const SizedBox(width: 12),
+                    _buildStatChip(Icons.emoji_events, '$wins W - $losses L'),
+                    if (pendingCount > 0) ...[
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          '$pendingCount pending', 
+                          style: TextStyle(fontSize: 11, color: Colors.deepOrange, fontWeight: FontWeight.bold)
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -616,11 +658,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.mail_outline, size: 64, color: Colors.grey[400]),
+            Icon(Icons.mail_outline, size: 64, color: Colors.white.withOpacity(0.1)),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'No pending invites',
-              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 18, color: Colors.white54, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -638,11 +680,22 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   }
 
   Widget _buildInviteCard(Map<String, dynamic> invite) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -650,19 +703,26 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: invite['teamType'] == '3v3' ? Colors.blue : Colors.purple,
-                    borderRadius: BorderRadius.circular(4),
+                    color: invite['teamType'] == '3v3' ? Colors.blue.withOpacity(0.2) : Colors.purple.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: invite['teamType'] == '3v3' ? Colors.blue.withOpacity(0.3) : Colors.purple.withOpacity(0.3)
+                    ),
                   ),
                   child: Text(
                     invite['teamType'] ?? '3v3',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(
+                      color: invite['teamType'] == '3v3' ? Colors.blue[300] : Colors.purple[200], 
+                      fontWeight: FontWeight.bold, 
+                      fontSize: 11
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     invite['name'] ?? 'Team',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
               ],
@@ -670,14 +730,20 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             const SizedBox(height: 8),
             Text(
               'Invited by ${invite['ownerName'] ?? 'Unknown'}',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: Colors.white70, fontSize: 13),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _declineInvite(invite),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red[300],
+                      side: BorderSide(color: Colors.red.withOpacity(0.5)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     child: const Text('Decline'),
                   ),
                 ),
@@ -688,6 +754,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepOrange,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
                     ),
                     child: const Text('Accept'),
                   ),
@@ -695,7 +764,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               ],
             ),
           ],
-        ),
       ),
     );
   }
@@ -780,39 +848,86 @@ class _TeamRankingsWithFilterState extends State<_TeamRankingsWithFilter> {
                       final wins = team['wins'] ?? 0;
                       final losses = team['losses'] ?? 0;
                       
-                      return Card(
+                      return Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: widget.teamType == '3v3' 
-                                ? Colors.blue.withOpacity(0.2) 
-                                : Colors.purple.withOpacity(0.2),
-                            child: Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                color: widget.teamType == '3v3' ? Colors.blue : Colors.purple,
-                                fontWeight: FontWeight.bold,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[900],
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                               // Optional: View team details if we wanted to
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: widget.teamType == '3v3' 
+                                          ? Colors.blue.withOpacity(0.2) 
+                                          : Colors.purple.withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: TextStyle(
+                                          color: widget.teamType == '3v3' ? Colors.blue : Colors.purple,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          team['name'] ?? 'Team',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '⭐ ${rating.toStringAsFixed(2)} • $wins W - $losses L', 
+                                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Challenge sent to ${team['name']}!')),
+                                      );
+                                      Navigator.pop(context);
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.deepOrange,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      elevation: 0,
+                                    ),
+                                    child: const Text('Challenge'),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          title: Text(
-                            team['name'] ?? 'Team',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text('⭐ ${rating.toStringAsFixed(2)} • $wins W - $losses L'),
-                          trailing: ElevatedButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Challenge sent to ${team['name']}!')),
-                              );
-                              Navigator.pop(context);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            ),
-                            child: const Text('Challenge'),
                           ),
                         ),
                       );

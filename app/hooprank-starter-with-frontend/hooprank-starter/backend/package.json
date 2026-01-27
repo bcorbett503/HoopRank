@@ -2,6 +2,9 @@
   "name": "hooprank-backend",
   "version": "0.1.1",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -21,7 +24,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "firebase-admin": "^13.6.0",
-    "pg": "^8.16.3",
+    "pg": "^8.17.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.27",
