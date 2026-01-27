@@ -16,10 +16,10 @@ export class Match {
     @Column('simple-json', { nullable: true })
     ratingDiff: Record<string, number>;
 
-    @ManyToOne(() => User, (user) => user.hostedMatches)
+    @ManyToOne(() => User, (user) => user.hostedMatches, { nullable: true })
     host: User;
 
-    @Column()
+    @Column({ nullable: true })
     hostId: string;
 
     @ManyToOne(() => User, (user) => user.guestMatches, { nullable: true })
