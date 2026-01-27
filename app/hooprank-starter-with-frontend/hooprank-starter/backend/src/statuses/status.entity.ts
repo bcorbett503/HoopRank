@@ -14,10 +14,10 @@ export class PlayerStatus {
     @Column({ name: 'image_url', nullable: true })
     imageUrl: string;
 
-    @Column({ name: 'scheduled_at', type: 'datetime', nullable: true })
+    @Column({ name: 'scheduled_at', type: 'timestamp', nullable: true })
     scheduledAt: Date;
 
-    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -32,7 +32,7 @@ export class StatusLike {
     @Column({ name: 'user_id' })
     userId: number;
 
-    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -50,6 +50,6 @@ export class StatusComment {
     @Column()
     content: string;
 
-    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
