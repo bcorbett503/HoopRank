@@ -9,8 +9,8 @@ class ApiService {
   static const String _productionUrl = 'https://heartfelt-appreciation-production-65f1.up.railway.app';
   
   // Development URLs
-  static const String _emulatorUrl = 'http://10.0.2.2:4000';  // Android emulator
-  static const String _localUrl = 'http://localhost:4000';     // iOS simulator / web
+  static const String _emulatorUrl = 'http://10.0.2.2:3000';  // Android emulator
+  static const String _localUrl = 'http://localhost:3000';     // iOS simulator / web
   
   // Set to true ONLY when running local backend server
   static const bool _useLocalServer = false;
@@ -20,9 +20,12 @@ class ApiService {
     if (kReleaseMode || !_useLocalServer) {
       return _productionUrl;
     }
-    // Only use emulator URL when explicitly developing locally
-    return _emulatorUrl;
-  } 
+    // Use localhost for iOS/macOS, 10.0.2.2 for Android emulator
+    if (Platform.isAndroid) {
+      return _emulatorUrl;
+    }
+    return _localUrl;
+  }
 
 
   static String? _authToken;

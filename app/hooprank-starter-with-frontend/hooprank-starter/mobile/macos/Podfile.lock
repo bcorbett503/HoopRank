@@ -132,6 +132,8 @@ PODS:
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - sign_in_with_apple (0.0.1):
+    - FlutterMacOS
 
 DEPENDENCIES:
   - facebook_auth_desktop (from `Flutter/ephemeral/.symlinks/plugins/facebook_auth_desktop/macos`)
@@ -146,6 +148,7 @@ DEPENDENCIES:
   - google_sign_in_ios (from `Flutter/ephemeral/.symlinks/plugins/google_sign_in_ios/darwin`)
   - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
   - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
+  - sign_in_with_apple (from `Flutter/ephemeral/.symlinks/plugins/sign_in_with_apple/macos`)
 
 SPEC REPOS:
   trunk:
@@ -193,6 +196,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
   shared_preferences_foundation:
     :path: Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin
+  sign_in_with_apple:
+    :path: Flutter/ephemeral/.symlinks/plugins/sign_in_with_apple/macos
 
 SPEC CHECKSUMS:
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
@@ -225,6 +230,7 @@ SPEC CHECKSUMS:
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
+  sign_in_with_apple: 6673c03c9e3643f6c8d33601943fbfa9ae99f94e
 
 PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
 
