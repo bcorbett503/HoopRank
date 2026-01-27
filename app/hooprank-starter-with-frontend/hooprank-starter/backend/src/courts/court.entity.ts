@@ -9,10 +9,10 @@ export class Court {
     @Column()
     name: string;
 
-    @Column('float')
+    @Column('float', { nullable: true })
     lat: number;
 
-    @Column('float')
+    @Column('float', { nullable: true })
     lng: number;
 
     @Column({ nullable: true })
