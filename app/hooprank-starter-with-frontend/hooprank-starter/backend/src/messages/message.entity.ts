@@ -6,19 +6,19 @@ export class Message {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ManyToOne(() => User)
+    @ManyToOne(() => User, { nullable: true })
     sender: User;
 
-    @Column()
+    @Column({ nullable: true })
     senderId: string;
 
-    @ManyToOne(() => User)
+    @ManyToOne(() => User, { nullable: true })
     receiver: User;
 
-    @Column()
+    @Column({ nullable: true })
     receiverId: string;
 
-    @Column()
+    @Column({ nullable: true })
     content: string;
 
     @Column({ nullable: true })
