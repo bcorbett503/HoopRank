@@ -14,6 +14,7 @@ import { PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCou
 import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     FirebaseModule,
     NotificationsModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule { }
 
