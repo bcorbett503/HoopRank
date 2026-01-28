@@ -882,7 +882,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 2), // Tighter spacing
                       if (isScheduledEvent)
-                        // Context Line: Visual Box inside header
+                        // Context Line: Visual Box inside header (serves as main content for scheduled runs)
                         Container(
                           margin: const EdgeInsets.only(top: 2),
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -894,7 +894,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.calendar_today_outlined, size: 10, color: Colors.greenAccent),
+                              const Icon(Icons.push_pin, size: 10, color: Colors.greenAccent), // Pin icon
                               const SizedBox(width: 4),
                               Flexible(
                                 child: RichText(
@@ -961,8 +961,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               ],
             ),
             
-            // Content
-            if (content.isNotEmpty && (courtName == null || content != '@$courtName'))
+            // Content (suppressed for scheduled events since green box IS the content)
+            if (content.isNotEmpty && !isScheduledEvent)
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 4), // Tighter padding
                 child: Text(
