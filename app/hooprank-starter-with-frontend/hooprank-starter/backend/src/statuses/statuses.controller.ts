@@ -9,12 +9,12 @@ export class StatusesController {
     @Post()
     async createStatus(
         @Headers('x-user-id') userId: string,
-        @Body() body: { content: string; imageUrl?: string; scheduledAt?: string },
+        @Body() body: { content: string; imageUrl?: string; scheduledAt?: string; courtId?: string },
     ) {
         if (!userId) {
             return { success: false, error: 'User ID required' };
         }
-        const status = await this.statusesService.createStatus(userId, body.content, body.imageUrl, body.scheduledAt);
+        const status = await this.statusesService.createStatus(userId, body.content, body.imageUrl, body.scheduledAt, body.courtId);
         return { success: true, status };
     }
 

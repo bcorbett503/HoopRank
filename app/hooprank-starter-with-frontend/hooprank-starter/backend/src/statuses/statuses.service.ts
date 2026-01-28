@@ -24,12 +24,13 @@ export class StatusesService {
 
     // ========== Status CRUD ==========
 
-    async createStatus(userId: string, content: string, imageUrl?: string, scheduledAt?: string): Promise<PlayerStatus> {
+    async createStatus(userId: string, content: string, imageUrl?: string, scheduledAt?: string, courtId?: string): Promise<PlayerStatus> {
         const status = new PlayerStatus();
         status.userId = userId;
         status.content = content;
         status.imageUrl = imageUrl || undefined;
         status.scheduledAt = scheduledAt ? new Date(scheduledAt) : undefined;
+        status.courtId = courtId || undefined;
         return this.statusRepo.save(status);
     }
 
@@ -238,7 +239,7 @@ export class StatusesService {
                 SELECT court_id FROM user_followed_courts WHERE ${d.cast('user_id', 'TEXT')} = ${d.param()}
             )
             SELECT * FROM (
-                -- Status posts from followed players + own posts
+                -- Status posts from followed players + own posts + posts at followed courts
                 SELECT 
                     'status' as type,
                     ${d.cast('ps.id', 'TEXT')} as id,
@@ -249,8 +250,8 @@ export class StatusesService {
                     ps.content,
                     ps.image_url as "imageUrl",
                     ps.scheduled_at as "scheduledAt",
-                    NULL as "courtId",
-                    NULL as "courtName",
+                    ps.court_id as "courtId",
+                    c.name as "courtName",
                     NULL as "matchScore",
                     NULL as "matchStatus",
                     (SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id) as "likeCount",
@@ -260,8 +261,10 @@ export class StatusesService {
                     EXISTS(SELECT 1 FROM event_attendees WHERE status_id = ps.id AND ${d.cast('user_id', 'TEXT')} = ${d.param()}) as "isAttendingByMe"
                 FROM player_statuses ps
                 LEFT JOIN users u ON ${d.cast('ps.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
+                LEFT JOIN courts c ON ${d.cast('ps.court_id', 'TEXT')} = ${d.cast('c.id', 'TEXT')}
                 WHERE ${d.cast('ps.user_id', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
                 OR ${d.cast('ps.user_id', 'TEXT')} = ${d.param()}
+                OR ${d.cast('ps.court_id', 'TEXT')} IN (SELECT court_id FROM followed_courts)
 
                 UNION ALL
 

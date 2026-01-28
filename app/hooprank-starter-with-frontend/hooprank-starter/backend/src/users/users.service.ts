@@ -463,6 +463,23 @@ export class UsersService {
         results.push('user_followed_players has correct types');
       }
 
+      // Fix 4: Add court_id column to player_statuses if missing
+      results.push('Checking player_statuses.court_id column...');
+      const courtIdColumnCheck = await this.dataSource.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'player_statuses' AND column_name = 'court_id'
+      `);
+      if (courtIdColumnCheck.length === 0) {
+        await this.dataSource.query(`
+          ALTER TABLE player_statuses 
+          ADD COLUMN court_id VARCHAR(255) NULL
+        `);
+        results.push('Added court_id column to player_statuses');
+      } else {
+        results.push('player_statuses.court_id already exists');
+      }
+
       return { success: true, results };
     } catch (error) {
       results.push(`Error: ${error.message}`);

@@ -20,6 +20,9 @@ export class PlayerStatus {
     @Column({ name: 'scheduled_at', type: 'timestamp', nullable: true })
     scheduledAt?: Date;
 
+    @Column({ name: 'court_id', type: 'varchar', length: 255, nullable: true })
+    courtId?: string;
+
     @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
