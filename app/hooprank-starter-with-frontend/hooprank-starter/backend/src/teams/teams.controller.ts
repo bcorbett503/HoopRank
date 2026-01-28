@@ -70,6 +70,25 @@ export class TeamsController {
     }
 
     /**
+     * Respond to team invite (accept/decline)
+     * This endpoint matches the frontend's expected API
+     */
+    @Post(':id/respond')
+    @HttpCode(200)
+    async respondToInvite(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: { accept: boolean },
+    ) {
+        if (body.accept) {
+            await this.teamsService.acceptInvite(teamId, userId);
+        } else {
+            await this.teamsService.declineInvite(teamId, userId);
+        }
+        return { success: true };
+    }
+
+    /**
      * Leave team
      */
     @Post(':id/leave')
