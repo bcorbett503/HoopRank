@@ -699,6 +699,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final content = post['content']?.toString() ?? '';
     final imageUrl = post['imageUrl']?.toString();
     final scheduledAt = post['scheduledAt'];
+    final courtName = post['courtName']?.toString(); // New: Extract court name
     
     // Use local state if available, otherwise use from API
     final serverLikeCount = post['likeCount'] is int ? post['likeCount'] : int.tryParse(post['likeCount']?.toString() ?? '0') ?? 0;
@@ -746,32 +747,34 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         final isTomorrow = schedDate.year == now.year && schedDate.month == now.month && schedDate.day == now.day + 1;
         final hour = schedDate.hour > 12 ? schedDate.hour - 12 : schedDate.hour;
         final amPm = schedDate.hour >= 12 ? 'PM' : 'AM';
+        String dayStr;
         if (isToday) {
-          scheduledTimeStr = 'Today at $hour:${schedDate.minute.toString().padLeft(2, '0')} $amPm';
+          dayStr = 'Today';
         } else if (isTomorrow) {
-          scheduledTimeStr = 'Tomorrow at $hour:${schedDate.minute.toString().padLeft(2, '0')} $amPm';
+          dayStr = 'Tomorrow';
         } else {
-          scheduledTimeStr = '${schedDate.month}/${schedDate.day} at $hour:${schedDate.minute.toString().padLeft(2, '0')} $amPm';
+          dayStr = '${schedDate.month}/${schedDate.day}';
         }
+        scheduledTimeStr = '$dayStr @ $hour:${schedDate.minute.toString().padLeft(2, '0')} $amPm';
       } catch (_) {}
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8), // Compact margin
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), // Premium dark surface
+        color: const Color(0xFF1E1E1E), 
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.1), // Softer shadow
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12), // Compact padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -780,7 +783,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(2), // Border effect
+                  padding: const EdgeInsets.all(1.5), // Thinner border
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
@@ -792,16 +795,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     ),
                   ),
                   child: CircleAvatar(
-                    radius: 20,
+                    radius: 18, // Slightly smaller avatar
                     backgroundColor: Colors.grey[900],
                     backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
                     child: userPhotoUrl == null
                         ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))
                         : null,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -811,113 +814,113 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           Flexible(
                             child: Text(
                               userName, 
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white), // Slightly smaller font
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isScheduledEvent) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                               decoration: BoxDecoration(
                                 color: Colors.green.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('SCHEDULED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green)),
+                              child: const Text('SCHEDULED', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.green)),
                             ),
                           ],
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isScheduledEvent ? scheduledTimeStr : timeAgo, 
-                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
-                      ),
+                      const SizedBox(height: 1), // Tighter spacing
+                      if (isScheduledEvent)
+                        // Context Line: When & Where
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11),
+                            children: [
+                              TextSpan(text: scheduledTimeStr, style: const TextStyle(fontWeight: FontWeight.w500)),
+                              if (courtName != null) ...[
+                                const TextSpan(text: ' at '),
+                                TextSpan(text: courtName, style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w600)),
+                              ]
+                            ],
+                          ),
+                        )
+                      else
+                        Text(
+                          timeAgo, 
+                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                        ),
                     ],
                   ),
                 ),
-                // Optional: Ellipsis menu
-                Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.2), size: 20),
+                // Compact "IN" Button for Scheduled Events (Top Right)
+                if (isScheduledEvent)
+                  GestureDetector(
+                    onTap: () => _toggleAttending(statusId, isAttending, attendeeCount),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isAttending ? Colors.green : Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.green, width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isAttending ? Icons.check : Icons.add,
+                            color: isAttending ? Colors.white : Colors.green,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isAttending ? "IN ($attendeeCount)" : (attendeeCount > 0 ? "JOIN ($attendeeCount)" : "JOIN"),
+                            style: TextStyle(
+                              color: isAttending ? Colors.white : Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.2), size: 18),
               ],
             ),
             
             // Content
             if (content.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 4),
+                padding: const EdgeInsets.only(top: 8, bottom: 4), // Tighter padding
                 child: Text(
                   content, 
-                  style: TextStyle(fontSize: 15, height: 1.4, color: Colors.white.withOpacity(0.9)),
+                  style: TextStyle(fontSize: 14, height: 1.3, color: Colors.white.withOpacity(0.9)), // Slightly smaller font
                 ),
               ),
               
             // Image if present
             if (imageUrl != null && imageUrl.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.only(top: 8),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.network(
                     imageUrl,
                     fit: BoxFit.cover,
                     width: double.infinity,
-                    height: 220,
+                    height: 180, // Reduced height
                     errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
                 ),
               ),
             
-            // Interaction Bar for Scheduled Events
-            if (isScheduledEvent) ...[
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: () => _toggleAttending(statusId, isAttending, attendeeCount),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isAttending ? Colors.green : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isAttending ? Colors.green : Colors.green.withOpacity(0.5), width: 1.5),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        isAttending ? Icons.check_circle : Icons.calendar_today,
-                        color: isAttending ? Colors.white : Colors.green,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isAttending ? "I'M GOING" : "JOIN GAME",
-                        style: TextStyle(
-                          color: isAttending ? Colors.white : Colors.green,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      if (attendeeCount > 0) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          '($attendeeCount)',
-                          style: TextStyle(
-                            color: isAttending ? Colors.white.withOpacity(0.9) : Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            
-            // Action Buttons Row (Like, Comment)
-            const SizedBox(height: 16),
+            // Interaction Bar (Like, Comment)
+            const SizedBox(height: 10), // Reduced spacing
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 2),
               child: Row(
                 children: [
                   // Like Button
@@ -927,12 +930,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       borderRadius: BorderRadius.circular(20),
                       onTap: () => _toggleLike(statusId, isLiked, likeCount),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                         child: Row(
                           children: [
                             Icon(
                               isLiked ? Icons.favorite : Icons.favorite_border_rounded,
-                              size: 20,
+                              size: 18, // Smaller icon
                               color: isLiked ? Colors.redAccent : Colors.grey[500],
                             ),
                             const SizedBox(width: 6),
@@ -940,7 +943,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               '$likeCount',
                               style: TextStyle(
                                 color: isLiked ? Colors.redAccent : Colors.grey[500],
-                                fontSize: 13,
+                                fontSize: 12, // Smaller font
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -949,7 +952,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   
                   // Comment Button
                   Material(
@@ -958,12 +961,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       borderRadius: BorderRadius.circular(20),
                       onTap: () => _toggleComments(statusId),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                         child: Row(
                           children: [
                             Icon(
                               Icons.chat_bubble_outline_rounded,
-                              size: 20,
+                              size: 18,
                               color: isExpanded ? Colors.blue : Colors.grey[500],
                             ),
                             const SizedBox(width: 6),
@@ -971,7 +974,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               '$commentCount',
                               style: TextStyle(
                                 color: isExpanded ? Colors.blue : Colors.grey[500],
-                                fontSize: 13,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -981,16 +984,25 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     ),
                   ),
                   
-                  const Spacer(),
-                  // Share Button (Visual only)
-                  Icon(Icons.share_outlined, color: Colors.grey[600], size: 20),
+                  // Timestamp for scheduled events (since it was replaced in header)
+                  if (isScheduledEvent) ...[
+                    const Spacer(),
+                    Text(
+                      'Posted $timeAgo', 
+                      style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10),
+                    ),
+                  ] else ...[
+                     const Spacer(),
+                     // Share Button (Visual only)
+                     Icon(Icons.share_outlined, color: Colors.grey[600], size: 18),
+                  ]
                 ],
               ),
             ),
             
             // Expanded comments section matches existing logic, just keeping it here
             if (isExpanded) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
