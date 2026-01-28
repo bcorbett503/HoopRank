@@ -807,18 +807,28 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     return Container(
       margin: const EdgeInsets.only(bottom: 8), // Compact margin
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), 
+        color: isScheduledEvent ? null : const Color(0xFF1E1E1E), 
+        gradient: isScheduledEvent 
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF1E3825), // Dark green
+                  const Color(0xFF152518), // Darker green
+                ],
+              )
+            : null,
         borderRadius: BorderRadius.circular(16),
         border: isScheduledEvent 
-            ? Border.all(color: Colors.green.withOpacity(0.5), width: 1.5) // Distinct green border for scheduled
+            ? Border.all(color: Colors.greenAccent.withOpacity(0.3), width: 1) // Distinct border
             : Border.all(color: Colors.white.withOpacity(0.05)),
         boxShadow: [
           BoxShadow(
             color: isScheduledEvent 
-                ? Colors.green.withOpacity(0.1) // Subtle green glow
+                ? Colors.black.withOpacity(0.3) 
                 : Colors.black.withOpacity(0.1),
-            blurRadius: isScheduledEvent ? 8 : 4,
-            offset: const Offset(0, 2),
+            blurRadius: isScheduledEvent ? 12 : 4,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -954,12 +964,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             if (isScheduledEvent)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(top: 12, bottom: 4),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                margin: const EdgeInsets.only(top: 8, bottom: 2),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.black.withOpacity(0.2), // Darker "cutout" look
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
                 ),
                 child: Text(
                   courtName != null 
@@ -967,9 +976,10 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     : '$scheduledDayStr, $scheduledTimeStr',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 15, // Slightly larger base for readability
+                    fontWeight: FontWeight.w700,
                     color: Colors.greenAccent,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
