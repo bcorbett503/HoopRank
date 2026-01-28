@@ -836,7 +836,31 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         ],
                       ),
                       const SizedBox(height: 1), // Tighter spacing
-                      if (!isScheduledEvent) // Only show timeAgo here for non-scheduled
+                      if (isScheduledEvent)
+                        // Context Line: When & Where inside header
+                        Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined, size: 10, color: Colors.greenAccent),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11),
+                                  children: [
+                                    TextSpan(text: scheduledTimeStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                                    if (courtName != null) ...[
+                                      const TextSpan(text: ' @ ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w400)),
+                                      TextSpan(text: courtName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                    ]
+                                  ],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
                         Text(
                           timeAgo, 
                           style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
@@ -880,40 +904,6 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.2), size: 18),
               ],
             ),
-            
-            // Distinct Scheduled Time/Place Row
-            if (isScheduledEvent) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10), // Reduced vertical padding
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.greenAccent), // Smaller icon
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: RichText(
-                        text: TextSpan(
-                          style: const TextStyle(fontSize: 13, color: Colors.white),
-                          children: [
-                            TextSpan(text: scheduledTimeStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-                            if (courtName != null) ...[
-                              const TextSpan(text: ' @ ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w400)), // @ separator
-                              TextSpan(text: courtName, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-                            ],
-                          ],
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1, // Force single line
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             
             // Content
             if (content.isNotEmpty)
