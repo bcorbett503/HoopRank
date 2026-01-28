@@ -885,14 +885,14 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             if (isScheduledEvent) ...[
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10), // Reduced vertical padding
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today_outlined, size: 16, color: Colors.greenAccent),
+                    const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.greenAccent), // Smaller icon
                     const SizedBox(width: 8),
                     Expanded(
                       child: RichText(
@@ -901,12 +901,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           children: [
                             TextSpan(text: scheduledTimeStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
                             if (courtName != null) ...[
-                              const TextSpan(text: ' at ', style: TextStyle(color: Colors.white54)),
-                              TextSpan(text: courtName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              const TextSpan(text: ' @ ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w400)), // @ separator
+                              TextSpan(text: courtName, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
                             ],
                           ],
                         ),
                         overflow: TextOverflow.ellipsis,
+                        maxLines: 1, // Force single line
                       ),
                     ),
                   ],
