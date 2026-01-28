@@ -336,4 +336,50 @@ export class StatusesService {
             return [];
         }
     }
+
+    // Debug method to check player_statuses table contents
+    async debugPlayerStatuses(): Promise<any> {
+        try {
+            // Get all statuses
+            const allStatuses = await this.dataSource.query(`
+                SELECT * FROM player_statuses ORDER BY created_at DESC LIMIT 10
+            `);
+
+            // Get followed players for test user
+            const followedPlayers = await this.dataSource.query(`
+                SELECT * FROM user_followed_players LIMIT 5
+            `);
+
+            // Get followed courts for test user  
+            const followedCourts = await this.dataSource.query(`
+                SELECT * FROM user_followed_courts LIMIT 5
+            `);
+
+            // Get users table schema
+            const usersColumns = await this.dataSource.query(`
+                SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'users'
+            `);
+
+            // Get check_ins
+            const checkIns = await this.dataSource.query(`
+                SELECT * FROM check_ins ORDER BY checked_in_at DESC LIMIT 5
+            `);
+
+            // Get matches
+            const matches = await this.dataSource.query(`
+                SELECT * FROM matches ORDER BY created_at DESC LIMIT 5
+            `);
+
+            return {
+                allStatuses,
+                followedPlayers,
+                followedCourts,
+                usersColumns,
+                checkIns,
+                matches
+            };
+        } catch (error) {
+            return { error: error.message, stack: error.stack };
+        }
+    }
 }

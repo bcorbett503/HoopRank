@@ -27,6 +27,12 @@ export class StatusesController {
         return this.statusesService.getFeed(userId);
     }
 
+    // Debug endpoint to check player_statuses table
+    @Get('debug-statuses')
+    async debugStatuses() {
+        return this.statusesService.debugPlayerStatuses();
+    }
+
     // Get unified feed (statuses + check-ins + matches)
     @Get('unified-feed')
     async getUnifiedFeed(
