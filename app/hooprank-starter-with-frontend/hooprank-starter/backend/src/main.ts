@@ -17,3 +17,5 @@ async function bootstrap() {
   console.log(`HoopRank API running on http://localhost:${port}`);
 }
 bootstrap();
+
+// Force rebuild Wed Jan 28 12:12:43 PST 2026
