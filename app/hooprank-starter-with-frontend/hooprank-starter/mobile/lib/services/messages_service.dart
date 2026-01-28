@@ -27,14 +27,14 @@ class Message {
 
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
-      id: json['id'],
-      senderId: json['senderId'],
-      receiverId: json['receiverId'],
-      content: json['content'],
-      createdAt: DateTime.parse(json['createdAt']),
-      matchId: json['matchId'],
+      id: json['id']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ?? '',
+      receiverId: json['receiverId']?.toString() ?? '',
+      content: json['content']?.toString() ?? '',
+      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
+      matchId: json['matchId']?.toString(),
       isChallenge: json['isChallenge'] ?? false,
-      challengeStatus: json['challengeStatus'],
+      challengeStatus: json['challengeStatus']?.toString(),
     );
   }
 
@@ -58,11 +58,16 @@ class Conversation {
   Conversation({this.threadId, required this.user, this.lastMessage, this.unreadCount = 0});
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    // Handle null user gracefully
+    final userJson = json['user'];
+    if (userJson == null) {
+      throw FormatException('Conversation requires a user object');
+    }
     return Conversation(
-      threadId: json['threadId'],
-      user: User.fromJson(json['user']),
+      threadId: json['threadId']?.toString(),
+      user: User.fromJson(userJson as Map<String, dynamic>),
       lastMessage: json['lastMessage'] != null ? Message.fromJson(json['lastMessage']) : null,
-      unreadCount: json['unreadCount'] ?? 0,
+      unreadCount: (json['unreadCount'] is int) ? json['unreadCount'] : int.tryParse(json['unreadCount']?.toString() ?? '0') ?? 0,
     );
   }
   

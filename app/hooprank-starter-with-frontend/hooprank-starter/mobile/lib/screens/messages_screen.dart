@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../state/app_state.dart';
 import '../services/messages_service.dart';
 import '../widgets/player_profile_sheet.dart';
@@ -39,16 +40,31 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
     }
     
     try {
-      // Load both team and individual conversations in parallel
-      final results = await Future.wait([
-        _messagesService.getTeamChats(userId),
-        _messagesService.getConversations(userId),
-      ]);
+      // Load team and individual conversations in parallel, but handle team chat errors gracefully
+      List<TeamConversation> teamChats = [];
+      List<Conversation> conversations = [];
+      
+      // Try to load team chats, but don't fail if the endpoint doesn't exist
+      try {
+        teamChats = await _messagesService.getTeamChats(userId);
+      } catch (e) {
+        // Team chats endpoint may not exist or user has no teams - this is OK
+        debugPrint('Team chats not available: $e');
+        teamChats = [];
+      }
+      
+      // Load individual conversations
+      try {
+        conversations = await _messagesService.getConversations(userId);
+      } catch (e) {
+        debugPrint('Conversations error: $e');
+        conversations = [];
+      }
       
       if (mounted) {
         setState(() {
-          _teamChats = results[0] as List<TeamConversation>;
-          _conversations = results[1] as List<Conversation>;
+          _teamChats = teamChats;
+          _conversations = conversations;
           _isLoading = false;
           _error = null;
         });
@@ -114,36 +130,107 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
       onRefresh: _loadAllConversations,
       child: ListView(
         children: [
-          // Team chats section (pinned at top)
-          if (_teamChats.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.deepOrange.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.groups, size: 14, color: Colors.deepOrange),
+          // Team chats section (pinned at top) - show even if empty with "Join a Team" suggestion
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'TEAM CHATS',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2, // Consistent with Followed Players header
-                      color: Colors.white70,
-                    ),
+                  child: const Icon(Icons.groups, size: 14, color: Colors.deepOrange),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'TEAM CHATS',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    color: Colors.white70,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
+          if (_teamChats.isEmpty)
+            // "Join a Team" suggestion card
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.deepOrange.withOpacity(0.2)),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    // Navigate to Rankings -> Teams -> Local
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    // Wait a frame then navigate to rankings
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        // Use GoRouter to navigate to rankings with teams tab
+                        context.go('/rankings?tab=teams&region=local');
+                      }
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.deepOrange.withOpacity(0.3), Colors.orange.withOpacity(0.2)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.group_add, color: Colors.deepOrange, size: 24),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Join a Team',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Create or join a 3v3 or 5v5 team to unlock team chat',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.deepOrange),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
             ..._teamChats.map((teamChat) => _buildTeamChatTile(teamChat)),
-            const SizedBox(height: 12),
-          ],
+          const SizedBox(height: 12),
           
           // Individual conversations section
           if (_teamChats.isNotEmpty && _conversations.isNotEmpty)
