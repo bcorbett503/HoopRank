@@ -25,6 +25,12 @@ export class UsersController {
     return this.usersService.runMigrations();
   }
 
+  // Debug endpoint to check user_followed_courts table
+  @Get('admin/debug-follows')
+  async debugFollows() {
+    return this.usersService.debugFollowedCourts();
+  }
+
   @Get()
   findAll() {
     return this.usersService.getAll();

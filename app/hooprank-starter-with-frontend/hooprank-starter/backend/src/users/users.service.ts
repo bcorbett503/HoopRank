@@ -298,6 +298,35 @@ export class UsersService {
     }
   }
 
+  async debugFollowedCourts(): Promise<any> {
+    const isPostgres = !!process.env.DATABASE_URL;
+    try {
+      const query = isPostgres
+        ? `SELECT * FROM user_followed_courts ORDER BY created_at DESC LIMIT 20`
+        : `SELECT * FROM user_followed_courts ORDER BY created_at DESC LIMIT 20`;
+      const rows = await this.dataSource.query(query);
+
+      // Also get table info
+      const tableInfo = isPostgres
+        ? await this.dataSource.query(`
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'user_followed_courts'
+          `)
+        : 'SQLite - table exists';
+
+      return {
+        success: true,
+        rowCount: rows.length,
+        rows,
+        tableInfo,
+        isPostgres
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
   async getFollowedActivity(userId: string): Promise<{ courtActivity: any[]; playerActivity: any[] }> {
     return { courtActivity: [], playerActivity: [] };
   }
