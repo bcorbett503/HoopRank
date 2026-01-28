@@ -52,7 +52,7 @@ export class TeamMember {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'team_id', type: 'text' })
+    @Column({ name: 'team_id', type: 'uuid' })
     teamId: string;
 
     @Column({ name: 'user_id', type: 'text' })
