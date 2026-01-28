@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -1236,7 +1237,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HoopRank'),
+        title: Text(
+          'HoopRank',
+          style: GoogleFonts.teko(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            fontStyle: FontStyle.italic,
+            color: Colors.white,
+            letterSpacing: 1.5,
+          ),
+        ),
         actions: [
           // Profile avatar button with notification badge
           Consumer<AuthState>(
