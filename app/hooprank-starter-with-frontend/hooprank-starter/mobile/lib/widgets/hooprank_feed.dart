@@ -1007,23 +1007,30 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF1E3825), // Dark green
-                  const Color(0xFF152518), // Darker green
+                  const Color(0xFF2D1E38), // Deep Basketball Purple
+                  const Color(0xFF1A1225), // Darker background
                 ],
               )
             : null,
         borderRadius: BorderRadius.circular(16),
         border: isScheduledEvent 
-            ? Border.all(color: Colors.greenAccent.withOpacity(0.3), width: 1) // Distinct border
+            ? Border.all(color: Colors.purpleAccent.withOpacity(0.6), width: 2) // Bolded border
             : Border.all(color: Colors.white.withOpacity(0.05)),
         boxShadow: [
           BoxShadow(
             color: isScheduledEvent 
-                ? Colors.black.withOpacity(0.3) 
+                ? Colors.purple.withOpacity(0.15) // Purple glow
                 : Colors.black.withOpacity(0.1),
-            blurRadius: isScheduledEvent ? 12 : 4,
-            offset: const Offset(0, 4),
+            blurRadius: isScheduledEvent ? 20 : 4,
+            spreadRadius: isScheduledEvent ? 2 : 0, // Lift off
+            offset: isScheduledEvent ? const Offset(0, 8) : const Offset(0, 4),
           ),
+          if (isScheduledEvent)
+             BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+             ),
         ],
       ),
       child: Stack(
@@ -1036,17 +1043,17 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.3),
+                  color: Colors.deepPurple.withOpacity(0.4),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
                     bottomRight: Radius.circular(8),
                   ),
                 ),
-                child: const Icon(Icons.push_pin, size: 12, color: Colors.greenAccent),
+                child: const Icon(Icons.push_pin, size: 12, color: Colors.purpleAccent),
               ),
             ),
           Padding(
-            padding: const EdgeInsets.all(12), // Compact padding
+            padding: const EdgeInsets.all(10), // More compact padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1126,7 +1133,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       decoration: BoxDecoration(
                         color: isAttending ? Colors.green : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.green, width: 1),
+                        border: Border.all(color: Colors.green, width: 1.5),
+                        boxShadow: isAttending ? [BoxShadow(color: Colors.green.withOpacity(0.4), blurRadius: 8)] : null,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1158,8 +1166,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             if (isScheduledEvent)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(top: 8, bottom: 2),
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                margin: const EdgeInsets.only(top: 4, bottom: 0),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.2), // Darker "cutout" look
                   borderRadius: BorderRadius.circular(12),
@@ -1171,8 +1179,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 15, // Slightly larger base for readability
-                    fontWeight: FontWeight.w700,
-                    color: Colors.greenAccent,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                     letterSpacing: 0.5,
                   ),
                 ),

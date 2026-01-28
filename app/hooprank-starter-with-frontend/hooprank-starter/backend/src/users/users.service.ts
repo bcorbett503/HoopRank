@@ -270,17 +270,22 @@ export class UsersService {
   async getFollows(userId: string): Promise<{ courts: any[]; players: any[] }> {
     const isPostgres = !!process.env.DATABASE_URL;
 
-    const courtsQuery = isPostgres
-      ? `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`
-      : `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = ?`;
-    const courts = await this.dataSource.query(courtsQuery, [userId]);
+    try {
+      const courtsQuery = isPostgres
+        ? `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`
+        : `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = ?`;
+      const courts = await this.dataSource.query(courtsQuery, [userId]);
 
-    const playersQuery = isPostgres
-      ? `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = $1`
-      : `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = ?`;
-    const players = await this.dataSource.query(playersQuery, [userId]);
+      const playersQuery = isPostgres
+        ? `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = $1`
+        : `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = ?`;
+      const players = await this.dataSource.query(playersQuery, [userId]);
 
-    return { courts, players };
+      return { courts, players };
+    } catch (error) {
+      console.error('getFollows error (tables may not exist):', error.message);
+      return { courts: [], players: [] };
+    }
   }
 
   async getFollowedActivity(userId: string): Promise<{ courtActivity: any[]; playerActivity: any[] }> {

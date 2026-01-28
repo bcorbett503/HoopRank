@@ -634,7 +634,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     
     final hasTeam = team.isNotEmpty;
-    final rating = hasTeam ? ((team['rating'] as num?)?.toDouble() ?? 3.0) : 0.0;
+    // Parse rating safely - backend may return String or num
+    final rv = team['rating'];
+    final rating = hasTeam ? (rv is num ? rv.toDouble() : (double.tryParse(rv?.toString() ?? '') ?? 3.0)) : 0.0;
     final teamName = hasTeam ? (team['name'] ?? teamType) : null;
     
     return GestureDetector(
@@ -2392,9 +2394,11 @@ class _TeamSelectionSheetState extends State<_TeamSelectionSheet> {
                             ),
                           ),
                           title: Text(team['name'] ?? 'Team'),
-                          subtitle: Text(
-                            'Rating: ${(team['rating'] as num?)?.toStringAsFixed(1) ?? '3.0'} • ${team['wins'] ?? 0}W-${team['losses'] ?? 0}L',
-                          ),
+                          subtitle: Builder(builder: (context) {
+                            final rv = team['rating'];
+                            final ratingStr = rv is num ? rv.toStringAsFixed(1) : (double.tryParse(rv?.toString() ?? '')?.toStringAsFixed(1) ?? '3.0');
+                            return Text('Rating: $ratingStr • ${team['wins'] ?? 0}W-${team['losses'] ?? 0}L');
+                          }),
                           trailing: ElevatedButton(
                             onPressed: () => widget.onTeamSelected(team),
                             style: ElevatedButton.styleFrom(backgroundColor: color),

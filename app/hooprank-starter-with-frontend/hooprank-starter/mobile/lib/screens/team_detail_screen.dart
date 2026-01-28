@@ -301,7 +301,11 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildHeaderStat('Rating', (team['rating'] as num?)?.toStringAsFixed(1) ?? '3.0'),
+                        Builder(builder: (context) {
+                          final rv = team['rating'];
+                          final ratingStr = rv is num ? rv.toStringAsFixed(1) : (double.tryParse(rv?.toString() ?? '')?.toStringAsFixed(1) ?? '3.0');
+                          return _buildHeaderStat('Rating', ratingStr);
+                        }),
                         Container(width: 1, height: 30, color: Colors.white.withOpacity(0.3), margin: const EdgeInsets.symmetric(horizontal: 20)),
                         _buildHeaderStat('Wins', '${team['wins'] ?? 0}'),
                         Container(width: 1, height: 30, color: Colors.white.withOpacity(0.3), margin: const EdgeInsets.symmetric(horizontal: 20)),
@@ -442,10 +446,14 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           decoration: isPending ? null : TextDecoration.underline,
         ),
       ),
-      subtitle: Text(
-        isPending ? 'Pending invite' : 'Rating: ${(member['rating'] as num?)?.toStringAsFixed(1) ?? '3.0'}',
-        style: TextStyle(color: isPending ? Colors.grey : null),
-      ),
+      subtitle: Builder(builder: (context) {
+        final mr = member['rating'];
+        final ratingStr = mr is num ? mr.toStringAsFixed(1) : (double.tryParse(mr?.toString() ?? '')?.toStringAsFixed(1) ?? '3.0');
+        return Text(
+          isPending ? 'Pending invite' : 'Rating: $ratingStr',
+          style: TextStyle(color: isPending ? Colors.grey : null),
+        );
+      }),
       trailing: isMemberOwner
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

@@ -531,9 +531,13 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   Widget _buildTeamCard(Map<String, dynamic> team) {
     final isOwner = team['isOwner'] == true;
     final teamType = team['teamType'] ?? '3v3';
-    final rating = (team['rating'] as num?)?.toDouble() ?? 3.0;
-    final wins = team['wins'] ?? 0;
-    final losses = team['losses'] ?? 0;
+    // Parse rating safely - backend may return String or num
+    final ratingValue = team['rating'];
+    final rating = ratingValue is num ? ratingValue.toDouble() : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0);
+    final winsValue = team['wins'];
+    final wins = winsValue is int ? winsValue : (int.tryParse(winsValue?.toString() ?? '') ?? 0);
+    final lossesValue = team['losses'];
+    final losses = lossesValue is int ? lossesValue : (int.tryParse(lossesValue?.toString() ?? '') ?? 0);
     final memberCount = team['memberCount'] ?? 1;
     final pendingCount = team['pendingCount'] ?? 0;
 
@@ -844,9 +848,13 @@ class _TeamRankingsWithFilterState extends State<_TeamRankingsWithFilter> {
                     itemCount: _teams.length,
                     itemBuilder: (context, index) {
                       final team = _teams[index];
-                      final rating = (team['rating'] as num?)?.toDouble() ?? 3.0;
-                      final wins = team['wins'] ?? 0;
-                      final losses = team['losses'] ?? 0;
+                      // Parse safely - backend may return String or num
+                      final rv = team['rating'];
+                      final rating = rv is num ? rv.toDouble() : (double.tryParse(rv?.toString() ?? '') ?? 3.0);
+                      final wv = team['wins'];
+                      final wins = wv is int ? wv : (int.tryParse(wv?.toString() ?? '') ?? 0);
+                      final lv = team['losses'];
+                      final losses = lv is int ? lv : (int.tryParse(lv?.toString() ?? '') ?? 0);
                       
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),

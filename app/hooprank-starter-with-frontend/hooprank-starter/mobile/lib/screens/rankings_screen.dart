@@ -315,7 +315,9 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     );
     
     final hasTeam = team.isNotEmpty;
-    final rating = hasTeam ? ((team['rating'] as num?)?.toDouble() ?? 3.0) : 0.0;
+    // Parse rating safely - backend may return String or num
+    final ratingValue = team['rating'];
+    final rating = hasTeam ? (ratingValue is num ? ratingValue.toDouble() : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0)) : 0.0;
     final teamName = hasTeam ? (team['name'] ?? teamType) : null;
     
     return GestureDetector(
@@ -1076,9 +1078,13 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   }
 
   Widget _buildTeamRankingCard(Map<String, dynamic> team, int rank) {
-    final rating = (team['rating'] as num?)?.toDouble() ?? 3.0;
-    final wins = team['wins'] ?? 0;
-    final losses = team['losses'] ?? 0;
+    // Parse safely - backend may return String or num
+    final ratingValue = team['rating'];
+    final rating = ratingValue is num ? ratingValue.toDouble() : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0);
+    final winsValue = team['wins'];
+    final wins = winsValue is int ? winsValue : (int.tryParse(winsValue?.toString() ?? '') ?? 0);
+    final lossesValue = team['losses'];
+    final losses = lossesValue is int ? lossesValue : (int.tryParse(lossesValue?.toString() ?? '') ?? 0);
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1225,8 +1231,12 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 ],
               ),
               const SizedBox(height: 8),
-              Text('Rating: ${((team['rating'] as num?)?.toDouble() ?? 3.0).toStringAsFixed(2)} • ${team['wins'] ?? 0}W-${team['losses'] ?? 0}L',
-                  style: TextStyle(color: Colors.grey[400])),
+              Builder(builder: (context) {
+                final rv = team['rating']; 
+                final ratingD = rv is num ? rv.toDouble() : (double.tryParse(rv?.toString() ?? '') ?? 3.0);
+                return Text('Rating: ${ratingD.toStringAsFixed(2)} • ${team['wins'] ?? 0}W-${team['losses'] ?? 0}L',
+                    style: TextStyle(color: Colors.grey[400]));
+              }),
               const SizedBox(height: 20),
               
               // View Details

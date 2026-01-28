@@ -223,8 +223,9 @@ export class StatusesService {
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50): Promise<any[]> {
         const d = this.dialect.reset();
 
-        // Build the query with dialect-aware SQL and production column names
-        const query = `
+        try {
+            // Build the query with dialect-aware SQL and production column names
+            const query = `
             WITH followed_players AS (
                 SELECT followed_id FROM user_followed_players WHERE ${d.cast('follower_id', 'TEXT')} = ${d.param()}
             ),
@@ -321,6 +322,10 @@ export class StatusesService {
             LIMIT ${d.param()}
         `;
 
-        return this.dataSource.query(query, [userId, userId, userId, userId, userId, limit]);
+            return this.dataSource.query(query, [userId, userId, userId, userId, userId, limit]);
+        } catch (error) {
+            console.error('getUnifiedFeed error (tables may not exist):', error.message);
+            return [];
+        }
     }
 }
