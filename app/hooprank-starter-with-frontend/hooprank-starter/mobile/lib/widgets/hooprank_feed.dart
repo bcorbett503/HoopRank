@@ -822,8 +822,27 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12), // Compact padding
+      child: Stack(
+        children: [
+          // Pin icon in upper left corner for scheduled runs
+          if (isScheduledEvent)
+            Positioned(
+              top: 0,
+              left: 0,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.3),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(8),
+                  ),
+                ),
+                child: const Icon(Icons.push_pin, size: 12, color: Colors.greenAccent),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(12), // Compact padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -875,46 +894,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                                 color: Colors.green.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('SCHEDULED', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.green)),
+                              child: const Text('SCHEDULED RUN', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.green)),
                             ),
                           ],
                         ],
                       ),
                       const SizedBox(height: 2), // Tighter spacing
-                      if (isScheduledEvent)
-                        // Context Line: Visual Box inside header (serves as main content for scheduled runs)
-                        Container(
-                          margin: const EdgeInsets.only(top: 2),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.push_pin, size: 10, color: Colors.greenAccent), // Pin icon
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: TextStyle(color: Colors.greenAccent.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w500),
-                                    children: [
-                                      TextSpan(text: '$scheduledDayStr, '), 
-                                      TextSpan(text: scheduledTimeStr),
-                                      if (courtName != null) ...[
-                                        const TextSpan(text: ' @'),
-                                        TextSpan(text: courtName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      ]
-                                    ],
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              ),
-                            ],
-                          ),
+                      if (!isScheduledEvent)
+                        Text(
+                          timeAgo, 
+                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
                         )
                       else
                         Text(
@@ -961,7 +950,45 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               ],
             ),
             
-            // Content (suppressed for scheduled events since green box IS the content)
+            // Scheduled Run Details - Centered with larger font
+            if (isScheduledEvent)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      '$scheduledDayStr, $scheduledTimeStr',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.greenAccent,
+                      ),
+                    ),
+                    if (courtName != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '@$courtName',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.greenAccent.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            
+            // Regular Content (for non-scheduled events)
             if (content.isNotEmpty && !isScheduledEvent)
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 4), // Tighter padding
@@ -1147,6 +1174,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             ],
           ],
         ),
+        ),
+        ],
       ),
     );
   }
