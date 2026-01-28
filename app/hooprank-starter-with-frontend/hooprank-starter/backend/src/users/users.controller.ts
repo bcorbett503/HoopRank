@@ -72,8 +72,8 @@ export class UsersController {
       }
       return { success: true };
     } catch (error) {
-      console.error('followCourt error:', error.message);
-      return { success: false, error: 'Failed to follow court' };
+      console.error('followCourt error:', error);
+      return { success: false, error: `Failed to follow court: ${error.message}` };
     }
   }
 
