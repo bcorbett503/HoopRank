@@ -323,76 +323,270 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.location_on, color: Colors.blue, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Following ${followedCourts.length} court${followedCourts.length == 1 ? '' : 's'}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                            const Icon(Icons.location_on, color: Colors.blue, size: 18),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Following ',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => _showFollowedCourtsModal(context, followedCourts),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '${followedCourts.length} court${followedCourts.length == 1 ? '' : 's'}',
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.chevron_right, color: Colors.blue, size: 16),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Empty state message
+                      Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          children: [
+                            Icon(Icons.sports_basketball, size: 48, color: Colors.white.withOpacity(0.15)),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No activity yet',
+                              style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'When players schedule games or check in at your followed courts, they\'ll appear here.',
+                              style: TextStyle(color: Colors.white38, fontSize: 13),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            // Empty state message
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                children: [
-                  Icon(Icons.sports_basketball, size: 48, color: Colors.white.withOpacity(0.15)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No activity yet',
-                    style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'When players schedule games or check in at your followed courts, they\'ll appear here.',
-                    style: TextStyle(color: Colors.white38, fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+                );
+              }
 
-    // Case 3: Has court-related activity - show using same card style as All feed
-    return RefreshIndicator(
-      onRefresh: () => _loadFeed(filter: 'courts'),
-      child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 100),
-        itemCount: courtItems.length + 1, // +1 for header
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            // Header showing followed courts count
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on, color: Colors.blue, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Following ${followedCourts.length} court${followedCourts.length == 1 ? '' : 's'} • ${courtItems.length} update${courtItems.length == 1 ? '' : 's'}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          return _buildFeedItemCard(courtItems[index - 1]);
-        },
-      ),
-    );
-  }
+              // Case 3: Has court-related activity - show using same card style as All feed
+              return RefreshIndicator(
+                onRefresh: () => _loadFeed(filter: 'courts'),
+                child: ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  itemCount: courtItems.length + 1, // +1 for header
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      // Header showing followed courts count - CLICKABLE
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on, color: Colors.blue, size: 18),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Following ',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => _showFollowedCourtsModal(context, followedCourts),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '${followedCourts.length} court${followedCourts.length == 1 ? '' : 's'}',
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.chevron_right, color: Colors.blue, size: 16),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '• ${courtItems.length} update${courtItems.length == 1 ? '' : 's'}',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return _buildFeedItemCard(courtItems[index - 1]);
+                  },
+                ),
+              );
+            }
+
+            /// Show modal with list of followed courts
+            void _showFollowedCourtsModal(BuildContext context, Set<String> followedCourts) async {
+              final checkInState = context.read<CheckInState>();
+              final courtsWithActivity = await checkInState.getFollowedCourtsWithActivity();
+              
+              if (!context.mounted) return;
+              
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: const Color(0xFF1E1E1E),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                isScrollControlled: true,
+                builder: (context) {
+                  return StatefulBuilder(
+                    builder: (context, setModalState) {
+                      return DraggableScrollableSheet(
+                        initialChildSize: 0.5,
+                        minChildSize: 0.3,
+                        maxChildSize: 0.8,
+                        expand: false,
+                        builder: (context, scrollController) {
+                          return Column(
+                            children: [
+                              // Handle bar
+                              Container(
+                                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Colors.white24,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              // Title
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Following ${courtsWithActivity.length} Court${courtsWithActivity.length == 1 ? '' : 's'}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Divider(color: Colors.white12, height: 1),
+                              // Court list
+                              Expanded(
+                                child: courtsWithActivity.isEmpty
+                                    ? Center(
+                                        child: Text(
+                                          'No courts followed yet',
+                                          style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        controller: scrollController,
+                                        itemCount: courtsWithActivity.length,
+                                        itemBuilder: (context, index) {
+                                          final court = courtsWithActivity[index];
+                                          final isFollowing = checkInState.isFollowing(court.courtId);
+                                          final hasAlert = checkInState.isAlertEnabled(court.courtId);
+                                          
+                                          return ListTile(
+                                            leading: Container(
+                                              width: 40,
+                                              height: 40,
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(Icons.sports_basketball, color: Colors.blue, size: 24),
+                                            ),
+                                            title: Text(
+                                              court.courtName,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            subtitle: court.address != null
+                                                ? Text(
+                                                    court.address!,
+                                                    style: TextStyle(
+                                                      color: Colors.white.withOpacity(0.5),
+                                                      fontSize: 12,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  )
+                                                : null,
+                                            trailing: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                // Alert/Bell button
+                                                IconButton(
+                                                  icon: Icon(
+                                                    hasAlert ? Icons.notifications_active : Icons.notifications_none,
+                                                    color: hasAlert ? Colors.amber : Colors.white38,
+                                                  ),
+                                                  onPressed: () async {
+                                                    await checkInState.toggleAlert(court.courtId);
+                                                    setModalState(() {}); // Refresh modal
+                                                  },
+                                                  tooltip: hasAlert ? 'Disable alerts' : 'Enable alerts',
+                                                ),
+                                                // Heart/Follow button
+                                                IconButton(
+                                                  icon: Icon(
+                                                    isFollowing ? Icons.favorite : Icons.favorite_border,
+                                                    color: isFollowing ? Colors.red : Colors.white38,
+                                                  ),
+                                                  onPressed: () async {
+                                                    await checkInState.toggleFollow(court.courtId);
+                                                    // Refresh the list after unfollowing
+                                                    final updatedCourts = await checkInState.getFollowedCourtsWithActivity();
+                                                    setModalState(() {
+                                                      courtsWithActivity.clear();
+                                                      courtsWithActivity.addAll(updatedCourts);
+                                                    });
+                                                  },
+                                                  tooltip: isFollowing ? 'Unfollow' : 'Follow',
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            }
 
 
 
