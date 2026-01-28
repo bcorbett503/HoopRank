@@ -601,10 +601,18 @@ class ApiService {
     required String name,
     required String teamType,
   }) async {
+    debugPrint('>>> createTeam: name=$name, teamType=$teamType');
+    debugPrint('>>> createTeam: _userId=$_userId, baseUrl=$baseUrl');
+    
+    if (_userId == null || _userId!.isEmpty) {
+      debugPrint('>>> createTeam: ERROR - userId is null or empty!');
+      throw Exception('Not authenticated - userId is missing');
+    }
+    
     final response = await http.post(
       Uri.parse('$baseUrl/teams'),
       headers: {
-        'x-user-id': _userId ?? '',
+        'x-user-id': _userId!,
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -613,6 +621,8 @@ class ApiService {
       }),
     );
 
+    debugPrint('>>> createTeam: status=${response.statusCode}, body=${response.body}');
+    
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(response.body);
     }

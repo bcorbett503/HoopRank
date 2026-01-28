@@ -68,6 +68,14 @@ export class TeamsService {
      * Create a new team
      */
     async createTeam(userId: string, name: string, teamType: string): Promise<Team> {
+        console.log(`[TeamsService.createTeam] userId=${userId}, name=${name}, teamType=${teamType}`);
+
+        // Validate userId
+        if (!userId || userId.trim() === '') {
+            console.log('[TeamsService.createTeam] ERROR: userId is empty');
+            throw new BadRequestException('User ID is required');
+        }
+
         // Validate team type
         if (!['3v3', '5v5'].includes(teamType)) {
             throw new BadRequestException('Team type must be 3v3 or 5v5');
