@@ -59,12 +59,21 @@ export class UsersController {
     if (!userId) {
       return { success: false, error: 'User ID required' };
     }
-    await this.usersService.followCourt(userId, body.courtId);
-    // If alerts requested, also enable alerts
-    if (body.alertsEnabled) {
-      await this.notificationsService.enableCourtAlert(userId, body.courtId);
+    try {
+      await this.usersService.followCourt(userId, body.courtId);
+      // If alerts requested, also enable alerts (but don't fail if this throws)
+      if (body.alertsEnabled) {
+        try {
+          await this.notificationsService.enableCourtAlert(userId, body.courtId);
+        } catch (alertError) {
+          console.error('Error enabling court alert:', alertError.message);
+        }
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('followCourt error:', error.message);
+      return { success: false, error: 'Failed to follow court' };
     }
-    return { success: true };
   }
 
   @Delete('me/follows/courts/:courtId')
@@ -75,10 +84,19 @@ export class UsersController {
     if (!userId) {
       return { success: false, error: 'User ID required' };
     }
-    await this.usersService.unfollowCourt(userId, courtId);
-    // Also disable alerts when unfollowing
-    await this.notificationsService.disableCourtAlert(userId, courtId);
-    return { success: true };
+    try {
+      await this.usersService.unfollowCourt(userId, courtId);
+      // Also disable alerts when unfollowing (but don't fail if this throws)
+      try {
+        await this.notificationsService.disableCourtAlert(userId, courtId);
+      } catch (alertError) {
+        console.error('Error disabling court alert:', alertError.message);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('unfollowCourt error:', error.message);
+      return { success: false, error: 'Failed to unfollow court' };
+    }
   }
 
   @Put('me/follows/courts/:courtId/alerts')
@@ -131,8 +149,13 @@ export class UsersController {
     if (!userId) {
       return { success: false, error: 'User ID required' };
     }
-    await this.notificationsService.saveFcmToken(userId, body.token);
-    return { success: true };
+    try {
+      await this.notificationsService.saveFcmToken(userId, body.token);
+      return { success: true };
+    } catch (error) {
+      console.error('saveFcmToken error:', error.message);
+      return { success: false, error: 'Failed to save FCM token' };
+    }
   }
 
   @Get(':id')
