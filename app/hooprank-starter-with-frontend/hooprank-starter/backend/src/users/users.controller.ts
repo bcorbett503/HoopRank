@@ -19,6 +19,12 @@ export class UsersController {
     return this.usersService.findOrCreate(uid, email);
   }
 
+  // One-time migration endpoint - must be before :id routes
+  @Post('admin/run-migrations')
+  async runMigrations() {
+    return this.usersService.runMigrations();
+  }
+
   @Get()
   findAll() {
     return this.usersService.getAll();
@@ -162,10 +168,6 @@ export class UsersController {
     return this.usersService.getMatches(id);
   }
 
-  // One-time migration endpoint - call this to fix DB schema issues
-  @Post('admin/run-migrations')
-  async runMigrations() {
-    return this.usersService.runMigrations();
-  }
+
 }
 
