@@ -764,11 +764,15 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E), 
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: isScheduledEvent 
+            ? Border.all(color: Colors.green.withOpacity(0.5), width: 1.5) // Distinct green border for scheduled
+            : Border.all(color: Colors.white.withOpacity(0.05)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1), // Softer shadow
-            blurRadius: 4,
+            color: isScheduledEvent 
+                ? Colors.green.withOpacity(0.1) // Subtle green glow
+                : Colors.black.withOpacity(0.1),
+            blurRadius: isScheduledEvent ? 8 : 4,
             offset: const Offset(0, 2),
           ),
         ],
@@ -832,21 +836,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         ],
                       ),
                       const SizedBox(height: 1), // Tighter spacing
-                      if (isScheduledEvent)
-                        // Context Line: When & Where
-                        RichText(
-                          text: TextSpan(
-                            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11),
-                            children: [
-                              TextSpan(text: scheduledTimeStr, style: const TextStyle(fontWeight: FontWeight.w500)),
-                              if (courtName != null) ...[
-                                const TextSpan(text: ' at '),
-                                TextSpan(text: courtName, style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w600)),
-                              ]
-                            ],
-                          ),
-                        )
-                      else
+                      if (!isScheduledEvent) // Only show timeAgo here for non-scheduled
                         Text(
                           timeAgo, 
                           style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
@@ -890,6 +880,39 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.2), size: 18),
               ],
             ),
+            
+            // Distinct Scheduled Time/Place Row
+            if (isScheduledEvent) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, size: 16, color: Colors.greenAccent),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(fontSize: 13, color: Colors.white),
+                          children: [
+                            TextSpan(text: scheduledTimeStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+                            if (courtName != null) ...[
+                              const TextSpan(text: ' at ', style: TextStyle(color: Colors.white54)),
+                              TextSpan(text: courtName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            ],
+                          ],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             
             // Content
             if (content.isNotEmpty)
