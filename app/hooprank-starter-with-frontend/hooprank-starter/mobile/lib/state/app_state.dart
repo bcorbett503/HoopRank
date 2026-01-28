@@ -24,6 +24,7 @@ class AuthState extends ChangeNotifier {
 
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
+    const storage = FlutterSecureStorage();
     
     // Check if onboarding has been completed
     _onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
@@ -34,6 +35,13 @@ class AuthState extends ChangeNotifier {
         final Map<String, dynamic> data = jsonDecode(raw);
         _currentUser = User.fromJson(data);
         ApiService.setUserId(_currentUser!.id);
+        
+        // Restore auth token from secure storage
+        final storedToken = await storage.read(key: 'auth_token');
+        if (storedToken != null) {
+          ApiService.setAuthToken(storedToken);
+        }
+        
         // Register FCM token for existing session
         _registerFcmToken();
       } catch (e) {
@@ -61,6 +69,9 @@ class AuthState extends ChangeNotifier {
   Future<void> login(User user, {String? token}) async {
     _currentUser = user;
     ApiService.setUserId(user.id);
+    if (token != null) {
+      ApiService.setAuthToken(token);
+    }
     notifyListeners();
 
     final prefs = await SharedPreferences.getInstance();
