@@ -1349,21 +1349,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 color: Colors.white70,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              '·',
-                              style: TextStyle(color: Colors.white30, fontSize: 12),
-                            ),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'When/where are you playing?',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white38,
-                                ),
-                              ),
-                            ),
+
                           ],
                         ),
                       ),
@@ -1431,7 +1417,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Share a status, schedule run, or check in...',
+                                      'Share a status, schedule a run, or check in at a court.',
                                       style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
