@@ -1386,16 +1386,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           margin: const EdgeInsets.only(bottom: 16),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E), // Slightly lighter than background
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withOpacity(0.1),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
                             ],
-                            border: Border.all(color: Colors.white.withOpacity(0.05)),
                           ),
                           child: Row(
                             children: [
@@ -1428,29 +1427,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   children: [
                                     Text(
                                       'What\'s on your mind?',
-                                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14, fontWeight: FontWeight.w500),
+                                      style: TextStyle(color: Colors.grey.shade800, fontSize: 14, fontWeight: FontWeight.w500),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       'Share a status, schedule run, or check in...',
-                                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                      style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
-                              ),
-                              // Icons
-                              const SizedBox(width: 8),
-                              Icon(Icons.photo_camera_outlined, color: Colors.white.withOpacity(0.4), size: 22),
-                              const SizedBox(width: 12),
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.deepOrange.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.edit, size: 16, color: Colors.deepOrange),
                               ),
                             ],
                           ),
