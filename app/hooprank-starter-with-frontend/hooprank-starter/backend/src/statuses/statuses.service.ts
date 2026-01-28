@@ -221,9 +221,9 @@ export class StatusesService {
     // ========== Unified Feed ==========
 
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50): Promise<any[]> {
-        const d = this.dialect.reset();
-
         try {
+            const d = this.dialect.reset();
+
             // Build the query with dialect-aware SQL and production column names
             const query = `
             WITH followed_players AS (
