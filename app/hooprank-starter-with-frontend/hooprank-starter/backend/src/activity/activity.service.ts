@@ -22,11 +22,11 @@ export class ActivityService {
                     c.city as court_city,
                     creator.id as creator_id,
                     creator.name as creator_name,
-                    creator.photo_url as creator_photo_url,
+                    creator.avatar_url as creator_avatar_url,
                     creator.hoop_rank as creator_rating,
                     opponent.id as opponent_id,
                     opponent.name as opponent_name,
-                    opponent.photo_url as opponent_photo_url,
+                    opponent.avatar_url as opponent_avatar_url,
                     opponent.hoop_rank as opponent_rating
                 FROM matches m
                 LEFT JOIN courts c ON m.court_id = c.id
@@ -52,13 +52,13 @@ export class ActivityService {
                 creator: {
                     id: r.creator_id,
                     name: r.creator_name,
-                    photoUrl: r.creator_photo_url,
+                    photoUrl: r.creator_avatar_url,
                     rating: r.creator_rating,
                 },
                 opponent: r.opponent_id ? {
                     id: r.opponent_id,
                     name: r.opponent_name,
-                    photoUrl: r.opponent_photo_url,
+                    photoUrl: r.opponent_avatar_url,
                     rating: r.opponent_rating,
                 } : null,
             }));
