@@ -43,10 +43,14 @@ export class UsersController {
 
   @Get('me/follows')
   async getFollows(@Headers('x-user-id') userId: string) {
+    console.log('getFollows controller: userId received:', userId);
     if (!userId) {
+      console.log('getFollows controller: no userId, returning empty');
       return { courts: [], players: [] };
     }
-    return this.usersService.getFollows(userId);
+    const result = await this.usersService.getFollows(userId);
+    console.log('getFollows controller: returning result:', result);
+    return result;
   }
 
   @Get('me/follows/activity')
