@@ -1,16 +1,26 @@
 // fix_follows.js - Verify and fix user_followed_courts table constraint
 const { Client } = require('pg');
 
-const PROD_DATABASE_URL = 'postgresql://postgres:EPLWEqKnQBDjuZGOJQNXPxKWjGBhWAAO@autorack.proxy.rlwy.net:53540/railway';
+// Use the DATABASE_URL from environment or fallback
+const PROD_DATABASE_URL = process.env.PROD_DATABASE_URL ||
+    'postgresql://postgres:PgWRGfwrQprwVnLpYMNLSNxlNKNTIuxO@autorack.proxy.rlwy.net:52122/railway';
 
 async function main() {
-    const client = new Client({ connectionString: PROD_DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    console.log('Connecting to database...');
+    console.log('URL (masked):', PROD_DATABASE_URL.replace(/:[^:@]+@/, ':****@'));
+
+    const client = new Client({
+        connectionString: PROD_DATABASE_URL,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 30000,
+    });
 
     try {
         await client.connect();
         console.log('Connected to production database');
 
         // Check if table exists and its structure
+        console.log('\n--- Checking user_followed_courts table ---');
         const tableCheck = await client.query(`
             SELECT column_name, data_type 
             FROM information_schema.columns 
@@ -63,6 +73,7 @@ async function main() {
         }
 
         // Also check user_followed_players
+        console.log('\n--- Checking user_followed_players table ---');
         const playersCheck = await client.query(`
             SELECT column_name, data_type 
             FROM information_schema.columns 
@@ -71,7 +82,7 @@ async function main() {
         `);
 
         if (playersCheck.rows.length === 0) {
-            console.log('\nTable user_followed_players does not exist! Creating it...');
+            console.log('Table user_followed_players does not exist! Creating it...');
             await client.query(`
                 CREATE TABLE user_followed_players (
                     id SERIAL PRIMARY KEY,
@@ -83,11 +94,11 @@ async function main() {
             `);
             console.log('Created user_followed_players table');
         } else {
-            console.log('\nuser_followed_players columns:', playersCheck.rows.map(r => r.column_name).join(', '));
+            console.log('Columns:', playersCheck.rows.map(r => r.column_name).join(', '));
         }
 
         // Test the insert
-        console.log('\nTesting insert...');
+        console.log('\n--- Testing insert operation ---');
         try {
             await client.query(`
                 INSERT INTO user_followed_courts (user_id, court_id)
@@ -103,8 +114,11 @@ async function main() {
             console.log('Test insert failed:', e.message);
         }
 
+        console.log('\n✅ Database check complete!');
+
     } catch (err) {
         console.error('Error:', err.message);
+        console.error('Stack:', err.stack);
     } finally {
         await client.end();
     }

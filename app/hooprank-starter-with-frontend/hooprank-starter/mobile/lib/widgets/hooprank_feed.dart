@@ -404,6 +404,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   // ========== Interactive Handlers ==========
 
   void _toggleLike(int statusId, bool currentlyLiked, int currentCount) async {
+    debugPrint('LIKE: Toggle like for statusId=$statusId, currentlyLiked=$currentlyLiked');
     // Optimistic update
     setState(() {
       _likeStates[statusId] = !currentlyLiked;
@@ -413,7 +414,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final success = currentlyLiked 
         ? await ApiService.unlikeStatus(statusId)
         : await ApiService.likeStatus(statusId);
+    debugPrint('LIKE: API response success=$success');
     if (!success && mounted) {
+      debugPrint('LIKE: Reverting due to API failure');
       // Revert on failure
       setState(() {
         _likeStates[statusId] = currentlyLiked;
@@ -452,6 +455,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   void _toggleAttending(int statusId, bool currentlyAttending, int currentCount) async {
+    debugPrint('ATTEND: Toggle attending for statusId=$statusId, currentlyAttending=$currentlyAttending');
     // Optimistic update
     setState(() {
       _attendingStates[statusId] = !currentlyAttending;
@@ -461,7 +465,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final success = currentlyAttending
         ? await ApiService.removeAttending(statusId)
         : await ApiService.markAttending(statusId);
+    debugPrint('ATTEND: API response success=$success');
     if (!success && mounted) {
+      debugPrint('ATTEND: Reverting due to API failure');
       // Revert on failure
       setState(() {
         _attendingStates[statusId] = currentlyAttending;
@@ -473,7 +479,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   // ========== Post Card with Interactive Engagement ==========
 
   Widget _buildPostCard(Map<String, dynamic> post) {
-    final statusId = post['id'];
+    // Ensure statusId is an int - it might come as a string or int from the API
+    final rawId = post['id'];
+    final statusId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
+    if (statusId == 0) {
+      debugPrint('FEED: Warning - invalid statusId for post: ${post['content']?.toString().substring(0, 20)}...');
+    }
     final userName = post['userName']?.toString() ?? 'Unknown';
     final userPhotoUrl = post['userPhotoUrl']?.toString();
     final content = post['content']?.toString() ?? '';

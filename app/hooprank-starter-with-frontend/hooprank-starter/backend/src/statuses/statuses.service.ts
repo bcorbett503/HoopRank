@@ -281,8 +281,8 @@ export class StatusesService {
                     false as "isAttendingByMe"
                 FROM check_ins ci
                 JOIN users u ON ${d.cast('ci.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-                LEFT JOIN courts c ON ci.court_id = c.id
-                WHERE ci.court_id IN (SELECT court_id FROM followed_courts)
+                LEFT JOIN courts c ON ${d.cast('ci.court_id', 'TEXT')} = ${d.cast('c.id', 'TEXT')}
+                WHERE ${d.cast('ci.court_id', 'TEXT')} IN (SELECT court_id FROM followed_courts)
                 AND ci.checked_in_at > ${d.interval(7)}
 
                 UNION ALL
@@ -309,9 +309,9 @@ export class StatusesService {
                     false as "isAttendingByMe"
                 FROM matches m
                 JOIN users u ON ${d.cast('m.creator_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-                LEFT JOIN courts c ON m.court_id = c.id
+                LEFT JOIN courts c ON ${d.cast('m.court_id', 'TEXT')} = ${d.cast('c.id', 'TEXT')}
                 WHERE (
-                    m.court_id IN (SELECT court_id FROM followed_courts)
+                    ${d.cast('m.court_id', 'TEXT')} IN (SELECT court_id FROM followed_courts)
                     OR ${d.cast('m.creator_id', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
                     OR ${d.cast('m.opponent_id', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
                 )
