@@ -1237,14 +1237,42 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'HoopRank',
-          style: GoogleFonts.teko(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            fontStyle: FontStyle.italic,
-            color: Colors.white,
-            letterSpacing: 1.5,
+        title: RichText(
+          text: TextSpan(
+            style: GoogleFonts.teko(
+              fontSize: 32, // Slightly larger
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+              letterSpacing: 1.2,
+            ),
+            children: [
+              TextSpan(
+                text: 'HOOP',
+                style: TextStyle(
+                  color: Colors.deepOrange,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.5),
+                      offset: const Offset(2, 2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+              TextSpan(
+                text: 'RANK',
+                style: TextStyle(
+                  color: Colors.white,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.5),
+                      offset: const Offset(2, 2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
