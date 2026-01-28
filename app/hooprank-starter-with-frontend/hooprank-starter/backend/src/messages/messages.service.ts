@@ -44,41 +44,46 @@ export class MessagesService {
         const isPostgres = !!process.env.DATABASE_URL;
 
         if (isPostgres) {
-            // Get challenges where user is sender OR receiver with pending status
-            const results = await this.dataSource.query(`
-                SELECT m.*, 
-                    u.id as sender_id, u.name as sender_name, u.avatar_url as sender_avatar_url, u.hoop_rank as sender_hoop_rank,
-                    CASE 
-                        WHEN m.from_id = $1 THEN 'sent'
-                        ELSE 'received'
-                    END as direction
-                FROM messages m
-                JOIN users u ON u.id = CASE WHEN m.from_id = $1 THEN m.to_id ELSE m.from_id END
-                WHERE m.is_challenge = true 
-                    AND m.challenge_status = 'pending'
-                    AND (m.from_id = $1 OR m.to_id = $1)
-                ORDER BY m.created_at DESC
-            `, [userId]);
+            try {
+                // Get challenges where user is sender OR receiver with pending status
+                const results = await this.dataSource.query(`
+                    SELECT m.*, 
+                        u.id as sender_id, u.name as sender_name, u.avatar_url as sender_avatar_url, u.hoop_rank as sender_hoop_rank,
+                        CASE 
+                            WHEN m.from_id = $1 THEN 'sent'
+                            ELSE 'received'
+                        END as direction
+                    FROM messages m
+                    JOIN users u ON u.id = CASE WHEN m.from_id = $1 THEN m.to_id ELSE m.from_id END
+                    WHERE m.is_challenge = true 
+                        AND m.challenge_status = 'pending'
+                        AND (m.from_id = $1 OR m.to_id = $1)
+                    ORDER BY m.created_at DESC
+                `, [userId]);
 
-            return results.map((r: any) => ({
-                message: {
-                    id: r.id,
-                    senderId: r.from_id,
-                    receiverId: r.to_id,
-                    content: r.body,
-                    createdAt: r.created_at,
-                    isChallenge: r.is_challenge,
-                    challengeStatus: r.challenge_status,
-                    matchId: r.match_id,
-                },
-                sender: {
-                    id: r.sender_id,
-                    name: r.sender_name,
-                    photoUrl: r.sender_avatar_url,
-                    hoopRank: r.sender_hoop_rank,
-                },
-                direction: r.direction,
-            }));
+                return results.map((r: any) => ({
+                    message: {
+                        id: r.id,
+                        senderId: r.from_id,
+                        receiverId: r.to_id,
+                        content: r.body,
+                        createdAt: r.created_at,
+                        isChallenge: r.is_challenge,
+                        challengeStatus: r.challenge_status,
+                        matchId: r.match_id,
+                    },
+                    sender: {
+                        id: r.sender_id,
+                        name: r.sender_name,
+                        photoUrl: r.sender_avatar_url,
+                        hoopRank: r.sender_hoop_rank,
+                    },
+                    direction: r.direction,
+                }));
+            } catch (error) {
+                console.error('getPendingChallenges error:', error.message);
+                return [];
+            }
         }
 
         // SQLite fallback
