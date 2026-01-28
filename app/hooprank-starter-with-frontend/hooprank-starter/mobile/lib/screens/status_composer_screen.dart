@@ -276,6 +276,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
         text,
         imageUrl: imageUrl,
         scheduledAt: _scheduledTime,
+        courtId: _taggedCourt?.id,
       );
       
       if (mounted) {
