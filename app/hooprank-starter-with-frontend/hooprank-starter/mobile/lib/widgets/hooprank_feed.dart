@@ -29,7 +29,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadFeed();
+    _loadFeedWithRetry();
   }
 
   @override
@@ -38,10 +38,28 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     super.dispose();
   }
 
+  /// Load feed with retry if userId not available yet
+  Future<void> _loadFeedWithRetry({int retries = 3}) async {
+    for (int i = 0; i < retries; i++) {
+      final userId = ApiService.userId;
+      debugPrint('FEED_INIT: attempt ${i+1}/$retries, userId=$userId');
+      if (userId != null && userId.isNotEmpty) {
+        await _loadFeed();
+        return;
+      }
+      // Wait a bit for auth to complete
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    // Still try even without userId
+    debugPrint('FEED_INIT: proceeding without userId after $retries attempts');
+    await _loadFeed();
+  }
+
   Future<void> _loadFeed({String filter = 'all'}) async {
     setState(() => _isLoading = true);
     try {
-      debugPrint('FEED: Loading unified feed with filter=$filter');
+      final userId = ApiService.userId;
+      debugPrint('FEED: Loading unified feed with filter=$filter, userId=$userId');
       final feed = await ApiService.getUnifiedFeed(filter: filter);
       debugPrint('FEED: Received ${feed.length} items');
       if (feed.isNotEmpty) {

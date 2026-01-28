@@ -161,4 +161,11 @@ export class UsersController {
   getMatches(@Param('id') id: string) {
     return this.usersService.getMatches(id);
   }
+
+  // One-time migration endpoint - call this to fix DB schema issues
+  @Post('admin/run-migrations')
+  async runMigrations() {
+    return this.usersService.runMigrations();
+  }
 }
+

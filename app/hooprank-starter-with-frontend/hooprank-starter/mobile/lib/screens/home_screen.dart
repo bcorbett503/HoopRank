@@ -99,15 +99,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         photoUrl: user.photoUrl
       );
       
-      // Also create status in backend API  
-      await ApiService.createStatus(status, imageUrl: imageUrl);
+      // Also create status in backend API (with scheduled time if set)
+      await ApiService.createStatus(
+        status, 
+        imageUrl: imageUrl,
+        scheduledAt: _scheduledTime,
+      );
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_selectedImage != null ? 'Post with photo shared!' : 'Status updated!')),
+          SnackBar(content: Text(_scheduledTime != null 
+            ? 'Game scheduled!' 
+            : (_selectedImage != null ? 'Post with photo shared!' : 'Status updated!'))),
         );
         _statusController.clear();
-        setState(() => _selectedImage = null);
+        setState(() {
+          _selectedImage = null;
+          _scheduledTime = null;  // Clear scheduled time after posting
+          _isRecurring = false;
+        });
         // Unfocus keyboard
         FocusScope.of(context).unfocus();
       }

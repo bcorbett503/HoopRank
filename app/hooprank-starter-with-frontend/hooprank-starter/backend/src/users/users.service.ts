@@ -286,4 +286,103 @@ export class UsersService {
   async getFollowedActivity(userId: string): Promise<{ courtActivity: any[]; playerActivity: any[] }> {
     return { courtActivity: [], playerActivity: [] };
   }
+
+  /**
+   * Run one-time schema migrations to fix known issues.
+   * This fixes:
+   * 1. user_followed_courts.court_id - change from UUID to VARCHAR(255)
+   * 2. user_court_alerts - create table if missing
+   */
+  async runMigrations(): Promise<{ success: boolean; results: string[] }> {
+    const isPostgres = !!process.env.DATABASE_URL;
+    if (!isPostgres) {
+      return { success: true, results: ['Migrations only needed for PostgreSQL'] };
+    }
+
+    const results: string[] = [];
+
+    try {
+      // Fix 1: Recreate user_followed_courts with VARCHAR(255) for court_id
+      results.push('Fixing user_followed_courts table...');
+
+      // Check if table exists and has wrong type
+      const columnCheck = await this.dataSource.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'user_followed_courts' AND column_name = 'court_id'
+      `);
+
+      if (columnCheck.length > 0 && columnCheck[0].data_type === 'uuid') {
+        // Drop and recreate with correct type
+        await this.dataSource.query(`DROP TABLE IF EXISTS user_followed_courts CASCADE`);
+        await this.dataSource.query(`
+          CREATE TABLE user_followed_courts (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR(255) NOT NULL,
+            court_id VARCHAR(255) NOT NULL,
+            alerts_enabled BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, court_id)
+          )
+        `);
+        results.push('Recreated user_followed_courts with VARCHAR(255) for court_id');
+      } else if (columnCheck.length === 0) {
+        // Table doesn't exist, create it
+        await this.dataSource.query(`
+          CREATE TABLE IF NOT EXISTS user_followed_courts (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR(255) NOT NULL,
+            court_id VARCHAR(255) NOT NULL,
+            alerts_enabled BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, court_id)
+          )
+        `);
+        results.push('Created user_followed_courts table');
+      } else {
+        results.push('user_followed_courts.court_id already has correct type');
+      }
+
+      // Fix 2: Create user_court_alerts if missing
+      results.push('Checking user_court_alerts table...');
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS user_court_alerts (
+          id SERIAL PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL,
+          court_id VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, court_id)
+        )
+      `);
+      results.push('Ensured user_court_alerts table exists');
+
+      // Fix 3: Ensure user_followed_players has correct type
+      const playerColumnCheck = await this.dataSource.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'user_followed_players' AND column_name = 'follower_id'
+      `);
+
+      if (playerColumnCheck.length === 0) {
+        await this.dataSource.query(`
+          CREATE TABLE IF NOT EXISTS user_followed_players (
+            id SERIAL PRIMARY KEY,
+            follower_id VARCHAR(255) NOT NULL,
+            followed_id VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(follower_id, followed_id)
+          )
+        `);
+        results.push('Created user_followed_players table');
+      } else {
+        results.push('user_followed_players table exists');
+      }
+
+      return { success: true, results };
+    } catch (error) {
+      results.push(`Error: ${error.message}`);
+      return { success: false, results };
+    }
+  }
 }
+

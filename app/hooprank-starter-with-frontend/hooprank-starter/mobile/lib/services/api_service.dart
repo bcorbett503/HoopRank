@@ -960,8 +960,8 @@ class ApiService {
   // Status API (Likes & Comments)
   // ===================
 
-  /// Create a new status with optional image
-  static Future<Map<String, dynamic>?> createStatus(String content, {String? imageUrl}) async {
+  /// Create a new status with optional image and scheduled time
+  static Future<Map<String, dynamic>?> createStatus(String content, {String? imageUrl, DateTime? scheduledAt}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/statuses'),
       headers: {
@@ -971,6 +971,7 @@ class ApiService {
       body: jsonEncode({
         'content': content,
         if (imageUrl != null) 'imageUrl': imageUrl,
+        if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
       }),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
