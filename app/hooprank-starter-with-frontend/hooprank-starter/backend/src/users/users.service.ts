@@ -275,26 +275,26 @@ export class UsersService {
   }
 
   async getFollows(userId: string): Promise<{ courts: any[]; players: any[] }> {
-    const isPostgres = !!process.env.DATABASE_URL;
-    console.log('getFollows called, userId:', userId, 'isPostgres:', isPostgres);
-
+    console.log('getFollows called, userId:', userId);
     try {
-      const courtsQuery = isPostgres
-        ? `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`
-        : `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = ?`;
-      const courts = await this.dataSource.query(courtsQuery, [userId]);
-      console.log('getFollows courts result:', courts);
+      // Use PostgreSQL syntax directly like debug endpoint that works
+      const courts = await this.dataSource.query(
+        `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`,
+        [userId]
+      );
+      console.log('getFollows courts result:', JSON.stringify(courts));
 
-      const playersQuery = isPostgres
-        ? `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = $1`
-        : `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = ?`;
-      const players = await this.dataSource.query(playersQuery, [userId]);
-      console.log('getFollows players result:', players);
+      const players = await this.dataSource.query(
+        `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = $1`,
+        [userId]
+      );
+      console.log('getFollows players result:', JSON.stringify(players));
 
       return { courts, players };
     } catch (error) {
-      console.error('getFollows error:', error);
-      return { courts: [], players: [] };
+      console.error('getFollows error:', error.message, error.stack);
+      // Return the error in the response so we can see it
+      return { courts: [], players: [], error: error.message } as any;
     }
   }
 
