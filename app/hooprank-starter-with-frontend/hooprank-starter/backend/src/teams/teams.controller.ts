@@ -122,4 +122,29 @@ export class TeamsController {
         await this.teamsService.removeMember(teamId, userId, memberId);
         return { success: true };
     }
+
+    /**
+     * Get team chat messages
+     */
+    @Get(':id/messages')
+    async getTeamMessages(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.teamsService.getTeamMessages(teamId, userId);
+    }
+
+    /**
+     * Send message to team chat
+     */
+    @Post(':id/messages')
+    @HttpCode(201)
+    async sendTeamMessage(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: { content: string },
+    ) {
+        return this.teamsService.sendTeamMessage(teamId, userId, body.content);
+    }
 }
+

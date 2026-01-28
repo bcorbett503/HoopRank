@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Team, TeamMember } from './team.entity';
+import { Repository, DataSource } from 'typeorm';
+import { Team, TeamMember, TeamMessage } from './team.entity';
 import { User } from '../users/user.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class TeamsService {
@@ -11,8 +12,12 @@ export class TeamsService {
         private teamsRepository: Repository<Team>,
         @InjectRepository(TeamMember)
         private membersRepository: Repository<TeamMember>,
+        @InjectRepository(TeamMessage)
+        private messagesRepository: Repository<TeamMessage>,
         @InjectRepository(User)
         private usersRepository: Repository<User>,
+        private notificationsService: NotificationsService,
+        private dataSource: DataSource,
     ) { }
 
     /**
@@ -303,14 +308,141 @@ export class TeamsService {
             relations: ['team'],
         });
 
-        return memberships.map(m => ({
-            teamId: m.team.id,
-            teamName: m.team.name,
-            teamType: m.team.teamType,
-            threadId: `team_${m.team.id}`,
-            lastMessage: null,
-            lastSenderName: null,
-            lastMessageAt: null,
+        // Get last message for each team
+        const results: any[] = [];
+        for (const m of memberships) {
+            if (!m.team) continue;
+
+            const lastMsg = await this.messagesRepository.findOne({
+                where: { teamId: m.team.id },
+                order: { createdAt: 'DESC' },
+            });
+
+            results.push({
+                teamId: m.team.id,
+                teamName: m.team.name,
+                teamType: m.team.teamType,
+                threadId: `team_${m.team.id}`,
+                lastMessage: lastMsg?.content || null,
+                lastSenderName: null,  // Could lookup sender name
+                lastMessageAt: lastMsg?.createdAt || null,
+            });
+        }
+        return results;
+    }
+
+    /**
+     * Get messages for a team chat
+     */
+    async getTeamMessages(teamId: string, userId: string): Promise<any[]> {
+        // Verify user is a member
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You are not a member of this team');
+        }
+
+        // Get messages
+        const messages = await this.messagesRepository.find({
+            where: { teamId },
+            order: { createdAt: 'ASC' },
+            take: 100,  // Limit to last 100 messages
+        });
+
+        return messages.map(m => ({
+            id: m.id,
+            senderId: m.senderId,
+            content: m.content,
+            createdAt: m.createdAt,
+            senderName: null,  // Could lookup from users
+            senderPhotoUrl: null,
         }));
+    }
+
+    /**
+     * Send a message to a team chat
+     */
+    async sendTeamMessage(teamId: string, userId: string, content: string): Promise<TeamMessage> {
+        // Verify user is a member
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You are not a member of this team');
+        }
+
+        // Get team info for notification
+        const team = await this.teamsRepository.findOne({ where: { id: teamId } });
+        if (!team) {
+            throw new NotFoundException('Team not found');
+        }
+
+        // Save message
+        const message = this.messagesRepository.create({
+            teamId,
+            senderId: userId,
+            content,
+        });
+        await this.messagesRepository.save(message);
+
+        // Send push notifications to other team members
+        this.sendTeamMessageNotification(teamId, userId, team.name, content).catch(err => {
+            console.error('Failed to send team message notifications:', err);
+        });
+
+        return message;
+    }
+
+    /**
+     * Send push notification to team members about new message
+     */
+    private async sendTeamMessageNotification(
+        teamId: string,
+        senderId: string,
+        teamName: string,
+        messagePreview: string,
+    ): Promise<void> {
+        // Get FCM tokens for all team members except sender
+        const result = await this.dataSource.query(`
+            SELECT u.fcm_token 
+            FROM users u
+            JOIN team_members tm ON u.id = tm.user_id
+            WHERE tm.team_id = $1 
+              AND tm.status = 'active' 
+              AND tm.user_id != $2
+              AND u.fcm_token IS NOT NULL
+        `, [teamId, senderId]);
+
+        const tokens = result.map((r: any) => r.fcm_token).filter((t: string) => t);
+        if (tokens.length === 0) return;
+
+        const admin = require('firebase-admin');
+        try {
+            const message = {
+                tokens,
+                notification: {
+                    title: `💬 ${teamName}`,
+                    body: messagePreview.substring(0, 100),
+                },
+                data: {
+                    type: 'team_message',
+                    teamId,
+                },
+                apns: {
+                    payload: {
+                        aps: {
+                            sound: 'default',
+                            badge: 1,
+                        },
+                    },
+                },
+            };
+
+            const response = await admin.messaging().sendEachForMulticast(message);
+            console.log(`Team message notifications: ${response.successCount} sent, ${response.failureCount} failed`);
+        } catch (error) {
+            console.error('Error sending team message notifications:', error);
+        }
     }
 }

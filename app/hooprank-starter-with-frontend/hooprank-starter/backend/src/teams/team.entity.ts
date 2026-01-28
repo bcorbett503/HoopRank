@@ -75,3 +75,29 @@ export class TeamMember {
     @JoinColumn({ name: 'user_id' })
     user: User;
 }
+
+/**
+ * Team message for group chat
+ */
+@Entity('team_messages')
+export class TeamMessage {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ name: 'team_id', type: 'uuid' })
+    teamId: string;
+
+    @Column({ name: 'sender_id', type: 'text' })
+    senderId: string;
+
+    @Column({ type: 'text' })
+    content: string;
+
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
+
+    @ManyToOne(() => Team)
+    @JoinColumn({ name: 'team_id' })
+    team: Team;
+}
+
