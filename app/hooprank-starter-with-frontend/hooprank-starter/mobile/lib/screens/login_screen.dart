@@ -54,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
             photoUrl: firebaseUser.photoURL,
             provider: provider,
           );
-          await auth.login(user);
+          await auth.login(user, token: idToken);
           
           // Let the router handle redirect based on user.isProfileComplete
           // The router will redirect to /profile/setup if incomplete, or /play if complete

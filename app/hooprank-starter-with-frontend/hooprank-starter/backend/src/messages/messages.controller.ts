@@ -3,11 +3,11 @@ import { MessagesService } from './messages.service';
 import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('messages')
-@UseGuards(AuthGuard)
 export class MessagesController {
     constructor(private readonly messagesService: MessagesService) { }
 
     @Post()
+    @UseGuards(AuthGuard)
     async sendMessage(@Body() body: { senderId: string; receiverId: string; content: string; matchId?: string; isChallenge?: boolean }) {
         return this.messagesService.sendMessage(body.senderId, body.receiverId, body.content, body.matchId, body.isChallenge);
     }
