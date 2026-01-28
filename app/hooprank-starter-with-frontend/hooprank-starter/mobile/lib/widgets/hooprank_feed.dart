@@ -961,30 +961,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      '$scheduledDayStr, $scheduledTimeStr',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.greenAccent,
-                      ),
-                    ),
-                    if (courtName != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '@$courtName',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.greenAccent.withOpacity(0.8),
-                        ),
-                      ),
-                    ],
-                  ],
+                child: Text(
+                  courtName != null 
+                    ? '$scheduledDayStr, $scheduledTimeStr @$courtName'
+                    : '$scheduledDayStr, $scheduledTimeStr',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.greenAccent,
+                  ),
                 ),
               ),
             
