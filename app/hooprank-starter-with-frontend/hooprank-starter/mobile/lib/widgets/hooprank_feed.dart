@@ -699,7 +699,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final content = post['content']?.toString() ?? '';
     final imageUrl = post['imageUrl']?.toString();
     final scheduledAt = post['scheduledAt'];
-    final courtName = post['courtName']?.toString(); // New: Extract court name
+    // Improved extraction logic
+    final courtName = post['courtName']?.toString() ?? 
+                     (rawContent.startsWith('@') ? rawContent.substring(1).trim() : null);
     
     // Use local state if available, otherwise use from API
     final serverLikeCount = post['likeCount'] is int ? post['likeCount'] : int.tryParse(post['likeCount']?.toString() ?? '0') ?? 0;
@@ -738,24 +740,32 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     }
 
     // Format scheduled time
+    DateTime? scheduledDate;
+    String scheduledDayStr = ''; 
     String scheduledTimeStr = '';
+    
     if (isScheduledEvent) {
       try {
-        final schedDate = DateTime.parse(scheduledAt.toString());
+        scheduledDate = DateTime.parse(scheduledAt.toString());
         final now = DateTime.now();
-        final isToday = schedDate.year == now.year && schedDate.month == now.month && schedDate.day == now.day;
-        final isTomorrow = schedDate.year == now.year && schedDate.month == now.month && schedDate.day == now.day + 1;
-        final hour = schedDate.hour > 12 ? schedDate.hour - 12 : schedDate.hour;
-        final amPm = schedDate.hour >= 12 ? 'PM' : 'AM';
-        String dayStr;
+        final isToday = scheduledDate!.year == now.year && scheduledDate!.month == now.month && scheduledDate!.day == now.day;
+        final isTomorrow = scheduledDate!.year == now.year && scheduledDate!.month == now.month && scheduledDate!.day == now.day + 1;
+        final hour = scheduledDate!.hour > 12 ? scheduledDate!.hour - 12 : scheduledDate!.hour;
+        final amPm = scheduledDate!.hour >= 12 ? 'pm' : 'am';
+        
         if (isToday) {
-          dayStr = 'Today';
+          scheduledDayStr = 'Today';
         } else if (isTomorrow) {
-          dayStr = 'Tomorrow';
+          scheduledDayStr = 'Tomorrow';
         } else {
-          dayStr = '${schedDate.month}/${schedDate.day}';
+          scheduledDayStr = '${scheduledDate!.month}/${scheduledDate!.day}';
         }
-        scheduledTimeStr = '$dayStr @ $hour:${schedDate.minute.toString().padLeft(2, '0')} $amPm';
+        
+        if (scheduledDate!.minute == 0) {
+            scheduledTimeStr = '$hour$amPm';
+        } else {
+            scheduledTimeStr = '$hour:${scheduledDate!.minute.toString().padLeft(2, '0')}$amPm';
+        }
       } catch (_) {}
     }
 
@@ -835,30 +845,41 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           ],
                         ],
                       ),
-                      const SizedBox(height: 1), // Tighter spacing
+                      const SizedBox(height: 2), // Tighter spacing
                       if (isScheduledEvent)
-                        // Context Line: When & Where inside header
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today_outlined, size: 10, color: Colors.greenAccent),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: RichText(
-                                text: TextSpan(
-                                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11),
-                                  children: [
-                                    TextSpan(text: scheduledTimeStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-                                    if (courtName != null) ...[
-                                      const TextSpan(text: ' @ ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w400)),
-                                      TextSpan(text: courtName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                    ]
-                                  ],
+                        // Context Line: Visual Box inside header
+                        Container(
+                          margin: const EdgeInsets.only(top: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.calendar_today_outlined, size: 10, color: Colors.greenAccent),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(color: Colors.greenAccent.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w500),
+                                    children: [
+                                      TextSpan(text: '$scheduledDayStr, '), 
+                                      TextSpan(text: scheduledTimeStr),
+                                      if (courtName != null) ...[
+                                        const TextSpan(text: ' @'),
+                                        TextSpan(text: courtName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      ]
+                                    ],
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         )
                       else
                         Text(
@@ -906,7 +927,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             ),
             
             // Content
-            if (content.isNotEmpty)
+            if (content.isNotEmpty && (courtName == null || content != '@$courtName'))
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 4), // Tighter padding
                 child: Text(
