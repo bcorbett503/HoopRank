@@ -300,30 +300,29 @@ export class UsersService {
 
   async debugFollowedCourts(): Promise<any> {
     const isPostgres = !!process.env.DATABASE_URL;
+    const testUserId = '4ODZUrySRUhFDC5wVW6dCySBprD2';
     try {
-      const query = isPostgres
-        ? `SELECT * FROM user_followed_courts ORDER BY created_at DESC LIMIT 20`
-        : `SELECT * FROM user_followed_courts ORDER BY created_at DESC LIMIT 20`;
-      const rows = await this.dataSource.query(query);
+      // Get all rows
+      const allRows = await this.dataSource.query(
+        `SELECT * FROM user_followed_courts ORDER BY created_at DESC LIMIT 20`
+      );
 
-      // Also get table info
-      const tableInfo = isPostgres
-        ? await this.dataSource.query(`
-            SELECT column_name, data_type 
-            FROM information_schema.columns 
-            WHERE table_name = 'user_followed_courts'
-          `)
-        : 'SQLite - table exists';
+      // Test exact getFollows query
+      const courtsForUser = await this.dataSource.query(
+        `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`,
+        [testUserId]
+      );
 
       return {
         success: true,
-        rowCount: rows.length,
-        rows,
-        tableInfo,
+        allRowsCount: allRows.length,
+        allRows,
+        testUserId,
+        courtsForTestUser: courtsForUser,
         isPostgres
       };
     } catch (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: error.message, stack: error.stack };
     }
   }
 
