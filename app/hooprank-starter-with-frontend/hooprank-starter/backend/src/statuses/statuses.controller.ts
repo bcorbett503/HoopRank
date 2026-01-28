@@ -33,10 +33,15 @@ export class StatusesController {
         @Headers('x-user-id') userId: string,
         @Query('filter') filter: string = 'all',
     ) {
-        if (!userId) {
+        try {
+            if (!userId) {
+                return [];
+            }
+            return await this.statusesService.getUnifiedFeed(userId, filter || 'all');
+        } catch (error) {
+            console.error('Controller getUnifiedFeed error:', error.message);
             return [];
         }
-        return this.statusesService.getUnifiedFeed(userId, filter || 'all');
     }
 
     // Get single status with details
