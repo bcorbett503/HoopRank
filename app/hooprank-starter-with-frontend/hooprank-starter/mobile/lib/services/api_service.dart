@@ -354,7 +354,7 @@ class ApiService {
   /// Register FCM token for push notifications
   static Future<void> registerFcmToken(String userId, String token) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/users/$userId/fcm-token'),
+      Uri.parse('$baseUrl/users/me/fcm-token'),
       headers: {
         'Authorization': 'Bearer $_authToken',
         'x-user-id': userId,

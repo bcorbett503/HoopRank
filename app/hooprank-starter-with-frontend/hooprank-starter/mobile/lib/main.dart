@@ -28,6 +28,7 @@ import 'screens/network_test_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/notification_service.dart';
+import 'services/court_service.dart';
 
 // Background message handler - must be top-level function
 @pragma('vm:entry-point')
@@ -54,6 +55,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthState()),
         ChangeNotifierProvider(create: (_) => MatchState()),
         ChangeNotifierProvider(create: (_) => CheckInState()),
+        Provider(create: (_) => CourtService()),
       ],
       child: const HoopRankApp(),
     ),

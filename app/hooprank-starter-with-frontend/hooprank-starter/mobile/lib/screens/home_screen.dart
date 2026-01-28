@@ -15,6 +15,7 @@ import '../models.dart';
 import '../services/court_service.dart';
 import '../widgets/hooprank_feed.dart';
 import 'map_screen.dart';
+import 'status_composer_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1325,327 +1326,142 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   
                   return Column(
                     children: [
-                      // Status Update Bar (Moved to Top)
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                      // === Status Section Header (Single Line) ===
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 8),
+                        child: Row(
                           children: [
-                            // Image preview if selected
-                            if (_selectedImage != null)
-                              Stack(
-                                children: [
-                                  Container(
-                                    height: 100,
-                                    width: double.infinity,
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      image: DecorationImage(
-                                        image: FileImage(File(_selectedImage!.path)),
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() => _selectedImage = null),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black54,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: const Icon(Icons.close, color: Colors.white, size: 16),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                shape: BoxShape.circle,
                               ),
-                            // Time chip when scheduled (shown above text field)
-                            if (_scheduledTime != null)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: GestureDetector(
-                                  onTap: () => setState(() {
-                                    _scheduledTime = null;
-                                    _isRecurring = false;
-                                  }),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.deepOrange.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.event, size: 14, color: Colors.deepOrange),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          _formatScheduledTime(),
-                                          style: const TextStyle(color: Colors.deepOrange, fontSize: 12, fontWeight: FontWeight.w500),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        const Icon(Icons.close, size: 14, color: Colors.deepOrange),
-                                      ],
-                                    ),
-                                  ),
+                              child: const Icon(Icons.edit_note, size: 14, color: Colors.blue),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'STATUS',
+                              style: TextStyle(
+                                fontSize: 12, 
+                                fontWeight: FontWeight.bold, 
+                                letterSpacing: 1.0,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '·',
+                              style: TextStyle(color: Colors.white30, fontSize: 12),
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'When/where are you playing?',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white38,
                                 ),
                               ),
-                            // Main input row
-                            Row(
-                              children: [
-                                // Expandable action buttons
-                                if (_isStatusBarExpanded) ...[
-                                  // Camera button
-                                  IconButton(
-                                    icon: Icon(Icons.photo_camera, color: Colors.grey[600]),
-                                    onPressed: _takePhoto,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // Gallery button
-                                  IconButton(
-                                    icon: Icon(Icons.photo_library, color: Colors.grey[600]),
-                                    onPressed: _pickImage,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // Schedule/Calendar button
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.calendar_today,
-                                      color: _scheduledTime != null ? Colors.deepOrange : Colors.grey[600],
-                                    ),
-                                    onPressed: _showScheduleSheet,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                                // Text field
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      if (!_isStatusBarExpanded) {
-                                        setState(() => _isStatusBarExpanded = true);
-                                      }
-                                    },
-                                    child: TextField(
-                                      controller: _statusController,
-                                      onTap: () {
-                                        if (!_isStatusBarExpanded) {
-                                          setState(() => _isStatusBarExpanded = true);
-                                        }
-                                      },
-                                      decoration: InputDecoration(
-                                        hintText: "@CourtName to check in or schedule...or drop your status",
-                                        border: InputBorder.none,
-                                        hintStyle: TextStyle(color: Colors.grey[500], fontSize: 13),
-                                        isDense: true,
-                                      ),
-                                      style: const TextStyle(color: Colors.black, fontSize: 14),
-                                      onSubmitted: (value) => _submitStatus(value),
-                                    ),
-                                  ),
-                                ),
-                                // Send/Schedule button
-                                IconButton(
-                                  icon: Icon(
-                                    _scheduledTime != null ? Icons.event_available : Icons.send,
-                                    color: Colors.deepOrange,
-                                  ),
-                                  onPressed: () => _submitStatus(_statusController.text),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                              ],
                             ),
                           ],
                         ),
                       ),
-                      
-                      // Court tagging suggestions dropdown
-                      if (_showCourtSuggestions && _courtSuggestions.isNotEmpty)
-                        Container(
-                          constraints: const BoxConstraints(maxHeight: 200),
-                          margin: const EdgeInsets.only(bottom: 12),
+                      // Status Update Bar - Tappable with User Avatar
+                      GestureDetector(
+                        onTap: () async {
+                          final result = await Navigator.push<bool>(
+                            context, 
+                            MaterialPageRoute(
+                              builder: (_) => const StatusComposerScreen(),
+                              fullscreenDialog: true,
+                            ),
+                          );
+                          if (result == true) {
+                            setState(() {}); // Refresh feed
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.grey[800],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                            color: const Color(0xFF1E1E1E), // Slightly lighter than background
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                            border: Border.all(color: Colors.white.withOpacity(0.05)),
                           ),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            padding: EdgeInsets.zero,
-                            itemCount: _courtSuggestions.length,
-                            itemBuilder: (context, index) {
-                              final court = _courtSuggestions[index];
-                              return ListTile(
-                                leading: const Icon(Icons.location_on, color: Colors.blue, size: 20),
-                                title: Text(court.name, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                                subtitle: court.address != null 
-                                    ? Text(court.address!, style: TextStyle(color: Colors.grey[400], fontSize: 12))
-                                    : null,
-                                onTap: () => _selectCourt(court),
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                              );
-                            },
-                          ),
-                        ),
-                      
-                      // Hero Rank Card (Moved Below Status)
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.grey.shade900,
-                              Colors.blueGrey.shade900,
+                          child: Row(
+                            children: [
+                              // User Avatar
+                              Consumer<AuthState>(
+                                builder: (context, authState, _) {
+                                  final user = authState.currentUser;
+                                  final photoUrl = user?.photoUrl;
+                                  final name = user?.name ?? '?';
+                                  
+                                  return CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: Colors.deepOrange,
+                                    backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                                    child: photoUrl == null
+                                        ? Text(
+                                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                          )
+                                        : null,
+                                  );
+                                }
+                              ),
+                              const SizedBox(width: 12),
+                              // Placeholder Text
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'What\'s on your mind?',
+                                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14, fontWeight: FontWeight.w500),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Share a status, schedule run, or check in...',
+                                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Icons
+                              const SizedBox(width: 8),
+                              Icon(Icons.photo_camera_outlined, color: Colors.white.withOpacity(0.4), size: 22),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.deepOrange.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.edit, size: 16, color: Colors.deepOrange),
+                              ),
                             ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.5),
-                              blurRadius: 15,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Abstract background elements
-                            // Abstract background elements removed
-                            
-                              Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: IntrinsicHeight(
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: _buildRatingChip(
-                                          label: '1v1',
-                                          rating: rating,
-                                          color: Colors.deepOrange,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: _buildTeamSlot('3v3', Colors.blue),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: _buildTeamSlot('5v5', Colors.purple),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              // Compact Challenges Row inside card
-                              if (_challenges.isNotEmpty || _teamChallenges.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.05),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.sports_basketball, size: 16, color: Colors.deepOrange),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            '${_challenges.length + _teamChallenges.length} active challenge${_challenges.length + _teamChallenges.length == 1 ? '' : 's'}',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                          ),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {
-                                            // Challenges are shown below - could scroll to them here
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Scroll down to see challenge details')),
-                                            );
-                                          },
-                                          style: TextButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                                            minimumSize: Size.zero,
-                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                          ),
-                                          child: const Text('VIEW', style: TextStyle(color: Colors.deepOrange, fontSize: 11, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              else 
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.05),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.sports_basketball_outlined, size: 16, color: Colors.white30),
-                                        const SizedBox(width: 8),
-                                        const Expanded(
-                                          child: Text(
-                                            'No active challenges',
-                                            style: TextStyle(fontSize: 12, color: Colors.white54),
-                                          ),
-                                        ),
-                                        TextButton(
-                                          onPressed: _showStartGameModeDialog,
-                                          style: TextButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                                            minimumSize: Size.zero,
-                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                          ),
-                                          child: const Text('START', style: TextStyle(color: Colors.deepOrange, fontSize: 11, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                          ],
                         ),
                       ),
+                      
                     ],
                   );
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
 
               // === HoopRank Feed Section ===
               Padding(

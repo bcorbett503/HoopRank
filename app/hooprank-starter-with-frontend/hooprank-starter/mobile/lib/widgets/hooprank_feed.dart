@@ -62,12 +62,25 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       debugPrint('FEED: Loading unified feed with filter=$filter, userId=$userId');
       final feed = await ApiService.getUnifiedFeed(filter: filter);
       debugPrint('FEED: Received ${feed.length} items');
-      if (feed.isNotEmpty) {
-        debugPrint('FEED: First item type=${feed.first['type']}');
+      
+      // De-duplicate by id to prevent showing same item multiple times
+      final seenIds = <String>{};
+      final dedupedFeed = feed.where((item) {
+        final id = item['id']?.toString();
+        if (id == null || seenIds.contains(id)) {
+          return false;
+        }
+        seenIds.add(id);
+        return true;
+      }).toList();
+      debugPrint('FEED: After dedup: ${dedupedFeed.length} items (removed ${feed.length - dedupedFeed.length} duplicates)');
+      
+      if (dedupedFeed.isNotEmpty) {
+        debugPrint('FEED: First item type=${dedupedFeed.first['type']}');
       }
       if (mounted) {
         setState(() {
-          _statusPosts = feed;
+          _statusPosts = dedupedFeed;
           _isLoading = false;
         });
       }
@@ -85,7 +98,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       children: [
         // Tab bar
         Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.05),
             borderRadius: BorderRadius.circular(8),
@@ -99,11 +112,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             indicatorSize: TabBarIndicatorSize.tab,
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white54,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             dividerColor: Colors.transparent,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 8),
             tabs: const [
-              Tab(text: 'All'),
-              Tab(text: 'Courts'),
+              Tab(height: 32, text: 'All'),
+              Tab(height: 32, text: 'Courts'),
             ],
           ),
         ),
@@ -180,12 +194,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Filter to only show court-related items
-    final courtItems = _statusPosts.where((item) => 
-      item['type'] == 'checkin' || item['type'] == 'match'
-    ).toList();
+    // Get followed courts from CheckInState
+    final checkInState = context.watch<CheckInState>();
+    final followedCourts = checkInState.followedCourts;
 
-    if (courtItems.isEmpty) {
+    // Case 1: No courts followed at all
+    if (followedCourts.isEmpty) {
       return _buildEmptyState(
         'No courts followed', 
         'Follow courts to see check-ins and activity here.',
@@ -206,16 +220,147 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         ),
       );
     }
+    
+    // Filter items related to followed courts:
+    // 1. Check-ins and matches at followed courts (by courtId)
+    // 2. Status posts mentioning followed courts (by content containing court names)
+    // 3. Scheduled events that mention followed courts
+    final courtItems = _statusPosts.where((item) {
+      // Include check-ins and matches by courtId
+      if (item['type'] == 'checkin' || item['type'] == 'match') {
+        final courtId = item['courtId']?.toString();
+        if (courtId != null && followedCourts.contains(courtId)) {
+          return true;
+        }
+      }
+      
+      // Include status posts that mention followed courts in content
+      final content = item['content']?.toString().toLowerCase() ?? '';
+      for (final courtId in followedCourts) {
+        // Check if content mentions the court (with @, or partial match)
+        if (content.contains('@') || content.contains('olympic') || content.contains('club')) {
+          // For now, include posts that have @ mentions (court references)
+          // This is a simple heuristic - posts with @ typically reference courts
+          if (content.contains('@')) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    }).toList();
+    
+    // Sort by scheduled events first (soonest first), then by createdAt
+    courtItems.sort((a, b) {
+      final aScheduled = a['scheduledAt'] != null;
+      final bScheduled = b['scheduledAt'] != null;
+      
+      // Scheduled events come first
+      if (aScheduled && !bScheduled) return -1;
+      if (!aScheduled && bScheduled) return 1;
+      
+      // If both scheduled, sort by scheduled time (soonest first)
+      if (aScheduled && bScheduled) {
+        final aTime = DateTime.tryParse(a['scheduledAt']?.toString() ?? '');
+        final bTime = DateTime.tryParse(b['scheduledAt']?.toString() ?? '');
+        if (aTime != null && bTime != null) {
+          return aTime.compareTo(bTime);
+        }
+      }
+      
+      // Otherwise sort by createdAt (most recent first)
+      final aCreated = DateTime.tryParse(a['createdAt']?.toString() ?? '');
+      final bCreated = DateTime.tryParse(b['createdAt']?.toString() ?? '');
+      if (aCreated != null && bCreated != null) {
+        return bCreated.compareTo(aCreated);
+      }
+      return 0;
+    });
 
+    // Case 2: Courts followed but no related activity
+    if (courtItems.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: () => _loadFeed(filter: 'courts'),
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 100),
+          children: [
+            // Header showing followed courts count
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.blue, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Following ${followedCourts.length} court${followedCourts.length == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Empty state message
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(Icons.sports_basketball, size: 48, color: Colors.white.withOpacity(0.15)),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No activity yet',
+                    style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'When players schedule games or check in at your followed courts, they\'ll appear here.',
+                    style: TextStyle(color: Colors.white38, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Case 3: Has court-related activity - show using same card style as All feed
     return RefreshIndicator(
       onRefresh: () => _loadFeed(filter: 'courts'),
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: courtItems.length,
-        itemBuilder: (context, index) => _buildFeedItemCard(courtItems[index]),
+        itemCount: courtItems.length + 1, // +1 for header
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            // Header showing followed courts count
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.blue, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Following ${followedCourts.length} court${followedCourts.length == 1 ? '' : 's'} • ${courtItems.length} update${courtItems.length == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return _buildFeedItemCard(courtItems[index - 1]);
+        },
       ),
     );
   }
+
+
 
   Widget _buildEmptyState(String title, String subtitle, {Widget? extraContent}) {
     return Padding(
@@ -256,50 +401,97 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
     String timeAgo = _formatTimeAgo(createdAt);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      color: Colors.blue.withOpacity(0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.blue.withOpacity(0.2)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E), // Premium dark surface
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.withOpacity(0.15), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.blue,
-              backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
-              child: userPhotoUrl == null
-                  ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: TextSpan(
-                      style: const TextStyle(fontSize: 14, color: Colors.white),
-                      children: [
-                        TextSpan(text: userName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        const TextSpan(text: ' checked in at '),
-                        TextSpan(text: courtName, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.blue)),
-                      ],
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2), // Border effect
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Colors.blue, Colors.blue.withOpacity(0.5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                  if (timeAgo.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.grey[900],
+                    backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
+                    child: userPhotoUrl == null
+                        ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          style: const TextStyle(fontSize: 15, color: Colors.white, height: 1.3),
+                          children: [
+                            TextSpan(text: userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const TextSpan(text: ' checked in', style: TextStyle(color: Colors.white70)),
+                          ],
+                        ),
+                      ),
+                      if (timeAgo.isNotEmpty)
+                        Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.sports_basketball, size: 16, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      courtName, 
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
                     ),
+                  ),
                 ],
               ),
             ),
-            const Icon(Icons.location_on, color: Colors.blue, size: 20),
           ],
         ),
       ),
@@ -312,70 +504,87 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final courtName = item['courtName']?.toString() ?? 'Unknown Court';
     final matchStatus = item['matchStatus']?.toString() ?? '';
     final createdAt = item['createdAt'];
+    // For match results, we often get a score
+    final matchScore = item['matchScore']?.toString(); // e.g. "21-18" or null
 
     String timeAgo = _formatTimeAgo(createdAt);
 
     final statusColor = matchStatus == 'ended' ? Colors.green : Colors.orange;
-    final statusText = matchStatus == 'ended' ? 'Completed' : (matchStatus == 'live' ? 'Live' : 'Waiting');
+    final statusText = matchStatus == 'ended' ? 'Final Score' : (matchStatus == 'live' ? 'Live Game' : 'Upcoming');
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      color: statusColor.withOpacity(0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: statusColor.withOpacity(0.3)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: statusColor,
-              backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
-              child: userPhotoUrl == null
-                  ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-                  : null,
+            // Header
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: statusColor,
+                  backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
+                  child: userPhotoUrl == null
+                      ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text('played at $courtName', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Text(timeAgo, style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 12),
+            // Match Result Banner
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [statusColor.withOpacity(0.2), statusColor.withOpacity(0.05)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: statusColor.withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  RichText(
-                    text: TextSpan(
-                      style: const TextStyle(fontSize: 14, color: Colors.white),
-                      children: [
-                        TextSpan(text: userName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        const TextSpan(text: ' played at '),
-                        TextSpan(text: courtName, style: TextStyle(fontWeight: FontWeight.w600, color: statusColor)),
-                      ],
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(statusText.toUpperCase(), 
+                          style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                      const SizedBox(height: 4),
+                      Text(matchScore ?? 'Game Score', 
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(statusText, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.bold)),
-                        ),
-                        if (timeAgo.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-                        ],
-                      ],
-                    ),
-                  ),
+                  Icon(Icons.emoji_events_outlined, color: statusColor.withOpacity(0.8), size: 28),
                 ],
               ),
             ),
-            Icon(Icons.sports_basketball, color: statusColor, size: 20),
           ],
         ),
       ),
@@ -547,203 +756,264 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       } catch (_) {}
     }
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      color: isScheduledEvent ? Colors.green.withOpacity(0.08) : Colors.white.withOpacity(0.05),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isScheduledEvent ? BorderSide(color: Colors.green.withOpacity(0.3)) : BorderSide.none,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E), // Premium dark surface
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header with avatar and name
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: isScheduledEvent ? Colors.green : Colors.deepOrange,
-                  backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
-                  child: userPhotoUrl == null
-                      ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-                      : null,
+                Container(
+                  padding: const EdgeInsets.all(2), // Border effect
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: isScheduledEvent 
+                          ? [Colors.green, Colors.green.withOpacity(0.5)]
+                          : [Colors.deepOrange, Colors.deepOrange.withOpacity(0.5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.grey[900],
+                    backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
+                    child: userPhotoUrl == null
+                        ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                        : null,
+                  ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(userName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      if (timeAgo.isNotEmpty)
-                        Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              userName, 
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isScheduledEvent) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('SCHEDULED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isScheduledEvent ? scheduledTimeStr : timeAgo, 
+                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
-                if (isScheduledEvent)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.event, size: 14, color: Colors.green),
-                        const SizedBox(width: 4),
-                        Text(scheduledTimeStr, style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
+                // Optional: Ellipsis menu
+                Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.2), size: 20),
               ],
             ),
-            const SizedBox(height: 10),
+            
             // Content
-            Text(content, style: const TextStyle(fontSize: 14)),
+            if (content.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 4),
+                child: Text(
+                  content, 
+                  style: TextStyle(fontSize: 15, height: 1.4, color: Colors.white.withOpacity(0.9)),
+                ),
+              ),
+              
             // Image if present
-            if (imageUrl != null && imageUrl.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
+            if (imageUrl != null && imageUrl.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: 220,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            
+            // Interaction Bar for Scheduled Events
+            if (isScheduledEvent) ...[
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => _toggleAttending(statusId, isAttending, attendeeCount),
+                child: Container(
                   width: double.infinity,
-                  height: 200,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isAttending ? Colors.green : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isAttending ? Colors.green : Colors.green.withOpacity(0.5), width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isAttending ? Icons.check_circle : Icons.calendar_today,
+                        color: isAttending ? Colors.white : Colors.green,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isAttending ? "I'M GOING" : "JOIN GAME",
+                        style: TextStyle(
+                          color: isAttending ? Colors.white : Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      if (attendeeCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '($attendeeCount)',
+                          style: TextStyle(
+                            color: isAttending ? Colors.white.withOpacity(0.9) : Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ],
-            const SizedBox(height: 10),
             
-            // "I'm IN" button for scheduled events
-            if (isScheduledEvent) ...[
-              Row(
+            // Action Buttons Row (Like, Comment)
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _toggleAttending(statusId, isAttending, attendeeCount),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isAttending ? Colors.green : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green, width: 2),
-                        ),
+                  // Like Button
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => _toggleLike(statusId, isLiked, likeCount),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              isAttending ? Icons.check_circle : Icons.add_circle_outline,
-                              color: isAttending ? Colors.white : Colors.green,
+                              isLiked ? Icons.favorite : Icons.favorite_border_rounded,
                               size: 20,
+                              color: isLiked ? Colors.redAccent : Colors.grey[500],
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              isAttending ? "I'M IN!" : "I'M IN",
+                              '$likeCount',
                               style: TextStyle(
-                                color: isAttending ? Colors.white : Colors.green,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                color: isLiked ? Colors.redAccent : Colors.grey[500],
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            if (attendeeCount > 0) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isAttending ? Colors.white.withOpacity(0.2) : Colors.green.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '$attendeeCount going',
-                                  style: TextStyle(
-                                    color: isAttending ? Colors.white : Colors.green,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 16),
+                  
+                  // Comment Button
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => _toggleComments(statusId),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 20,
+                              color: isExpanded ? Colors.blue : Colors.grey[500],
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '$commentCount',
+                              style: TextStyle(
+                                color: isExpanded ? Colors.blue : Colors.grey[500],
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const Spacer(),
+                  // Share Button (Visual only)
+                  Icon(Icons.share_outlined, color: Colors.grey[600], size: 20),
                 ],
               ),
-              const SizedBox(height: 10),
-            ],
-            
-            // Like/Comment action row
-            Row(
-              children: [
-                // Like button
-                GestureDetector(
-                  onTap: () => _toggleLike(statusId, isLiked, likeCount),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isLiked ? Icons.favorite : Icons.favorite_border,
-                        size: 20,
-                        color: isLiked ? Colors.red : Colors.grey[400],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$likeCount',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 20),
-                // Comment button
-                GestureDetector(
-                  onTap: () => _toggleComments(statusId),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.chat_bubble_outline,
-                        size: 18,
-                        color: isExpanded ? Colors.blue : Colors.grey[400],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$commentCount',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
             
-            // Expanded comments section
+            // Expanded comments section matches existing logic, just keeping it here
             if (isExpanded) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.black.withOpacity(0.2), // Darker inset background
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Existing comments
                     if (comments.isEmpty)
-                      Text('No comments yet', style: TextStyle(color: Colors.grey[500], fontSize: 12))
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text('No comments yet. Be the first!', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                      )
                     else
                       ...comments.map((comment) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.only(bottom: 12),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             CircleAvatar(
-                              radius: 12,
+                              radius: 14,
                               backgroundColor: Colors.deepOrange.withOpacity(0.3),
                               backgroundImage: comment['userPhotoUrl'] != null 
                                   ? NetworkImage(comment['userPhotoUrl']) 
@@ -755,18 +1025,28 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                                     )
                                   : null,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    comment['userName'] ?? 'User',
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        comment['userName'] ?? 'User',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '· now', // Simplified for demo
+                                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                      ),
+                                    ],
                                   ),
+                                  const SizedBox(height: 2),
                                   Text(
                                     comment['content'] ?? '',
-                                    style: const TextStyle(fontSize: 12),
+                                    style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.8)),
                                   ),
                                 ],
                               ),

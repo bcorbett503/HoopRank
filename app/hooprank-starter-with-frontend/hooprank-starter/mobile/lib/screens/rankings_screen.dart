@@ -43,6 +43,9 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   
   // User's teams for invite functionality
   List<Map<String, dynamic>> _myTeams = [];
+  
+  // Current user's own ranking info
+  double _myRating = 3.0;
 
   @override
   void initState() {
@@ -56,6 +59,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     });
     _fetchPlayers();
     _fetchMyTeams();
+    _fetchMyRating();
   }
 
   @override
@@ -202,6 +206,16 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     }
   }
 
+  void _fetchMyRating() {
+    final appState = Provider.of<AuthState>(context, listen: false);
+    final currentUser = appState.currentUser;
+    if (currentUser != null) {
+      setState(() {
+        _myRating = currentUser.rating;
+      });
+    }
+  }
+
   List<User> get _filteredPlayers {
     final currentUser = Provider.of<AuthState>(context, listen: false).currentUser;
     
@@ -249,6 +263,122 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     if (rating >= 2.5) return 'Bench';
     if (rating >= 2.0) return 'Rookie';
     return 'Newcomer';
+  }
+
+  /// Build a rating chip for the My HoopRanks section
+  Widget _buildRatingChip(String label, double rating, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+            ),
+          ),
+          Expanded(child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                rating.toStringAsFixed(2),
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _getRankLabel(rating),
+                style: const TextStyle(color: Colors.white54, fontSize: 10),
+              ),
+            ],
+          )),
+        ],
+      ),
+    );
+  }
+
+  /// Build a team slot for 3v3 or 5v5 - shows rating if user has team, or "Find a Team" if not
+  Widget _buildTeamSlot(String teamType, Color color) {
+    // Find user's team of this type
+    final team = _myTeams.firstWhere(
+      (t) => t['teamType'] == teamType,
+      orElse: () => <String, dynamic>{},
+    );
+    
+    final hasTeam = team.isNotEmpty;
+    final rating = hasTeam ? ((team['rating'] as num?)?.toDouble() ?? 3.0) : 0.0;
+    final teamName = hasTeam ? (team['name'] ?? teamType) : null;
+    
+    return GestureDetector(
+      onTap: () {
+        if (!hasTeam) {
+          // Navigate to Teams tab to find/create a team
+          final tabController = DefaultTabController.of(context);
+          if (tabController.length > 1) {
+            tabController.animateTo(1); // Switch to Teams tab
+          }
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: hasTeam ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                teamType,
+                style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+              ),
+            ),
+            Expanded(child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (hasTeam) ...[
+                  Text(
+                    rating.toStringAsFixed(2),
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    teamName!,
+                    style: const TextStyle(color: Colors.white54, fontSize: 10),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                  ),
+                ] else ...[
+                  const Icon(Icons.add_circle_outline, color: Colors.white30, size: 24),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'JOIN',
+                    style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ],
+            )),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showPlayerProfile(User player) {
@@ -503,6 +633,77 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     
     return Column(
       children: [
+        // === My HoopRanks Section ===
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.grey.shade900,
+                Colors.blueGrey.shade900,
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.emoji_events, size: 14, color: Colors.amber),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'MY HOOPRANKS',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Rating chips row
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: _buildRatingChip('1v1', _myRating, Colors.deepOrange)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildTeamSlot('3v3', Colors.blue)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildTeamSlot('5v5', Colors.purple)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
         // Search and filter
         Padding(
           padding: const EdgeInsets.all(12),

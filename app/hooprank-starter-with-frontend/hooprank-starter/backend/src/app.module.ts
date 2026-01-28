@@ -14,6 +14,7 @@ import { PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCou
 import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ActivityModule } from './activity/activity.module';
 import { HealthController } from './health.controller';
 import { SnakeNamingStrategy } from './snake-naming.strategy';
 
@@ -56,6 +57,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     MessagesModule,
     FirebaseModule,
     NotificationsModule,
+    ActivityModule,
   ],
   controllers: [HealthController],
 })
