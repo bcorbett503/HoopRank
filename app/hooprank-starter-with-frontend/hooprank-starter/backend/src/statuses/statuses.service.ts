@@ -40,7 +40,7 @@ export class StatusesService {
                 ps.id,
                 ps.user_id as "userId",
                 u.name as "userName",
-                u."photoUrl" as "userPhotoUrl",
+                u.avatar_url as "userPhotoUrl",
                 ps.content,
                 ps.image_url as "imageUrl",
                 ps.created_at as "createdAt",
@@ -68,7 +68,7 @@ export class StatusesService {
                 ps.id,
                 ps.user_id as "userId",
                 u.name as "userName",
-                u."photoUrl" as "userPhotoUrl",
+                u.avatar_url as "userPhotoUrl",
                 ps.content,
                 ps.image_url as "imageUrl",
                 ps.created_at as "createdAt",
@@ -94,7 +94,7 @@ export class StatusesService {
                 ps.id,
                 ps.user_id as "userId",
                 u.name as "userName",
-                u."photoUrl" as "userPhotoUrl",
+                u.avatar_url as "userPhotoUrl",
                 ps.content,
                 ps.image_url as "imageUrl",
                 ps.created_at as "createdAt",
@@ -139,7 +139,7 @@ export class StatusesService {
             SELECT 
                 sl.user_id as "userId",
                 u.name as "userName",
-                u."photoUrl" as "userPhotoUrl",
+                u.avatar_url as "userPhotoUrl",
                 sl.created_at as "createdAt"
             FROM status_likes sl
             LEFT JOIN users u ON ${d.cast('sl.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
@@ -163,7 +163,7 @@ export class StatusesService {
                 sc.id,
                 sc.user_id as "userId",
                 u.name as "userName",
-                u."photoUrl" as "userPhotoUrl",
+                u.avatar_url as "userPhotoUrl",
                 sc.content,
                 sc.created_at as "createdAt"
             FROM status_comments sc
@@ -208,7 +208,7 @@ export class StatusesService {
             SELECT 
                 ea.user_id as "userId",
                 u.name as "userName",
-                u."photoUrl" as "userPhotoUrl",
+                u.avatar_url as "userPhotoUrl",
                 ea.created_at as "createdAt"
             FROM event_attendees ea
             LEFT JOIN users u ON ${d.cast('ea.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
@@ -223,7 +223,7 @@ export class StatusesService {
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50): Promise<any[]> {
         const d = this.dialect.reset();
 
-        // Build the query with dialect-aware SQL
+        // Build the query with dialect-aware SQL and production column names
         const query = `
             WITH followed_players AS (
                 SELECT followed_id FROM user_followed_players WHERE ${d.cast('follower_id', 'TEXT')} = ${d.param()}
@@ -239,7 +239,7 @@ export class StatusesService {
                     ps.created_at as "createdAt",
                     ps.user_id as "userId",
                     u.name as "userName",
-                    u."photoUrl" as "userPhotoUrl",
+                    u.avatar_url as "userPhotoUrl",
                     ps.content,
                     ps.image_url as "imageUrl",
                     ps.scheduled_at as "scheduledAt",
@@ -266,22 +266,22 @@ export class StatusesService {
                     ci.checked_in_at as "createdAt",
                     ci.user_id as "userId",
                     u.name as "userName",
-                    u."photoUrl" as "userPhotoUrl",
+                    u.avatar_url as "userPhotoUrl",
                     NULL as content,
                     NULL as "imageUrl",
                     NULL as "scheduledAt",
-                    ci.court_id as "courtId",
+                    ${d.cast('ci.court_id', 'TEXT')} as "courtId",
                     c.name as "courtName",
                     NULL as "matchScore",
                     NULL as "matchStatus",
                     0 as "likeCount",
                     0 as "commentCount",
-                    0 as "isLikedByMe",
+                    false as "isLikedByMe",
                     0 as "attendeeCount",
-                    0 as "isAttendingByMe"
+                    false as "isAttendingByMe"
                 FROM check_ins ci
                 JOIN users u ON ${d.cast('ci.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-                LEFT JOIN courts c ON ${d.cast('ci.court_id', 'TEXT')} = ${d.cast('c.id', 'TEXT')}
+                LEFT JOIN courts c ON ci.court_id = c.id
                 WHERE ci.court_id IN (SELECT court_id FROM followed_courts)
                 AND ci.checked_in_at > ${d.interval(7)}
 
@@ -291,31 +291,31 @@ export class StatusesService {
                 SELECT 
                     'match' as type,
                     ${d.cast('m.id', 'TEXT')} as id,
-                    m."createdAt" as "createdAt",
-                    m."hostId" as "userId",
+                    m.created_at as "createdAt",
+                    m.creator_id as "userId",
                     u.name as "userName",
-                    u."photoUrl" as "userPhotoUrl",
+                    u.avatar_url as "userPhotoUrl",
                     NULL as content,
                     NULL as "imageUrl",
                     NULL as "scheduledAt",
-                    m."courtId" as "courtId",
+                    ${d.cast('m.court_id', 'TEXT')} as "courtId",
                     c.name as "courtName",
-                    m."ratingDiff" as "matchScore",
+                    m.score_creator::TEXT as "matchScore",
                     m.status as "matchStatus",
                     0 as "likeCount",
                     0 as "commentCount",
-                    0 as "isLikedByMe",
+                    false as "isLikedByMe",
                     0 as "attendeeCount",
-                    0 as "isAttendingByMe"
+                    false as "isAttendingByMe"
                 FROM matches m
-                JOIN users u ON ${d.cast('m."hostId"', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-                LEFT JOIN courts c ON ${d.cast('m."courtId"', 'TEXT')} = ${d.cast('c.id', 'TEXT')}
+                JOIN users u ON ${d.cast('m.creator_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
+                LEFT JOIN courts c ON m.court_id = c.id
                 WHERE (
-                    m."courtId" IN (SELECT court_id FROM followed_courts)
-                    OR ${d.cast('m."hostId"', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
-                    OR ${d.cast('m."guestId"', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
+                    m.court_id IN (SELECT court_id FROM followed_courts)
+                    OR ${d.cast('m.creator_id', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
+                    OR ${d.cast('m.opponent_id', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
                 )
-                AND m."createdAt" > ${d.interval(7)}
+                AND m.created_at > ${d.interval(7)}
             ) combined
             ORDER BY "createdAt" DESC
             LIMIT ${d.param()}
