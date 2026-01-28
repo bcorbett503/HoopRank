@@ -62,29 +62,34 @@ export class StatusesService {
     // ========== Feed ==========
 
     async getFeed(userId: string, limit: number = 50): Promise<any[]> {
-        const d = this.dialect.reset();
-        const query = `
-            SELECT 
-                ps.id,
-                ps.user_id as "userId",
-                u.name as "userName",
-                u.avatar_url as "userPhotoUrl",
-                ps.content,
-                ps.image_url as "imageUrl",
-                ps.created_at as "createdAt",
-                (SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id) as "likeCount",
-                (SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id) as "commentCount",
-                EXISTS(SELECT 1 FROM status_likes WHERE status_id = ps.id AND ${d.cast('user_id', 'TEXT')} = ${d.param()}) as "isLikedByMe"
-            FROM player_statuses ps
-            LEFT JOIN users u ON ${d.cast('ps.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-            WHERE ${d.cast('ps.user_id', 'TEXT')} IN (
-                SELECT ${d.cast('followed_id', 'TEXT')} FROM user_followed_players WHERE ${d.cast('follower_id', 'TEXT')} = ${d.param()}
-            )
-            OR ${d.cast('ps.user_id', 'TEXT')} = ${d.param()}
-            ORDER BY ps.created_at DESC
-            LIMIT ${d.param()}
-        `;
-        return this.dataSource.query(query, [userId, userId, userId, limit]);
+        try {
+            const d = this.dialect.reset();
+            const query = `
+                SELECT 
+                    ps.id,
+                    ps.user_id as "userId",
+                    u.name as "userName",
+                    u.avatar_url as "userPhotoUrl",
+                    ps.content,
+                    ps.image_url as "imageUrl",
+                    ps.created_at as "createdAt",
+                    (SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id) as "likeCount",
+                    (SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id) as "commentCount",
+                    EXISTS(SELECT 1 FROM status_likes WHERE status_id = ps.id AND ${d.cast('user_id', 'TEXT')} = ${d.param()}) as "isLikedByMe"
+                FROM player_statuses ps
+                LEFT JOIN users u ON ${d.cast('ps.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
+                WHERE ${d.cast('ps.user_id', 'TEXT')} IN (
+                    SELECT ${d.cast('followed_id', 'TEXT')} FROM user_followed_players WHERE ${d.cast('follower_id', 'TEXT')} = ${d.param()}
+                )
+                OR ${d.cast('ps.user_id', 'TEXT')} = ${d.param()}
+                ORDER BY ps.created_at DESC
+                LIMIT ${d.param()}
+            `;
+            return this.dataSource.query(query, [userId, userId, userId, limit]);
+        } catch (error) {
+            console.error('getFeed error:', error.message);
+            return [];
+        }
     }
 
     async getUserPosts(targetUserId: string, viewerUserId?: string): Promise<any[]> {

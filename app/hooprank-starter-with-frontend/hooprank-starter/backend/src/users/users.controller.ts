@@ -59,6 +59,7 @@ export class UsersController {
     if (!userId) {
       return { success: false, error: 'User ID required' };
     }
+    console.log('followCourt controller: userId=', userId, 'body=', body, 'courtId=', body?.courtId);
     try {
       await this.usersService.followCourt(userId, body.courtId);
       // If alerts requested, also enable alerts (but don't fail if this throws)
