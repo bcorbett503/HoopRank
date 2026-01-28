@@ -314,18 +314,29 @@ export class UsersService {
     const results: string[] = [];
 
     try {
-      // Fix 1: Recreate user_followed_courts with VARCHAR(255) for court_id
+      // Fix 1: Recreate user_followed_courts with VARCHAR(255) for both user_id and court_id
       results.push('Fixing user_followed_courts table...');
 
-      // Check if table exists and has wrong type
-      const columnCheck = await this.dataSource.query(`
+      // Check if table exists and has wrong types for either user_id or court_id
+      const userIdCheck = await this.dataSource.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'user_followed_courts' AND column_name = 'user_id'
+      `);
+
+      const courtIdCheck = await this.dataSource.query(`
         SELECT data_type 
         FROM information_schema.columns 
         WHERE table_name = 'user_followed_courts' AND column_name = 'court_id'
       `);
 
-      if (columnCheck.length > 0 && columnCheck[0].data_type === 'uuid') {
-        // Drop and recreate with correct type
+      const needsRecreate =
+        (userIdCheck.length > 0 && userIdCheck[0].data_type !== 'character varying') ||
+        (courtIdCheck.length > 0 && courtIdCheck[0].data_type !== 'character varying');
+
+      if (needsRecreate) {
+        // Drop and recreate with correct types
+        results.push(`user_id type: ${userIdCheck[0]?.data_type}, court_id type: ${courtIdCheck[0]?.data_type} - recreating...`);
         await this.dataSource.query(`DROP TABLE IF EXISTS user_followed_courts CASCADE`);
         await this.dataSource.query(`
           CREATE TABLE user_followed_courts (
@@ -337,8 +348,8 @@ export class UsersService {
             UNIQUE(user_id, court_id)
           )
         `);
-        results.push('Recreated user_followed_courts with VARCHAR(255) for court_id');
-      } else if (columnCheck.length === 0) {
+        results.push('Recreated user_followed_courts with VARCHAR(255) for user_id and court_id');
+      } else if (userIdCheck.length === 0) {
         // Table doesn't exist, create it
         await this.dataSource.query(`
           CREATE TABLE IF NOT EXISTS user_followed_courts (
@@ -352,7 +363,7 @@ export class UsersService {
         `);
         results.push('Created user_followed_courts table');
       } else {
-        results.push('user_followed_courts.court_id already has correct type');
+        results.push('user_followed_courts has correct types');
       }
 
       // Fix 2: Create user_court_alerts if missing
