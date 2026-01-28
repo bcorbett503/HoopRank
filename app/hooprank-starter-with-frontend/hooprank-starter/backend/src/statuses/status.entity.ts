@@ -84,10 +84,10 @@ export class UserFollowedCourt {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({ name: 'user_id' })
+    @Column({ name: 'user_id', type: 'varchar', length: 255 })
     userId: string;
 
-    @Column({ name: 'court_id' })
+    @Column({ name: 'court_id', type: 'varchar', length: 255 })
     courtId: string;
 
     @Column({ name: 'alerts_enabled', default: false })
@@ -103,10 +103,10 @@ export class UserFollowedPlayer {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({ name: 'follower_id' })
+    @Column({ name: 'follower_id', type: 'varchar', length: 255 })
     followerId: string;
 
-    @Column({ name: 'followed_id' })
+    @Column({ name: 'followed_id', type: 'varchar', length: 255 })
     followedId: string;
 
     @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
