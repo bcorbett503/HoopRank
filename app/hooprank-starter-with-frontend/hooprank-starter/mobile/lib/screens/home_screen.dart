@@ -1489,7 +1489,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(width: 12),
                     const Text(
-                      'HOOPRANK FEED',
+                      'FEED',
                       style: TextStyle(
                         fontSize: 13, 
                         fontWeight: FontWeight.bold, 

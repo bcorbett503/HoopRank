@@ -179,12 +179,34 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       );
     }
 
+    // Filter out expired scheduled runs and separate active scheduled runs
+    final now = DateTime.now();
+    final activePosts = _statusPosts.where((post) {
+      final scheduledAt = post['scheduledAt'];
+      if (scheduledAt != null) {
+        try {
+          final schedDate = DateTime.parse(scheduledAt.toString());
+          return schedDate.isAfter(now); // Only include future scheduled runs
+        } catch (_) {
+          return true; // Include if parsing fails
+        }
+      }
+      return true; // Include non-scheduled posts
+    }).toList();
+
+    // Separate scheduled runs (pinned) from regular posts
+    final scheduledRuns = activePosts.where((post) => post['scheduledAt'] != null).toList();
+    final regularPosts = activePosts.where((post) => post['scheduledAt'] == null).toList();
+
+    // Combine: scheduled runs first, then regular posts
+    final sortedPosts = [...scheduledRuns, ...regularPosts];
+
     return RefreshIndicator(
       onRefresh: () => _loadFeed(filter: 'all'),
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: _statusPosts.length,
-        itemBuilder: (context, index) => _buildFeedItemCard(_statusPosts[index]),
+        itemCount: sortedPosts.length,
+        itemBuilder: (context, index) => _buildFeedItemCard(sortedPosts[index]),
       ),
     );
   }
@@ -225,7 +247,19 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     // 1. Check-ins and matches at followed courts (by courtId)
     // 2. Status posts mentioning followed courts (by content containing court names)
     // 3. Scheduled events that mention followed courts
+    final now = DateTime.now();
     final courtItems = _statusPosts.where((item) {
+      // First, filter out expired scheduled runs
+      final scheduledAt = item['scheduledAt'];
+      if (scheduledAt != null) {
+        try {
+          final schedDate = DateTime.parse(scheduledAt.toString());
+          if (schedDate.isBefore(now)) {
+            return false; // Exclude expired scheduled runs
+          }
+        } catch (_) {}
+      }
+      
       // Include check-ins and matches by courtId
       if (item['type'] == 'checkin' || item['type'] == 'match') {
         final courtId = item['courtId']?.toString();
@@ -700,6 +734,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final imageUrl = post['imageUrl']?.toString();
     final scheduledAt = post['scheduledAt'];
     // Improved extraction logic
+    final rawContent = content.trim();
     final courtName = post['courtName']?.toString() ?? 
                      (rawContent.startsWith('@') ? rawContent.substring(1).trim() : null);
     
