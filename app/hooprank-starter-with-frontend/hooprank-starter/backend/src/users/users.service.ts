@@ -276,26 +276,34 @@ export class UsersService {
 
   async getFollows(userId: string): Promise<{ courts: any[]; players: any[] }> {
     console.log('getFollows called, userId:', userId);
+
+    // Query courts
+    let courts: any[] = [];
     try {
-      // Use PostgreSQL syntax directly like debug endpoint that works
-      const courts = await this.dataSource.query(
+      courts = await this.dataSource.query(
         `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`,
         [userId]
       );
-      console.log('getFollows courts result:', JSON.stringify(courts));
+      console.log('getFollows courts SUCCESS:', JSON.stringify(courts));
+    } catch (courtError) {
+      console.error('getFollows courts ERROR:', courtError.message);
+      return { courts: [], players: [], courtsError: courtError.message } as any;
+    }
 
-      const players = await this.dataSource.query(
+    // Query players - separate try-catch
+    let players: any[] = [];
+    try {
+      players = await this.dataSource.query(
         `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = $1`,
         [userId]
       );
-      console.log('getFollows players result:', JSON.stringify(players));
-
-      return { courts, players };
-    } catch (error) {
-      console.error('getFollows error:', error.message, error.stack);
-      // Return the error in the response so we can see it
-      return { courts: [], players: [], error: error.message } as any;
+      console.log('getFollows players SUCCESS:', JSON.stringify(players));
+    } catch (playerError) {
+      console.error('getFollows players ERROR:', playerError.message);
+      return { courts, players: [], playersError: playerError.message } as any;
     }
+
+    return { courts, players };
   }
 
   async debugFollowedCourts(): Promise<any> {
