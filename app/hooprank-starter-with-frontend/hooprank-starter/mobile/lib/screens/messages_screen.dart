@@ -233,7 +233,7 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
           const SizedBox(height: 12),
           
           // Individual conversations section
-          if (_teamChats.isNotEmpty && _conversations.isNotEmpty)
+          if (_conversations.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Row(

@@ -1,10 +1,15 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, Headers, Inject, forwardRef } from '@nestjs/common';
 import { MessagesService } from './messages.service';
+import { TeamsService } from '../teams/teams.service';
 import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('messages')
 export class MessagesController {
-    constructor(private readonly messagesService: MessagesService) { }
+    constructor(
+        private readonly messagesService: MessagesService,
+        @Inject(forwardRef(() => TeamsService))
+        private readonly teamsService: TeamsService,
+    ) { }
 
     @Post()
     @UseGuards(AuthGuard)
@@ -15,6 +20,11 @@ export class MessagesController {
     @Get('challenges')
     async getChallenges(@Headers('x-user-id') userId: string) {
         return this.messagesService.getPendingChallenges(userId);
+    }
+
+    @Get('team-chats')
+    async getTeamChats(@Headers('x-user-id') userId: string) {
+        return this.teamsService.getTeamChats(userId);
     }
 
     @Get('conversations/:userId')
