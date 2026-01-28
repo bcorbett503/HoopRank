@@ -221,17 +221,24 @@ export class UsersService {
 
   async followCourt(userId: string, courtId: string): Promise<void> {
     const isPostgres = !!process.env.DATABASE_URL;
-    if (isPostgres) {
-      await this.dataSource.query(`
-        INSERT INTO user_followed_courts (user_id, court_id)
-        VALUES ($1, $2)
-        ON CONFLICT (user_id, court_id) DO NOTHING
-      `, [userId, courtId]);
-    } else {
-      await this.dataSource.query(`
-        INSERT OR IGNORE INTO user_followed_courts (user_id, court_id)
-        VALUES (?, ?)
-      `, [userId, courtId]);
+    console.log(`followCourt: userId=${userId}, courtId=${courtId}, isPostgres=${isPostgres}`);
+    try {
+      if (isPostgres) {
+        await this.dataSource.query(`
+          INSERT INTO user_followed_courts (user_id, court_id)
+          VALUES ($1, $2)
+          ON CONFLICT (user_id, court_id) DO NOTHING
+        `, [userId, courtId]);
+      } else {
+        await this.dataSource.query(`
+          INSERT OR IGNORE INTO user_followed_courts (user_id, court_id)
+          VALUES (?, ?)
+        `, [userId, courtId]);
+      }
+      console.log('followCourt: success');
+    } catch (error) {
+      console.error('followCourt service error:', error);
+      throw error;
     }
   }
 
