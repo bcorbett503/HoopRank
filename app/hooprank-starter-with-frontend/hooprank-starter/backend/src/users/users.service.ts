@@ -418,14 +418,24 @@ export class UsersService {
       `);
       results.push('Ensured user_court_alerts table exists');
 
-      // Fix 3: Ensure user_followed_players has correct type
-      const playerColumnCheck = await this.dataSource.query(`
+      // Fix 3: Ensure user_followed_players has correct column types
+      results.push('Fixing user_followed_players table...');
+      const followerColumnCheck = await this.dataSource.query(`
         SELECT data_type 
         FROM information_schema.columns 
         WHERE table_name = 'user_followed_players' AND column_name = 'follower_id'
       `);
+      const followedColumnCheck = await this.dataSource.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'user_followed_players' AND column_name = 'followed_id'
+      `);
 
-      if (playerColumnCheck.length === 0) {
+      const followerIsWrongType = followerColumnCheck.length > 0 && followerColumnCheck[0].data_type === 'integer';
+      const followedIsWrongType = followedColumnCheck.length > 0 && followedColumnCheck[0].data_type === 'integer';
+
+      if (followerColumnCheck.length === 0) {
+        // Table doesn't exist, create it
         await this.dataSource.query(`
           CREATE TABLE IF NOT EXISTS user_followed_players (
             id SERIAL PRIMARY KEY,
@@ -436,8 +446,21 @@ export class UsersService {
           )
         `);
         results.push('Created user_followed_players table');
+      } else if (followerIsWrongType || followedIsWrongType) {
+        // Table exists with wrong column types, recreate it
+        await this.dataSource.query(`DROP TABLE IF EXISTS user_followed_players CASCADE`);
+        await this.dataSource.query(`
+          CREATE TABLE user_followed_players (
+            id SERIAL PRIMARY KEY,
+            follower_id VARCHAR(255) NOT NULL,
+            followed_id VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(follower_id, followed_id)
+          )
+        `);
+        results.push('Recreated user_followed_players with VARCHAR(255) columns');
       } else {
-        results.push('user_followed_players table exists');
+        results.push('user_followed_players has correct types');
       }
 
       return { success: true, results };
