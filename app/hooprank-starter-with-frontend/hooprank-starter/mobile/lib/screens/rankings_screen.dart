@@ -676,7 +676,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'MY HOOPRANKS',
+                        'RANKINGS',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
