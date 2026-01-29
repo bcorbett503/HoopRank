@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -136,18 +137,38 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final playerId = auth.currentUser?.id;
 
     if (userId != null && playerId != null) {
-      // Upload image if a new one was selected
+      // Upload image if a new one was selected - convert to base64 data URL
+      String? avatarUrl;
       if (_imageFile != null) {
-        final error = await ApiService.uploadImage(
-          type: 'profile',
-          targetId: userId,
-          imageFile: _imageFile!,
-        );
-        if (error == null) {
-          debugPrint('Profile photo uploaded successfully');
-        } else {
-          debugPrint('Profile photo upload failed: $error');
+        try {
+          final bytes = await _imageFile!.readAsBytes();
+          final base64Image = base64Encode(bytes);
+          final mimeType = _imageFile!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+          avatarUrl = 'data:$mimeType;base64,$base64Image';
+          debugPrint('Profile photo encoded: ${avatarUrl.length} chars');
+        } catch (e) {
+          debugPrint('Failed to encode profile photo: $e');
         }
+      } else if (_profilePictureUrl != null && !_profilePictureUrl!.startsWith('/')) {
+        // Keep existing network URL
+        avatarUrl = _profilePictureUrl;
+      }
+      
+      // Save profile data including avatar via API
+      final profileUpdates = <String, dynamic>{
+        'name': '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}',
+        'position': _pos,
+        'height': "$_ft'$_inch\"",
+      };
+      if (avatarUrl != null) {
+        profileUpdates['avatarUrl'] = avatarUrl;
+      }
+      
+      try {
+        await ApiService.updateProfile(profileUpdates);
+        debugPrint('Profile updated successfully');
+      } catch (e) {
+        debugPrint('Profile update failed: $e');
       }
       
       final data = ProfileData(
@@ -158,7 +179,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         heightFt: _ft,
         heightIn: _inch,
         position: _pos,
-        profilePictureUrl: _profilePictureUrl,
+        profilePictureUrl: avatarUrl ?? _profilePictureUrl,
         visibility: _visibility,
       );
       await ProfileService.saveProfile(userId, data);
