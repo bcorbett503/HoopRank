@@ -573,6 +573,28 @@ export class UsersService {
         results.push('users.id already correct type');
       }
 
+      // Fix 7: Add missing columns to users table
+      results.push('Checking for missing columns in users table...');
+      const missingColumns = [
+        { name: 'position', type: 'TEXT' },
+        { name: 'height', type: 'TEXT' },
+        { name: 'weight', type: 'INTEGER' },
+        { name: 'city', type: 'TEXT' },
+      ];
+
+      for (const col of missingColumns) {
+        const exists = await this.dataSource.query(`
+          SELECT column_name FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = $1
+        `, [col.name]);
+
+        if (exists.length === 0) {
+          await this.dataSource.query(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`);
+          results.push(`Added column ${col.name}`);
+        }
+      }
+      results.push('Finished checking missing columns');
+
       return { success: true, results };
     } catch (error) {
       results.push(`Error: ${error.message}`);
