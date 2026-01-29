@@ -65,7 +65,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     );
     if (source != null) {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: source);
+      final picked = await picker.pickImage(source: source, maxWidth: 512, maxHeight: 512, imageQuality: 75);
       if (picked != null) {
         debugPrint('Team logo: Picked image at ${picked.path}');
         // Upload the image - returns null on success, error message on failure
