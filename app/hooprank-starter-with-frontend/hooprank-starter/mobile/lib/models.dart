@@ -69,20 +69,21 @@ class User {
       throw FormatException('User id cannot be null or empty');
     }
 
-    final gamesPlayed = _parseInt(json['gamesPlayed']);
-    final gamesContested = _parseInt(json['gamesContested']);
-    final contestRate = json['contestRate'] != null 
-        ? _parseDouble(json['contestRate']) 
+    final gamesPlayed = _parseInt(json['gamesPlayed'] ?? json['games_played']);
+    final gamesContested = _parseInt(json['gamesContested'] ?? json['games_contested']);
+    final contestRate = json['contestRate'] ?? json['contest_rate'] != null 
+        ? _parseDouble(json['contestRate'] ?? json['contest_rate']) 
         : (gamesPlayed > 0 ? gamesContested / gamesPlayed : 0.0);
 
+    // Handle both camelCase (app) and snake_case (production backend) field names
     return User(
       id: id,
-      name: json['name']?.toString() ?? 'Unknown',
-      photoUrl: json['photoUrl']?.toString(),
+      name: json['name']?.toString() ?? json['display_name']?.toString() ?? 'Unknown',
+      photoUrl: json['photoUrl']?.toString() ?? json['avatar_url']?.toString(),
       team: json['team']?.toString(),
       position: json['position']?.toString(),
-      rating: _parseDouble(json['rating'], fallback: 3.0),
-      matchesPlayed: _parseInt(json['matchesPlayed']),
+      rating: _parseDouble(json['rating'] ?? json['hoop_rank'], fallback: 3.0),
+      matchesPlayed: _parseInt(json['matchesPlayed'] ?? json['matches_played']),
       height: json['height']?.toString(),
       wins: _parseInt(json['wins']),
       losses: _parseInt(json['losses']),
