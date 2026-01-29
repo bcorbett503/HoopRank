@@ -1256,15 +1256,15 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               
             // Image if present
             // Video display (if present)
-            if (item['videoUrl'] != null && item['videoUrl'].toString().isNotEmpty)
+            if (post['videoUrl'] != null && post['videoUrl'].toString().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: FeedVideoPlayer(
-                  videoUrl: item['videoUrl'].toString(),
-                  thumbnailUrl: item['videoThumbnailUrl']?.toString(),
-                  durationMs: item['videoDurationMs'] is int 
-                    ? item['videoDurationMs'] 
-                    : int.tryParse(item['videoDurationMs']?.toString() ?? ''),
+                  videoUrl: post['videoUrl'].toString(),
+                  thumbnailUrl: post['videoThumbnailUrl']?.toString(),
+                  durationMs: post['videoDurationMs'] is int 
+                    ? post['videoDurationMs'] 
+                    : int.tryParse(post['videoDurationMs']?.toString() ?? ''),
                   autoPlay: true,
                   startMuted: true,
                 ),
