@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
@@ -86,12 +87,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final checkInState = Provider.of<CheckInState>(context, listen: false);
     
     if (user != null) {
-      // For now, use the local file path as imageUrl (in production, upload to cloud storage first)
+      // Encode image as base64 data URL
       String? imageUrl;
       if (_selectedImage != null) {
-        // TODO: Upload to cloud storage and get URL
-        // For now, just note that we have an image (placeholder)
-        imageUrl = _selectedImage!.path;
+        final bytes = await File(_selectedImage!.path).readAsBytes();
+        final mimeType = _selectedImage!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        imageUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
+        debugPrint('HOME_STATUS: Encoded image to ${imageUrl.length} chars');
       }
       
       // Update local status display

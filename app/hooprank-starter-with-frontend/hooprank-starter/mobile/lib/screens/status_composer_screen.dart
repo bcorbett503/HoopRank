@@ -328,11 +328,17 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
       // Encode image as base64 data URL if selected
       String? imageUrl;
       if (_selectedImage != null) {
+        debugPrint('STATUS_IMAGE: Encoding image from ${_selectedImage!.path}');
         final bytes = await File(_selectedImage!.path).readAsBytes();
+        debugPrint('STATUS_IMAGE: Read ${bytes.length} bytes');
         final mimeType = _selectedImage!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
         imageUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
+        debugPrint('STATUS_IMAGE: Encoded to data URL of length ${imageUrl.length}');
+      } else {
+        debugPrint('STATUS_IMAGE: No image selected');
       }
       
+      debugPrint('STATUS_IMAGE: Calling createStatus with imageUrl=${imageUrl != null ? 'data URL (${imageUrl.length} chars)' : 'null'}');
       await ApiService.createStatus(
         text,
         imageUrl: imageUrl,

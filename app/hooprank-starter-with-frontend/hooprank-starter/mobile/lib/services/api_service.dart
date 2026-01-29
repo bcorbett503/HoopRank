@@ -972,22 +972,29 @@ class ApiService {
 
   /// Create a new status with optional image, scheduled time, and court tag
   static Future<Map<String, dynamic>?> createStatus(String content, {String? imageUrl, DateTime? scheduledAt, String? courtId}) async {
+    debugPrint('API createStatus: content length=${content.length}, imageUrl=${imageUrl != null ? "${imageUrl.length} chars" : "null"}, scheduledAt=$scheduledAt, courtId=$courtId');
+    final body = {
+      'content': content,
+      if (imageUrl != null) 'imageUrl': imageUrl,
+      if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
+      if (courtId != null) 'courtId': courtId,
+    };
+    debugPrint('API createStatus: body keys=${body.keys.toList()}');
     final response = await http.post(
       Uri.parse('$baseUrl/statuses'),
       headers: {
         'x-user-id': _userId ?? '',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({
-        'content': content,
-        if (imageUrl != null) 'imageUrl': imageUrl,
-        if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
-        if (courtId != null) 'courtId': courtId,
-      }),
+      body: jsonEncode(body),
     );
+    debugPrint('API createStatus: response status=${response.statusCode}');
     if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body);
+      final result = jsonDecode(response.body);
+      debugPrint('API createStatus: success, result imageUrl=${result['status']?['image_url']}');
+      return result;
     }
+    debugPrint('API createStatus: failed, body=${response.body}');
     return null;
   }
 
