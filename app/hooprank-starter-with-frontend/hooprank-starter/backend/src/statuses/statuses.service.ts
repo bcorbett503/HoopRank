@@ -38,11 +38,13 @@ export class StatusesService {
             console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, courtId, videoUrl, videoDurationMs });
 
             // Use raw SQL to insert status (bypasses TypeORM entity schema issues)
+            // NOTE: video columns commented out until schema sync completes
+            // TODO: Re-enable video columns after database migration: video_url, video_thumbnail_url, video_duration_ms
             const result = await this.dataSource.query(`
-                INSERT INTO player_statuses (user_id, content, image_url, scheduled_at, court_id, video_url, video_thumbnail_url, video_duration_ms, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                INSERT INTO player_statuses (user_id, content, image_url, scheduled_at, court_id, created_at)
+                VALUES ($1, $2, $3, $4, $5, NOW())
                 RETURNING *
-            `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null, videoUrl || null, videoThumbnailUrl || null, videoDurationMs || null]);
+            `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null]);
 
             console.log('createStatus success:', result[0]);
             return result[0];
@@ -248,6 +250,8 @@ export class StatusesService {
         try {
             // Simplified query - status posts only for now
             // Use LEFT JOINs and avoid subqueries to tables that may not exist
+            // NOTE: video_url, video_thumbnail_url, video_duration_ms columns will be available
+            // after schema sync - for now use NULL placeholders to avoid query errors
             const query = `
                 SELECT 
                     'status' as type,
@@ -258,9 +262,9 @@ export class StatusesService {
                     u.avatar_url as "userPhotoUrl",
                     ps.content,
                     ps.image_url as "imageUrl",
-                    ps.video_url as "videoUrl",
-                    ps.video_thumbnail_url as "videoThumbnailUrl",
-                    ps.video_duration_ms as "videoDurationMs",
+                    NULL as "videoUrl",
+                    NULL as "videoThumbnailUrl",
+                    NULL as "videoDurationMs",
                     ps.scheduled_at as "scheduledAt",
                     ps.court_id as "courtId",
                     c.name as "courtName",
