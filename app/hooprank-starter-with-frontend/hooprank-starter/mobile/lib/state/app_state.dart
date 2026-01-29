@@ -44,12 +44,42 @@ class AuthState extends ChangeNotifier {
         
         // Register FCM token for existing session
         _registerFcmToken();
+        
+        // Refresh user data from backend to get latest profile (including position)
+        _refreshUserInBackground();
       } catch (e) {
         // Handle corruption
         await prefs.remove('hooprank:user');
       }
     }
     notifyListeners();
+  }
+  
+  /// Background refresh that doesn't block initialization
+  Future<void> _refreshUserInBackground() async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 500)); // Small delay to ensure API is ready
+      final updatedUser = await ApiService.getMe();
+      if (updatedUser != null) {
+        debugPrint('_refreshUserInBackground: got user with position=${updatedUser.position}');
+        _currentUser = updatedUser;
+        notifyListeners();
+        
+        // Update persisted data
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('hooprank:user', jsonEncode({
+          'id': updatedUser.id,
+          'name': updatedUser.name,
+          'photoUrl': updatedUser.photoUrl,
+          'team': updatedUser.team,
+          'position': updatedUser.position,
+          'rating': updatedUser.rating,
+          'matchesPlayed': updatedUser.matchesPlayed,
+        }));
+      }
+    } catch (e) {
+      debugPrint('_refreshUserInBackground failed: $e');
+    }
   }
   
   Future<void> completeOnboarding() async {
