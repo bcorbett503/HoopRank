@@ -406,4 +406,32 @@ export class StatusesService {
             return { error: error.message, stack: error.stack };
         }
     }
+
+    // Simple test query to debug unified feed
+    async testFeedQuery(userId: string): Promise<any> {
+        try {
+            // Just query statuses directly without complex CTEs
+            const simpleQuery = await this.dataSource.query(`
+                SELECT 
+                    'status' as type,
+                    ps.id,
+                    ps.user_id as "userId",
+                    ps.content,
+                    ps.court_id as "courtId",
+                    ps.created_at as "createdAt"
+                FROM player_statuses ps
+                WHERE ps.user_id = $1
+                ORDER BY ps.created_at DESC
+                LIMIT 10
+            `, [userId]);
+
+            return {
+                userId,
+                simpleQuery,
+                message: 'Direct query without JOINs or CTEs'
+            };
+        } catch (error) {
+            return { error: error.message };
+        }
+    }
 }
