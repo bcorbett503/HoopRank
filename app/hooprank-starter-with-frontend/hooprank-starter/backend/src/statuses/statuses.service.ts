@@ -246,8 +246,7 @@ export class StatusesService {
 
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50): Promise<any[]> {
         try {
-            // Simplified query - status posts only for now
-            // Use LEFT JOINs and avoid subqueries to tables that may not exist
+            // Full query with engagement counts now that tables are fixed
             const query = `
                 SELECT 
                     'status' as type,
@@ -264,11 +263,11 @@ export class StatusesService {
                     ps.scheduled_at as "scheduledAt",
                     ps.court_id as "courtId",
                     c.name as "courtName",
-                    0 as "likeCount",
-                    0 as "commentCount",
-                    false as "isLikedByMe",
-                    0 as "attendeeCount",
-                    false as "isAttendingByMe"
+                    COALESCE((SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id), 0)::INTEGER as "likeCount",
+                    COALESCE((SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id), 0)::INTEGER as "commentCount",
+                    EXISTS(SELECT 1 FROM status_likes WHERE status_id = ps.id AND user_id = $1) as "isLikedByMe",
+                    COALESCE((SELECT COUNT(*) FROM event_attendees WHERE status_id = ps.id), 0)::INTEGER as "attendeeCount",
+                    EXISTS(SELECT 1 FROM event_attendees WHERE status_id = ps.id AND user_id = $1) as "isAttendingByMe"
                 FROM player_statuses ps
                 LEFT JOIN users u ON ps.user_id::TEXT = u.id::TEXT
                 LEFT JOIN courts c ON ps.court_id::TEXT = c.id::TEXT
@@ -279,7 +278,7 @@ export class StatusesService {
                 LIMIT $4
             `;
 
-            console.log('getUnifiedFeed: executing simplified query for user:', userId);
+            console.log('getUnifiedFeed: executing full query for user:', userId);
             const results = await this.dataSource.query(query, [userId, userId, userId, limit]);
             console.log('getUnifiedFeed: got', results.length, 'results');
             return results;
@@ -288,6 +287,7 @@ export class StatusesService {
             return [];
         }
     }
+
 
     // Debug method to check player_statuses table contents
     async debugPlayerStatuses(): Promise<any> {
