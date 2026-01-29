@@ -19,9 +19,9 @@ export class UsersService {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
-      // Check if user exists by auth_token
+      // Check if user exists by id (which is the Firebase UID)
       const existing = await this.dataSource.query(
-        `SELECT * FROM users WHERE auth_token = $1 LIMIT 1`,
+        `SELECT * FROM users WHERE id = $1 LIMIT 1`,
         [authToken]
       );
 
@@ -29,12 +29,14 @@ export class UsersService {
         return existing[0];
       }
 
-      // Create new user
+      // Create new user with correct production column names
+      // Production table has: id, email, display_name, avatar_url, rating, created_at, updated_at, fcm_token
+      console.log('findOrCreate: creating new user with id=', authToken);
       const result = await this.dataSource.query(`
-        INSERT INTO users (id, email, auth_token, name, hoop_rank, reputation, loc_enabled, created_at, updated_at)
-        VALUES ($1, $2, $3, 'New Player', 3.0, 5.0, false, NOW(), NOW())
+        INSERT INTO users (id, email, display_name, rating, created_at, updated_at)
+        VALUES ($1, $2, 'New Player', 3.0, NOW(), NOW())
         RETURNING *
-      `, [authToken, email, authToken]);
+      `, [authToken, email]);
 
       return result[0];
     }
@@ -86,16 +88,18 @@ export class UsersService {
       let paramIndex = 1;
 
       // Map camelCase to snake_case for production columns
+      // Production table has: id, email, display_name, avatar_url, rating, created_at, updated_at, fcm_token
       const columnMap: Record<string, string> = {
-        name: 'name',
+        name: 'display_name',       // app sends 'name', production uses 'display_name'
+        displayName: 'display_name',
         email: 'email',
         avatarUrl: 'avatar_url',
-        hoopRank: 'hoop_rank',
+        hoopRank: 'rating',         // app sends 'hoopRank', production uses 'rating'
+        rating: 'rating',
         position: 'position',
         height: 'height',
         weight: 'weight',
         city: 'city',
-        gamesPlayed: 'games_played',
         fcmToken: 'fcm_token',
       };
 
