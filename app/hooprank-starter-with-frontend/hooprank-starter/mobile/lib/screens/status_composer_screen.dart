@@ -341,25 +341,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Quick prompts (shown when text is empty)
-                  if (_textController.text.isEmpty) ...[
-                    const Text(
-                      'Quick ideas:',
-                      style: TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _quickPrompts.map((p) => ActionChip(
-                        label: Text(p, style: const TextStyle(fontSize: 12)),
-                        backgroundColor: Colors.white.withOpacity(0.08),
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        onPressed: () => _usePrompt(p),
-                      )).toList(),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+
                   
                   // Followed Courts - quick select
                   Builder(
@@ -537,7 +519,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                     minLines: 3,
                     style: const TextStyle(color: Colors.white, fontSize: 18),
                     decoration: const InputDecoration(
-                      hintText: 'What\'s happening on the court?\n\nType @ to tag a court...',
+                      hintText: 'What\'s on your mind, hooper?\n\nType @ to tag a court...',
                       hintStyle: TextStyle(color: Colors.white30, fontSize: 16),
                       border: InputBorder.none,
                     ),
