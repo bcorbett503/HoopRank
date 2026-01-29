@@ -37,7 +37,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
             type: 'postgres',
             url: databaseUrl,
             entities: [User, Court, Match, Message, Team, TeamMember, TeamMessage, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
-            synchronize: false, // Disabled for production - use migrations instead
+            synchronize: true, // TEMPORARILY enabled to add video columns - revert after deployment
             ssl: false, // Railway internal connection doesn't need SSL
             namingStrategy: new SnakeNamingStrategy(),
           };
