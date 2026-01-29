@@ -353,6 +353,7 @@ class ApiService {
 
   /// Register FCM token for push notifications
   static Future<void> registerFcmToken(String userId, String token) async {
+    debugPrint('FCM: Registering token for user $userId');
     final response = await http.post(
       Uri.parse('$baseUrl/users/me/fcm-token'),
       headers: {
@@ -363,8 +364,9 @@ class ApiService {
       body: jsonEncode({'token': token}),
     );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to register FCM token');
+    debugPrint('FCM: Response status=${response.statusCode}, body=${response.body}');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to register FCM token: ${response.statusCode}');
     }
   }
 

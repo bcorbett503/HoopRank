@@ -1043,36 +1043,71 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       try {
         scheduledDate = DateTime.parse(scheduledAt.toString());
         final now = DateTime.now();
-        final isToday = scheduledDate!.year == now.year && scheduledDate!.month == now.month && scheduledDate!.day == now.day;
-        final isTomorrow = scheduledDate!.year == now.year && scheduledDate!.month == now.month && scheduledDate!.day == now.day + 1;
-        final hour = scheduledDate!.hour > 12 ? scheduledDate!.hour - 12 : scheduledDate!.hour;
-        final amPm = scheduledDate!.hour >= 12 ? 'pm' : 'am';
+        final todayStart = DateTime(now.year, now.month, now.day);
+        final tomorrowStart = todayStart.add(const Duration(days: 1));
+        final dayAfterTomorrow = todayStart.add(const Duration(days: 2));
+        
+        final isToday = scheduledDate!.isAfter(todayStart) && scheduledDate!.isBefore(tomorrowStart);
+        final isTomorrow = scheduledDate!.isAfter(tomorrowStart.subtract(const Duration(seconds: 1))) && scheduledDate!.isBefore(dayAfterTomorrow);
+        
+        // Time of day descriptor
+        final hour = scheduledDate!.hour;
+        String timeOfDay;
+        if (hour < 12) {
+          timeOfDay = 'morning';
+        } else if (hour < 17) {
+          timeOfDay = 'afternoon';
+        } else {
+          timeOfDay = 'evening';
+        }
+        
+        // Day of week names
+        const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        final dayOfWeek = weekdays[scheduledDate!.weekday - 1];
+        
+        // Format hour for display
+        final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+        final amPm = hour >= 12 ? 'pm' : 'am';
         
         if (isToday) {
-          scheduledDayStr = 'Today';
+          scheduledDayStr = 'This $timeOfDay';
         } else if (isTomorrow) {
-          scheduledDayStr = 'Tomorrow';
+          scheduledDayStr = 'Tomorrow $timeOfDay';
         } else {
-          scheduledDayStr = '${scheduledDate!.month}/${scheduledDate!.day}';
+          // Show day of week + date (e.g., "Friday 1/31")
+          scheduledDayStr = '$dayOfWeek ${scheduledDate!.month}/${scheduledDate!.day}';
         }
         
         if (scheduledDate!.minute == 0) {
-            scheduledTimeStr = '$hour$amPm';
+          scheduledTimeStr = '$displayHour$amPm';
         } else {
-            scheduledTimeStr = '$hour:${scheduledDate!.minute.toString().padLeft(2, '0')}$amPm';
+          scheduledTimeStr = '$displayHour:${scheduledDate!.minute.toString().padLeft(2, '0')}$amPm';
         }
       } catch (_) {}
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8), // Compact margin
+      margin: const EdgeInsets.only(bottom: 12), // Slightly more spacing
       decoration: isScheduledEvent 
           ? BoxDecoration(
+              // Distinct modern look for Scheduled Runs
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF25282B), // Slightly lighter/cooler dark grey
+                  const Color(0xFF1A1D21),
+                ],
+              ),
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFF00C853).withOpacity(0.3), // Subtle green border
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.4),
-                  blurRadius: 10,
+                  color: const Color(0xFF00C853).withOpacity(0.05), // Very faint green glow
+                  blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
@@ -1091,35 +1126,27 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: CustomPaint(
-          painter: isScheduledEvent ? BasketballCourtPainter() : null,
-          child: Stack(
+        child: Stack(
         children: [
-          // Pin icon in upper left corner for scheduled runs
+          // Background accent graphic for scheduled runs (Abstract/Modern)
           if (isScheduledEvent)
             Positioned(
-              top: 0,
-              left: 0,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade700.withOpacity(0.6),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(8),
-                  ),
-                ),
-                child: Icon(Icons.push_pin, size: 12, color: Colors.white.withOpacity(0.7)),
+              right: -20,
+              top: -20,
+              child: Opacity(
+                opacity: 0.05,
+                child: Icon(Icons.sports_basketball, size: 150, color: const Color(0xFF00C853)),
               ),
             ),
+
           Padding(
-            padding: const EdgeInsets.all(10), // More compact padding
+            padding: const EdgeInsets.all(16), // More breathing room
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header with avatar and name
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.all(1.5), // Thinner border
@@ -1127,14 +1154,14 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
                       colors: isScheduledEvent 
-                          ? [Colors.white, Colors.white.withOpacity(0.7)] // White border
+                          ? [const Color(0xFF00C853), const Color(0xFF00C853).withOpacity(0.5)] // Green border for scheduled
                           : [Colors.deepOrange, Colors.deepOrange.withOpacity(0.5)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                   ),
                   child: CircleAvatar(
-                    radius: 18, // Slightly smaller avatar
+                    radius: 20, 
                     backgroundColor: Colors.grey[900],
                     backgroundImage: userPhotoUrl != null 
                       ? (userPhotoUrl.startsWith('data:') 
@@ -1147,7 +1174,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         : null,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1157,47 +1184,41 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           Flexible(
                             child: Text(
                               userName, 
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold, 
-                                fontSize: 14, 
+                                fontSize: 15, 
                                 color: Colors.white,
-                                shadows: isScheduledEvent ? [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 3, offset: const Offset(0, 1))] : null,
                               ), 
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isScheduledEvent) ...[
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2), 
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.black, width: 1.0), // Black border
+                                color: const Color(0xFF00C853).withOpacity(0.15), 
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF00C853).withOpacity(0.3)),
                               ),
                               child: const Text(
                                 'SCHEDULED RUN', 
                                 style: TextStyle(
-                                  fontSize: 8, 
-                                  fontWeight: FontWeight.bold, 
-                                  color: Colors.black, // Black text
+                                  fontSize: 9, 
+                                  fontWeight: FontWeight.w700, 
+                                  color: Color(0xFF00C853), // Green text
+                                  letterSpacing: 0.5,
                                 )
                               ),
                             ),
                           ],
                         ],
                       ),
-                      const SizedBox(height: 2), // Tighter spacing
-                      if (!isScheduledEvent)
-                        Text(
-                          timeAgo, 
-                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
-                        )
-                      else
-                        Text(
-                          timeAgo, 
-                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
-                        ),
+                      const SizedBox(height: 2),
+                      Text(
+                        timeAgo, 
+                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
@@ -1206,27 +1227,27 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   GestureDetector(
                     onTap: () => _toggleAttending(statusId, isAttending, attendeeCount),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isAttending ? Colors.white : const Color(0xFF00C853), // Green fill for JOIN, White for IN
+                        color: isAttending ? const Color(0xFF00C853).withOpacity(0.15) : const Color(0xFF00C853), 
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))],
+                        border: isAttending ? Border.all(color: const Color(0xFF00C853)) : null,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             isAttending ? Icons.check : Icons.add_rounded, 
-                            color: isAttending ? Colors.black : Colors.white, // Black check, White +
-                            size: isAttending ? 14 : 16, 
+                            color: isAttending ? const Color(0xFF00C853) : Colors.black, 
+                            size: 16, 
                           ),
                           const SizedBox(width: 4),
                           Text(
                             isAttending ? "IN ($attendeeCount)" : "JOIN ($attendeeCount)",
                             style: TextStyle(
-                              color: isAttending ? Colors.black : Colors.white, // White text on Green button
+                              color: isAttending ? const Color(0xFF00C853) : Colors.black, 
                               fontWeight: FontWeight.bold,
-                              fontSize: 10,
+                              fontSize: 11,
                             ),
                           ),
                         ],
@@ -1234,50 +1255,81 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     ),
                   )
                 else
-                  Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.2), size: 18),
+                  Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.2), size: 20),
               ],
             ),
             
-            // Scheduled Run Details - Centered with larger font
+            // Scheduled Run Details - Modern Card
             if (isScheduledEvent)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(top: 4, bottom: 0),
-                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                margin: const EdgeInsets.only(top: 16, bottom: 4),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.25), 
-                  borderRadius: BorderRadius.circular(8), // Boxy
-                  border: Border.all(color: Colors.white.withOpacity(0.8), width: 2), // Interior court lines
+                  color: Colors.black.withOpacity(0.3), 
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
                 ),
-                child: Text(
-                  courtName != null 
-                    ? '$scheduledDayStr, $scheduledTimeStr @$courtName'
-                    : '$scheduledDayStr, $scheduledTimeStr',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15, // Slightly larger base for readability
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
+                child: Column(
+                  children: [
+                    // Time Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                         Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white.withOpacity(0.7)),
+                         const SizedBox(width: 8),
+                         Text(
+                          '$scheduledDayStr @ $scheduledTimeStr',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (courtName != null) ...[
+                      const SizedBox(height: 8),
+                      Container(height: 1, width: 40, color: Colors.white.withOpacity(0.1)),
+                      const SizedBox(height: 8),
+                      // Location Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                           Icon(Icons.location_on_rounded, size: 16, color: const Color(0xFF00C853)),
+                           const SizedBox(width: 4),
+                           Flexible(
+                             child: Text(
+                              courtName,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF00C853), // Green for location
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                           ),
+                        ],
+                      ),
+                    ]
+                  ],
                 ),
               ),
             
             // Regular Content (for non-scheduled events)
             if (content.isNotEmpty && !isScheduledEvent)
               Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 4), // Tighter padding
+                padding: const EdgeInsets.only(top: 12, bottom: 4), 
                 child: Text(
                   content, 
-                  style: TextStyle(fontSize: 14, height: 1.3, color: Colors.white.withOpacity(0.9)), // Slightly smaller font
+                  style: TextStyle(fontSize: 15, height: 1.4, color: Colors.white.withOpacity(0.9)), 
                 ),
               ),
               
-            // Image if present
-            // Video display (if present)
+            // Video / Image Logic Same As Before
             if (post['videoUrl'] != null && post['videoUrl'].toString().isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 12),
                 child: FeedVideoPlayer(
                   videoUrl: post['videoUrl'].toString(),
                   thumbnailUrl: post['videoThumbnailUrl']?.toString(),
@@ -1288,10 +1340,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   startMuted: true,
                 ),
               )
-            // Image display (if no video)
             else if (imageUrl != null && imageUrl.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 12),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: imageUrl.startsWith('data:')
@@ -1299,23 +1350,23 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         Uri.parse(imageUrl).data!.contentAsBytes(),
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        height: 180,
+                        height: 200, // Slightly taller
                         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       )
                     : Image.network(
                         imageUrl,
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        height: 180,
+                        height: 200,
                         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
                 ),
               ),
             
-            // Interaction Bar (Like, Comment)
-            const SizedBox(height: 10), // Reduced spacing
+            // Interaction Bar
+            const SizedBox(height: 14), 
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Row(
                 children: [
                   // Like Button
@@ -1325,12 +1376,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       borderRadius: BorderRadius.circular(20),
                       onTap: () => _toggleLike(statusId, isLiked, likeCount),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         child: Row(
                           children: [
                             Icon(
                               isLiked ? Icons.favorite : Icons.favorite_border_rounded,
-                              size: 18, // Smaller icon
+                              size: 20, 
                               color: isLiked ? Colors.redAccent : Colors.grey[500],
                             ),
                             const SizedBox(width: 6),
@@ -1338,7 +1389,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               '$likeCount',
                               style: TextStyle(
                                 color: isLiked ? Colors.redAccent : Colors.grey[500],
-                                fontSize: 12, // Smaller font
+                                fontSize: 13, 
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1347,7 +1398,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   
                   // Comment Button
                   Material(
@@ -1356,12 +1407,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       borderRadius: BorderRadius.circular(20),
                       onTap: () => _toggleComments(statusId),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         child: Row(
                           children: [
                             Icon(
                               Icons.chat_bubble_outline_rounded,
-                              size: 18,
+                              size: 20,
                               color: isExpanded ? Colors.blue : Colors.grey[500],
                             ),
                             const SizedBox(width: 6),
@@ -1369,7 +1420,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               '$commentCount',
                               style: TextStyle(
                                 color: isExpanded ? Colors.blue : Colors.grey[500],
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1379,33 +1430,19 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     ),
                   ),
                   
-                  // Timestamp for scheduled events (since it was replaced in header)
-                  if (isScheduledEvent) ...[
-                    const Spacer(),
-                    Text(
-                      'Posted $timeAgo', 
-                      style: TextStyle(
-                        color: Colors.white, 
-                        fontSize: 10,
-                        shadows: [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 2, offset: const Offset(0, 1))],
-                      ),
-                    ),
-                  ] else ...[
-                     const Spacer(),
-                     // Share Button (Visual only)
-                     Icon(Icons.share_outlined, color: Colors.grey[600], size: 18),
-                  ],
+                  const Spacer(),
+                  // Share Button
+                  Icon(Icons.share_outlined, color: Colors.grey[600], size: 20),
                   
-                  // Delete Button (only for own posts)
+                  // Delete Button
                   if (isOwnPost) ...[
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     GestureDetector(
                       onTap: () => _confirmDeletePost(statusId),
                       child: Icon(
                         Icons.delete_outline, 
-                        color: isScheduledEvent ? Colors.white : Colors.grey[600], 
-                        size: 18,
-                        shadows: isScheduledEvent ? [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 2)] : null,
+                        color: Colors.grey[600], 
+                        size: 20,
                       ),
                     ),
                   ],
@@ -1494,7 +1531,6 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         ),
         ),
         ],
-      ),
       ),
       ),
     );

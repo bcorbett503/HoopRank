@@ -189,6 +189,8 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
       if (time != null && mounted) {
         setState(() {
           _scheduledTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+          // Clear media when scheduling - scheduled runs don't allow media
+          _selectedImage = null;
         });
       }
     }
@@ -619,19 +621,22 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
               top: false,
               child: Row(
                 children: [
-                  // Photo from camera
-                  IconButton(
-                    icon: const Icon(Icons.camera_alt, color: Colors.white70),
-                    onPressed: _takePhoto,
-                    tooltip: 'Take photo',
-                  ),
-                  // Photo from gallery
-                  IconButton(
-                    icon: const Icon(Icons.photo_library, color: Colors.white70),
-                    onPressed: _pickImage,
-                    tooltip: 'Add photo',
-                  ),
-                  // Tag court
+                  // Media buttons only shown for regular posts (not scheduled runs)
+                  if (_scheduledTime == null) ...[
+                    // Photo from camera
+                    IconButton(
+                      icon: const Icon(Icons.camera_alt, color: Colors.white70),
+                      onPressed: _takePhoto,
+                      tooltip: 'Take photo',
+                    ),
+                    // Photo from gallery
+                    IconButton(
+                      icon: const Icon(Icons.photo_library, color: Colors.white70),
+                      onPressed: _pickImage,
+                      tooltip: 'Add photo',
+                    ),
+                  ],
+                  // Tag court - always available
                   IconButton(
                     icon: const Icon(Icons.location_on, color: Colors.white70),
                     onPressed: () {
@@ -641,17 +646,18 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                     },
                     tooltip: 'Tag court',
                   ),
-                  // Tag friend
-                  IconButton(
-                    icon: const Icon(Icons.person_add, color: Colors.white70),
-                    onPressed: () {
-                      // TODO: Implement friend tagging
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Friend tagging coming soon!')),
-                      );
-                    },
-                    tooltip: 'Tag friends',
-                  ),
+                  // Tag friend - only for regular posts
+                  if (_scheduledTime == null)
+                    IconButton(
+                      icon: const Icon(Icons.person_add, color: Colors.white70),
+                      onPressed: () {
+                        // TODO: Implement friend tagging
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Friend tagging coming soon!')),
+                        );
+                      },
+                      tooltip: 'Tag friends',
+                    ),
                   const Spacer(),
                   // Schedule Run button with text
                   GestureDetector(

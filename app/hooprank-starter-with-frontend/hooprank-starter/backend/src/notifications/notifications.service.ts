@@ -108,7 +108,25 @@ export class NotificationsService {
      * Save FCM token for a user
      */
     async saveFcmToken(userId: string, token: string): Promise<void> {
-        await this.usersRepository.update(userId, { fcmToken: token });
+        console.log('saveFcmToken: userId=', userId, 'token=', token.substring(0, 20) + '...');
+        try {
+            // Use raw SQL for more reliable update
+            if (this.isPostgres) {
+                const result = await this.dataSource.query(`
+                    UPDATE users SET fcm_token = $1, updated_at = NOW()
+                    WHERE id = $2
+                `, [token, userId]);
+                console.log('saveFcmToken: update result=', result);
+            } else {
+                await this.dataSource.query(`
+                    UPDATE users SET fcm_token = ?, updated_at = datetime('now')
+                    WHERE id = ?
+                `, [token, userId]);
+            }
+        } catch (error) {
+            console.error('saveFcmToken error:', error.message);
+            throw error;
+        }
     }
 
     /**
