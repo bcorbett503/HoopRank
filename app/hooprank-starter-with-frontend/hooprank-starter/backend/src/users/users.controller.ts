@@ -41,6 +41,36 @@ export class UsersController {
     return this.usersService.findOne(userId);
   }
 
+  @Put('me')
+  async updateMe(
+    @Headers('x-user-id') userId: string,
+    @Body() data: Partial<User>,
+  ) {
+    if (!userId) {
+      return { success: false, error: 'User ID required' };
+    }
+    try {
+      console.log('updateMe: userId=', userId, 'data=', data);
+      const user = await this.usersService.updateProfile(userId, data);
+      return user;
+    } catch (error) {
+      console.error('updateMe error:', error.message);
+      // If user doesn't exist, try to create them first
+      if (error.message === 'User not found') {
+        console.log('updateMe: user not found, creating...');
+        try {
+          await this.usersService.findOrCreate(userId, data.email || '');
+          const user = await this.usersService.updateProfile(userId, data);
+          return user;
+        } catch (createError) {
+          console.error('updateMe: failed to create user:', createError.message);
+          return { success: false, error: 'Failed to create user profile' };
+        }
+      }
+      return { success: false, error: 'Failed to update profile' };
+    }
+  }
+
   @Get('me/follows')
   async getFollows(@Headers('x-user-id') userId: string) {
     console.log('getFollows controller: userId received:', userId);
