@@ -1014,7 +1014,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             : null,
         borderRadius: BorderRadius.circular(16),
         border: isScheduledEvent 
-            ? Border.all(color: Colors.white.withOpacity(0.6), width: 2) // Bolded border
+            ? Border.all(color: Colors.green.withOpacity(0.8), width: 2) // HoopRank green border
             : Border.all(color: Colors.white.withOpacity(0.05)),
         boxShadow: [
           BoxShadow(
