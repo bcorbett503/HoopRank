@@ -160,108 +160,143 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     }
   }
 
-  void _showScheduleSheet() {
-    showModalBottomSheet(
+  void _showScheduleSheet() async {
+    // Go directly to date picker
+    final date = await showDatePicker(
       context: context,
-      backgroundColor: Colors.grey[900],
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.deepOrange,
+              onPrimary: Colors.white,
+              surface: Color(0xFF1E2128),
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    
+    if (date != null && mounted) {
+      // Show custom time picker with half-hour slots
+      final time = await _showDigitalTimePicker(date);
+      if (time != null && mounted) {
+        setState(() {
+          _scheduledTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+        });
+      }
+    }
+  }
+  
+  /// Custom digital time picker with only hour and half-hour options
+  Future<TimeOfDay?> _showDigitalTimePicker(DateTime selectedDate) async {
+    final now = DateTime.now();
+    final isToday = selectedDate.year == now.year && 
+                    selectedDate.month == now.month && 
+                    selectedDate.day == now.day;
+    
+    // Generate time slots from 6am to 11pm, every 30 minutes
+    final List<TimeOfDay> timeSlots = [];
+    for (int hour = 6; hour <= 23; hour++) {
+      for (int minute = 0; minute <= 30; minute += 30) {
+        final slot = TimeOfDay(hour: hour, minute: minute);
+        // If today, only show future times
+        if (isToday) {
+          final slotDateTime = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, hour, minute);
+          if (slotDateTime.isAfter(now)) {
+            timeSlots.add(slot);
+          }
+        } else {
+          timeSlots.add(slot);
+        }
+      }
+    }
+    
+    return showModalBottomSheet<TimeOfDay>(
+      context: context,
+      backgroundColor: const Color(0xFF1E2128),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => _buildScheduleSheet(ctx),
-    );
-  }
-
-  Widget _buildScheduleSheet(BuildContext ctx) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '📅 Schedule Your Game',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-          const SizedBox(height: 16),
-          // Quick time options
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTimeChip('In 1 hour', Duration(hours: 1)),
-              _buildTimeChip('In 2 hours', Duration(hours: 2)),
-              _buildTimeChip('This evening', null, evening: true),
-              _buildTimeChip('Tomorrow', Duration(days: 1)),
+              Row(
+                children: [
+                  const Icon(Icons.access_time, color: Colors.deepOrange),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Pick a time for ${_formatDateOnly(selectedDate)}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 200,
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 2.0,
+                  ),
+                  itemCount: timeSlots.length,
+                  itemBuilder: (context, index) {
+                    final slot = timeSlots[index];
+                    final label = _formatTimeOfDay(slot);
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.pop(ctx, slot),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.deepOrange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            label,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Custom time picker
-          ListTile(
-            leading: const Icon(Icons.access_time, color: Colors.deepOrange),
-            title: const Text('Pick custom time', style: TextStyle(color: Colors.white)),
-            onTap: () async {
-              Navigator.pop(ctx);
-              final date = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now(),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 30)),
-              );
-              if (date != null) {
-                final time = await showTimePicker(
-                  context: context,
-                  initialTime: TimeOfDay.now(),
-                );
-                if (time != null) {
-                  setState(() {
-                    _scheduledTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-                  });
-                }
-              }
-            },
-          ),
-          // Recurring option
-          SwitchListTile(
-            value: _isRecurring,
-            onChanged: (v) => setState(() => _isRecurring = v),
-            title: const Text('Repeat weekly', style: TextStyle(color: Colors.white)),
-            secondary: const Icon(Icons.repeat, color: Colors.white54),
-            activeColor: Colors.deepOrange,
-          ),
-          if (_scheduledTime != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepOrange,
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-                child: Text('Schedule for ${_formatTime(_scheduledTime!)}'),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimeChip(String label, Duration? duration, {bool evening = false}) {
-    return ActionChip(
-      label: Text(label),
-      backgroundColor: Colors.white.withOpacity(0.1),
-      labelStyle: const TextStyle(color: Colors.white),
-      onPressed: () {
-        setState(() {
-          if (evening) {
-            final now = DateTime.now();
-            _scheduledTime = DateTime(now.year, now.month, now.day, 18, 0);
-          } else if (duration != null) {
-            _scheduledTime = DateTime.now().add(duration);
-          }
-        });
-        Navigator.pop(context);
+        );
       },
     );
+  }
+  
+  String _formatDateOnly(DateTime date) {
+    final now = DateTime.now();
+    final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+    final isTomorrow = date.difference(DateTime(now.year, now.month, now.day)).inDays == 1;
+    if (isToday) return 'Today';
+    if (isTomorrow) return 'Tomorrow';
+    return '${date.month}/${date.day}';
+  }
+  
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final period = time.hour >= 12 ? 'PM' : 'AM';
+    if (time.minute == 0) return '$hour $period';
+    return '$hour:${time.minute.toString().padLeft(2, '0')} $period';
   }
 
   String _formatTime(DateTime time) {
@@ -608,19 +643,41 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                     tooltip: 'Tag friends',
                   ),
                   const Spacer(),
-                  // Schedule button
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _scheduledTime != null ? Colors.deepOrange.withOpacity(0.2) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.schedule,
-                        color: _scheduledTime != null ? Colors.deepOrange : Colors.white70,
+                  // Schedule Run button with text
+                  GestureDetector(
+                    onTap: _showScheduleSheet,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _scheduledTime != null 
+                            ? Colors.deepOrange.withOpacity(0.2) 
+                            : Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _scheduledTime != null 
+                              ? Colors.deepOrange.withOpacity(0.5) 
+                              : Colors.white.withOpacity(0.15),
+                        ),
                       ),
-                      onPressed: _showScheduleSheet,
-                      tooltip: 'Schedule',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_month,
+                            size: 18,
+                            color: _scheduledTime != null ? Colors.deepOrange : Colors.white70,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _scheduledTime != null ? 'Scheduled ✓' : 'Schedule Run',
+                            style: TextStyle(
+                              color: _scheduledTime != null ? Colors.deepOrange : Colors.white70,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
