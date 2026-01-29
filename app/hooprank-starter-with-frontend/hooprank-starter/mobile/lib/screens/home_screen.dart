@@ -133,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       source: ImageSource.gallery,
       maxWidth: 1024,
       maxHeight: 1024,
-      imageQuality: 85,
+      imageQuality: 60,
     );
     if (image != null) {
       setState(() => _selectedImage = image);
