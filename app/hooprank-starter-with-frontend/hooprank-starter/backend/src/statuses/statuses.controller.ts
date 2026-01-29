@@ -33,6 +33,12 @@ export class StatusesController {
         return this.statusesService.debugPlayerStatuses();
     }
 
+    // Test endpoint to debug feed query in isolation
+    @Get('test-feed')
+    async testFeed(@Headers('x-user-id') userId: string) {
+        return this.statusesService.testFeedQuery(userId);
+    }
+
     // Get unified feed (statuses + check-ins + matches)
     @Get('unified-feed')
     async getUnifiedFeed(
