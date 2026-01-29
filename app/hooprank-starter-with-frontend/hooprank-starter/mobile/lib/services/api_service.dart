@@ -970,14 +970,25 @@ class ApiService {
   // Status API (Likes & Comments)
   // ===================
 
-  /// Create a new status with optional image, scheduled time, and court tag
-  static Future<Map<String, dynamic>?> createStatus(String content, {String? imageUrl, DateTime? scheduledAt, String? courtId}) async {
-    debugPrint('API createStatus: content length=${content.length}, imageUrl=${imageUrl != null ? "${imageUrl.length} chars" : "null"}, scheduledAt=$scheduledAt, courtId=$courtId');
+  /// Create a new status with optional image, video, scheduled time, and court tag
+  static Future<Map<String, dynamic>?> createStatus(
+    String content, {
+    String? imageUrl, 
+    DateTime? scheduledAt, 
+    String? courtId,
+    String? videoUrl,
+    String? videoThumbnailUrl,
+    int? videoDurationMs,
+  }) async {
+    debugPrint('API createStatus: content length=${content.length}, imageUrl=${imageUrl != null ? "${imageUrl.length} chars" : "null"}, videoUrl=${videoUrl != null ? "present" : "null"}, scheduledAt=$scheduledAt, courtId=$courtId');
     final body = {
       'content': content,
       if (imageUrl != null) 'imageUrl': imageUrl,
       if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
       if (courtId != null) 'courtId': courtId,
+      if (videoUrl != null) 'videoUrl': videoUrl,
+      if (videoThumbnailUrl != null) 'videoThumbnailUrl': videoThumbnailUrl,
+      if (videoDurationMs != null) 'videoDurationMs': videoDurationMs,
     };
     debugPrint('API createStatus: body keys=${body.keys.toList()}');
     final response = await http.post(
@@ -991,7 +1002,7 @@ class ApiService {
     debugPrint('API createStatus: response status=${response.statusCode}');
     if (response.statusCode == 200 || response.statusCode == 201) {
       final result = jsonDecode(response.body);
-      debugPrint('API createStatus: success, result imageUrl=${result['status']?['image_url']}');
+      debugPrint('API createStatus: success');
       return result;
     }
     debugPrint('API createStatus: failed, body=${response.body}');

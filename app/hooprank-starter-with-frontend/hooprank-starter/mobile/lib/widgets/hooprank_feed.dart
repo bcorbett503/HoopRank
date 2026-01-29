@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../state/check_in_state.dart';
 import '../services/api_service.dart';
+import 'feed_video_player.dart';
 
 /// Unified HoopRank Feed with All/Courts tabs
 class HoopRankFeed extends StatefulWidget {
@@ -1254,7 +1255,22 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               ),
               
             // Image if present
-            if (imageUrl != null && imageUrl.isNotEmpty)
+            // Video display (if present)
+            if (item['videoUrl'] != null && item['videoUrl'].toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: FeedVideoPlayer(
+                  videoUrl: item['videoUrl'].toString(),
+                  thumbnailUrl: item['videoThumbnailUrl']?.toString(),
+                  durationMs: item['videoDurationMs'] is int 
+                    ? item['videoDurationMs'] 
+                    : int.tryParse(item['videoDurationMs']?.toString() ?? ''),
+                  autoPlay: true,
+                  startMuted: true,
+                ),
+              )
+            // Image display (if no video)
+            else if (imageUrl != null && imageUrl.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: ClipRRect(

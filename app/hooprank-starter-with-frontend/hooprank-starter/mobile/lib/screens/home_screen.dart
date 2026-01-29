@@ -15,9 +15,11 @@ import '../state/app_state.dart';
 import '../state/check_in_state.dart';
 import '../models.dart';
 import '../services/court_service.dart';
+import '../services/video_upload_service.dart';
 import '../widgets/hooprank_feed.dart';
 import 'map_screen.dart';
 import 'status_composer_screen.dart';
+import 'package:video_player/video_player.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +42,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _teamChallenges = []; // Pending team challenges (3v3/5v5)
   final TextEditingController _statusController = TextEditingController();
   XFile? _selectedImage; // Selected image for post
+  XFile? _selectedVideo; // Selected video for post
+  int? _videoDurationMs; // Video duration in milliseconds
+  bool _isUploadingVideo = false; // Video upload in progress
   final ImagePicker _imagePicker = ImagePicker();
   
   // Court tagging autocomplete state
@@ -80,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _submitStatus(String status) async {
-    if (status.isEmpty && _selectedImage == null) return;
+    if (status.isEmpty && _selectedImage == null && _selectedVideo == null) return;
     
     final authState = Provider.of<AuthState>(context, listen: false);
     final user = authState.currentUser;
@@ -89,11 +94,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (user != null) {
       // Encode image as base64 data URL
       String? imageUrl;
+      String? videoUrl;
+      String? videoThumbnailUrl;
+      int? videoDurationMs;
+      
       if (_selectedImage != null) {
         final bytes = await File(_selectedImage!.path).readAsBytes();
         final mimeType = _selectedImage!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
         imageUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
         debugPrint('HOME_STATUS: Encoded image to ${imageUrl.length} chars');
+      }
+      
+      // Upload video to Firebase Storage
+      if (_selectedVideo != null) {
+        setState(() => _isUploadingVideo = true);
+        try {
+          debugPrint('HOME_STATUS: Uploading video...');
+          videoUrl = await VideoUploadService.uploadVideo(
+            File(_selectedVideo!.path), 
+            user.id,
+          );
+          
+          // Generate and upload thumbnail
+          videoThumbnailUrl = await VideoUploadService.generateAndUploadThumbnail(
+            _selectedVideo!.path, 
+            user.id,
+          );
+          
+          videoDurationMs = _videoDurationMs;
+          debugPrint('HOME_STATUS: Video uploaded: $videoUrl');
+        } catch (e) {
+          debugPrint('HOME_STATUS: Video upload failed: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Video upload failed: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          setState(() => _isUploadingVideo = false);
+          return;
+        }
+        setState(() => _isUploadingVideo = false);
       }
       
       // Update local status display
@@ -108,17 +151,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         status, 
         imageUrl: imageUrl,
         scheduledAt: _scheduledTime,
+        videoUrl: videoUrl,
+        videoThumbnailUrl: videoThumbnailUrl,
+        videoDurationMs: videoDurationMs,
       );
       
       if (mounted) {
+        String message = 'Status updated!';
+        if (_scheduledTime != null) {
+          message = 'Game scheduled!';
+        } else if (_selectedVideo != null) {
+          message = 'Video posted!';
+        } else if (_selectedImage != null) {
+          message = 'Post with photo shared!';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_scheduledTime != null 
-            ? 'Game scheduled!' 
-            : (_selectedImage != null ? 'Post with photo shared!' : 'Status updated!'))),
+          SnackBar(content: Text(message)),
         );
         _statusController.clear();
         setState(() {
           _selectedImage = null;
+          _selectedVideo = null;
+          _videoDurationMs = null;
           _scheduledTime = null;  // Clear scheduled time after posting
           _isRecurring = false;
         });
@@ -149,6 +204,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     if (photo != null) {
       setState(() => _selectedImage = photo);
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    final XFile? video = await _imagePicker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(seconds: 15),
+    );
+    
+    if (video != null) {
+      // Validate duration
+      final controller = VideoPlayerController.file(File(video.path));
+      try {
+        await controller.initialize();
+        final duration = controller.value.duration;
+        final durationMs = duration.inMilliseconds;
+        
+        if (!VideoUploadService.isValidDuration(durationMs)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Video must be 15 seconds or less. Please trim it first.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+        
+        setState(() {
+          _selectedVideo = video;
+          _videoDurationMs = durationMs;
+          _selectedImage = null; // Clear image if selecting video
+        });
+      } finally {
+        controller.dispose();
+      }
     }
   }
 
