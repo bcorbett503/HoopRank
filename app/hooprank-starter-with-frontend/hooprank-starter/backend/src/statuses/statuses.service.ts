@@ -237,114 +237,42 @@ export class StatusesService {
 
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50): Promise<any[]> {
         try {
-            const d = this.dialect.reset();
-
-            // Build the query with dialect-aware SQL and production column names
+            // Simplified query - status posts only for now
+            // Use LEFT JOINs and avoid subqueries to tables that may not exist
             const query = `
-            WITH followed_players AS (
-                SELECT followed_id FROM user_followed_players WHERE ${d.cast('follower_id', 'TEXT')} = ${d.param()}
-            ),
-            followed_courts AS (
-                SELECT court_id FROM user_followed_courts WHERE ${d.cast('user_id', 'TEXT')} = ${d.param()}
-            )
-            SELECT * FROM (
-                -- Status posts from followed players + own posts + posts at followed courts
                 SELECT 
                     'status' as type,
-                    ${d.cast('ps.id', 'TEXT')} as id,
+                    ps.id::TEXT as id,
                     ps.created_at as "createdAt",
                     ps.user_id as "userId",
-                    u.display_name as "userName",
+                    COALESCE(u.display_name, 'Unknown') as "userName",
                     u.avatar_url as "userPhotoUrl",
                     ps.content,
                     ps.image_url as "imageUrl",
                     ps.scheduled_at as "scheduledAt",
                     ps.court_id as "courtId",
                     c.name as "courtName",
-                    NULL as "matchScore",
-                    NULL as "matchStatus",
-                    (SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id) as "likeCount",
-                    (SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id) as "commentCount",
-                    EXISTS(SELECT 1 FROM status_likes WHERE status_id = ps.id AND ${d.cast('user_id', 'TEXT')} = ${d.param()}) as "isLikedByMe",
-                    (SELECT COUNT(*) FROM event_attendees WHERE status_id = ps.id) as "attendeeCount",
-                    EXISTS(SELECT 1 FROM event_attendees WHERE status_id = ps.id AND ${d.cast('user_id', 'TEXT')} = ${d.param()}) as "isAttendingByMe"
+                    0 as "likeCount",
+                    0 as "commentCount",
+                    false as "isLikedByMe",
+                    0 as "attendeeCount",
+                    false as "isAttendingByMe"
                 FROM player_statuses ps
-                LEFT JOIN users u ON ${d.cast('ps.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-                LEFT JOIN courts c ON ${d.cast('ps.court_id', 'TEXT')} = ${d.cast('c.id', 'TEXT')}
-                WHERE ${d.cast('ps.user_id', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
-                OR ${d.cast('ps.user_id', 'TEXT')} = ${d.param()}
-                OR ${d.cast('ps.court_id', 'TEXT')} IN (SELECT court_id FROM followed_courts)
+                LEFT JOIN users u ON ps.user_id::TEXT = u.id::TEXT
+                LEFT JOIN courts c ON ps.court_id::TEXT = c.id::TEXT
+                WHERE ps.user_id = $1
+                   OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
+                   OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
+                ORDER BY ps.created_at DESC
+                LIMIT $4
+            `;
 
-                UNION ALL
-
-                -- Check-ins at followed courts
-                SELECT 
-                    'checkin' as type,
-                    ${d.cast('ci.id', 'TEXT')} as id,
-                    ci.checked_in_at as "createdAt",
-                    ci.user_id as "userId",
-                    u.display_name as "userName",
-                    u.avatar_url as "userPhotoUrl",
-                    NULL as content,
-                    NULL as "imageUrl",
-                    NULL as "scheduledAt",
-                    ${d.cast('ci.court_id', 'TEXT')} as "courtId",
-                    c.name as "courtName",
-                    NULL as "matchScore",
-                    NULL as "matchStatus",
-                    0 as "likeCount",
-                    0 as "commentCount",
-                    false as "isLikedByMe",
-                    0 as "attendeeCount",
-                    false as "isAttendingByMe"
-                FROM check_ins ci
-                JOIN users u ON ${d.cast('ci.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-                LEFT JOIN courts c ON ${d.cast('ci.court_id', 'TEXT')} = ${d.cast('c.id', 'TEXT')}
-                WHERE ${d.cast('ci.court_id', 'TEXT')} IN (SELECT court_id FROM followed_courts)
-                AND ci.checked_in_at > ${d.interval(7)}
-
-                UNION ALL
-
-                -- Matches involving followed players or at followed courts
-                SELECT 
-                    'match' as type,
-                    ${d.cast('m.id', 'TEXT')} as id,
-                    m.created_at as "createdAt",
-                    m.creator_id as "userId",
-                    u.display_name as "userName",
-                    u.avatar_url as "userPhotoUrl",
-                    NULL as content,
-                    NULL as "imageUrl",
-                    NULL as "scheduledAt",
-                    ${d.cast('m.court_id', 'TEXT')} as "courtId",
-                    c.name as "courtName",
-                    m.score_creator::TEXT as "matchScore",
-                    m.status as "matchStatus",
-                    0 as "likeCount",
-                    0 as "commentCount",
-                    false as "isLikedByMe",
-                    0 as "attendeeCount",
-                    false as "isAttendingByMe"
-                FROM matches m
-                JOIN users u ON ${d.cast('m.creator_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-                LEFT JOIN courts c ON ${d.cast('m.court_id', 'TEXT')} = ${d.cast('c.id', 'TEXT')}
-                WHERE (
-                    ${d.cast('m.court_id', 'TEXT')} IN (SELECT court_id FROM followed_courts)
-                    OR ${d.cast('m.creator_id', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
-                    OR ${d.cast('m.opponent_id', 'TEXT')} IN (SELECT ${d.cast('followed_id', 'TEXT')} FROM followed_players)
-                )
-                AND m.created_at > ${d.interval(7)}
-            ) combined
-            ORDER BY "createdAt" DESC
-            LIMIT ${d.param()}
-        `;
-
-            console.log('getUnifiedFeed: executing query with params:', { userId, limit });
-            const results = await this.dataSource.query(query, [userId, userId, userId, userId, userId, limit]);
+            console.log('getUnifiedFeed: executing simplified query for user:', userId);
+            const results = await this.dataSource.query(query, [userId, userId, userId, limit]);
             console.log('getUnifiedFeed: got', results.length, 'results');
             return results;
         } catch (error) {
-            console.error('getUnifiedFeed error (tables may not exist):', error.message);
+            console.error('getUnifiedFeed error:', error.message);
             return [];
         }
     }
