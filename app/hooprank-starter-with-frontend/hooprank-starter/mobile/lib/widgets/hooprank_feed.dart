@@ -862,6 +862,49 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     }
   }
 
+  void _confirmDeletePost(int statusId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2128),
+        title: const Text('Delete Post', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this post? This cannot be undone.', 
+          style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      final success = await ApiService.deleteStatus(statusId);
+      if (success && mounted) {
+        // Remove from local state and refresh
+        setState(() {
+          _statusPosts.removeWhere((post) {
+            final rawId = post['id'];
+            final postId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
+            return postId == statusId;
+          });
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post deleted'), backgroundColor: Colors.green),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete post'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void _toggleComments(int statusId) async {
     final isExpanded = _expandedComments[statusId] ?? false;
     if (!isExpanded && !_comments.containsKey(statusId)) {
@@ -922,6 +965,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     if (statusId == 0) {
       debugPrint('FEED: Warning - invalid statusId for post: ${post['content']?.toString().substring(0, 20)}...');
     }
+    final postUserId = post['userId']?.toString() ?? '';
+    final isOwnPost = postUserId == ApiService.userId;
     final userName = post['userName']?.toString() ?? 'Unknown';
     final userPhotoUrl = post['userPhotoUrl']?.toString();
     final content = post['content']?.toString() ?? '';
@@ -1290,7 +1335,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                      const Spacer(),
                      // Share Button (Visual only)
                      Icon(Icons.share_outlined, color: Colors.grey[600], size: 18),
-                  ]
+                  ],
+                  
+                  // Delete Button (only for own posts)
+                  if (isOwnPost) ...[
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () => _confirmDeletePost(statusId),
+                      child: Icon(Icons.delete_outline, color: Colors.grey[600], size: 18),
+                    ),
+                  ],
                 ],
               ),
             ),

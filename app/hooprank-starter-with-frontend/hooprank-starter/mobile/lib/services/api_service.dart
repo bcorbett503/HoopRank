@@ -1089,6 +1089,19 @@ class ApiService {
     return response.statusCode == 200;
   }
 
+  /// Delete a status (post)
+  static Future<bool> deleteStatus(int statusId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/statuses/$statusId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['success'] == true;
+    }
+    return false;
+  }
+
   /// Get all posts by a specific user
   static Future<List<Map<String, dynamic>>> getUserPosts(String targetUserId) async {
     final response = await http.get(
