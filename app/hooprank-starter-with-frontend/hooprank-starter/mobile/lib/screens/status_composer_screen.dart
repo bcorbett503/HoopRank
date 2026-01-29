@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../services/court_service.dart';
+import '../state/check_in_state.dart';
 
 /// Full-screen status composer with rich options for posting
 class StatusComposerScreen extends StatefulWidget {
@@ -359,6 +360,89 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                     ),
                     const SizedBox(height: 20),
                   ],
+                  
+                  // Followed Courts - quick select
+                  Builder(
+                    builder: (context) {
+                      final checkInState = Provider.of<CheckInState>(context, listen: false);
+                      final courtService = Provider.of<CourtService>(context, listen: false);
+                      final followedCourts = checkInState.followedCourts;
+                      
+                      if (followedCourts.isEmpty) return const SizedBox.shrink();
+                      
+                      // Get court names for followed court IDs
+                      final courts = <Court>[];
+                      for (final courtId in followedCourts) {
+                        final court = courtService.getCourtById(courtId);
+                        if (court != null) courts.add(court);
+                      }
+                      
+                      if (courts.isEmpty) return const SizedBox.shrink();
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.favorite, size: 14, color: Colors.redAccent.withOpacity(0.7)),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Your courts:',
+                                style: TextStyle(color: Colors.white54, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: courts.take(5).map((court) => ActionChip(
+                              avatar: Icon(
+                                _taggedCourt?.id == court.id ? Icons.check_circle : Icons.location_on,
+                                size: 16,
+                                color: _taggedCourt?.id == court.id ? Colors.green : Colors.blue,
+                              ),
+                              label: Text(
+                                court.name,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _taggedCourt?.id == court.id ? Colors.green : Colors.white70,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              backgroundColor: _taggedCourt?.id == court.id
+                                  ? Colors.green.withOpacity(0.2)
+                                  : Colors.blue.withOpacity(0.15),
+                              side: BorderSide(
+                                color: _taggedCourt?.id == court.id
+                                    ? Colors.green.withOpacity(0.5)
+                                    : Colors.blue.withOpacity(0.3),
+                              ),
+                              onPressed: () {
+                                if (_taggedCourt?.id == court.id) {
+                                  // Deselect
+                                  setState(() => _taggedCourt = null);
+                                } else {
+                                  // Select this court
+                                  setState(() => _taggedCourt = court);
+                                  // Optionally add @courtname to text
+                                  if (!_textController.text.contains('@${court.name}')) {
+                                    final current = _textController.text;
+                                    if (current.isNotEmpty && !current.endsWith(' ')) {
+                                      _textController.text = '$current @${court.name}';
+                                    } else {
+                                      _textController.text = '${current}@${court.name}';
+                                    }
+                                  }
+                                }
+                              },
+                            )).toList(),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    },
+                  ),
                   
                   // Scheduled time badge
                   if (_scheduledTime != null)
