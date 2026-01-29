@@ -70,6 +70,27 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     _focusNode.dispose();
     super.dispose();
   }
+  
+  /// Load followed courts with court data
+  Future<List<Court>> _loadFollowedCourts(BuildContext context) async {
+    final checkInState = Provider.of<CheckInState>(context, listen: false);
+    final courtService = Provider.of<CourtService>(context, listen: false);
+    final followedCourts = checkInState.followedCourts;
+    
+    if (followedCourts.isEmpty) return [];
+    
+    // Ensure courts are loaded
+    await courtService.loadCourts();
+    
+    // Get court objects for followed court IDs
+    final courts = <Court>[];
+    for (final courtId in followedCourts) {
+      final court = courtService.getCourtById(courtId);
+      if (court != null) courts.add(court);
+    }
+    
+    return courts;
+  }
 
   void _onTextChanged() {
     final text = _textController.text;
@@ -344,22 +365,14 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
 
                   
                   // Followed Courts - quick select
-                  Builder(
-                    builder: (context) {
-                      final checkInState = Provider.of<CheckInState>(context, listen: false);
-                      final courtService = Provider.of<CourtService>(context, listen: false);
-                      final followedCourts = checkInState.followedCourts;
-                      
-                      if (followedCourts.isEmpty) return const SizedBox.shrink();
-                      
-                      // Get court names for followed court IDs
-                      final courts = <Court>[];
-                      for (final courtId in followedCourts) {
-                        final court = courtService.getCourtById(courtId);
-                        if (court != null) courts.add(court);
+                  FutureBuilder<List<Court>>(
+                    future: _loadFollowedCourts(context),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const SizedBox.shrink();
                       }
                       
-                      if (courts.isEmpty) return const SizedBox.shrink();
+                      final courts = snapshot.data!;
                       
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
