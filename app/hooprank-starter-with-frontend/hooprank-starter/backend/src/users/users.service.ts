@@ -524,19 +524,31 @@ export class UsersService {
       if (usersIdType.length > 0 && usersIdType[0].data_type === 'integer') {
         results.push('users.id is INTEGER, converting to VARCHAR...');
 
-        // Drop any foreign key constraints referencing users.id
-        try {
-          await this.dataSource.query(`
-            ALTER TABLE player_statuses DROP CONSTRAINT IF EXISTS player_statuses_user_id_fkey
-          `);
-          results.push('Dropped player_statuses FK constraint');
-        } catch (e) {
-          results.push('No player_statuses FK to drop');
+        // Drop ALL foreign key constraints referencing users.id
+        const fkConstraints = [
+          'player_statuses_user_id_fkey',
+          'matches_host_id_fkey',
+          'matches_guest_id_fkey',
+          'matches_creator_id_fkey',
+          'matches_opponent_id_fkey',
+          'check_ins_user_id_fkey',
+          'friendships_user_id_fkey',
+          'friendships_friend_id_fkey',
+        ];
+
+        for (const fk of fkConstraints) {
+          try {
+            const tableName = fk.replace(/_[^_]+_id_fkey$/, '');
+            await this.dataSource.query(`ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${fk}`);
+            results.push(`Dropped ${fk}`);
+          } catch (e) {
+            results.push(`No FK ${fk} to drop`);
+          }
         }
 
-        // Drop the primary key constraint
+        // Drop the primary key constraint with CASCADE
         try {
-          await this.dataSource.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_pkey`);
+          await this.dataSource.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_pkey CASCADE`);
           results.push('Dropped users primary key');
         } catch (e) {
           results.push('No PK to drop: ' + e.message);
