@@ -515,6 +515,52 @@ export class UsersService {
         results.push('player_statuses.user_id already correct type');
       }
 
+      // Fix 6: Fix users.id from INTEGER to VARCHAR (for Firebase UIDs)
+      results.push('Checking users.id type...');
+      const usersIdType = await this.dataSource.query(`
+        SELECT data_type FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'id'
+      `);
+      if (usersIdType.length > 0 && usersIdType[0].data_type === 'integer') {
+        results.push('users.id is INTEGER, converting to VARCHAR...');
+
+        // Drop any foreign key constraints referencing users.id
+        try {
+          await this.dataSource.query(`
+            ALTER TABLE player_statuses DROP CONSTRAINT IF EXISTS player_statuses_user_id_fkey
+          `);
+          results.push('Dropped player_statuses FK constraint');
+        } catch (e) {
+          results.push('No player_statuses FK to drop');
+        }
+
+        // Drop the primary key constraint
+        try {
+          await this.dataSource.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_pkey`);
+          results.push('Dropped users primary key');
+        } catch (e) {
+          results.push('No PK to drop: ' + e.message);
+        }
+
+        // Alter the column type
+        await this.dataSource.query(`
+          ALTER TABLE users 
+          ALTER COLUMN id TYPE VARCHAR(255) 
+          USING id::TEXT
+        `);
+        results.push('Converted users.id to VARCHAR(255)');
+
+        // Re-add primary key
+        try {
+          await this.dataSource.query(`ALTER TABLE users ADD PRIMARY KEY (id)`);
+          results.push('Re-added users primary key');
+        } catch (e) {
+          results.push('Could not re-add PK: ' + e.message);
+        }
+      } else {
+        results.push('users.id already correct type');
+      }
+
       return { success: true, results };
     } catch (error) {
       results.push(`Error: ${error.message}`);
