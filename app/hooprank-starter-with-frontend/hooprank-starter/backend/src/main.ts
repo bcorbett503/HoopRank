@@ -59,6 +59,31 @@ async function runStartupMigrations(dataSource: DataSource): Promise<void> {
         } else {
           console.log(`  ${table}.user_id already varchar, skipping...`);
         }
+
+        // Also fix status_id foreign key to point to player_statuses
+        // The original migration may have created FK pointing to wrong table
+        console.log(`  Checking ${table}.status_id FK constraint...`);
+
+        try {
+          // Drop old FK constraint if exists (might reference wrong table)
+          await dataSource.query(`
+            ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${table}_status_id_fkey
+          `);
+
+          // Re-create with correct reference to player_statuses
+          await dataSource.query(`
+            ALTER TABLE ${table} 
+            ADD CONSTRAINT ${table}_status_id_fkey 
+            FOREIGN KEY (status_id) 
+            REFERENCES player_statuses(id) 
+            ON DELETE CASCADE
+          `);
+
+          console.log(`  ✓ Verified ${table}.status_id FK`);
+        } catch (fkError) {
+          // Constraint might already exist with correct reference
+          console.log(`  FK constraint already correct or error: ${fkError.message}`);
+        }
       } catch (tableError) {
         console.error(`  Error fixing ${table}:`, tableError.message);
       }
