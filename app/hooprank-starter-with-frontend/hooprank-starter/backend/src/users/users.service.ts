@@ -480,6 +480,24 @@ export class UsersService {
         results.push('player_statuses.court_id already exists');
       }
 
+      // Fix 5: Fix player_statuses.user_id from INTEGER to VARCHAR (for Firebase UIDs)
+      results.push('Checking player_statuses.user_id type...');
+      const statusUserIdType = await this.dataSource.query(`
+        SELECT data_type FROM information_schema.columns 
+        WHERE table_name = 'player_statuses' AND column_name = 'user_id'
+      `);
+      if (statusUserIdType.length > 0 && statusUserIdType[0].data_type === 'integer') {
+        results.push('player_statuses.user_id is INTEGER, converting to VARCHAR...');
+        await this.dataSource.query(`
+          ALTER TABLE player_statuses 
+          ALTER COLUMN user_id TYPE VARCHAR(255) 
+          USING user_id::TEXT
+        `);
+        results.push('Converted player_statuses.user_id to VARCHAR(255)');
+      } else {
+        results.push('player_statuses.user_id already correct type');
+      }
+
       return { success: true, results };
     } catch (error) {
       results.push(`Error: ${error.message}`);
