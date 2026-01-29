@@ -24,16 +24,25 @@ export class StatusesService {
 
     // ========== Status CRUD ==========
 
-    async createStatus(userId: string, content: string, imageUrl?: string, scheduledAt?: string, courtId?: string): Promise<PlayerStatus> {
+    async createStatus(
+        userId: string,
+        content: string,
+        imageUrl?: string,
+        scheduledAt?: string,
+        courtId?: string,
+        videoUrl?: string,
+        videoThumbnailUrl?: string,
+        videoDurationMs?: number
+    ): Promise<PlayerStatus> {
         try {
-            console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, courtId });
+            console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, courtId, videoUrl, videoDurationMs });
 
             // Use raw SQL to insert status (bypasses TypeORM entity schema issues)
             const result = await this.dataSource.query(`
-                INSERT INTO player_statuses (user_id, content, image_url, scheduled_at, court_id, created_at)
-                VALUES ($1, $2, $3, $4, $5, NOW())
+                INSERT INTO player_statuses (user_id, content, image_url, scheduled_at, court_id, video_url, video_thumbnail_url, video_duration_ms, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
                 RETURNING *
-            `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null]);
+            `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null, videoUrl || null, videoThumbnailUrl || null, videoDurationMs || null]);
 
             console.log('createStatus success:', result[0]);
             return result[0];
@@ -249,6 +258,9 @@ export class StatusesService {
                     u.avatar_url as "userPhotoUrl",
                     ps.content,
                     ps.image_url as "imageUrl",
+                    ps.video_url as "videoUrl",
+                    ps.video_thumbnail_url as "videoThumbnailUrl",
+                    ps.video_duration_ms as "videoDurationMs",
                     ps.scheduled_at as "scheduledAt",
                     ps.court_id as "courtId",
                     c.name as "courtName",

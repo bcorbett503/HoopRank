@@ -23,6 +23,15 @@ export class PlayerStatus {
     @Column({ name: 'court_id', type: 'varchar', length: 255, nullable: true })
     courtId?: string;
 
+    @Column({ name: 'video_url', type: 'varchar', length: 500, nullable: true })
+    videoUrl?: string;
+
+    @Column({ name: 'video_thumbnail_url', type: 'varchar', length: 500, nullable: true })
+    videoThumbnailUrl?: string;
+
+    @Column({ name: 'video_duration_ms', type: 'integer', nullable: true })
+    videoDurationMs?: number;
+
     @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
