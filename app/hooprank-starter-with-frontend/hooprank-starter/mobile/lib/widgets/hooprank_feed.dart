@@ -1259,13 +1259,21 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 padding: const EdgeInsets.only(top: 8),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 180, // Reduced height
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
+                  child: imageUrl.startsWith('data:')
+                    ? Image.memory(
+                        Uri.parse(imageUrl).data!.contentAsBytes(),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: 180,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      )
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: 180,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
                 ),
               ),
             

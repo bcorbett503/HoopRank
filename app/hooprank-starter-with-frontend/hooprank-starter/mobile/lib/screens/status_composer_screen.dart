@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -147,14 +148,14 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   }
 
   Future<void> _pickImage() async {
-    final image = await _imagePicker.pickImage(source: ImageSource.gallery);
+    final image = await _imagePicker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 75);
     if (image != null) {
       setState(() => _selectedImage = image);
     }
   }
 
   Future<void> _takePhoto() async {
-    final image = await _imagePicker.pickImage(source: ImageSource.camera);
+    final image = await _imagePicker.pickImage(source: ImageSource.camera, maxWidth: 1024, maxHeight: 1024, imageQuality: 75);
     if (image != null) {
       setState(() => _selectedImage = image);
     }
@@ -324,10 +325,13 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     setState(() => _isSubmitting = true);
     
     try {
-      // TODO: Image upload for status posts - for now, status is text only
-      // In the future, implement status image upload similar to profile/team uploads
+      // Encode image as base64 data URL if selected
       String? imageUrl;
-      // Skipping image upload for now - can be added when backend supports it
+      if (_selectedImage != null) {
+        final bytes = await File(_selectedImage!.path).readAsBytes();
+        final mimeType = _selectedImage!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        imageUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
+      }
       
       await ApiService.createStatus(
         text,
