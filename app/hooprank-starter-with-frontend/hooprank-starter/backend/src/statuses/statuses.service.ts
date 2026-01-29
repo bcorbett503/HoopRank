@@ -25,13 +25,22 @@ export class StatusesService {
     // ========== Status CRUD ==========
 
     async createStatus(userId: string, content: string, imageUrl?: string, scheduledAt?: string, courtId?: string): Promise<PlayerStatus> {
-        const status = new PlayerStatus();
-        status.userId = userId;
-        status.content = content;
-        status.imageUrl = imageUrl || undefined;
-        status.scheduledAt = scheduledAt ? new Date(scheduledAt) : undefined;
-        status.courtId = courtId || undefined;
-        return this.statusRepo.save(status);
+        try {
+            console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, courtId });
+
+            // Use raw SQL to insert status (bypasses TypeORM entity schema issues)
+            const result = await this.dataSource.query(`
+                INSERT INTO player_statuses (user_id, content, image_url, scheduled_at, court_id, created_at)
+                VALUES ($1, $2, $3, $4, $5, NOW())
+                RETURNING *
+            `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null]);
+
+            console.log('createStatus success:', result[0]);
+            return result[0];
+        } catch (error) {
+            console.error('createStatus error:', error.message);
+            throw error;
+        }
     }
 
     async getStatus(statusId: number): Promise<any> {
