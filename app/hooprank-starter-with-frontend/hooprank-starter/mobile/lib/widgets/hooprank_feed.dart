@@ -663,7 +663,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   child: CircleAvatar(
                     radius: 20,
                     backgroundColor: Colors.grey[900],
-                    backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
+                    backgroundImage: userPhotoUrl != null 
+                      ? (userPhotoUrl.startsWith('data:') 
+                          ? MemoryImage(Uri.parse(userPhotoUrl).data!.contentAsBytes()) 
+                          : NetworkImage(userPhotoUrl) as ImageProvider)
+                      : null,
                     child: userPhotoUrl == null
                         ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
@@ -764,7 +768,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: statusColor,
-                  backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
+                  backgroundImage: userPhotoUrl != null 
+                    ? (userPhotoUrl.startsWith('data:') 
+                        ? MemoryImage(Uri.parse(userPhotoUrl).data!.contentAsBytes()) 
+                        : NetworkImage(userPhotoUrl) as ImageProvider)
+                    : null,
                   child: userPhotoUrl == null
                       ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))
@@ -1121,7 +1129,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   child: CircleAvatar(
                     radius: 18, // Slightly smaller avatar
                     backgroundColor: Colors.grey[900],
-                    backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
+                    backgroundImage: userPhotoUrl != null 
+                      ? (userPhotoUrl.startsWith('data:') 
+                          ? MemoryImage(Uri.parse(userPhotoUrl).data!.contentAsBytes()) 
+                          : NetworkImage(userPhotoUrl) as ImageProvider)
+                      : null,
                     child: userPhotoUrl == null
                         ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))
@@ -1377,7 +1389,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               radius: 14,
                               backgroundColor: Colors.deepOrange.withOpacity(0.3),
                               backgroundImage: comment['userPhotoUrl'] != null 
-                                  ? NetworkImage(comment['userPhotoUrl']) 
+                                  ? (comment['userPhotoUrl'].toString().startsWith('data:') 
+                                      ? MemoryImage(Uri.parse(comment['userPhotoUrl']).data!.contentAsBytes()) 
+                                      : NetworkImage(comment['userPhotoUrl']) as ImageProvider)
                                   : null,
                               child: comment['userPhotoUrl'] == null
                                   ? Text(

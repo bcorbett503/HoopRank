@@ -1292,7 +1292,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     children: [
                       CircleAvatar(
                         radius: 16,
-                        backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                        backgroundImage: photoUrl != null 
+                          ? (photoUrl.startsWith('data:') 
+                              ? MemoryImage(Uri.parse(photoUrl).data!.contentAsBytes()) 
+                              : NetworkImage(photoUrl) as ImageProvider)
+                          : null,
                         child: photoUrl == null
                             ? const Icon(Icons.person, size: 18)
                             : null,
@@ -1434,7 +1438,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   return CircleAvatar(
                                     radius: 18,
                                     backgroundColor: Colors.deepOrange,
-                                    backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                                    backgroundImage: photoUrl != null 
+                                      ? (photoUrl.startsWith('data:') 
+                                          ? MemoryImage(Uri.parse(photoUrl).data!.contentAsBytes()) 
+                                          : NetworkImage(photoUrl) as ImageProvider)
+                                      : null,
                                     child: photoUrl == null
                                         ? Text(
                                             name.isNotEmpty ? name[0].toUpperCase() : '?',
