@@ -119,7 +119,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (source == null) return;
 
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source);
+    final pickedFile = await picker.pickImage(
+      source: source,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 75,
+    );
 
     if (pickedFile != null) {
       setState(() {
@@ -165,7 +170,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       }
       
       try {
-        await ApiService.updateProfile(profileUpdates);
+        await ApiService.updateProfile(userId, profileUpdates);
         debugPrint('Profile updated successfully');
       } catch (e) {
         debugPrint('Profile update failed: $e');
