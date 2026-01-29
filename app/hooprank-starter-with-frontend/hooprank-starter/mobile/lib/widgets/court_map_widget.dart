@@ -344,15 +344,19 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                             double markerSize;
                             
                             if (isSignature) {
-                              // Signature courts: crown marker, larger size
+                              // Legendary courts: crown marker, larger size
                               markerAsset = 'assets/court_marker_signature_crown.jpg';
                               markerSize = 36;
+                            } else if (court.isIndoor) {
+                              // Indoor courts: hardwood floor marker
+                              markerAsset = 'assets/court_marker_signature_crown.jpg';
+                              markerSize = 26;
                             } else if (hasKings) {
                               // Courts with kings: king marker
                               markerAsset = 'assets/court_marker_king.jpg';
                               markerSize = 28;
                             } else {
-                              // Regular courts
+                              // Regular outdoor courts
                               markerAsset = 'assets/court_marker.jpg';
                               markerSize = 22;
                             }
@@ -566,14 +570,34 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                           if (court.isSignature)
                             Container(
                               margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.amber.withOpacity(0.4),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: const Text('👑 Legendary', 
+                                style: TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.bold)),
+                            ),
+                          if (court.isIndoor)
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.amber.withOpacity(0.2),
+                                color: Colors.blue.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                                border: Border.all(color: Colors.blue.withOpacity(0.5)),
                               ),
-                              child: const Text('★ Signature', 
-                                style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
+                              child: const Text('🪵 Hardwood', 
+                                style: TextStyle(fontSize: 10, color: Colors.lightBlue, fontWeight: FontWeight.bold)),
                             ),
                         ],
                       ),
