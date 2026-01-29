@@ -169,26 +169,25 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   Future<void> _fetchTeams() async {
     setState(() => _isLoadingTeams = true);
     try {
+      // Call /teams endpoint (returns all teams) and filter by teamType client-side
       final response = await http.get(
-        Uri.parse('${ApiService.baseUrl}/rankings?mode=$_teamFilter'),
+        Uri.parse('${ApiService.baseUrl}/teams'),
         headers: {'x-user-id': ApiService.userId ?? ''},
       );
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final rawTeams = (data['rankings'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-        // Inject teamType from current filter if not present
-        final teamsWithType = rawTeams.map<Map<String, dynamic>>((t) {
-          if (t['teamType'] == null) {
-            return {...t, 'teamType': _teamFilter};
-          }
-          return t;
-        }).toList();
+        final rawTeams = (data as List?)?.cast<Map<String, dynamic>>() ?? [];
+        // Filter teams by selected team type (3v3 or 5v5)
+        final filteredTeams = rawTeams.where((t) =>
+            (t['teamType'] ?? t['team_type'] ?? '3v3').toString().toLowerCase() == _teamFilter.toLowerCase()
+        ).toList();
         setState(() {
-          _teams = teamsWithType;
+          _teams = filteredTeams;
           _isLoadingTeams = false;
         });
       } else {
+        debugPrint('Failed to fetch teams: ${response.statusCode}');
         setState(() => _isLoadingTeams = false);
       }
     } catch (e) {
