@@ -488,6 +488,19 @@ export class UsersService {
       `);
       if (statusUserIdType.length > 0 && statusUserIdType[0].data_type === 'integer') {
         results.push('player_statuses.user_id is INTEGER, converting to VARCHAR...');
+
+        // First, drop any foreign key constraints on user_id
+        try {
+          await this.dataSource.query(`
+            ALTER TABLE player_statuses 
+            DROP CONSTRAINT IF EXISTS player_statuses_user_id_fkey
+          `);
+          results.push('Dropped player_statuses_user_id_fkey constraint');
+        } catch (e) {
+          results.push('No FK constraint to drop or already dropped');
+        }
+
+        // Now alter the column type
         await this.dataSource.query(`
           ALTER TABLE player_statuses 
           ALTER COLUMN user_id TYPE VARCHAR(255) 
