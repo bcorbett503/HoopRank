@@ -44,8 +44,20 @@ export class StatusesService {
                 RETURNING *
             `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null, videoUrl || null, videoThumbnailUrl || null, videoDurationMs || null]);
 
-            console.log('createStatus success:', result[0]);
-            return result[0];
+            const createdStatus = result[0];
+            console.log('createStatus success:', createdStatus);
+
+            // Auto-mark creator as attending for scheduled runs
+            if (scheduledAt && createdStatus.id) {
+                try {
+                    await this.markAttending(userId, createdStatus.id);
+                    console.log('Auto-marked creator as attending for scheduled run:', createdStatus.id);
+                } catch (attendError) {
+                    console.error('Failed to auto-mark creator as attending:', attendError.message);
+                }
+            }
+
+            return createdStatus;
         } catch (error) {
             console.error('createStatus error:', error.message);
             throw error;

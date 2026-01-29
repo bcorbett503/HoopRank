@@ -1222,7 +1222,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            isAttending ? "IN ($attendeeCount)" : (attendeeCount > 0 ? "JOIN ($attendeeCount)" : "JOIN"),
+                            isAttending ? "IN ($attendeeCount)" : "JOIN ($attendeeCount)",
                             style: TextStyle(
                               color: isAttending ? Colors.black : Colors.white, // White text on Green button
                               fontWeight: FontWeight.bold,
