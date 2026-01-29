@@ -1007,8 +1007,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF2D1E38), // Deep Basketball Purple
-                  const Color(0xFF1A1225), // Darker background
+                  const Color(0xFF3A3A3A), // Cement gray
+                  const Color(0xFF2A2A2A), // Slightly darker cement
                 ],
               )
             : null,
@@ -1019,7 +1019,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         boxShadow: [
           BoxShadow(
             color: isScheduledEvent 
-                ? Colors.purple.withOpacity(0.15) // Purple glow
+                ? Colors.white.withOpacity(0.08) // Subtle white glow
                 : Colors.black.withOpacity(0.1),
             blurRadius: isScheduledEvent ? 20 : 4,
             spreadRadius: isScheduledEvent ? 2 : 0, // Lift off
@@ -1043,13 +1043,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.deepPurple.withOpacity(0.4),
+                  color: Colors.grey.shade700.withOpacity(0.6),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
                     bottomRight: Radius.circular(8),
                   ),
                 ),
-                child: const Icon(Icons.push_pin, size: 12, color: Colors.purpleAccent),
+                child: Icon(Icons.push_pin, size: 12, color: Colors.white.withOpacity(0.7)),
               ),
             ),
           Padding(
