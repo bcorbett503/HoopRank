@@ -389,4 +389,3 @@ export class StatusesService {
         }
     }
 }
-```
