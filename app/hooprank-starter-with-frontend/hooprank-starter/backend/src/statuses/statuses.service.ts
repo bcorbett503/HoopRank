@@ -378,4 +378,47 @@ export class StatusesService {
             return { error: error.message };
         }
     }
+
+    // Migration method to add video columns
+    async migrateVideoColumns(): Promise<any> {
+        try {
+            // Check if columns already exist
+            const checkQuery = `
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'player_statuses' 
+                AND column_name IN ('video_url', 'video_thumbnail_url', 'video_duration_ms');
+            `;
+            const existing = await this.dataSource.query(checkQuery);
+
+            if (existing.length === 3) {
+                return {
+                    success: true,
+                    message: 'Video columns already exist',
+                    columns: existing.map((r: any) => r.column_name)
+                };
+            }
+
+            // Add columns that don't exist
+            const alterQuery = `
+                ALTER TABLE player_statuses 
+                ADD COLUMN IF NOT EXISTS video_url VARCHAR(500),
+                ADD COLUMN IF NOT EXISTS video_thumbnail_url VARCHAR(500),
+                ADD COLUMN IF NOT EXISTS video_duration_ms INTEGER;
+            `;
+            await this.dataSource.query(alterQuery);
+
+            // Verify columns were added
+            const verify = await this.dataSource.query(checkQuery);
+
+            return {
+                success: true,
+                message: 'Video columns added successfully',
+                columns: verify.map((r: any) => r.column_name)
+            };
+        } catch (error) {
+            console.error('Migration error:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
 }

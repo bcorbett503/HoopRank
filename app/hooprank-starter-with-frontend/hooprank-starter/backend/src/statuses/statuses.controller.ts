@@ -56,6 +56,12 @@ export class StatusesController {
         return this.statusesService.testFeedQuery(userId);
     }
 
+    // Migration endpoint to add video columns
+    @Post('migrate-video-columns')
+    async migrateVideoColumns() {
+        return this.statusesService.migrateVideoColumns();
+    }
+
     // Get unified feed (statuses + check-ins + matches)
     @Get('unified-feed')
     async getUnifiedFeed(
