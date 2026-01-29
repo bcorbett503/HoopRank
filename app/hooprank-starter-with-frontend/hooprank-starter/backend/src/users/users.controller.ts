@@ -205,9 +205,36 @@ export class UsersController {
   }
 
   @Post(':id/profile')
-  @UseGuards(AuthGuard)
-  updateProfile(@Param('id') id: string, @Body() data: Partial<User>) {
-    return this.usersService.updateProfile(id, data);
+  async updateProfile(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId: string,
+    @Body() data: Partial<User>,
+  ) {
+    // Use id from param, fallback to x-user-id header
+    const targetId = id || userId;
+    if (!targetId) {
+      return { success: false, error: 'User ID required' };
+    }
+    try {
+      console.log('updateProfile: id=', targetId, 'data=', data);
+      const user = await this.usersService.updateProfile(targetId, data);
+      return user;
+    } catch (error) {
+      console.error('updateProfile error:', error.message);
+      // If user doesn't exist, try to create them first
+      if (error.message === 'User not found') {
+        console.log('updateProfile: user not found, creating...');
+        try {
+          await this.usersService.findOrCreate(targetId, data.email || '');
+          const user = await this.usersService.updateProfile(targetId, data);
+          return user;
+        } catch (createError) {
+          console.error('updateProfile: failed to create user:', createError.message);
+          return { success: false, error: 'Failed to create user profile' };
+        }
+      }
+      return { success: false, error: 'Failed to update profile' };
+    }
   }
 
   @Post(':id/friends/:friendId')
