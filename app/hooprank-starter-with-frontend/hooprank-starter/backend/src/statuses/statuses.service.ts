@@ -384,6 +384,11 @@ export class StatusesService {
                 SELECT id, email, display_name, avatar_url FROM users LIMIT 5
             `);
 
+            // Get player_statuses schema
+            const statusesSchema = await this.dataSource.query(`
+                SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'player_statuses'
+            `);
+
             return {
                 allStatuses,
                 followedPlayers,
@@ -391,7 +396,8 @@ export class StatusesService {
                 usersColumns,
                 checkIns,
                 matches,
-                users
+                users,
+                statusesSchema
             };
         } catch (error) {
             return { error: error.message, stack: error.stack };
