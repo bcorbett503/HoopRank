@@ -339,7 +339,10 @@ export class StatusesService {
             LIMIT ${d.param()}
         `;
 
-            return this.dataSource.query(query, [userId, userId, userId, userId, userId, limit]);
+            console.log('getUnifiedFeed: executing query with params:', { userId, limit });
+            const results = await this.dataSource.query(query, [userId, userId, userId, userId, userId, limit]);
+            console.log('getUnifiedFeed: got', results.length, 'results');
+            return results;
         } catch (error) {
             console.error('getUnifiedFeed error (tables may not exist):', error.message);
             return [];
