@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../state/check_in_state.dart';
 import '../services/api_service.dart';
 import 'feed_video_player.dart';
+import 'dart:math' as math;
 
 /// Unified HoopRank Feed with All/Courts tabs
 class HoopRankFeed extends StatefulWidget {
@@ -1002,6 +1003,17 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final isAttending = _attendingStates[statusId] ?? serverIsAttending;
     
     final isScheduledEvent = scheduledAt != null;
+    
+    // Hide expired scheduled runs (real-time check)
+    if (isScheduledEvent) {
+      try {
+        final schedDate = DateTime.parse(scheduledAt.toString());
+        if (schedDate.isBefore(DateTime.now())) {
+          return const SizedBox.shrink(); // Hide expired scheduled runs
+        }
+      } catch (_) {}
+    }
+    
     final isExpanded = _expandedComments[statusId] ?? false;
     final comments = _comments[statusId] ?? [];
 
@@ -1054,40 +1066,34 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8), // Compact margin
-      decoration: BoxDecoration(
-        color: isScheduledEvent ? null : const Color(0xFF1E1E1E), 
-        gradient: isScheduledEvent 
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF3A3A3A), // Cement gray
-                  const Color(0xFF2A2A2A), // Slightly darker cement
-                ],
-              )
-            : null,
+      decoration: isScheduledEvent 
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.4),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            )
+          : BoxDecoration(
+              color: const Color(0xFF1E1E1E), 
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        border: isScheduledEvent 
-            ? Border.all(color: Colors.green.withOpacity(0.8), width: 2) // HoopRank green border
-            : Border.all(color: Colors.white.withOpacity(0.05)),
-        boxShadow: [
-          BoxShadow(
-            color: isScheduledEvent 
-                ? Colors.white.withOpacity(0.08) // Subtle white glow
-                : Colors.black.withOpacity(0.1),
-            blurRadius: isScheduledEvent ? 20 : 4,
-            spreadRadius: isScheduledEvent ? 2 : 0, // Lift off
-            offset: isScheduledEvent ? const Offset(0, 8) : const Offset(0, 4),
-          ),
-          if (isScheduledEvent)
-             BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-             ),
-        ],
-      ),
-      child: Stack(
+        child: CustomPaint(
+          painter: isScheduledEvent ? BasketballCourtPainter() : null,
+          child: Stack(
         children: [
           // Pin icon in upper left corner for scheduled runs
           if (isScheduledEvent)
@@ -1121,7 +1127,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
                       colors: isScheduledEvent 
-                          ? [Colors.green, Colors.green.withOpacity(0.5)]
+                          ? [Colors.white, Colors.white.withOpacity(0.7)] // White border
                           : [Colors.deepOrange, Colors.deepOrange.withOpacity(0.5)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -1151,19 +1157,32 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           Flexible(
                             child: Text(
                               userName, 
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white), // Slightly smaller font
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 14, 
+                                color: Colors.white,
+                                shadows: isScheduledEvent ? [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 3, offset: const Offset(0, 1))] : null,
+                              ), 
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isScheduledEvent) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.2),
+                                color: Colors.white.withOpacity(0.2), 
                                 borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.black, width: 1.0), // Black border
                               ),
-                              child: const Text('SCHEDULED RUN', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.green)),
+                              child: const Text(
+                                'SCHEDULED RUN', 
+                                style: TextStyle(
+                                  fontSize: 8, 
+                                  fontWeight: FontWeight.bold, 
+                                  color: Colors.black, // Black text
+                                )
+                              ),
                             ),
                           ],
                         ],
@@ -1189,24 +1208,23 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isAttending ? Colors.green : Colors.transparent,
+                        color: isAttending ? Colors.white : const Color(0xFF00C853), // Green fill for JOIN, White for IN
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.green, width: 1.5),
-                        boxShadow: isAttending ? [BoxShadow(color: Colors.green.withOpacity(0.4), blurRadius: 8)] : null,
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isAttending ? Icons.check : Icons.add,
-                            color: isAttending ? Colors.white : Colors.green,
-                            size: 12,
+                            isAttending ? Icons.check : Icons.add_rounded, 
+                            color: isAttending ? Colors.black : Colors.white, // Black check, White +
+                            size: isAttending ? 14 : 16, 
                           ),
                           const SizedBox(width: 4),
                           Text(
                             isAttending ? "IN ($attendeeCount)" : (attendeeCount > 0 ? "JOIN ($attendeeCount)" : "JOIN"),
                             style: TextStyle(
-                              color: isAttending ? Colors.white : Colors.green,
+                              color: isAttending ? Colors.black : Colors.white, // White text on Green button
                               fontWeight: FontWeight.bold,
                               fontSize: 10,
                             ),
@@ -1227,8 +1245,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 margin: const EdgeInsets.only(top: 4, bottom: 0),
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2), // Darker "cutout" look
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.black.withOpacity(0.25), 
+                  borderRadius: BorderRadius.circular(8), // Boxy
+                  border: Border.all(color: Colors.white.withOpacity(0.8), width: 2), // Interior court lines
                 ),
                 child: Text(
                   courtName != null 
@@ -1365,7 +1384,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     const Spacer(),
                     Text(
                       'Posted $timeAgo', 
-                      style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10),
+                      style: TextStyle(
+                        color: Colors.white, 
+                        fontSize: 10,
+                        shadows: [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 2, offset: const Offset(0, 1))],
+                      ),
                     ),
                   ] else ...[
                      const Spacer(),
@@ -1378,7 +1401,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     const SizedBox(width: 12),
                     GestureDetector(
                       onTap: () => _confirmDeletePost(statusId),
-                      child: Icon(Icons.delete_outline, color: Colors.grey[600], size: 18),
+                      child: Icon(
+                        Icons.delete_outline, 
+                        color: isScheduledEvent ? Colors.white : Colors.grey[600], 
+                        size: 18,
+                        shadows: isScheduledEvent ? [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 2)] : null,
+                      ),
                     ),
                   ],
                 ],
@@ -1466,6 +1494,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         ),
         ),
         ],
+      ),
+      ),
       ),
     );
   }
@@ -1595,4 +1625,86 @@ class _CommentInputState extends State<_CommentInput> {
       ],
     );
   }
+}
+
+
+class BasketballCourtPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(16));
+    
+    // Clip to rounded rect prevents drawing outside corners
+    canvas.save();
+    canvas.clipRRect(rrect);
+    
+    // Parquet Wood Colors (Light Maple/Blonde)
+    final woodColors = [
+      const Color(0xFFEACC94), // Light Maple
+      const Color(0xFFE0C082), // Honey
+      const Color(0xFFD6B575), // Slightly darker
+      const Color(0xFFF3DFA8), // Very light
+      const Color(0xFFDEC58A), // Standard
+    ];
+
+    const plankWidth = 16.0; // Narrower planks similar to reference
+    
+    // Iterate columns (Planks)
+    for (double x = 0; x < size.width; x += plankWidth) {
+      final colIndex = (x / plankWidth).floor();
+      // Stagger rows
+      double y = (colIndex % 2 == 0) ? -20.0 : -60.0;
+      
+      // Deterministic random for this column to prevent flickering
+      final random = math.Random(colIndex * 1337 + 42); 
+      
+      while (y < size.height) {
+        final plankLen = 80.0 + random.nextInt(100); // Shorter planks
+        final plankRect = Rect.fromLTWH(x, y, plankWidth, plankLen);
+        
+        // 1. Draw Plank with random wood shade
+        final color = woodColors[random.nextInt(woodColors.length)];
+        canvas.drawRect(plankRect, Paint()..color = color);
+        
+        // 2. Plank Joints/Grain (Very subtle)
+        canvas.drawRect(plankRect, Paint()
+          ..color = Colors.black.withOpacity(0.04)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.5
+        );
+
+        y += plankLen;
+      }
+    }
+    
+    // 3. Gloss/Varnish Effect (Stronger gloss)
+    final glossGradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+         Colors.white.withOpacity(0.35), // Strong glare
+         Colors.white.withOpacity(0.1),
+         Colors.transparent,
+      ],
+      stops: const [0.0, 0.25, 0.7],
+    );
+    canvas.drawRect(rect, Paint()..shader = glossGradient.createShader(rect));
+    
+    canvas.restore(); // End Clip
+    
+    // 4. Court Lines (White Border)
+    final linePaint = Paint()
+      ..color = Colors.white.withOpacity(0.95) // White lines
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0; 
+      
+    // Draw outer court line (inset)
+    canvas.drawRRect(rrect.deflate(2.0), linePaint);
+    
+    // Optional: Draw a curved 3-point line hint?
+    // Let's keep it simple with just the border for now, but black.
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

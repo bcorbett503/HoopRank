@@ -28,33 +28,42 @@ def parse_dart_file(filepath):
     with open(filepath, 'r') as f:
         content = f.read()
     
-    # Find all gym entries - each starts with { and ends with },
-    # Match the opening brace, any content up to 'id': 'value', 'name': 'value', 'lat': num, 'lng': num
     gyms = []
     
-    # Split by entries - each entry starts with { and ends with },
-    entries = re.split(r'\n  \{\n', content)
+    # Find the list content between [ and ];
+    list_start = content.find("indoorGymsData = [")
+    if list_start == -1:
+        print("ERROR: Could not find indoorGymsData list in file")
+        return gyms
     
-    for entry in entries[1:]:  # Skip first (header)
+    list_content = content[list_start:]
+    
+    # Use a more robust regex to find each entry block
+    # Match { followed by content until }, on its own line
+    entry_pattern = re.compile(
+        r"\{\s*\n"                           # Opening brace
+        r"\s*'id':\s*'([^']+)',\s*\n"        # id
+        r"\s*'name':\s*'([^']*)',\s*\n"      # name (can be empty)
+        r"\s*'lat':\s*([\d.-]+),\s*\n"       # lat
+        r"\s*'lng':\s*([\d.-]+),\s*\n"       # lng
+        r"\s*'category':\s*'([^']+)',\s*\n"  # category
+        r"\s*'indoor':\s*true,\s*\n"         # indoor
+        r"\s*\}",                             # Closing brace
+        re.MULTILINE
+    )
+    
+    for match in entry_pattern.finditer(list_content):
         try:
-            # Extract id
-            id_match = re.search(r"'id':\s*'([^']+)'", entry)
-            name_match = re.search(r"'name':\s*'([^']*)'", entry)
-            lat_match = re.search(r"'lat':\s*([\d.-]+)", entry)
-            lng_match = re.search(r"'lng':\s*([\d.-]+)", entry)
-            category_match = re.search(r"'category':\s*'([^']+)'", entry)
-            
-            if id_match and name_match and lat_match and lng_match:
-                gyms.append({
-                    'id': id_match.group(1),
-                    'name': name_match.group(1),
-                    'lat': float(lat_match.group(1)),
-                    'lng': float(lng_match.group(1)),
-                    'category': category_match.group(1) if category_match else 'other',
-                    'raw_entry': entry  # Keep original for reconstruction
-                })
+            gym = {
+                'id': match.group(1),
+                'name': match.group(2),
+                'lat': float(match.group(3)),
+                'lng': float(match.group(4)),
+                'category': match.group(5),
+            }
+            gyms.append(gym)
         except Exception as e:
-            pass  # Skip malformed entries
+            print(f"Error parsing entry: {e}")
     
     return gyms
 

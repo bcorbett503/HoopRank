@@ -23,24 +23,58 @@ class CourtService {
       // Load indoor venues (gyms, schools, rec centers)
       final List<Map<String, dynamic>> indoorData = indoorGymsData;
 
+      // Curated set of TRUE signature courts - famous streetball/high-traffic locations
+      // Only these specific courts get the signature designation
+      final signatureCourtNames = <String>{
+        // NYC
+        'rucker park', 'holcombe rucker park', 'west 4th', 'the cage', 'dyckman',
+        // LA
+        'drew league', 'king drew', 'venice beach', 'pan pacific', 'jesse owens',
+        // Chicago
+        'seward park', 'washington park', 'foster park',
+        // Detroit
+        'st. cecilia', 'saint cecilia', 'the saint',
+        // DC
+        'barry farm', 'watts branch', 'turkey thicket',
+        // Philadelphia
+        'hank gathers', 'tarken', 'murphy recreation',
+        // Atlanta
+        'run n shoot', 'piedmont park', 'grant park',
+        // Houston
+        'emancipation park', 'fonde recreation',
+        // Bay Area
+        'mosswood', 'kezar pavilion', 'bushrod', 'defremery',
+        // Boston
+        'malcolm x park',
+        // Miami
+        'jose marti', 'overtown youth', 'hadley park',
+        // Seattle
+        'cal anderson', 'rainier playfield',
+        // Denver
+        'rude recreation',
+        // Portland
+        'irving park', 'dishman',
+        // Dallas
+        'kiest park', 'exline',
+        // Indianapolis
+        'tarkington park',
+      };
+      
+      // Helper to check if a court name matches any signature court
+      bool isSignatureCourt(String name) {
+        final nameLower = name.toLowerCase();
+        return signatureCourtNames.any((sig) => nameLower.contains(sig));
+      }
+      
       // Process outdoor courts
       final outdoorCourts = outdoorData.map((json) {
         final id = (json['id'] as String?) ?? 'unknown';
         final name = (json['name'] as String?) ?? 'Basketball Court';
-        final hash = id.hashCode.abs();
         
-        // Determine if this is a signature court
-        final nameUpper = name.toUpperCase();
-        final isSignature = nameUpper.contains('ARENA') ||
-            nameUpper.contains('CENTER') ||
-            nameUpper.contains('CENTRE') ||
-            nameUpper.contains('GYMNASIUM') ||
-            nameUpper.contains('STADIUM') ||
-            nameUpper.contains('COLISEUM') ||
-            nameUpper.contains('GYM') ||
-            nameUpper.contains('FIELDHOUSE') ||
-            nameUpper.contains('OLYMPIC CLUB') ||
-            (hash % 15 == 0);
+        // Only explicitly marked signature courts or those in curated list
+        final isSignature = json['signature'] == true || 
+            json['isSignature'] == true ||
+            isSignatureCourt(name);
 
         return Court(
           id: id,
@@ -53,20 +87,24 @@ class CourtService {
         );
       }).toList();
       
-      // Process indoor venues
+      // Process indoor venues - NOT all are signature, only famous ones
       final indoorCourts = indoorData.map((json) {
         final id = (json['id'] as String?) ?? 'unknown';
         final name = (json['name'] as String?) ?? 'Indoor Court';
         final category = (json['category'] as String?) ?? 'other';
         
-        // All indoor venues are signature courts
+        // Indoor signature if explicitly marked or in curated list
+        final isSignature = json['signature'] == true ||
+            json['isSignature'] == true ||
+            isSignatureCourt(name);
+        
         return Court(
           id: id,
           name: name,
           lat: (json['lat'] as num).toDouble(),
           lng: (json['lng'] as num).toDouble(),
           address: (json['city'] as String?) ?? (json['address'] as String?),
-          isSignature: true,
+          isSignature: isSignature,
           isIndoor: true,
         );
       }).toList();

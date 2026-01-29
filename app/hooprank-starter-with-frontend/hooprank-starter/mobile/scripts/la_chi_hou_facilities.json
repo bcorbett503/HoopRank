@@ -1,0 +1,3194 @@
+[
+  {
+    "id": "osm_la_west_368166512",
+    "name": "Boys and Girls Club of Santa Monica",
+    "lat": 34.021121,
+    "lng": -118.493414,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_368172698",
+    "name": "Claude Pepper Senior Citizen Center",
+    "lat": 34.045195,
+    "lng": -118.376304,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_368172703",
+    "name": "Edwards Community Center",
+    "lat": 34.014681,
+    "lng": -118.492841,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_2707776860",
+    "name": "Beverly Wood Swim School",
+    "lat": 34.037874,
+    "lng": -118.388302,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_3397608470",
+    "name": "Yoga Nest Venice",
+    "lat": 33.97952,
+    "lng": -118.465631,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_5133454764",
+    "name": "Aura Yoga",
+    "lat": 34.092133,
+    "lng": -118.379272,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_5133454766",
+    "name": "Hot Pilates",
+    "lat": 34.092175,
+    "lng": -118.379168,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_5247316841",
+    "name": "ABC's of Dance",
+    "lat": 34.08979,
+    "lng": -118.376604,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_5910751758",
+    "name": "Venice Barbell Club",
+    "lat": 33.999791,
+    "lng": -118.464066,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_6639727770",
+    "name": "Venice Pool",
+    "lat": 33.995183,
+    "lng": -118.444335,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_7833716176",
+    "name": "Westwood Recreation Center",
+    "lat": 34.052385,
+    "lng": -118.448214,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_7833716177",
+    "name": "Westwood Recreation Center",
+    "lat": 34.052631,
+    "lng": -118.448763,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_7836553544",
+    "name": "Cheviot Hills Recreation Center",
+    "lat": 34.047205,
+    "lng": -118.408495,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_7852149777",
+    "name": "Barrington Recreation Center",
+    "lat": 34.06086,
+    "lng": -118.468506,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_7852149778",
+    "name": "Barrington Recreation Center",
+    "lat": 34.061335,
+    "lng": -118.468424,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_7993443501",
+    "name": "Kenneth Hahn State Recreation Area",
+    "lat": 34.006286,
+    "lng": -118.368744,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_8301099757",
+    "name": "Culver-Palms Family YMCA",
+    "lat": 34.002509,
+    "lng": -118.405333,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_8301099783",
+    "name": "Culver City Teen Center",
+    "lat": 34.012638,
+    "lng": -118.401727,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_8328997962",
+    "name": "Culver City Scout House",
+    "lat": 34.010338,
+    "lng": -118.404967,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_8346283514",
+    "name": "IMAN Cultural Center",
+    "lat": 34.028292,
+    "lng": -118.409579,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_8525661539",
+    "name": "Riddick Youth Center",
+    "lat": 34.038331,
+    "lng": -118.421865,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_9694141589",
+    "name": "Masonic Temple",
+    "lat": 34.020638,
+    "lng": -118.489563,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_9864089985",
+    "name": "Kol Torah Center",
+    "lat": 34.048355,
+    "lng": -118.434973,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_9887832780",
+    "name": "Chabad Persian Youth Center",
+    "lat": 34.055117,
+    "lng": -118.388394,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_9918178357",
+    "name": "Gunther-Hirsh Family Center",
+    "lat": 34.07691,
+    "lng": -118.361152,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_9938349548",
+    "name": "JEM Recreation Center",
+    "lat": 34.064793,
+    "lng": -118.41247,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_10175193530",
+    "name": "Jim Gilliam Senior Citizen Center",
+    "lat": 34.012282,
+    "lng": -118.353153,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_10245714627",
+    "name": "La Tijera Community Center",
+    "lat": 33.979677,
+    "lng": -118.369966,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_10286197695",
+    "name": "Girl Scouts Greater Los Angeles",
+    "lat": 33.968202,
+    "lng": -118.355398,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_10830557502",
+    "name": "Rockreation",
+    "lat": 34.034782,
+    "lng": -118.453376,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_10892015887",
+    "name": "Pacific Coast Baseball Club",
+    "lat": 34.036083,
+    "lng": -118.450663,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_11217156644",
+    "name": "Police Activities League Youth Center",
+    "lat": 34.019975,
+    "lng": -118.48061,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_11657406039",
+    "name": "Virginia Avenue Park Teen Center",
+    "lat": 34.020294,
+    "lng": -118.468344,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_11970784995",
+    "name": "Sender One",
+    "lat": 34.059899,
+    "lng": -118.444243,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_22729480",
+    "name": "Culver City Municipal Plunge",
+    "lat": 34.012135,
+    "lng": -118.401582,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_44631340",
+    "name": "Los Angeles Tennis Center",
+    "lat": 34.070133,
+    "lng": -118.448476,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_44664336",
+    "name": "Spieker Aquatics Center",
+    "lat": 34.074842,
+    "lng": -118.450694,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_136915196",
+    "name": "Bad News Bears Fields",
+    "lat": 34.050987,
+    "lng": -118.447999,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_218925531",
+    "name": "Santa Monica Swim Center",
+    "lat": 34.016288,
+    "lng": -118.473154,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_243866639",
+    "name": "Plummer Park Community Center",
+    "lat": 34.091504,
+    "lng": -118.350835,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_270285795",
+    "name": "Michelle and Barack Obama Sports Complex",
+    "lat": 34.023105,
+    "lng": -118.351474,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_330130796",
+    "name": "Riviera Tennis Club",
+    "lat": 34.051091,
+    "lng": -118.499176,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_383910174",
+    "name": "LCS Arena",
+    "lat": 34.031257,
+    "lng": -118.456729,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_388763617",
+    "name": "Mulholland Tennis Club",
+    "lat": 34.118072,
+    "lng": -118.391213,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_390902856",
+    "name": "Roxbury Park Community Center",
+    "lat": 34.05759,
+    "lng": -118.406136,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_391219445",
+    "name": "The Cliffs of Id",
+    "lat": 34.033269,
+    "lng": -118.371131,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_391226507",
+    "name": "Saint Augustine Parish Hall",
+    "lat": 34.020519,
+    "lng": -118.400191,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_412539753",
+    "name": "Los Angeles Clippers Training Center",
+    "lat": 33.983183,
+    "lng": -118.399598,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_415376452",
+    "name": "Disability Community Resource Center",
+    "lat": 33.999984,
+    "lng": -118.441663,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_419960458",
+    "name": "Rosalind Wyman Recreation Center",
+    "lat": 34.03306,
+    "lng": -118.417552,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_419966841",
+    "name": "Saint Joan of Arc Parish Hall",
+    "lat": 34.032118,
+    "lng": -118.442573,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_420288629",
+    "name": "Nolte Community Center",
+    "lat": 34.024077,
+    "lng": -118.436568,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_420984273",
+    "name": "Westchester Senior Citizen Center",
+    "lat": 33.958625,
+    "lng": -118.417322,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_421719501",
+    "name": "Westchester Family YMCA",
+    "lat": 33.966651,
+    "lng": -118.396973,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_422269845",
+    "name": "Culver City Senior Center",
+    "lat": 34.013889,
+    "lng": -118.403322,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_422876622",
+    "name": "Edwin W. Pauley Pavilion",
+    "lat": 34.07038,
+    "lng": -118.446755,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_422876645",
+    "name": "Student Activities Center (SAC)",
+    "lat": 34.071468,
+    "lng": -118.444094,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_423517423",
+    "name": "Pan Pacific Senior Activity Center",
+    "lat": 34.072295,
+    "lng": -118.353594,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_424947740",
+    "name": "St. Paul the Apostle Parish Center",
+    "lat": 34.055493,
+    "lng": -118.437658,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_425125876",
+    "name": "Felicia Mahood Multipurpose Senior Center",
+    "lat": 34.045721,
+    "lng": -118.449596,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_425139610",
+    "name": "Westwood Recreation Center",
+    "lat": 34.053246,
+    "lng": -118.448079,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_425665688",
+    "name": "Harry and Frances Rubinfeld Russian Jewish Community Center",
+    "lat": 34.090516,
+    "lng": -118.356174,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_425737662",
+    "name": "Fairfax Senior Citizen Center",
+    "lat": 34.084041,
+    "lng": -118.362346,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_426842310",
+    "name": "Joan & Ephraim Sales Community Center",
+    "lat": 34.04818,
+    "lng": -118.414394,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_429349405",
+    "name": "La Cienega Community Center",
+    "lat": 34.062168,
+    "lng": -118.375667,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_429377622",
+    "name": "Syd Kronenthal Recreation Center",
+    "lat": 34.028068,
+    "lng": -118.377395,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_429861190",
+    "name": "Pool House",
+    "lat": 34.139815,
+    "lng": -118.413329,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_440289139",
+    "name": "Santa Monica Family YMCA",
+    "lat": 34.018324,
+    "lng": -118.494283,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_440292455",
+    "name": "Joslyn Park Community Building",
+    "lat": 34.008124,
+    "lng": -118.481609,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_440839027",
+    "name": "Beverly Hills Karate Academy",
+    "lat": 34.081527,
+    "lng": -118.389483,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_440839455",
+    "name": "Core Performance Center",
+    "lat": 34.016311,
+    "lng": -118.471261,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_440850346",
+    "name": "Memorial Park Gym & Fitness Room",
+    "lat": 34.020286,
+    "lng": -118.480635,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_440861800",
+    "name": "The Park Center",
+    "lat": 34.020658,
+    "lng": -118.468216,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_443396883",
+    "name": "Judith And Thomas L. Beckman Yola Center",
+    "lat": 33.962702,
+    "lng": -118.353761,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_443668578",
+    "name": "Pan Pacific Park Pool",
+    "lat": 34.071812,
+    "lng": -118.354231,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_493538640",
+    "name": "Jim Gilliam Recreation Center",
+    "lat": 34.012745,
+    "lng": -118.352421,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_907145142",
+    "name": "North Venice Little League",
+    "lat": 34.014675,
+    "lng": -118.439791,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_1004507615",
+    "name": "Mar Vista Pool",
+    "lat": 34.017155,
+    "lng": -118.428558,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_1028578078",
+    "name": "Stoner Pool",
+    "lat": 34.038167,
+    "lng": -118.453305,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_1120221761",
+    "name": "Collins and Katz Family YMCA",
+    "lat": 34.043351,
+    "lng": -118.459041,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_1171323832",
+    "name": "LAX Firing Range",
+    "lat": 33.960794,
+    "lng": -118.372986,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_1377085429",
+    "name": "Burns Recreation Center",
+    "lat": 33.968351,
+    "lng": -118.415766,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_1377085430",
+    "name": "Gersten Pavilion",
+    "lat": 33.967701,
+    "lng": -118.415551,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_west_1381578438",
+    "name": "Thelma Terry Building",
+    "lat": 34.021326,
+    "lng": -118.468258,
+    "city": "LA_West"
+  },
+  {
+    "id": "osm_la_east_358794667",
+    "name": "Whittier Narrows Dam County Recreational Area",
+    "lat": 34.042952,
+    "lng": -118.066043,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_368174413",
+    "name": "West San Gabriel Valley YMCA",
+    "lat": 34.090833,
+    "lng": -118.118889,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_368174415",
+    "name": "Perry Gymnasium",
+    "lat": 33.980833,
+    "lng": -118.045278,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_3184199242",
+    "name": "The Strength Shoppe",
+    "lat": 34.139729,
+    "lng": -118.132046,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_3186103819",
+    "name": "Movement Unlimited Fitness Center",
+    "lat": 34.146528,
+    "lng": -118.000036,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_3193094189",
+    "name": "kate | yoga",
+    "lat": 34.145819,
+    "lng": -117.999015,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_3485293104",
+    "name": "Pasadena Senior Center",
+    "lat": 34.147925,
+    "lng": -118.14842,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_4732453965",
+    "name": "Duarte Community Center",
+    "lat": 34.139085,
+    "lng": -117.971694,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_4732453967",
+    "name": "Duarte Senior Center",
+    "lat": 34.139397,
+    "lng": -117.970485,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_4732453968",
+    "name": "Duarte City Pool",
+    "lat": 34.139173,
+    "lng": -117.970998,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_5572248850",
+    "name": "Santa Fe Dam Radio Control Modelers Flting Field",
+    "lat": 34.128845,
+    "lng": -117.96588,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_5910361071",
+    "name": "One More Kilo Barbell Club",
+    "lat": 34.021885,
+    "lng": -117.958233,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_5910379501",
+    "name": "Signature Athleticss",
+    "lat": 33.970264,
+    "lng": -118.104889,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_5910922978",
+    "name": "Team Crossfit",
+    "lat": 34.132572,
+    "lng": -118.003234,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_7097453192",
+    "name": "YMCA Child Care",
+    "lat": 34.001521,
+    "lng": -117.960891,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_7097453199",
+    "name": "senior center",
+    "lat": 34.002223,
+    "lng": -117.961242,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_8394916917",
+    "name": "The Youth House",
+    "lat": 34.118394,
+    "lng": -118.146214,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_12610466721",
+    "name": "Los Angeles Oberena Basque Club",
+    "lat": 33.955596,
+    "lng": -118.127017,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_13264508301",
+    "name": "Ultrazone",
+    "lat": 34.0966,
+    "lng": -118.124231,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_13425327853",
+    "name": "The Family Room",
+    "lat": 34.121089,
+    "lng": -118.107384,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_13461559282",
+    "name": "San Gabriel Community Recreation Center",
+    "lat": 34.099075,
+    "lng": -118.109365,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_13462996084",
+    "name": "Crowell Family YMCA",
+    "lat": 34.10757,
+    "lng": -118.136656,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_13475411654",
+    "name": "Waterworks Aquatics",
+    "lat": 34.149343,
+    "lng": -118.103007,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_25205966",
+    "name": "Asian Youth Center",
+    "lat": 34.097603,
+    "lng": -118.100262,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_28275047",
+    "name": "El Monte Aquatic Center",
+    "lat": 34.067008,
+    "lng": -118.035299,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_41599406",
+    "name": "Tennis Courts",
+    "lat": 34.118099,
+    "lng": -118.146289,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_44634950",
+    "name": "Braun Athletic Center",
+    "lat": 34.133891,
+    "lng": -118.127487,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_101206888",
+    "name": "Hutto-Patterson Gymnasium",
+    "lat": 34.143259,
+    "lng": -118.118156,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_192856966",
+    "name": "iTennis Pasadena",
+    "lat": 34.142359,
+    "lng": -118.124878,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_209720642",
+    "name": "Pasadena Ice Skating Center",
+    "lat": 34.143481,
+    "lng": -118.143419,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_209720643",
+    "name": "Pasadena Conference Center",
+    "lat": 34.144174,
+    "lng": -118.143423,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_209720644",
+    "name": "Pasadena Convention Center - Hall C",
+    "lat": 34.143305,
+    "lng": -118.144303,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_209720649",
+    "name": "Pasadena Convention Center - A, B and Ballroom",
+    "lat": 34.143783,
+    "lng": -118.145259,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_264249478",
+    "name": "Scott Gym",
+    "lat": 34.133881,
+    "lng": -118.128279,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_264249479",
+    "name": "Gamble Gym",
+    "lat": 34.133473,
+    "lng": -118.128279,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_402927880",
+    "name": "Swimming Pool",
+    "lat": 34.148103,
+    "lng": -118.017588,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_450179505",
+    "name": "Pasadena Lawn Bowling Club and Croquet Club",
+    "lat": 34.14147,
+    "lng": -118.149346,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_470022059",
+    "name": "Hacienda Heights Community Center",
+    "lat": 34.012978,
+    "lng": -117.978948,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_470606171",
+    "name": "South Gym",
+    "lat": 34.129076,
+    "lng": -118.036761,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_470606282",
+    "name": "Arcadia Community Center",
+    "lat": 34.131507,
+    "lng": -118.043659,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_471256169",
+    "name": "Rosemead Community Recreation Center",
+    "lat": 34.079255,
+    "lng": -118.076909,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_471416029",
+    "name": "Esther Snyder Community Center",
+    "lat": 34.087144,
+    "lng": -117.963759,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_471433238",
+    "name": "YMCA",
+    "lat": 34.146275,
+    "lng": -117.987034,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_471564005",
+    "name": "Teen Club Center",
+    "lat": 33.969164,
+    "lng": -118.037644,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_471607977",
+    "name": "Whittier Transportation Center",
+    "lat": 33.974526,
+    "lng": -118.037871,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_764860491",
+    "name": "Arcadia Aquatic Center",
+    "lat": 34.128987,
+    "lng": -118.036204,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_la_east_1223387931",
+    "name": "Santa Anita Park",
+    "lat": 34.138947,
+    "lng": -118.045483,
+    "city": "LA_East"
+  },
+  {
+    "id": "osm_chicago_north_903255917",
+    "name": "Center on Halsted",
+    "lat": 41.948865,
+    "lng": -87.649885,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_1892429510",
+    "name": "Southport Fitness",
+    "lat": 41.944049,
+    "lng": -87.663633,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_3015681541",
+    "name": "Cheetah Gym",
+    "lat": 41.977465,
+    "lng": -87.668526,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_3570195335",
+    "name": "Archery Bow Range Chicago",
+    "lat": 41.913243,
+    "lng": -87.711207,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_3659464571",
+    "name": "Wicker Park Fitness",
+    "lat": 41.903123,
+    "lng": -87.671362,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_3882086460",
+    "name": "Push Fitness",
+    "lat": 41.92481,
+    "lng": -87.71378,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_3993096533",
+    "name": "Moore Family Aquatic Center",
+    "lat": 41.995406,
+    "lng": -87.679157,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_4081878208",
+    "name": "Cheetah Gym",
+    "lat": 41.910232,
+    "lng": -87.676429,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_4124179103",
+    "name": "TulaYoga Studio",
+    "lat": 41.923194,
+    "lng": -87.698356,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_4472578071",
+    "name": "Edgewater Athletic Club",
+    "lat": 41.995011,
+    "lng": -87.657406,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_5138412953",
+    "name": "Thousand Waves Martial Arts & Self-Defense Center",
+    "lat": 41.939951,
+    "lng": -87.659918,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_5172182732",
+    "name": "JPUSA",
+    "lat": 41.965694,
+    "lng": -87.653201,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_5910361066",
+    "name": "Illumine Weightlifting",
+    "lat": 42.018702,
+    "lng": -87.793435,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_5910442394",
+    "name": "Sayre Park Weightlifting Club",
+    "lat": 41.92081,
+    "lng": -87.797154,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_6265112454",
+    "name": "Villari's Martial Arts",
+    "lat": 41.997164,
+    "lng": -87.76299,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_7087365640",
+    "name": "Diving Platform",
+    "lat": 41.955055,
+    "lng": -87.76294,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_7152419183",
+    "name": "Bosnian Herzogovinian American Community Center",
+    "lat": 41.973431,
+    "lng": -87.655726,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_8416901711",
+    "name": "First Ascent Block 37",
+    "lat": 41.884044,
+    "lng": -87.628772,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_8520355483",
+    "name": "Ukrainian Cultural Center",
+    "lat": 41.895624,
+    "lng": -87.68369,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_9354635442",
+    "name": "Big Blue Swim School",
+    "lat": 41.957951,
+    "lng": -87.688338,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_9556324745",
+    "name": "Movement Lincoln Park",
+    "lat": 41.907987,
+    "lng": -87.649585,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_9850361534",
+    "name": "First Ascent Humboldt Park",
+    "lat": 41.89647,
+    "lng": -87.701553,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_10254871949",
+    "name": "Sankofa Center at AAABNA",
+    "lat": 41.894926,
+    "lng": -87.771238,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_11224180352",
+    "name": "Topgolf",
+    "lat": 41.899802,
+    "lng": -87.624584,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_11234489176",
+    "name": "Rec Room",
+    "lat": 41.957672,
+    "lng": -87.654822,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_11257110619",
+    "name": "Foss Swim School",
+    "lat": 41.936747,
+    "lng": -87.670458,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_11258872240",
+    "name": "Third Space",
+    "lat": 41.947471,
+    "lng": -87.647991,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_11447982726",
+    "name": "Trellus",
+    "lat": 41.990765,
+    "lng": -87.690529,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_11966801784",
+    "name": "Movement Wrigleyville",
+    "lat": 41.947015,
+    "lng": -87.657668,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_12075844619",
+    "name": "Goldfish Swim School",
+    "lat": 41.924324,
+    "lng": -87.669949,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_12169129401",
+    "name": "Chicago Industrial Arts and Design Center",
+    "lat": 41.999001,
+    "lng": -87.674773,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_12192634801",
+    "name": "SPF Chicago",
+    "lat": 41.920198,
+    "lng": -87.661892,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_12192715901",
+    "name": "SPF Chicago",
+    "lat": 41.920788,
+    "lng": -87.661539,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_12521010346",
+    "name": "First Ascent Avondale",
+    "lat": 41.945123,
+    "lng": -87.710378,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_13250680025",
+    "name": "First Bulgarian Center",
+    "lat": 41.953879,
+    "lng": -87.722561,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_13259884601",
+    "name": "Campo Golf Club",
+    "lat": 41.975043,
+    "lng": -87.668148,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_26150291",
+    "name": "Ray Meyer Fitness and Recreation Center",
+    "lat": 41.922662,
+    "lng": -87.653181,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_53584355",
+    "name": "Lincoln Park Cultural Center",
+    "lat": 41.91967,
+    "lng": -87.635866,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_128012500",
+    "name": "Croatian Cultural Center of Chicago",
+    "lat": 41.99728,
+    "lng": -87.701706,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_129586325",
+    "name": "Lake Shore Park Fieldhouse",
+    "lat": 41.897205,
+    "lng": -87.617876,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_134577052",
+    "name": "Jorndt Field",
+    "lat": 41.974217,
+    "lng": -87.68324,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_141032964",
+    "name": "River Park Field House",
+    "lat": 41.973982,
+    "lng": -87.701963,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_145095847",
+    "name": "Pulaski Park Fieldhouse",
+    "lat": 41.906721,
+    "lng": -87.663322,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_155081698",
+    "name": "Bernard Horwich Jewish Community Center",
+    "lat": 42.010992,
+    "lng": -87.705837,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162314861",
+    "name": "Off The Street Club",
+    "lat": 41.881478,
+    "lng": -87.727797,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162336149",
+    "name": "Kedvale Park Fieldhouse",
+    "lat": 41.906381,
+    "lng": -87.730431,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162389872",
+    "name": "Hermosa Park Fieldhouse",
+    "lat": 41.92204,
+    "lng": -87.739608,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162434955",
+    "name": "Ken-Well Park Fieldhouse",
+    "lat": 41.934894,
+    "lng": -87.733687,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162437888",
+    "name": "Kelvyn Park Fieldhouse",
+    "lat": 41.929116,
+    "lng": -87.73815,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162452135",
+    "name": "Irving Park YMCA of Metro Chicago",
+    "lat": 41.953173,
+    "lng": -87.73489,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162452960",
+    "name": "Kilbourn Park Fieldhouse",
+    "lat": 41.944599,
+    "lng": -87.738544,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162461741",
+    "name": "Mayfair Park Fieldhouse",
+    "lat": 41.9631,
+    "lng": -87.742006,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162464432",
+    "name": "Sokol Community Center",
+    "lat": 41.96929,
+    "lng": -87.741658,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162472438",
+    "name": "Gompers Park Fieldhouse",
+    "lat": 41.975793,
+    "lng": -87.734412,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162474813",
+    "name": "Sauganash Park Fieldhouse",
+    "lat": 41.987991,
+    "lng": -87.737181,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162514320",
+    "name": "Austin Town Hall",
+    "lat": 41.888398,
+    "lng": -87.765798,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162522069",
+    "name": "LaFollette Park Fieldhouse",
+    "lat": 41.904977,
+    "lng": -87.755059,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162551502",
+    "name": "Blackhawk Park Fieldhouse",
+    "lat": 41.922878,
+    "lng": -87.751873,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162553340",
+    "name": "Galewood Park Fieldhouse",
+    "lat": 41.912425,
+    "lng": -87.768984,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162626169",
+    "name": "Cragin Park Fieldhouse",
+    "lat": 41.928112,
+    "lng": -87.758498,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162633165",
+    "name": "The Miracle Center",
+    "lat": 41.93159,
+    "lng": -87.763198,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162640922",
+    "name": "Chopin Park Fieldhouse",
+    "lat": 41.943191,
+    "lng": -87.762407,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162641479",
+    "name": "Portage Park Fieldhouse",
+    "lat": 41.955336,
+    "lng": -87.763646,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162641487",
+    "name": "Gymnasium Building",
+    "lat": 41.956045,
+    "lng": -87.766053,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162703000",
+    "name": "Wilson Park Fieldhouse",
+    "lat": 41.964489,
+    "lng": -87.758605,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_162704818",
+    "name": "Jefferson Park Fieldhouse",
+    "lat": 41.968676,
+    "lng": -87.762844,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163047005",
+    "name": "Amundsen Park Fieldhouse",
+    "lat": 41.913365,
+    "lng": -87.780236,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163047171",
+    "name": "Riis Park Fieldhouse",
+    "lat": 41.924093,
+    "lng": -87.77851,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163168338",
+    "name": "Merrimac Park Fieldhouse",
+    "lat": 41.952376,
+    "lng": -87.785012,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163177490",
+    "name": "Dunham Park Fieldhouse",
+    "lat": 41.965883,
+    "lng": -87.782526,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163226305",
+    "name": "Rosedale Park Fieldhouse",
+    "lat": 41.988766,
+    "lng": -87.785784,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163263674",
+    "name": "Rutherford-Sayre Park Fieldhouse",
+    "lat": 41.920739,
+    "lng": -87.796975,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163276203",
+    "name": "Bell Park Fieldhouse",
+    "lat": 41.935416,
+    "lng": -87.796273,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163306064",
+    "name": "Shabbona Park Fieldhouse",
+    "lat": 41.943588,
+    "lng": -87.799594,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163325525",
+    "name": "Norwood Park Fieldhouse",
+    "lat": 41.986551,
+    "lng": -87.79349,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163779336",
+    "name": "Golden Dome Fieldhouse",
+    "lat": 41.882684,
+    "lng": -87.716096,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163814367",
+    "name": "Kelly Hall YMCA",
+    "lat": 41.896081,
+    "lng": -87.721566,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163882505",
+    "name": "Simons Park Fieldhouse",
+    "lat": 41.911192,
+    "lng": -87.715402,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163883916",
+    "name": "Mozart Park Fieldhouse",
+    "lat": 41.917888,
+    "lng": -87.723728,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163886745",
+    "name": "McCormick Tribune YMCA of Metro Chicago",
+    "lat": 41.914674,
+    "lng": -87.719847,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163893291",
+    "name": "Kosciuszko Fieldhouse",
+    "lat": 41.930912,
+    "lng": -87.723835,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163893367",
+    "name": "Kosciuszko Park Natatorium",
+    "lat": 41.931508,
+    "lng": -87.723756,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163905310",
+    "name": "Avondale Park Fieldhouse",
+    "lat": 41.941299,
+    "lng": -87.715262,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163906946",
+    "name": "Athletic Field Park Fieldhouse",
+    "lat": 41.947247,
+    "lng": -87.717253,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163910328",
+    "name": "Independence Park Fieldhouse",
+    "lat": 41.952955,
+    "lng": -87.724768,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_163911234",
+    "name": "Women\u2019s Community Club Building",
+    "lat": 41.952131,
+    "lng": -87.722929,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_164018930",
+    "name": "Eugene Field Park Fieldhouse",
+    "lat": 41.974002,
+    "lng": -87.722427,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_164019271",
+    "name": "Albany Park Community Center",
+    "lat": 41.974305,
+    "lng": -87.713147,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_164021899",
+    "name": "Peterson Park Field House",
+    "lat": 41.986961,
+    "lng": -87.720593,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_165037939",
+    "name": "Chippewa Park Fieldhouse",
+    "lat": 42.004448,
+    "lng": -87.704937,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_192993421",
+    "name": "Broadway Armory Park Fieldhouse",
+    "lat": 41.989188,
+    "lng": -87.65963,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_200021209",
+    "name": "Hanson Park Stadium",
+    "lat": 41.922853,
+    "lng": -87.765057,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209389648",
+    "name": "Clemente High School Gym",
+    "lat": 41.903347,
+    "lng": -87.685933,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209390524",
+    "name": "Smith Park Fieldhouse",
+    "lat": 41.892139,
+    "lng": -87.690285,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209392772",
+    "name": "Humboldt Park Field House",
+    "lat": 41.907074,
+    "lng": -87.702959,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209401154",
+    "name": "Holstein Park Fieldhouse",
+    "lat": 41.921702,
+    "lng": -87.685096,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209402001",
+    "name": "Maplewood Park Fieldhouse",
+    "lat": 41.911115,
+    "lng": -87.691315,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209454952",
+    "name": "Windy City Fieldhouse",
+    "lat": 41.928419,
+    "lng": -87.686707,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209464537",
+    "name": "Revere Park Fieldhouse",
+    "lat": 41.953634,
+    "lng": -87.692044,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209464848",
+    "name": "Brands Park Fieldhouse",
+    "lat": 41.941349,
+    "lng": -87.700402,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209466014",
+    "name": "McFetridge Sports Center",
+    "lat": 41.951838,
+    "lng": -87.69715,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209474735",
+    "name": "Welles Park Field House",
+    "lat": 41.962817,
+    "lng": -87.6864,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209475968",
+    "name": "Gross Park Fieldhouse",
+    "lat": 41.968687,
+    "lng": -87.696668,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209476125",
+    "name": "Horner Park Fieldhouse",
+    "lat": 41.960535,
+    "lng": -87.697727,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209478192",
+    "name": "DANK Haus",
+    "lat": 41.96811,
+    "lng": -87.689268,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209487548",
+    "name": "Galter Life Center",
+    "lat": 41.97546,
+    "lng": -87.700588,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209570264",
+    "name": "Green Briar Park Fieldhouse",
+    "lat": 41.99088,
+    "lng": -87.696366,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209574401",
+    "name": "Warren Park Fieldhouse",
+    "lat": 42.00219,
+    "lng": -87.68893,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209590107",
+    "name": "Indian Boundary Park Fieldhouse",
+    "lat": 42.008967,
+    "lng": -87.692575,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209687473",
+    "name": "Thillens Stadium",
+    "lat": 41.99864,
+    "lng": -87.709977,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209830070",
+    "name": "Union Park Fieldhouse",
+    "lat": 41.884384,
+    "lng": -87.66453,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209838992",
+    "name": "Erie Neighborhood House",
+    "lat": 41.894852,
+    "lng": -87.670057,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209848348",
+    "name": "Commercial Club Park Fieldhouse",
+    "lat": 41.896628,
+    "lng": -87.674168,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209864116",
+    "name": "Wicker Park Fieldhouse",
+    "lat": 41.907975,
+    "lng": -87.67674,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209868741",
+    "name": "Bucktown Athletic Club",
+    "lat": 41.910708,
+    "lng": -87.67923,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209868907",
+    "name": "Bucktown Fitness Club",
+    "lat": 41.9107,
+    "lng": -87.68014,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209880205",
+    "name": "Lake Shore Sport & Fitness",
+    "lat": 41.926151,
+    "lng": -87.661651,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209883305",
+    "name": "Wrightwood Park Fieldhouse",
+    "lat": 41.928212,
+    "lng": -87.666751,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209885559",
+    "name": "Hamlin Park Fieldhouse",
+    "lat": 41.937304,
+    "lng": -87.680061,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209896673",
+    "name": "Lakeview YMCA",
+    "lat": 41.942467,
+    "lng": -87.669608,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209904732",
+    "name": "Bernard Sheil Community Center",
+    "lat": 41.945706,
+    "lng": -87.663613,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209918472",
+    "name": "Rizal Center",
+    "lat": 41.954595,
+    "lng": -87.663543,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209938828",
+    "name": "Levy Senior Center",
+    "lat": 41.968468,
+    "lng": -87.680018,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209939292",
+    "name": "Chase Park Fieldhouse",
+    "lat": 41.967788,
+    "lng": -87.668934,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209950677",
+    "name": "Emmerson Park Fieldhouse",
+    "lat": 41.994737,
+    "lng": -87.67636,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209956900",
+    "name": "Loyola Park Fieldhouse",
+    "lat": 42.010861,
+    "lng": -87.66156,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209958565",
+    "name": "Leone Beach Fieldhouse",
+    "lat": 42.013156,
+    "lng": -87.662513,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209958665",
+    "name": "Pottawattomie Park Fieldhouse",
+    "lat": 42.015146,
+    "lng": -87.678123,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209958677",
+    "name": "Touhy Park Fieldhouse",
+    "lat": 42.015263,
+    "lng": -87.672979,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_209958876",
+    "name": "Howard Area Community Center",
+    "lat": 42.018401,
+    "lng": -87.671712,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210268961",
+    "name": "Brooklyn Boulders",
+    "lat": 41.880132,
+    "lng": -87.652369,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210306942",
+    "name": "Eckhart Park Field House",
+    "lat": 41.896573,
+    "lng": -87.661418,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210307807",
+    "name": "Stanton Park Natatorium",
+    "lat": 41.905881,
+    "lng": -87.644389,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210316386",
+    "name": "Adams Park Fieldhouse",
+    "lat": 41.916525,
+    "lng": -87.655075,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210326654",
+    "name": "Chabad East Lakeview Community Center",
+    "lat": 41.936216,
+    "lng": -87.644942,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210330518",
+    "name": "Broadway Youth Center",
+    "lat": 41.954997,
+    "lng": -87.650465,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210331137",
+    "name": "Gill Park Fieldhouse",
+    "lat": 41.952359,
+    "lng": -87.650605,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210381981",
+    "name": "Clarendon Park Community Center",
+    "lat": 41.963675,
+    "lng": -87.649306,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210382373",
+    "name": "Margate Park Fieldhouse",
+    "lat": 41.972318,
+    "lng": -87.649932,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210383067",
+    "name": "Preston Bradley Center",
+    "lat": 41.968883,
+    "lng": -87.653914,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210395473",
+    "name": "Halas Sports Center",
+    "lat": 41.999768,
+    "lng": -87.659246,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210679928",
+    "name": "Seward Park Field House",
+    "lat": 41.902667,
+    "lng": -87.638167,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_210686229",
+    "name": "South Athletic Fieldhouse",
+    "lat": 41.914647,
+    "lng": -87.630005,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_231035795",
+    "name": "Saddle & Cycle Club",
+    "lat": 41.977515,
+    "lng": -87.653211,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_238367820",
+    "name": "The Peace Corner Youth Center",
+    "lat": 41.880798,
+    "lng": -87.751163,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_241710958",
+    "name": "Robert Louis Stevenson Recreation Center",
+    "lat": 41.887788,
+    "lng": -87.777714,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_254753944",
+    "name": "Haas Park Fieldhouse",
+    "lat": 41.925165,
+    "lng": -87.695345,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_264246921",
+    "name": "Oak Park Tennis and Fitness Center",
+    "lat": 41.887763,
+    "lng": -87.783825,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_277106337",
+    "name": "Paul Hruby Ice Arena",
+    "lat": 41.887743,
+    "lng": -87.785771,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_330649548",
+    "name": "Willye B. White Park Fieldhouse",
+    "lat": 42.019654,
+    "lng": -87.67149,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_330745202",
+    "name": "Jesse White Community Center & Fieldhouse",
+    "lat": 41.896888,
+    "lng": -87.639283,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_359386761",
+    "name": "The CIBC Fire Pitch",
+    "lat": 41.948382,
+    "lng": -87.695699,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_361582684",
+    "name": "Rock Solid",
+    "lat": 41.910534,
+    "lng": -87.691282,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_401486235",
+    "name": "By The Hand Club for Kids",
+    "lat": 41.888282,
+    "lng": -87.755004,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_411437406",
+    "name": "Stanton Park Fieldhouse",
+    "lat": 41.905519,
+    "lng": -87.644183,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_414261166",
+    "name": "Gymnastics and Recreation Center",
+    "lat": 41.88778,
+    "lng": -87.775836,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_414503960",
+    "name": "Christopher House",
+    "lat": 41.921935,
+    "lng": -87.757916,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_477359921",
+    "name": "Anderson Park Center",
+    "lat": 41.901218,
+    "lng": -87.778574,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_564124593",
+    "name": "iFLY",
+    "lat": 41.905323,
+    "lng": -87.648365,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_674760191",
+    "name": "Goldfish Swim School",
+    "lat": 41.890278,
+    "lng": -87.675739,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_675585333",
+    "name": "Kyrgyz Community Center",
+    "lat": 41.990136,
+    "lng": -87.747296,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_686708801",
+    "name": "Bear Paddle Swim School",
+    "lat": 42.009692,
+    "lng": -87.769217,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_914110317",
+    "name": "Lincolnwood Community Center",
+    "lat": 42.006558,
+    "lng": -87.73326,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_994989531",
+    "name": "Tilton Park Fieldhouse",
+    "lat": 41.883844,
+    "lng": -87.739691,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_1104841942",
+    "name": "Community Room",
+    "lat": 41.886426,
+    "lng": -87.717058,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_1177703814",
+    "name": "Katrina Adams Tennis Courts",
+    "lat": 41.87977,
+    "lng": -87.6637,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_1188758676",
+    "name": "North Austin Center",
+    "lat": 41.914703,
+    "lng": -87.755016,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_1289184570",
+    "name": "Michelle Obama Athletic Complex",
+    "lat": 41.879607,
+    "lng": -87.662785,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_north_1429288629",
+    "name": "Humboldt Pool",
+    "lat": 41.898669,
+    "lng": -87.703671,
+    "city": "Chicago_North"
+  },
+  {
+    "id": "osm_chicago_south_354275249",
+    "name": "Sears YMCA Day Care Center",
+    "lat": 41.87031,
+    "lng": -87.706444,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_4565736806",
+    "name": "A Listening Space",
+    "lat": 41.794296,
+    "lng": -87.618842,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_5910923585",
+    "name": "South Loop Strength",
+    "lat": 41.873628,
+    "lng": -87.630315,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_7442563831",
+    "name": "Gads Hill Center",
+    "lat": 41.815921,
+    "lng": -87.700873,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_8522222391",
+    "name": "Latinos Progresando Resource Center",
+    "lat": 41.851968,
+    "lng": -87.701564,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_10960680638",
+    "name": "Park No. 596 Fieldhouse",
+    "lat": 41.80529,
+    "lng": -87.685775,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_12061664116",
+    "name": "Metro Achievement Center",
+    "lat": 41.87736,
+    "lng": -87.649735,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_12312943304",
+    "name": "Nichols Park Fieldhouse",
+    "lat": 41.799099,
+    "lng": -87.592891,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_12331547635",
+    "name": "Durkin Park Fiedhouse",
+    "lat": 41.738793,
+    "lng": -87.729263,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_12829068936",
+    "name": "Chicago Liberation Center",
+    "lat": 41.852051,
+    "lng": -87.693617,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_24925475",
+    "name": "Jackson Park Fieldhouse",
+    "lat": 41.778836,
+    "lng": -87.585459,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_55060749",
+    "name": "Dvorak Park Fieldhouse",
+    "lat": 41.855019,
+    "lng": -87.653942,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_143959309",
+    "name": "Washington Park Fieldhouse",
+    "lat": 41.793431,
+    "lng": -87.615244,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_145257059",
+    "name": "Hyde Park Neighborhood Club",
+    "lat": 41.795716,
+    "lng": -87.593858,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_150749380",
+    "name": "Chicago Women's Park Fieldhouse",
+    "lat": 41.857666,
+    "lng": -87.621883,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_151173253",
+    "name": "Henry Crown Field House",
+    "lat": 41.793563,
+    "lng": -87.598932,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_151429631",
+    "name": "Sheridan Park Fieldhouse",
+    "lat": 41.870491,
+    "lng": -87.654687,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_152586235",
+    "name": "Ratner Athletic Center",
+    "lat": 41.794114,
+    "lng": -87.602019,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_157657341",
+    "name": "Armour Square Park Field House",
+    "lat": 41.834218,
+    "lng": -87.634775,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_157657344",
+    "name": "Arthur S. Keating Sports Center",
+    "lat": 41.838983,
+    "lng": -87.625566,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_162167251",
+    "name": "Archer Park Fieldhouse",
+    "lat": 41.803476,
+    "lng": -87.735134,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_162237076",
+    "name": "West Lawn Park Fieldhouse",
+    "lat": 41.774456,
+    "lng": -87.728845,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_162288358",
+    "name": "Scottsdale Park Fieldhouse",
+    "lat": 41.741643,
+    "lng": -87.736168,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_162294089",
+    "name": "Piotrowski Park Fieldhouse",
+    "lat": 41.836454,
+    "lng": -87.730777,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_162304404",
+    "name": "Franklin Park Fieldhouse",
+    "lat": 41.861179,
+    "lng": -87.733051,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_162316928",
+    "name": "Clark Park Fieldhouse",
+    "lat": 41.876728,
+    "lng": -87.740967,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_162506073",
+    "name": "The Salvation Army Midway Citadel Corps Community Center",
+    "lat": 41.807806,
+    "lng": -87.749808,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_163530839",
+    "name": "Bogan Park Fiedhouse",
+    "lat": 41.745752,
+    "lng": -87.720471,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_163769384",
+    "name": "Blessed Sacrament Youth Center",
+    "lat": 41.852029,
+    "lng": -87.715295,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_163769421",
+    "name": "Shedd Park Fieldhouse",
+    "lat": 41.850142,
+    "lng": -87.71708,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_163769451",
+    "name": "Lawndale Christian Health & Fitness Center",
+    "lat": 41.853409,
+    "lng": -87.719288,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_163775778",
+    "name": "Homan Square Park Fieldhouse",
+    "lat": 41.869408,
+    "lng": -87.713774,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_165055414",
+    "name": "Munroe Park Fieldhouse",
+    "lat": 41.70255,
+    "lng": -87.687026,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_165092216",
+    "name": "Hayes Park Fieldhouse",
+    "lat": 41.738988,
+    "lng": -87.696805,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_165092248",
+    "name": "Hayes Park Fieldhouse",
+    "lat": 41.739023,
+    "lng": -87.697282,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_165125857",
+    "name": "Marquette Park Field House",
+    "lat": 41.770755,
+    "lng": -87.703898,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_165142036",
+    "name": "Gage Park Fieldhouse",
+    "lat": 41.793509,
+    "lng": -87.684977,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_165151542",
+    "name": "Kelly Park Fieldhouse",
+    "lat": 41.819304,
+    "lng": -87.693076,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_165243682",
+    "name": "Rauner Family YMCA",
+    "lat": 41.843926,
+    "lng": -87.686336,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_184870088",
+    "name": "Operation PUSH Community House",
+    "lat": 41.804443,
+    "lng": -87.602774,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_186751944",
+    "name": "Mandrake Park Fieldhouse",
+    "lat": 41.824325,
+    "lng": -87.60757,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_187913598",
+    "name": "South Side YMCA",
+    "lat": 41.779533,
+    "lng": -87.587285,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_190571480",
+    "name": "Louis S. Viverito Senior Center",
+    "lat": 41.751507,
+    "lng": -87.749159,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209357208",
+    "name": "Douglass Park Field House",
+    "lat": 41.862361,
+    "lng": -87.69971,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209359410",
+    "name": "Altgeld Park Fieldhouse",
+    "lat": 41.874364,
+    "lng": -87.693297,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209604504",
+    "name": "Beverly Park Fieldhouse",
+    "lat": 41.708213,
+    "lng": -87.683668,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209619051",
+    "name": "Ridge Park Fieldhouse",
+    "lat": 41.718522,
+    "lng": -87.667812,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209638417",
+    "name": "Dawes Park Fieldhouse",
+    "lat": 41.746904,
+    "lng": -87.674016,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209653019",
+    "name": "Murray Park Fieldhouse",
+    "lat": 41.761072,
+    "lng": -87.667965,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209674418",
+    "name": "Lindblom Park Fieldhouse",
+    "lat": 41.783291,
+    "lng": -87.674603,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209703401",
+    "name": "Cornell Square Park Fieldhouse",
+    "lat": 41.802695,
+    "lng": -87.670123,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209708305",
+    "name": "Chicago Indoor Sports",
+    "lat": 41.822581,
+    "lng": -87.666654,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209708402",
+    "name": "Davis Square Park Fieldhouse",
+    "lat": 41.813126,
+    "lng": -87.66713,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209709733",
+    "name": "McKinley Park Field House",
+    "lat": 41.823704,
+    "lng": -87.682458,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_209783832",
+    "name": "Harrison Park Culture and Recreation Center",
+    "lat": 41.856821,
+    "lng": -87.671941,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210034062",
+    "name": "Graver Park Fieldhouse",
+    "lat": 41.707418,
+    "lng": -87.660926,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210063204",
+    "name": "Brainerd Park Fieldhouse",
+    "lat": 41.727156,
+    "lng": -87.6549,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210063307",
+    "name": "Foster Park Fieldhouse",
+    "lat": 41.741895,
+    "lng": -87.660151,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210085423",
+    "name": "Englewood Community Service Center",
+    "lat": 41.750707,
+    "lng": -87.652941,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210085967",
+    "name": "Dr. Martin Luther King, Jr. Family Entertainment Center",
+    "lat": 41.755667,
+    "lng": -87.654554,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210119570",
+    "name": "Ogden Park Fieldhouse",
+    "lat": 41.775031,
+    "lng": -87.655266,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210123564",
+    "name": "The Center of Englewood",
+    "lat": 41.772885,
+    "lng": -87.646429,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210123606",
+    "name": "Adele and Robert Stern Red Shield Center",
+    "lat": 41.76852,
+    "lng": -87.648738,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210132164",
+    "name": "Primo Center",
+    "lat": 41.781209,
+    "lng": -87.648817,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210159315",
+    "name": "Back of the Yards Park Fieldhouse",
+    "lat": 41.804396,
+    "lng": -87.657746,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210159318",
+    "name": "Sherman Park Fieldhouse",
+    "lat": 41.798423,
+    "lng": -87.657425,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210167563",
+    "name": "Wilson Park Fieldhouse",
+    "lat": 41.831719,
+    "lng": -87.654511,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210167996",
+    "name": "McGuane Park Fieldhouse",
+    "lat": 41.841145,
+    "lng": -87.648689,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210169120",
+    "name": "Bosley Park Fieldhouse",
+    "lat": 41.839245,
+    "lng": -87.653761,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210169802",
+    "name": "Wilson Community Center",
+    "lat": 41.835355,
+    "lng": -87.6556,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210222949",
+    "name": "ChiTown Futbol",
+    "lat": 41.849801,
+    "lng": -87.658079,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210234163",
+    "name": "Taylor-Lauridsen Park Fieldhouse",
+    "lat": 41.818043,
+    "lng": -87.643687,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210257784",
+    "name": "Fosco Park Fieldhouse",
+    "lat": 41.864754,
+    "lng": -87.657409,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210259447",
+    "name": "Flames Athletic Center",
+    "lat": 41.8666,
+    "lng": -87.64838,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210268961",
+    "name": "Brooklyn Boulders",
+    "lat": 41.880132,
+    "lng": -87.652369,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210269163",
+    "name": "Crown Family YMCA Center",
+    "lat": 41.876788,
+    "lng": -87.653207,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210430636",
+    "name": "Fernwood Park Fieldhouse",
+    "lat": 41.704104,
+    "lng": -87.638567,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210479596",
+    "name": "Abbott Park Fieldhouse",
+    "lat": 41.721162,
+    "lng": -87.622122,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210482266",
+    "name": "Euclid Park Fieldhouse",
+    "lat": 41.716072,
+    "lng": -87.637412,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210482461",
+    "name": "Smith Park Fieldhouse",
+    "lat": 41.713897,
+    "lng": -87.631217,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210490870",
+    "name": "Mahalia Jackson Park Field House",
+    "lat": 41.741352,
+    "lng": -87.639599,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210493281",
+    "name": "Robichaux Park Fieldhouse",
+    "lat": 41.725667,
+    "lng": -87.6345,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210504701",
+    "name": "West Chatham Park Fieldhouse",
+    "lat": 41.744734,
+    "lng": -87.631439,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210514641",
+    "name": "Hamilton Park Fieldhouse",
+    "lat": 41.762888,
+    "lng": -87.637663,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210520933",
+    "name": "Sherwood Park Fieldhouse",
+    "lat": 41.790591,
+    "lng": -87.633662,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210524310",
+    "name": "Lowe Park Fieldhouse",
+    "lat": 41.799467,
+    "lng": -87.641344,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210526714",
+    "name": "Taylor Park Fieldhouse",
+    "lat": 41.808813,
+    "lng": -87.627862,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210526821",
+    "name": "Elliot Donelley Youth Center",
+    "lat": 41.822434,
+    "lng": -87.622705,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210533317",
+    "name": "Henry Booth House",
+    "lat": 41.840983,
+    "lng": -87.624815,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210534983",
+    "name": "Anderson Park Recreation Building",
+    "lat": 41.826281,
+    "lng": -87.620865,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210535059",
+    "name": "Wentworth Gardens Park Fieldhouse",
+    "lat": 41.82555,
+    "lng": -87.631774,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210538466",
+    "name": "Chinese Community Center",
+    "lat": 41.85235,
+    "lng": -87.63416,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210539624",
+    "name": "Williams Park Field House",
+    "lat": 41.842753,
+    "lng": -87.62755,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210817043",
+    "name": "Jacoby Dickens Athletic Center",
+    "lat": 41.71776,
+    "lng": -87.608578,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210847058",
+    "name": "Tuley Park Fieldhouse",
+    "lat": 41.730131,
+    "lng": -87.611333,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210862919",
+    "name": "Grand Crossing Park Field House",
+    "lat": 41.755674,
+    "lng": -87.600442,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210873864",
+    "name": "Edward G. Irvin Center",
+    "lat": 41.773297,
+    "lng": -87.612726,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210875896",
+    "name": "Saint Columbanus Church Social Center",
+    "lat": 41.764397,
+    "lng": -87.617295,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210875898",
+    "name": "Meyering Park Field House",
+    "lat": 41.764609,
+    "lng": -87.616039,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_210904821",
+    "name": "Harriet Harris Community Center",
+    "lat": 41.78168,
+    "lng": -87.60488,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211068355",
+    "name": "The Rink",
+    "lat": 41.737293,
+    "lng": -87.596566,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211120463",
+    "name": "Avalon Park Field House",
+    "lat": 41.743623,
+    "lng": -87.59415,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211174494",
+    "name": "Don Nash Community Center",
+    "lat": 41.765825,
+    "lng": -87.579958,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211227139",
+    "name": "Kennicott Park Fieldhouse",
+    "lat": 41.814249,
+    "lng": -87.597575,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211271523",
+    "name": "Trumbull Park Fieldhouse",
+    "lat": 41.705704,
+    "lng": -87.564434,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211279476",
+    "name": "Bradley Park Fieldhouse",
+    "lat": 41.718054,
+    "lng": -87.564347,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211291977",
+    "name": "Chicago Youth Centers - Calumet Heights",
+    "lat": 41.727711,
+    "lng": -87.564189,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211311036",
+    "name": "Rebecca K. Crown Youth Center",
+    "lat": 41.756944,
+    "lng": -87.564765,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211359663",
+    "name": "SkyART",
+    "lat": 41.730383,
+    "lng": -87.550113,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211361331",
+    "name": "Centro Comunitario Juan Diego",
+    "lat": 41.734948,
+    "lng": -87.551778,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211361766",
+    "name": "Bessemer Park Fieldhouse",
+    "lat": 41.732868,
+    "lng": -87.556541,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_211380230",
+    "name": "Russell Square Park Fieldhouse",
+    "lat": 41.744422,
+    "lng": -87.549788,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_236013041",
+    "name": "Quest Multisport",
+    "lat": 41.873415,
+    "lng": -87.692349,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_384036544",
+    "name": "Owens Park Fieldhouse",
+    "lat": 41.735191,
+    "lng": -87.573827,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_425638205",
+    "name": "Arts & Recreation Center at Ellis Park",
+    "lat": 41.830325,
+    "lng": -87.610828,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_430285730",
+    "name": "MetroSquash Center",
+    "lat": 41.783726,
+    "lng": -87.606406,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_635453426",
+    "name": "XS Tennis Village",
+    "lat": 41.798217,
+    "lng": -87.62652,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_681216618",
+    "name": "Pullman Community Center",
+    "lat": 41.704724,
+    "lng": -87.593253,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_769714902",
+    "name": "Oakwood Center",
+    "lat": 41.825064,
+    "lng": -87.612029,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_779950638",
+    "name": "ComEd Recreation Center at Addams Park",
+    "lat": 41.861985,
+    "lng": -87.662881,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_878819417",
+    "name": "John D. & Alexandra C. Nichols Center",
+    "lat": 41.867835,
+    "lng": -87.716027,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_904631761",
+    "name": "Dr. Conrad Worrill Track and Field Center",
+    "lat": 41.709598,
+    "lng": -87.605196,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_1134949198",
+    "name": "Brighton Park Community Campus",
+    "lat": 41.805529,
+    "lng": -87.685597,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_1177703814",
+    "name": "Katrina Adams Tennis Courts",
+    "lat": 41.87977,
+    "lng": -87.6637,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_1288163120",
+    "name": "Douglass Tennis Courts",
+    "lat": 41.860349,
+    "lng": -87.697078,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_1289184570",
+    "name": "Michelle Obama Athletic Complex",
+    "lat": 41.879607,
+    "lng": -87.662785,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_1326118034",
+    "name": "Ping Tom Park Pool",
+    "lat": 41.8589,
+    "lng": -87.632763,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_1331088756",
+    "name": "Starling",
+    "lat": 41.858849,
+    "lng": -87.707033,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_1368815128",
+    "name": "Endeavor Health Performance Center",
+    "lat": 41.863616,
+    "lng": -87.664796,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_chicago_south_1383054579",
+    "name": "Beverly Hills Tennis Club",
+    "lat": 41.727217,
+    "lng": -87.675731,
+    "city": "Chicago_South"
+  },
+  {
+    "id": "osm_houston_south_5651816441",
+    "name": "Houston Swim Club",
+    "lat": 29.557699,
+    "lng": -95.392882,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_9509743498",
+    "name": "Houston Sword Sports",
+    "lat": 29.669315,
+    "lng": -95.437546,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_11016652729",
+    "name": "Aqua-Tots Swim Schools",
+    "lat": 29.551075,
+    "lng": -95.386214,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_43055529",
+    "name": "NRG Arena",
+    "lat": 29.681189,
+    "lng": -95.405795,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_119424696",
+    "name": "Houston Methodist Training Center",
+    "lat": 29.685829,
+    "lng": -95.414745,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_186826125",
+    "name": "UTHSC Recreation Center",
+    "lat": 29.690568,
+    "lng": -95.398094,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_200077590",
+    "name": "Weekley Family YMCA of Greater Houston",
+    "lat": 29.700302,
+    "lng": -95.439384,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_410595273",
+    "name": "Dojo Fit Club of Pearland",
+    "lat": 29.552592,
+    "lng": -95.280565,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_600849951",
+    "name": "Tom Bass Community Center",
+    "lat": 29.589562,
+    "lng": -95.353729,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_601724828",
+    "name": "Christia Adair Community Center",
+    "lat": 29.5892,
+    "lng": -95.347694,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_670799430",
+    "name": "Shadow Creek Sports Complex",
+    "lat": 29.581294,
+    "lng": -95.420967,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_686588753",
+    "name": "UTHealth Recreation Center",
+    "lat": 29.690734,
+    "lng": -95.39799,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_902118392",
+    "name": "Edgewood Community Center",
+    "lat": 29.666835,
+    "lng": -95.331733,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_902129400",
+    "name": "Houston Texans YMCA",
+    "lat": 29.697265,
+    "lng": -95.336313,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_902135697",
+    "name": "Bessie Swindle Community Center",
+    "lat": 29.632319,
+    "lng": -95.367637,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_979683778",
+    "name": "Almeda Community Center",
+    "lat": 29.600715,
+    "lng": -95.417074,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1073734776",
+    "name": "Linkwood Community Center",
+    "lat": 29.68739,
+    "lng": -95.43368,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1080551584",
+    "name": "Sunnyside Community Center",
+    "lat": 29.66881,
+    "lng": -95.372163,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1083304727",
+    "name": "Townwood Community Center",
+    "lat": 29.621499,
+    "lng": -95.429654,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1085497546",
+    "name": "Orissa Culture Center",
+    "lat": 29.612564,
+    "lng": -95.376548,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1103993261",
+    "name": "South Campus Athletic Fields",
+    "lat": 29.663405,
+    "lng": -95.445025,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1267584188",
+    "name": "Administrative Building & Community Center",
+    "lat": 29.687631,
+    "lng": -95.384527,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1289748277",
+    "name": "Garden Villas Community Center",
+    "lat": 29.664132,
+    "lng": -95.295096,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1300772251",
+    "name": "Charlton Community Center",
+    "lat": 29.687661,
+    "lng": -95.2741,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1427417454",
+    "name": "El Franco Lee Senior/Community Center",
+    "lat": 29.598366,
+    "lng": -95.251622,
+    "city": "Houston_South"
+  },
+  {
+    "id": "osm_houston_south_1427587394",
+    "name": "Crestmont Community Center",
+    "lat": 29.636136,
+    "lng": -95.345366,
+    "city": "Houston_South"
+  }
+]

@@ -1,0 +1,542 @@
+[
+  {
+    "id": "signature_nyc_rucker_park",
+    "name": "Rucker Park",
+    "lat": 40.8296,
+    "lng": -73.9367,
+    "city": "nyc",
+    "neighborhood": "Harlem",
+    "signature": true
+  },
+  {
+    "id": "signature_nyc_west_4th_street_courts_(the_ca",
+    "name": "West 4th Street Courts (The Cage)",
+    "lat": 40.7316,
+    "lng": -73.9981,
+    "city": "nyc",
+    "neighborhood": "Greenwich Village",
+    "signature": true
+  },
+  {
+    "id": "signature_nyc_dyckman_park",
+    "name": "Dyckman Park",
+    "lat": 40.865,
+    "lng": -73.9264,
+    "city": "nyc",
+    "neighborhood": "Washington Heights",
+    "signature": true
+  },
+  {
+    "id": "signature_nyc_geraldine_ferraro_playground",
+    "name": "Geraldine Ferraro Playground",
+    "lat": 40.7316,
+    "lng": -73.9981,
+    "city": "nyc",
+    "neighborhood": "Greenwich Village",
+    "signature": true
+  },
+  {
+    "id": "signature_nyc_lincoln_park_(jersey_city)",
+    "name": "Lincoln Park (Jersey City)",
+    "lat": 40.7247,
+    "lng": -74.0679,
+    "city": "nyc",
+    "neighborhood": "Jersey City",
+    "signature": true
+  },
+  {
+    "id": "signature_la_drew_league_(king_drew)",
+    "name": "Drew League (King Drew)",
+    "lat": 33.9241,
+    "lng": -118.2348,
+    "city": "la",
+    "neighborhood": "Compton",
+    "signature": true
+  },
+  {
+    "id": "signature_la_venice_beach_courts",
+    "name": "Venice Beach Courts",
+    "lat": 33.985,
+    "lng": -118.4725,
+    "city": "la",
+    "neighborhood": "Venice",
+    "signature": true
+  },
+  {
+    "id": "signature_la_pan_pacific_park",
+    "name": "Pan Pacific Park",
+    "lat": 34.0754,
+    "lng": -118.3629,
+    "city": "la",
+    "neighborhood": "Fairfax",
+    "signature": true
+  },
+  {
+    "id": "signature_la_jesse_owens_park",
+    "name": "Jesse Owens Park",
+    "lat": 33.9556,
+    "lng": -118.3508,
+    "city": "la",
+    "neighborhood": "Crenshaw",
+    "signature": true
+  },
+  {
+    "id": "signature_la_westchester_park",
+    "name": "Westchester Park",
+    "lat": 33.9606,
+    "lng": -118.3989,
+    "city": "la",
+    "neighborhood": "Westchester",
+    "signature": true
+  },
+  {
+    "id": "signature_chicago_seward_park",
+    "name": "Seward Park",
+    "lat": 41.8556,
+    "lng": -87.65,
+    "city": "chicago",
+    "neighborhood": "Near West Side",
+    "signature": true
+  },
+  {
+    "id": "signature_chicago_washington_park",
+    "name": "Washington Park",
+    "lat": 41.7944,
+    "lng": -87.6056,
+    "city": "chicago",
+    "neighborhood": "Washington Park",
+    "signature": true
+  },
+  {
+    "id": "signature_chicago_foster_park",
+    "name": "Foster Park",
+    "lat": 41.8756,
+    "lng": -87.69,
+    "city": "chicago",
+    "neighborhood": "Near North Side",
+    "signature": true
+  },
+  {
+    "id": "signature_chicago_clarendon_park",
+    "name": "Clarendon Park",
+    "lat": 41.9656,
+    "lng": -87.6544,
+    "city": "chicago",
+    "neighborhood": "Uptown",
+    "signature": true
+  },
+  {
+    "id": "signature_chicago_dvorak_park",
+    "name": "Dvorak Park",
+    "lat": 41.8561,
+    "lng": -87.6642,
+    "city": "chicago",
+    "neighborhood": "Pilsen",
+    "signature": true
+  },
+  {
+    "id": "signature_detroit_st._cecilia_gym_(the_saint)",
+    "name": "St. Cecilia Gym (The Saint)",
+    "lat": 42.3867,
+    "lng": -83.0989,
+    "city": "detroit",
+    "neighborhood": "North End",
+    "signature": true
+  },
+  {
+    "id": "signature_detroit_butzel_playfield",
+    "name": "Butzel Playfield",
+    "lat": 42.3847,
+    "lng": -83.0878,
+    "city": "detroit",
+    "neighborhood": "Corktown",
+    "signature": true
+  },
+  {
+    "id": "signature_detroit_considine_recreation_center",
+    "name": "Considine Recreation Center",
+    "lat": 42.3556,
+    "lng": -83.0789,
+    "city": "detroit",
+    "neighborhood": "Southwest Detroit",
+    "signature": true
+  },
+  {
+    "id": "signature_detroit_heilmann_recreation_center",
+    "name": "Heilmann Recreation Center",
+    "lat": 42.4089,
+    "lng": -83.0678,
+    "city": "detroit",
+    "neighborhood": "Palmer Park",
+    "signature": true
+  },
+  {
+    "id": "signature_dc_barry_farm_recreation_center",
+    "name": "Barry Farm Recreation Center",
+    "lat": 38.8589,
+    "lng": -76.9956,
+    "city": "dc",
+    "neighborhood": "Anacostia",
+    "signature": true
+  },
+  {
+    "id": "signature_dc_watts_branch_park",
+    "name": "Watts Branch Park",
+    "lat": 38.8978,
+    "lng": -76.9489,
+    "city": "dc",
+    "neighborhood": "Northeast DC",
+    "signature": true
+  },
+  {
+    "id": "signature_dc_turkey_thicket_recreation_cent",
+    "name": "Turkey Thicket Recreation Center",
+    "lat": 38.9267,
+    "lng": -76.9889,
+    "city": "dc",
+    "neighborhood": "Brookland",
+    "signature": true
+  },
+  {
+    "id": "signature_dc_jelleff_recreation_center",
+    "name": "Jelleff Recreation Center",
+    "lat": 38.9389,
+    "lng": -77.0689,
+    "city": "dc",
+    "neighborhood": "Georgetown",
+    "signature": true
+  },
+  {
+    "id": "signature_philly_hank_gathers_recreation_center",
+    "name": "Hank Gathers Recreation Center",
+    "lat": 39.9889,
+    "lng": -75.1489,
+    "city": "philly",
+    "neighborhood": "North Philadelphia",
+    "signature": true
+  },
+  {
+    "id": "signature_philly_tarken_recreation_center",
+    "name": "Tarken Recreation Center",
+    "lat": 39.9789,
+    "lng": -75.1389,
+    "city": "philly",
+    "neighborhood": "Kensington",
+    "signature": true
+  },
+  {
+    "id": "signature_philly_murphy_recreation_center",
+    "name": "Murphy Recreation Center",
+    "lat": 39.9567,
+    "lng": -75.1867,
+    "city": "philly",
+    "neighborhood": "West Philadelphia",
+    "signature": true
+  },
+  {
+    "id": "signature_philly_markward_playground",
+    "name": "Markward Playground",
+    "lat": 39.9489,
+    "lng": -75.1589,
+    "city": "philly",
+    "neighborhood": "South Philadelphia",
+    "signature": true
+  },
+  {
+    "id": "signature_atlanta_run_n_shoot",
+    "name": "Run N Shoot",
+    "lat": 33.7389,
+    "lng": -84.4189,
+    "city": "atlanta",
+    "neighborhood": "Southwest Atlanta",
+    "signature": true
+  },
+  {
+    "id": "signature_atlanta_central_park",
+    "name": "Central Park",
+    "lat": 33.7789,
+    "lng": -84.3889,
+    "city": "atlanta",
+    "neighborhood": "Old Fourth Ward",
+    "signature": true
+  },
+  {
+    "id": "signature_atlanta_grant_park",
+    "name": "Grant Park",
+    "lat": 33.7389,
+    "lng": -84.3689,
+    "city": "atlanta",
+    "neighborhood": "Grant Park",
+    "signature": true
+  },
+  {
+    "id": "signature_atlanta_piedmont_park",
+    "name": "Piedmont Park",
+    "lat": 33.7867,
+    "lng": -84.3756,
+    "city": "atlanta",
+    "neighborhood": "Midtown",
+    "signature": true
+  },
+  {
+    "id": "signature_houston_emancipation_park",
+    "name": "Emancipation Park",
+    "lat": 29.7389,
+    "lng": -95.3567,
+    "city": "houston",
+    "neighborhood": "Third Ward",
+    "signature": true
+  },
+  {
+    "id": "signature_houston_fonde_recreation_center",
+    "name": "Fonde Recreation Center",
+    "lat": 29.7489,
+    "lng": -95.3867,
+    "city": "houston",
+    "neighborhood": "Montrose",
+    "signature": true
+  },
+  {
+    "id": "signature_houston_macgregor_park",
+    "name": "MacGregor Park",
+    "lat": 29.7189,
+    "lng": -95.3389,
+    "city": "houston",
+    "neighborhood": "South MacGregor",
+    "signature": true
+  },
+  {
+    "id": "signature_bay_area_mosswood_park",
+    "name": "Mosswood Park",
+    "lat": 37.8267,
+    "lng": -122.2622,
+    "city": "bay_area",
+    "neighborhood": "Oakland",
+    "signature": true
+  },
+  {
+    "id": "signature_bay_area_kezar_pavilion",
+    "name": "Kezar Pavilion",
+    "lat": 37.7678,
+    "lng": -122.4534,
+    "city": "bay_area",
+    "neighborhood": "San Francisco",
+    "signature": true
+  },
+  {
+    "id": "signature_bay_area_bushrod_park",
+    "name": "Bushrod Park",
+    "lat": 37.8456,
+    "lng": -122.2656,
+    "city": "bay_area",
+    "neighborhood": "Oakland",
+    "signature": true
+  },
+  {
+    "id": "signature_bay_area_defremery_park",
+    "name": "DeFremery Park",
+    "lat": 37.8134,
+    "lng": -122.2889,
+    "city": "bay_area",
+    "neighborhood": "West Oakland",
+    "signature": true
+  },
+  {
+    "id": "signature_bay_area_golden_gate_park_(courts_by_st",
+    "name": "Golden Gate Park (courts by stadium)",
+    "lat": 37.7689,
+    "lng": -122.4867,
+    "city": "bay_area",
+    "neighborhood": "San Francisco",
+    "signature": true
+  },
+  {
+    "id": "signature_boston_malcolm_x_park_(roxbury)",
+    "name": "Malcolm X Park (Roxbury)",
+    "lat": 42.3267,
+    "lng": -71.0856,
+    "city": "boston",
+    "neighborhood": "Roxbury",
+    "signature": true
+  },
+  {
+    "id": "signature_boston_smith_park",
+    "name": "Smith Park",
+    "lat": 42.3389,
+    "lng": -71.0689,
+    "city": "boston",
+    "neighborhood": "South End",
+    "signature": true
+  },
+  {
+    "id": "signature_boston_ramsay_park",
+    "name": "Ramsay Park",
+    "lat": 42.3456,
+    "lng": -71.0789,
+    "city": "boston",
+    "neighborhood": "Roxbury",
+    "signature": true
+  },
+  {
+    "id": "signature_miami_jose_marti_park",
+    "name": "Jose Marti Park",
+    "lat": 25.7689,
+    "lng": -80.2167,
+    "city": "miami",
+    "neighborhood": "Little Havana",
+    "signature": true
+  },
+  {
+    "id": "signature_miami_overtown_youth_center",
+    "name": "Overtown Youth Center",
+    "lat": 25.7867,
+    "lng": -80.2056,
+    "city": "miami",
+    "neighborhood": "Overtown",
+    "signature": true
+  },
+  {
+    "id": "signature_miami_hadley_park",
+    "name": "Hadley Park",
+    "lat": 25.8267,
+    "lng": -80.2189,
+    "city": "miami",
+    "neighborhood": "Liberty City",
+    "signature": true
+  },
+  {
+    "id": "signature_seattle_cal_anderson_park",
+    "name": "Cal Anderson Park",
+    "lat": 47.6178,
+    "lng": -122.3189,
+    "city": "seattle",
+    "neighborhood": "Capitol Hill",
+    "signature": true
+  },
+  {
+    "id": "signature_seattle_rainier_playfield",
+    "name": "Rainier Playfield",
+    "lat": 47.5656,
+    "lng": -122.2867,
+    "city": "seattle",
+    "neighborhood": "Rainier Valley",
+    "signature": true
+  },
+  {
+    "id": "signature_seattle_green_lake_park",
+    "name": "Green Lake Park",
+    "lat": 47.6789,
+    "lng": -122.3389,
+    "city": "seattle",
+    "neighborhood": "Green Lake",
+    "signature": true
+  },
+  {
+    "id": "signature_denver_city_park_(courts_by_zoo)",
+    "name": "City Park (courts by zoo)",
+    "lat": 39.7489,
+    "lng": -104.9489,
+    "city": "denver",
+    "neighborhood": "City Park",
+    "signature": true
+  },
+  {
+    "id": "signature_denver_rude_recreation_center",
+    "name": "Rude Recreation Center",
+    "lat": 39.7389,
+    "lng": -104.9367,
+    "city": "denver",
+    "neighborhood": "Five Points",
+    "signature": true
+  },
+  {
+    "id": "signature_denver_hiawatha_davis_recreation_cent",
+    "name": "Hiawatha Davis Recreation Center",
+    "lat": 39.7567,
+    "lng": -104.9567,
+    "city": "denver",
+    "neighborhood": "Cole",
+    "signature": true
+  },
+  {
+    "id": "signature_portland_irving_park",
+    "name": "Irving Park",
+    "lat": 45.5389,
+    "lng": -122.6389,
+    "city": "portland",
+    "neighborhood": "Northeast Portland",
+    "signature": true
+  },
+  {
+    "id": "signature_portland_alberta_park",
+    "name": "Alberta Park",
+    "lat": 45.5589,
+    "lng": -122.6489,
+    "city": "portland",
+    "neighborhood": "Alberta Arts District",
+    "signature": true
+  },
+  {
+    "id": "signature_portland_matt_dishman_community_center",
+    "name": "Matt Dishman Community Center",
+    "lat": 45.5489,
+    "lng": -122.6589,
+    "city": "portland",
+    "neighborhood": "Eliot",
+    "signature": true
+  },
+  {
+    "id": "signature_dallas_kiest_park",
+    "name": "Kiest Park",
+    "lat": 32.7167,
+    "lng": -96.8367,
+    "city": "dallas",
+    "neighborhood": "Oak Cliff",
+    "signature": true
+  },
+  {
+    "id": "signature_dallas_exline_recreation_center",
+    "name": "Exline Recreation Center",
+    "lat": 32.7867,
+    "lng": -96.7689,
+    "city": "dallas",
+    "neighborhood": "East Dallas",
+    "signature": true
+  },
+  {
+    "id": "signature_dallas_martin_luther_king_jr._communi",
+    "name": "Martin Luther King Jr. Community Center",
+    "lat": 32.7689,
+    "lng": -96.7489,
+    "city": "dallas",
+    "neighborhood": "South Dallas",
+    "signature": true
+  },
+  {
+    "id": "signature_indianapolis_tarkington_park",
+    "name": "Tarkington Park",
+    "lat": 39.7956,
+    "lng": -86.1489,
+    "city": "indianapolis",
+    "neighborhood": "Butler-Tarkington",
+    "signature": true
+  },
+  {
+    "id": "signature_indianapolis_riverside_park",
+    "name": "Riverside Park",
+    "lat": 39.7889,
+    "lng": -86.1789,
+    "city": "indianapolis",
+    "neighborhood": "Riverside",
+    "signature": true
+  },
+  {
+    "id": "signature_indianapolis_martin_luther_king_jr._park",
+    "name": "Martin Luther King Jr. Park",
+    "lat": 39.7789,
+    "lng": -86.1289,
+    "city": "indianapolis",
+    "neighborhood": "Near Eastside",
+    "signature": true
+  }
+]

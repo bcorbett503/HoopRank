@@ -5,7 +5,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/court_service.dart';
+import '../services/profile_service.dart';
+import '../services/zipcode_service.dart';
 import '../state/check_in_state.dart';
+import '../state/app_state.dart';
 
 class CourtMapWidget extends StatefulWidget {
   final Function(Court) onCourtSelected;
@@ -68,10 +71,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   Future<void> _initializeMap() async {
     await CourtService().loadCourts();
     
+    bool locationObtained = false;
+    
+    // First, try to get the user's GPS location
     try {
       Position position = await _determinePosition();
       _initialCenter = LatLng(position.latitude, position.longitude);
-      _currentZoom = 13.0; // Zoom in to user's location
+      _currentZoom = 13.0;
+      locationObtained = true;
+      debugPrint('MAP: Using GPS location: ${position.latitude}, ${position.longitude}');
       
       if (widget.limitDistanceKm != null) {
         final nearbyCourts = CourtService().getCourtsNear(
@@ -85,13 +93,40 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
             _courts = nearbyCourts;
             _noCourtsFound = nearbyCourts.isEmpty;
             _isLoading = false;
-            _currentZoom = 15.0; // Zoom in closer for nearby search
+            _currentZoom = 15.0;
           });
           return;
         }
       }
     } catch (e) {
-      debugPrint('Error getting location: $e');
+      debugPrint('MAP: GPS location failed: $e');
+    }
+    
+    // If GPS failed, try to use the user's registered zipcode
+    if (!locationObtained) {
+      try {
+        final authState = Provider.of<AuthState>(context, listen: false);
+        final userId = authState.currentUser?.id;
+        
+        if (userId != null) {
+          final profile = await ProfileService.getProfile(userId);
+          
+          if (profile != null && profile.zip.isNotEmpty) {
+            final coords = ZipcodeService.getCoordinatesForZipcode(profile.zip);
+            _initialCenter = LatLng(coords.latitude, coords.longitude);
+            _currentZoom = 12.0; // Slightly zoomed out for zipcode-based centering
+            locationObtained = true;
+            debugPrint('MAP: Using zipcode location for ${profile.zip}: ${coords.latitude}, ${coords.longitude}');
+          }
+        }
+      } catch (e) {
+        debugPrint('MAP: Zipcode fallback failed: $e');
+      }
+    }
+    
+    // Log if using default location
+    if (!locationObtained) {
+      debugPrint('MAP: Using default location (San Rafael)');
     }
 
     if (mounted) {

@@ -2,9 +2,81 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
+import { DataSource } from 'typeorm';
+
+// Run necessary database migrations at startup
+async function runStartupMigrations(dataSource: DataSource): Promise<void> {
+  console.log('Running startup migrations...');
+
+  try {
+    // Check and fix user_id column types for engagement tables
+    // These were originally created as INTEGER but need to be VARCHAR for Firebase UIDs
+    const tablesToFix = ['status_likes', 'status_comments', 'event_attendees'];
+
+    for (const table of tablesToFix) {
+      try {
+        // Check if table exists
+        const tableExists = await dataSource.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = $1
+          )
+        `, [table]);
+
+        if (!tableExists[0]?.exists) {
+          console.log(`  Table ${table} does not exist, skipping...`);
+          continue;
+        }
+
+        // Check current column type
+        const columnInfo = await dataSource.query(`
+          SELECT data_type FROM information_schema.columns 
+          WHERE table_name = $1 AND column_name = 'user_id'
+        `, [table]);
+
+        if (columnInfo.length === 0) {
+          console.log(`  Table ${table} has no user_id column, skipping...`);
+          continue;
+        }
+
+        const currentType = columnInfo[0]?.data_type;
+
+        if (currentType === 'integer') {
+          console.log(`  Fixing ${table}.user_id: integer -> varchar...`);
+
+          // Drop FK constraint if exists
+          await dataSource.query(`
+            ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${table}_user_id_fkey
+          `);
+
+          // Change column type
+          await dataSource.query(`
+            ALTER TABLE ${table} 
+            ALTER COLUMN user_id TYPE VARCHAR(255) USING user_id::VARCHAR(255)
+          `);
+
+          console.log(`  ✓ Fixed ${table}.user_id`);
+        } else {
+          console.log(`  ${table}.user_id already varchar, skipping...`);
+        }
+      } catch (tableError) {
+        console.error(`  Error fixing ${table}:`, tableError.message);
+      }
+    }
+
+    console.log('Startup migrations complete.');
+  } catch (error) {
+    console.error('Startup migration error:', error.message);
+    // Don't throw - allow app to continue starting
+  }
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Run startup migrations
+  const dataSource = app.get(DataSource);
+  await runStartupMigrations(dataSource);
 
   // Increase JSON body size limit for base64 image uploads
   app.use(bodyParser.json({ limit: '5mb' }));
@@ -25,4 +97,5 @@ async function bootstrap() {
 bootstrap();
 
 
-// Force rebuild Wed Jan 28 12:12:43 PST 2026
+// Force rebuild Wed Jan 29 12:20:00 PST 2026
+
