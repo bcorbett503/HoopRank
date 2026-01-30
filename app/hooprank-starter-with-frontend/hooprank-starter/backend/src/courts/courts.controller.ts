@@ -64,4 +64,26 @@ export class CourtsController {
         await this.courtsService.checkOut(userId, courtId);
         return { success: true };
     }
+
+    @Post('admin/create')
+    async createCourt(
+        @Headers('x-user-id') userId: string,
+        @Query('id') id: string,
+        @Query('name') name: string,
+        @Query('city') city: string,
+        @Query('lat') lat: string,
+        @Query('lng') lng: string,
+        @Query('indoor') indoor?: string,
+        @Query('rims') rims?: string,
+    ) {
+        return this.courtsService.createCourt({
+            id,
+            name,
+            city,
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            indoor: indoor === 'true',
+            rims: rims ? parseInt(rims) : 2,
+        });
+    }
 }

@@ -206,4 +206,42 @@ export class CourtsService {
             totalMatches: parseInt(matchCount[0]?.count || '0', 10),
         };
     }
+
+    // ==================== COURT CREATION ====================
+
+    async createCourt(data: {
+        id: string;
+        name: string;
+        city: string;
+        lat: number;
+        lng: number;
+        indoor?: boolean;
+        rims?: number;
+    }): Promise<any> {
+        try {
+            if (this.dialect.isPostgres) {
+                const result = await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, rims, source, geog)
+                    VALUES ($1, $2, $3, $4, $5, 'user', ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography)
+                    ON CONFLICT (id) DO NOTHING
+                    RETURNING id, name, city
+                `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.lng, data.lat]);
+
+                if (result.length === 0) {
+                    return { success: false, error: 'Court already exists with this ID' };
+                }
+                return { success: true, court: result[0] };
+            }
+
+            // SQLite fallback
+            await this.dataSource.query(`
+                INSERT INTO courts (id, name, city, indoor, rims, lat, lng, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'user')
+            `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.lat, data.lng]);
+
+            return { success: true, court: data };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }
