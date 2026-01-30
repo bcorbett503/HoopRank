@@ -28,15 +28,21 @@ class Message {
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
       id: json['id']?.toString() ?? '',
-      senderId: json['senderId']?.toString() ?? '',
-      receiverId: json['receiverId']?.toString() ?? '',
-      content: json['content']?.toString() ?? '',
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
-      matchId: json['matchId']?.toString(),
-      isChallenge: json['isChallenge'] ?? false,
-      challengeStatus: json['challengeStatus']?.toString(),
+      // Handle both legacy (senderId/receiverId) and PostgreSQL (from_id/to_id) field names
+      senderId: (json['senderId'] ?? json['from_id'])?.toString() ?? '',
+      receiverId: (json['receiverId'] ?? json['to_id'])?.toString() ?? '',
+      content: (json['content'] ?? json['body'])?.toString() ?? '',
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt']) 
+          : json['created_at'] != null 
+              ? DateTime.parse(json['created_at']) 
+              : DateTime.now(),
+      matchId: (json['matchId'] ?? json['match_id'])?.toString(),
+      isChallenge: json['isChallenge'] ?? json['is_challenge'] ?? false,
+      challengeStatus: (json['challengeStatus'] ?? json['challenge_status'])?.toString(),
     );
   }
+
 
   Map<String, dynamic> toJson() {
     return {

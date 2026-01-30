@@ -107,18 +107,19 @@ export class MessagesService {
                         FROM messages m
                         WHERE m.from_id = $1 OR m.to_id = $1
                     )
-                    SELECT rm.*, u.id as user_id, u.name, u.avatar_url, u.hoop_rank as rating
+                    SELECT rm.*, u.id as user_id, u.display_name, u.avatar_url, u.rating
                     FROM ranked_messages rm
                     JOIN users u ON u.id = rm.other_user_id
                     WHERE rm.rn = 1
                     ORDER BY rm.created_at DESC
                 `, [userId]);
 
+
                 return results.map((r: any) => ({
                     threadId: r.thread_id,
                     user: {
                         id: r.user_id,
-                        name: r.name,
+                        name: r.display_name,
                         photoUrl: r.avatar_url,
                         rating: r.rating,
                     },
