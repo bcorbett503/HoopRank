@@ -91,7 +91,55 @@ export class MessagesService {
     }
 
     async getConversations(userId: string): Promise<any[]> {
-        // Get all messages where user is sender or receiver
+        const isPostgres = !!process.env.DATABASE_URL;
+
+        if (isPostgres) {
+            try {
+                // Get the most recent message with each unique conversation partner
+                const results = await this.dataSource.query(`
+                    WITH ranked_messages AS (
+                        SELECT m.*, 
+                            CASE WHEN m.from_id = $1 THEN m.to_id ELSE m.from_id END as other_user_id,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY CASE WHEN m.from_id = $1 THEN m.to_id ELSE m.from_id END
+                                ORDER BY m.created_at DESC
+                            ) as rn
+                        FROM messages m
+                        WHERE m.from_id = $1 OR m.to_id = $1
+                    )
+                    SELECT rm.*, u.id as user_id, u.display_name, u.avatar_url, u.rating
+                    FROM ranked_messages rm
+                    JOIN users u ON u.id = rm.other_user_id
+                    WHERE rm.rn = 1
+                    ORDER BY rm.created_at DESC
+                `, [userId]);
+
+                return results.map((r: any) => ({
+                    threadId: r.thread_id,
+                    user: {
+                        id: r.user_id,
+                        name: r.display_name,
+                        photoUrl: r.avatar_url,
+                        rating: r.rating,
+                    },
+                    lastMessage: {
+                        id: r.id,
+                        senderId: r.from_id,
+                        receiverId: r.to_id,
+                        content: r.body,
+                        createdAt: r.created_at,
+                        isChallenge: r.is_challenge,
+                        challengeStatus: r.challenge_status,
+                    },
+                    unreadCount: 0, // TODO: implement unread tracking
+                }));
+            } catch (error) {
+                console.error('getConversations error:', error.message);
+                return [];
+            }
+        }
+
+        // SQLite fallback - Get all messages where user is sender or receiver
         const messages = await this.messagesRepository.find({
             where: [
                 { fromId: userId },
@@ -118,6 +166,26 @@ export class MessagesService {
     }
 
     async getMessages(userId: string, otherUserId: string): Promise<Message[]> {
+        const isPostgres = !!process.env.DATABASE_URL;
+
+        if (isPostgres) {
+            try {
+                const results = await this.dataSource.query(`
+                    SELECT id, thread_id, from_id as "senderId", to_id as "receiverId", 
+                           body as content, created_at as "createdAt", 
+                           is_challenge as "isChallenge", challenge_status as "challengeStatus",
+                           match_id as "matchId"
+                    FROM messages
+                    WHERE (from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)
+                    ORDER BY created_at ASC
+                `, [userId, otherUserId]);
+                return results;
+            } catch (error) {
+                console.error('getMessages error:', error.message);
+                return [];
+            }
+        }
+
         return await this.messagesRepository.find({
             where: [
                 { fromId: userId, toId: otherUserId },
