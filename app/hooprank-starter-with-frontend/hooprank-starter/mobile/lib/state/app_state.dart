@@ -45,8 +45,15 @@ class AuthState extends ChangeNotifier {
         // Register FCM token for existing session
         _registerFcmToken();
         
-        // Refresh user data from backend to get latest profile (including position)
-        _refreshUserInBackground();
+        // CRITICAL: If cached user doesn't have position, we MUST fetch from backend
+        // synchronously to avoid router redirecting to profile setup incorrectly
+        if (_currentUser!.position == null || _currentUser!.position!.isEmpty) {
+          debugPrint('_init: Cached user has no position, fetching from backend...');
+          await _refreshUserSynchronously();
+        } else {
+          // User has position cached, can refresh in background
+          _refreshUserInBackground();
+        }
       } catch (e) {
         // Handle corruption
         await prefs.remove('hooprank:user');
@@ -54,6 +61,32 @@ class AuthState extends ChangeNotifier {
     }
     notifyListeners();
   }
+  
+  /// Synchronous refresh that blocks until user data is fetched
+  Future<void> _refreshUserSynchronously() async {
+    try {
+      final updatedUser = await ApiService.getMe();
+      if (updatedUser != null) {
+        debugPrint('_refreshUserSynchronously: got user with position=${updatedUser.position}');
+        _currentUser = updatedUser;
+        
+        // Update persisted data
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('hooprank:user', jsonEncode({
+          'id': updatedUser.id,
+          'name': updatedUser.name,
+          'photoUrl': updatedUser.photoUrl,
+          'team': updatedUser.team,
+          'position': updatedUser.position,
+          'rating': updatedUser.rating,
+          'matchesPlayed': updatedUser.matchesPlayed,
+        }));
+      }
+    } catch (e) {
+      debugPrint('_refreshUserSynchronously failed: $e');
+    }
+  }
+
   
   /// Background refresh that doesn't block initialization
   Future<void> _refreshUserInBackground() async {

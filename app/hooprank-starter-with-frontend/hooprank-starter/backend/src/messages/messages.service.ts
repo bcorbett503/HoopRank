@@ -195,5 +195,32 @@ export class MessagesService {
             order: { createdAt: 'ASC' }
         });
     }
+
+    /**
+     * Get count of unread messages for a user (messages where user is receiver and not read)
+     * For now, return count of conversations with messages from others (simple implementation)
+     */
+    async getUnreadCount(userId: string): Promise<number> {
+        const isPostgres = !!process.env.DATABASE_URL;
+
+        if (isPostgres) {
+            try {
+                // Count distinct senders who sent messages to this user
+                // This is a simplified version - a full implementation would need read_at tracking
+                const result = await this.dataSource.query(`
+                    SELECT COUNT(DISTINCT from_id) as count
+                    FROM messages
+                    WHERE to_id = $1
+                `, [userId]);
+                return parseInt(result[0]?.count || '0', 10);
+            } catch (error) {
+                console.error('getUnreadCount error:', error.message);
+                return 0;
+            }
+        }
+
+        // SQLite fallback
+        return 0;
+    }
 }
 

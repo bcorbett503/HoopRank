@@ -41,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final firebaseUser = credential.user!;
       final userId = firebaseUser.uid;
+      debugPrint('LOGIN: Firebase UID = $userId');
 
       // Get ID token first so it's available for both success and fallback cases
       final idToken = await firebaseUser.getIdToken();
@@ -48,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // Try to authenticate with backend (required)
       try {
         if (idToken != null) {
+          debugPrint('LOGIN: Calling ApiService.authenticate...');
           final user = await ApiService.authenticate(
             idToken,
             uid: userId,
@@ -56,7 +58,10 @@ class _LoginScreenState extends State<LoginScreen> {
             photoUrl: firebaseUser.photoURL,
             provider: provider,
           );
+          debugPrint('LOGIN: Backend returned user: ${user.name}, position=${user.position}, isProfileComplete=${user.isProfileComplete}');
+          
           await auth.login(user, token: idToken);
+          debugPrint('LOGIN: After auth.login, currentUser position=${auth.currentUser?.position}');
           
           // Let the router handle redirect based on user.isProfileComplete
           // The router will redirect to /profile/setup if incomplete, or /play if complete

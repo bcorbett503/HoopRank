@@ -33,6 +33,12 @@ export class MessagesController {
         return this.teamsService.getTeamChats(userId);
     }
 
+    @Get('unread-count')
+    async getUnreadCount(@Headers('x-user-id') userId: string) {
+        const count = await this.messagesService.getUnreadCount(userId);
+        return { unreadCount: count };
+    }
+
     @Get('conversations/:userId')
     async getConversations(@Param('userId') userId: string) {
         return this.messagesService.getConversations(userId);

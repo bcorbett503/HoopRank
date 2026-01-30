@@ -19,13 +19,14 @@ class ScaffoldWithNavBar extends StatefulWidget {
 
 class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
   int _unreadCount = 0;
+  int _teamInvitesCount = 0;
   bool _hasLoadedInitially = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUnreadCount();
-    ScaffoldWithNavBar.refreshBadge = _loadUnreadCount;
+    _loadBadgeCounts();
+    ScaffoldWithNavBar.refreshBadge = _loadBadgeCounts;
   }
   
   @override
@@ -39,16 +40,21 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
     super.didUpdateWidget(oldWidget);
     // Only refresh on first load, not every widget update (was causing stale data issue)
     if (!_hasLoadedInitially) {
-      _loadUnreadCount();
+      _loadBadgeCounts();
     }
   }
 
-  Future<void> _loadUnreadCount() async {
+  Future<void> _loadBadgeCounts() async {
     try {
-      final count = await ApiService.getUnreadMessageCount();
+      // Load both counts in parallel
+      final results = await Future.wait([
+        ApiService.getUnreadMessageCount(),
+        ApiService.getTeamInvites(),
+      ]);
       if (mounted) {
         setState(() {
-          _unreadCount = count;
+          _unreadCount = results[0] as int;
+          _teamInvitesCount = (results[1] as List).length;
           _hasLoadedInitially = true;
         });
       }
@@ -86,7 +92,17 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
             label: 'Messages',
           ),
           const NavigationDestination(icon: Icon(Icons.sports_basketball), label: 'Play'),
-          const NavigationDestination(icon: Icon(Icons.groups), label: 'Teams'),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: _teamInvitesCount > 0,
+              label: Text(
+                _teamInvitesCount > 99 ? '99+' : _teamInvitesCount.toString(),
+                style: const TextStyle(fontSize: 10),
+              ),
+              child: const Icon(Icons.groups),
+            ),
+            label: 'Teams',
+          ),
           const NavigationDestination(icon: Icon(Icons.place), label: 'Courts'),
         ],
       ),
