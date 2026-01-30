@@ -21,8 +21,8 @@ export class MessagesService {
             try {
                 console.log('sendMessage: inserting message:', { id, threadId, senderId, receiverId, content, isChallenge, matchId });
                 const result = await this.dataSource.query(`
-                    INSERT INTO messages (id, thread_id, from_id, to_id, body, is_challenge, challenge_status, match_id, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                    INSERT INTO messages (id, thread_id, from_id, to_id, body, read, is_challenge, challenge_status, match_id, created_at)
+                    VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, NOW())
                     RETURNING *
                 `, [id, threadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null]);
                 console.log('sendMessage: success:', result[0]);
