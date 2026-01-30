@@ -18,18 +18,18 @@ export class RankingsController {
 
         try {
             // For 1v1, return individual players
-            // Production database uses 'rating' column for player ratings
+            // Production database uses 'name' and 'hoop_rank' columns
             const players = await this.dataSource.query(`
         SELECT 
           id,
-          display_name as "name",
+          name,
           avatar_url as "photoUrl",
-          rating,
+          hoop_rank as "rating",
           position,
           city
         FROM users
-        WHERE rating IS NOT NULL
-        ORDER BY rating DESC
+        WHERE hoop_rank IS NOT NULL AND name IS NOT NULL
+        ORDER BY hoop_rank DESC
         LIMIT 100
       `);
 
