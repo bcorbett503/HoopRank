@@ -644,7 +644,31 @@ export class UsersService {
         `);
         results.push('Created team_members table');
       } else {
-        results.push('team_members table already exists');
+        // Check if id column exists
+        const idColumnCheck = await this.dataSource.query(`
+          SELECT column_name FROM information_schema.columns 
+          WHERE table_name = 'team_members' AND column_name = 'id'
+        `);
+
+        if (idColumnCheck.length === 0) {
+          results.push('team_members table missing id column, recreating...');
+          // Drop and recreate with proper schema
+          await this.dataSource.query(`DROP TABLE IF EXISTS team_members CASCADE`);
+          await this.dataSource.query(`
+            CREATE TABLE team_members (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+              user_id VARCHAR(255) NOT NULL,
+              status TEXT DEFAULT 'pending',
+              role TEXT DEFAULT 'member',
+              joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(team_id, user_id)
+            )
+          `);
+          results.push('Recreated team_members table with id column');
+        } else {
+          results.push('team_members table already exists with correct schema');
+        }
       }
 
       // Check if team_messages table exists
