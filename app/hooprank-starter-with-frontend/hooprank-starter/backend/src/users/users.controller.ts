@@ -37,6 +37,12 @@ export class UsersController {
     return this.usersService.debugFollowedCourts();
   }
 
+  // Cleanup endpoint to delete all users except specified ones
+  @Post('admin/cleanup-users')
+  async cleanupUsers() {
+    return this.usersService.cleanupUsers();
+  }
+
   @Get()
   findAll() {
     return this.usersService.getAll();

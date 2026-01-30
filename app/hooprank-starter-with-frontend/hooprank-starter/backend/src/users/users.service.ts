@@ -338,6 +338,96 @@ export class UsersService {
     }
   }
 
+  /**
+   * Cleanup database - delete all users except Kevin, Richard, Nathan
+   * Also deletes all related data from other tables
+   */
+  async cleanupUsers(): Promise<any> {
+    const KEEP_USERS = [
+      '0OW2dC3NsqexmTFTXgu57ZQfaIo2', // Kevin Corbett
+      'Zc3Ey4VTslZ3VxsPtcqulmMw9e53', // Richard Corbett
+      'vvxwohs5nXdstsgWlxuxfZdPbfI3', // Nathan North
+    ];
+
+    const results: string[] = [];
+
+    try {
+      // Delete related data first (foreign key constraints)
+      const tables = [
+        { name: 'player_statuses', userCol: 'user_id' },
+        { name: 'status_likes', userCol: 'user_id' },
+        { name: 'status_comments', userCol: 'user_id' },
+        { name: 'event_attendees', userCol: 'user_id' },
+        { name: 'user_followed_courts', userCol: 'user_id' },
+        { name: 'check_ins', userCol: 'user_id' },
+        { name: 'team_members', userCol: 'user_id' },
+      ];
+
+      for (const table of tables) {
+        try {
+          const result = await this.dataSource.query(
+            `DELETE FROM ${table.name} WHERE ${table.userCol} NOT IN ($1, $2, $3)`,
+            KEEP_USERS
+          );
+          results.push(`Deleted from ${table.name}: ${result?.[1] || 'unknown'} rows`);
+        } catch (e) {
+          results.push(`${table.name}: ${e.message}`);
+        }
+      }
+
+      // Delete user_followed_players (has two user columns)
+      try {
+        await this.dataSource.query(
+          `DELETE FROM user_followed_players WHERE follower_id NOT IN ($1, $2, $3) OR followed_id NOT IN ($1, $2, $3)`,
+          KEEP_USERS
+        );
+        results.push('Deleted from user_followed_players');
+      } catch (e) {
+        results.push(`user_followed_players: ${e.message}`);
+      }
+
+      // Delete matches (has both creator_id and opponent_id)
+      try {
+        await this.dataSource.query(
+          `DELETE FROM matches WHERE creator_id NOT IN ($1, $2, $3) OR opponent_id NOT IN ($1, $2, $3)`,
+          KEEP_USERS
+        );
+        results.push('Deleted from matches');
+      } catch (e) {
+        results.push(`matches: ${e.message}`);
+      }
+
+      // Delete messages (has from_id and to_id)
+      try {
+        await this.dataSource.query(
+          `DELETE FROM messages WHERE from_id NOT IN ($1, $2, $3) OR to_id NOT IN ($1, $2, $3)`,
+          KEEP_USERS
+        );
+        results.push('Deleted from messages');
+      } catch (e) {
+        results.push(`messages: ${e.message}`);
+      }
+
+      // Finally delete users
+      const userResult = await this.dataSource.query(
+        `DELETE FROM users WHERE id NOT IN ($1, $2, $3)`,
+        KEEP_USERS
+      );
+      results.push(`Deleted ${userResult?.[1] || 'users'} users`);
+
+      // Get remaining users
+      const remaining = await this.dataSource.query(`SELECT id, name FROM users`);
+
+      return {
+        success: true,
+        results,
+        remainingUsers: remaining
+      };
+    } catch (error) {
+      return { success: false, error: error.message, results };
+    }
+  }
+
   async getFollowedActivity(userId: string): Promise<{ courtActivity: any[]; playerActivity: any[] }> {
     return { courtActivity: [], playerActivity: [] };
   }
