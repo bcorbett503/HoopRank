@@ -33,7 +33,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   List<Court> _courts = [];
   bool _isLoading = true;
   LatLng _initialCenter = const LatLng(38.0194, -122.5376); // Default to San Rafael
-  double _currentZoom = 13.0;
+  double _currentZoom = 14.0;
   bool _showActiveOnly = false; // Filter for courts with same-day activity
 
   bool _noCourtsFound = false;
@@ -77,7 +77,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     try {
       Position position = await _determinePosition();
       _initialCenter = LatLng(position.latitude, position.longitude);
-      _currentZoom = 13.0;
+      _currentZoom = 14.0;
       locationObtained = true;
       debugPrint('MAP: Using GPS location: ${position.latitude}, ${position.longitude}');
       
