@@ -274,24 +274,13 @@ export class MessagesService {
      * Mark all messages from a specific sender as read
      * Called when user opens a conversation
      */
-    async markConversationAsRead(userId: string, otherUserId: string): Promise<{ userId: string, otherUserId: string, foundUnread: number, updated: boolean, error?: string }> {
+    async markConversationAsRead(userId: string, otherUserId: string): Promise<{ markedCount: number }> {
         const isPostgres = !!process.env.DATABASE_URL;
-        console.log(`markConversationAsRead: isPostgres=${isPostgres}`);
 
         if (isPostgres) {
             try {
                 // Ensure the 'read' and 'read_at' columns exist (auto-migration)
                 await this.ensureReadColumnsExist();
-
-                console.log(`markConversationAsRead: userId=${userId}, otherUserId=${otherUserId}`);
-
-                // First count how many messages we expect to update
-                const countResult = await this.dataSource.query(`
-                    SELECT COUNT(*) as count FROM messages 
-                    WHERE from_id = $1 AND to_id = $2 AND (read = false OR read IS NULL)
-                `, [otherUserId, userId]);
-                const foundUnread = parseInt(countResult[0]?.count || '0', 10);
-                console.log(`markConversationAsRead: Found ${foundUnread} unread messages to mark`);
 
                 // Mark all messages FROM the other user TO the current user as read
                 const result = await this.dataSource.query(`
@@ -299,15 +288,16 @@ export class MessagesService {
                     SET read = true, read_at = NOW()
                     WHERE from_id = $1 AND to_id = $2 AND (read = false OR read IS NULL)
                 `, [otherUserId, userId]);
-                console.log(`markConversationAsRead: Update result:`, result);
 
-                return { userId, otherUserId, foundUnread, updated: true };
+                // PostgreSQL returns affected row count in result[1] for UPDATE
+                const markedCount = result?.[1] || 0;
+                return { markedCount };
             } catch (error) {
-                console.error('markConversationAsRead error:', error);
-                return { userId, otherUserId, foundUnread: 0, updated: false, error: error.message };
+                console.error('markConversationAsRead error:', error.message);
+                return { markedCount: 0 };
             }
         }
-        return { userId, otherUserId, foundUnread: 0, updated: false, error: 'Not PostgreSQL' };
+        return { markedCount: 0 };
     }
 
     /**

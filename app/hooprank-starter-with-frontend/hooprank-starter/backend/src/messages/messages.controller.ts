@@ -55,6 +55,6 @@ export class MessagesController {
         @Param('otherUserId') otherUserId: string
     ) {
         const result = await this.messagesService.markConversationAsRead(userId, otherUserId);
-        return { success: true, ...result };
+        return { success: true, markedCount: result.markedCount };
     }
 }
