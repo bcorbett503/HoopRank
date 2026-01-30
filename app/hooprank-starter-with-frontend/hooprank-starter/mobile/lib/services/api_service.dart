@@ -1025,10 +1025,19 @@ class ApiService {
   }
 
   /// Get unified feed (statuses + check-ins + matches for followed players/courts)
-  static Future<List<Map<String, dynamic>>> getUnifiedFeed({String filter = 'all'}) async {
-    debugPrint('UNIFIED_FEED: calling /statuses/unified-feed?filter=$filter userId=$_userId');
+  /// filter: 'foryou' (local 50mi), 'following' (followed only), 'all' (default)
+  static Future<List<Map<String, dynamic>>> getUnifiedFeed({
+    String filter = 'all',
+    double? lat,
+    double? lng,
+  }) async {
+    var url = '$baseUrl/statuses/unified-feed?filter=$filter';
+    if (lat != null && lng != null) {
+      url += '&lat=$lat&lng=$lng';
+    }
+    debugPrint('UNIFIED_FEED: calling $url userId=$_userId');
     final response = await http.get(
-      Uri.parse('$baseUrl/statuses/unified-feed?filter=$filter'),
+      Uri.parse(url),
       headers: {'x-user-id': _userId ?? ''},
     );
     debugPrint('UNIFIED_FEED: status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 500))}');
@@ -1039,6 +1048,7 @@ class ApiService {
     }
     return [];
   }
+
 
   /// Like a status
   static Future<bool> likeStatus(int statusId) async {

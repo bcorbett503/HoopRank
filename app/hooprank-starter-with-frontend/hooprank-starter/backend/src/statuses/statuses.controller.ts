@@ -63,21 +63,27 @@ export class StatusesController {
     }
 
     // Get unified feed (statuses + check-ins + matches)
+    // Supports filter: 'foryou' (local 50mi), 'following' (followed only), 'all' (default)
     @Get('unified-feed')
     async getUnifiedFeed(
         @Headers('x-user-id') userId: string,
         @Query('filter') filter: string = 'all',
+        @Query('lat') lat?: string,
+        @Query('lng') lng?: string,
     ) {
         try {
             if (!userId) {
                 return [];
             }
-            return await this.statusesService.getUnifiedFeed(userId, filter || 'all');
+            const latitude = lat ? parseFloat(lat) : undefined;
+            const longitude = lng ? parseFloat(lng) : undefined;
+            return await this.statusesService.getUnifiedFeed(userId, filter || 'all', 50, latitude, longitude);
         } catch (error) {
             console.error('Controller getUnifiedFeed error:', error.message);
             return [];
         }
     }
+
 
     // Get single status with details
     @Get(':id')

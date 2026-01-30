@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
 import '../state/check_in_state.dart';
 import '../services/api_service.dart';
 import 'feed_video_player.dart';
 import 'dart:math' as math;
 
-/// Unified HoopRank Feed with All/Courts tabs
+/// Unified HoopRank Feed with For You/Following tabs
 class HoopRankFeed extends StatefulWidget {
   const HoopRankFeed({super.key});
 
@@ -16,8 +17,11 @@ class HoopRankFeed extends StatefulWidget {
 
 class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<Map<String, dynamic>> _statusPosts = [];
-  bool _isLoading = true;
+  List<Map<String, dynamic>> _forYouPosts = [];
+  List<Map<String, dynamic>> _followingPosts = [];
+  bool _isLoadingForYou = true;
+  bool _isLoadingFollowing = true;
+  Position? _userLocation;
 
   // Local state for optimistic UI updates
   final Map<int, bool> _likeStates = {}; // statusId -> isLiked
@@ -31,68 +35,111 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadFeedWithRetry();
+    _tabController.addListener(_onTabChanged);
+    _initLocation();
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
 
-  /// Load feed with retry if userId not available yet
-  Future<void> _loadFeedWithRetry({int retries = 3}) async {
-    for (int i = 0; i < retries; i++) {
-      final userId = ApiService.userId;
-      debugPrint('FEED_INIT: attempt ${i+1}/$retries, userId=$userId');
-      if (userId != null && userId.isNotEmpty) {
-        await _loadFeed();
-        return;
-      }
-      // Wait a bit for auth to complete
-      await Future.delayed(const Duration(milliseconds: 500));
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    if (_tabController.index == 0 && _forYouPosts.isEmpty) {
+      _loadForYouFeed();
+    } else if (_tabController.index == 1 && _followingPosts.isEmpty) {
+      _loadFollowingFeed();
     }
-    // Still try even without userId
-    debugPrint('FEED_INIT: proceeding without userId after $retries attempts');
-    await _loadFeed();
   }
 
-  Future<void> _loadFeed({String filter = 'all'}) async {
-    setState(() => _isLoading = true);
+  /// Get user's location for "For You" feed
+  Future<void> _initLocation() async {
     try {
-      final userId = ApiService.userId;
-      debugPrint('FEED: Loading unified feed with filter=$filter, userId=$userId');
-      final feed = await ApiService.getUnifiedFeed(filter: filter);
-      debugPrint('FEED: Received ${feed.length} items');
-      
-      // De-duplicate by id to prevent showing same item multiple times
-      final seenIds = <String>{};
-      final dedupedFeed = feed.where((item) {
-        final id = item['id']?.toString();
-        if (id == null || seenIds.contains(id)) {
-          return false;
-        }
-        seenIds.add(id);
-        return true;
-      }).toList();
-      debugPrint('FEED: After dedup: ${dedupedFeed.length} items (removed ${feed.length - dedupedFeed.length} duplicates)');
-      
-      if (dedupedFeed.isNotEmpty) {
-        debugPrint('FEED: First item type=${dedupedFeed.first['type']}');
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        _userLocation = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low,
+        );
+        debugPrint('FEED: Got location: ${_userLocation?.latitude}, ${_userLocation?.longitude}');
+      }
+    } catch (e) {
+      debugPrint('FEED: Location error: $e');
+    }
+    // Load initial feed (For You tab is default)
+    _loadForYouFeed();
+    _loadFollowingFeed();
+  }
+
+  Future<void> _loadForYouFeed() async {
+    setState(() => _isLoadingForYou = true);
+    try {
+      final feed = await ApiService.getUnifiedFeed(
+        filter: 'foryou',
+        lat: _userLocation?.latitude,
+        lng: _userLocation?.longitude,
+      );
+      debugPrint('FEED: For You received ${feed.length} items');
+      
+      final dedupedFeed = _deduplicateFeed(feed);
       if (mounted) {
         setState(() {
-          _statusPosts = dedupedFeed;
-          _isLoading = false;
+          _forYouPosts = dedupedFeed;
+          _isLoadingForYou = false;
         });
       }
     } catch (e) {
-      debugPrint('FEED: Error loading feed: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      debugPrint('FEED: Error loading For You feed: $e');
+      if (mounted) setState(() => _isLoadingForYou = false);
     }
   }
+
+  Future<void> _loadFollowingFeed() async {
+    setState(() => _isLoadingFollowing = true);
+    try {
+      final feed = await ApiService.getUnifiedFeed(filter: 'following');
+      debugPrint('FEED: Following received ${feed.length} items');
+      
+      final dedupedFeed = _deduplicateFeed(feed);
+      if (mounted) {
+        setState(() {
+          _followingPosts = dedupedFeed;
+          _isLoadingFollowing = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('FEED: Error loading Following feed: $e');
+      if (mounted) setState(() => _isLoadingFollowing = false);
+    }
+  }
+
+  List<Map<String, dynamic>> _deduplicateFeed(List<Map<String, dynamic>> feed) {
+    final seenIds = <String>{};
+    return feed.where((item) {
+      final id = item['id']?.toString();
+      if (id == null || seenIds.contains(id)) return false;
+      seenIds.add(id);
+      return true;
+    }).toList();
+  }
+
+  // Legacy method for compatibility - uses For You posts
+  Future<void> _loadFeed({String filter = 'all'}) async {
+    if (filter == 'following') {
+      await _loadFollowingFeed();
+    } else {
+      await _loadForYouFeed();
+    }
+  }
+
+  // Legacy getter for _statusPosts - uses current tab's posts
+  List<Map<String, dynamic>> get _statusPosts => 
+    _tabController.index == 0 ? _forYouPosts : _followingPosts;
 
   @override
   Widget build(BuildContext context) {
@@ -118,8 +165,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             dividerColor: Colors.transparent,
             labelPadding: const EdgeInsets.symmetric(horizontal: 8),
             tabs: const [
-              Tab(height: 32, text: 'All'),
-              Tab(height: 32, text: 'Courts'),
+              Tab(height: 32, text: 'For You'),
+              Tab(height: 32, text: 'Following'),
             ],
           ),
         ),
@@ -128,8 +175,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
           child: TabBarView(
             controller: _tabController,
             children: [
-              _buildAllFeed(),
-              _buildCourtsFeed(),
+              _buildForYouFeed(),
+              _buildFollowingFeed(),
             ],
           ),
         ),
@@ -137,14 +184,55 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildAllFeed() {
-    if (_isLoading) {
+  Widget _buildForYouFeed() {
+    if (_isLoadingForYou) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_statusPosts.isEmpty) {
+    if (_forYouPosts.isEmpty) {
       return _buildEmptyState(
-        'No activity yet', 
+        'No local activity yet',
+        'Be the first to post at a court near you!',
+        extraContent: _userLocation == null 
+          ? Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                'Enable location to see activity within 50 miles',
+                style: TextStyle(color: Colors.orange.shade300, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            )
+          : null,
+      );
+    }
+
+    // Pin scheduled runs to top
+    final sortedPosts = _sortPostsWithScheduledFirst(_forYouPosts);
+
+    return RefreshIndicator(
+      onRefresh: _loadForYouFeed,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 100),
+        itemCount: sortedPosts.length,
+        itemBuilder: (context, index) => _buildFeedItemCard(sortedPosts[index]),
+      ),
+    );
+  }
+
+  Widget _buildFollowingFeed() {
+    if (_isLoadingFollowing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final checkInState = context.watch<CheckInState>();
+    final courtCount = checkInState.followedCourtCount;
+    final playerCount = checkInState.followedPlayerCount;
+    final totalFollowing = courtCount + playerCount;
+
+    // No following anyone yet - show empty state with follow buttons
+    if (totalFollowing == 0) {
+      return _buildEmptyState(
+        'Not following anyone yet', 
         'Follow courts and players to see their updates here.',
         extraContent: Padding(
           padding: const EdgeInsets.only(top: 16),
@@ -181,130 +269,140 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       );
     }
 
-    // Filter out expired scheduled runs and separate active scheduled runs
-    final now = DateTime.now();
-    final activePosts = _statusPosts.where((post) {
-      final scheduledAt = post['scheduledAt'];
-      if (scheduledAt != null) {
-        try {
-          final schedDate = DateTime.parse(scheduledAt.toString());
-          return schedDate.isAfter(now); // Only include future scheduled runs
-        } catch (_) {
-          return true; // Include if parsing fails
-        }
-      }
-      return true; // Include non-scheduled posts
-    }).toList();
+    // Following header widget - always show both counts
+    Widget followingHeader = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          const Icon(Icons.rss_feed, color: Colors.white54, size: 16),
+          const SizedBox(width: 8),
+          const Text('Following ', style: TextStyle(color: Colors.white54, fontSize: 13)),
+          // Players count - show modal if following, navigate if 0
+          GestureDetector(
+            onTap: () {
+              if (playerCount > 0) {
+                _showFollowedPlayersModal(context, checkInState);
+              } else {
+                context.go('/rankings');
+              }
+            },
+            child: Text(
+              '$playerCount player${playerCount == 1 ? '' : 's'}',
+              style: TextStyle(
+                color: playerCount > 0 ? Colors.green : Colors.white38,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+                decorationColor: playerCount > 0 ? Colors.green : Colors.white38,
+              ),
+            ),
+          ),
+          const Text(' • ', style: TextStyle(color: Colors.white38, fontSize: 13)),
+          // Courts count - show modal if following, navigate if 0
+          GestureDetector(
+            onTap: () {
+              if (courtCount > 0) {
+                _showFollowedCourtsModal(context, checkInState);
+              } else {
+                context.go('/courts');
+              }
+            },
+            child: Text(
+              '$courtCount court${courtCount == 1 ? '' : 's'}',
+              style: TextStyle(
+                color: courtCount > 0 ? Colors.blue : Colors.white38,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+                decorationColor: courtCount > 0 ? Colors.blue : Colors.white38,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
 
-    // Separate scheduled runs (pinned) from regular posts
-    final scheduledRuns = activePosts.where((post) => post['scheduledAt'] != null).toList();
-    final regularPosts = activePosts.where((post) => post['scheduledAt'] == null).toList();
+    // Has following but no activity
+    if (_followingPosts.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadFollowingFeed,
+        child: ListView(
+          children: [
+            followingHeader,
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(Icons.hourglass_empty, size: 40, color: Colors.white.withValues(alpha: 0.15)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'No activity yet',
+                    style: TextStyle(color: Colors.white54, fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Check back later for updates from the players and courts you follow.',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-    // Combine: scheduled runs first, then regular posts
-    final sortedPosts = [...scheduledRuns, ...regularPosts];
+    // Pin scheduled runs to top
+    final sortedPosts = _sortPostsWithScheduledFirst(_followingPosts);
 
     return RefreshIndicator(
-      onRefresh: () => _loadFeed(filter: 'all'),
+      onRefresh: _loadFollowingFeed,
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: sortedPosts.length,
-        itemBuilder: (context, index) => _buildFeedItemCard(sortedPosts[index]),
+        itemCount: sortedPosts.length + 1, // +1 for header
+        itemBuilder: (context, index) {
+          if (index == 0) return followingHeader;
+          return _buildFeedItemCard(sortedPosts[index - 1]);
+        },
       ),
     );
   }
 
-  Widget _buildCourtsFeed() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // Get followed courts from CheckInState
-    final checkInState = context.watch<CheckInState>();
-    final followedCourts = checkInState.followedCourts;
-
-    // Case 1: No courts followed at all
-    if (followedCourts.isEmpty) {
-      return _buildEmptyState(
-        'No courts followed', 
-        'Follow courts to see check-ins and activity here.',
-        extraContent: Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: SizedBox(
-            width: 160,
-            child: ElevatedButton.icon(
-              onPressed: () => context.go('/courts'),
-              icon: const Icon(Icons.location_on, size: 18),
-              label: const Text('Follow Courts'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    
-    // Filter items related to followed courts:
-    // 1. Check-ins and matches at followed courts (by courtId)
-    // 2. Status posts mentioning followed courts (by content containing court names)
-    // 3. Scheduled events that mention followed courts
+  /// Sort posts with scheduled runs at the top (soonest first), then regular posts by createdAt
+  List<Map<String, dynamic>> _sortPostsWithScheduledFirst(List<Map<String, dynamic>> posts) {
     final now = DateTime.now();
-    final courtItems = _statusPosts.where((item) {
-      // First, filter out expired scheduled runs
-      final scheduledAt = item['scheduledAt'];
+    
+    // Filter out expired scheduled runs
+    final activePosts = posts.where((post) {
+      final scheduledAt = post['scheduledAt'];
       if (scheduledAt != null) {
         try {
           final schedDate = DateTime.parse(scheduledAt.toString());
-          if (schedDate.isBefore(now)) {
-            return false; // Exclude expired scheduled runs
-          }
-        } catch (_) {}
-      }
-      
-      // Include check-ins and matches by courtId
-      if (item['type'] == 'checkin' || item['type'] == 'match') {
-        final courtId = item['courtId']?.toString();
-        if (courtId != null && followedCourts.contains(courtId)) {
+          return schedDate.isAfter(now);
+        } catch (_) {
           return true;
         }
       }
-      
-      // Include status posts that mention followed courts in content
-      final content = item['content']?.toString().toLowerCase() ?? '';
-      for (final courtId in followedCourts) {
-        // Check if content mentions the court (with @, or partial match)
-        if (content.contains('@') || content.contains('olympic') || content.contains('club')) {
-          // For now, include posts that have @ mentions (court references)
-          // This is a simple heuristic - posts with @ typically reference courts
-          if (content.contains('@')) {
-            return true;
-          }
-        }
-      }
-      
-      return false;
+      return true;
     }).toList();
-    
-    // Sort by scheduled events first (soonest first), then by createdAt
-    courtItems.sort((a, b) {
-      final aScheduled = a['scheduledAt'] != null;
-      final bScheduled = b['scheduledAt'] != null;
-      
-      // Scheduled events come first
-      if (aScheduled && !bScheduled) return -1;
-      if (!aScheduled && bScheduled) return 1;
-      
-      // If both scheduled, sort by scheduled time (soonest first)
-      if (aScheduled && bScheduled) {
-        final aTime = DateTime.tryParse(a['scheduledAt']?.toString() ?? '');
-        final bTime = DateTime.tryParse(b['scheduledAt']?.toString() ?? '');
-        if (aTime != null && bTime != null) {
-          return aTime.compareTo(bTime);
-        }
+
+    // Separate scheduled runs from regular posts
+    final scheduledRuns = activePosts.where((post) => post['scheduledAt'] != null).toList();
+    final regularPosts = activePosts.where((post) => post['scheduledAt'] == null).toList();
+
+    // Sort scheduled runs by time (soonest first)
+    scheduledRuns.sort((a, b) {
+      final aTime = DateTime.tryParse(a['scheduledAt']?.toString() ?? '');
+      final bTime = DateTime.tryParse(b['scheduledAt']?.toString() ?? '');
+      if (aTime != null && bTime != null) {
+        return aTime.compareTo(bTime);
       }
-      
-      // Otherwise sort by createdAt (most recent first)
+      return 0;
+    });
+
+    // Sort regular posts by createdAt (most recent first)
+    regularPosts.sort((a, b) {
       final aCreated = DateTime.tryParse(a['createdAt']?.toString() ?? '');
       final bCreated = DateTime.tryParse(b['createdAt']?.toString() ?? '');
       if (aCreated != null && bCreated != null) {
@@ -313,284 +411,212 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       return 0;
     });
 
-    // Case 2: Courts followed but no related activity
-    if (courtItems.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: () => _loadFeed(filter: 'courts'),
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 100),
+    // Combine: scheduled runs first, then regular posts
+    return [...scheduledRuns, ...regularPosts];
+  }
+
+  /// Show modal with list of followed players
+  void _showFollowedPlayersModal(BuildContext context, CheckInState checkInState) async {
+    final players = await checkInState.getFollowedPlayersInfo();
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.8,
+        expand: false,
+        builder: (context, scrollController) => Column(
           children: [
-            // Header showing followed courts count
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Title
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                            const Icon(Icons.location_on, color: Colors.blue, size: 18),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Following ',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => _showFollowedCourtsModal(context, followedCourts),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    '${followedCourts.length} court${followedCourts.length == 1 ? '' : 's'}',
-                                    style: const TextStyle(
-                                      color: Colors.blue,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      decoration: TextDecoration.underline,
-                                      decorationColor: Colors.blue,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.chevron_right, color: Colors.blue, size: 16),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Empty state message
-                      Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            Icon(Icons.sports_basketball, size: 48, color: Colors.white.withOpacity(0.15)),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No activity yet',
-                              style: TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w500),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'When players schedule games or check in at your followed courts, they\'ll appear here.',
-                              style: TextStyle(color: Colors.white38, fontSize: 13),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  const Icon(Icons.person, color: Colors.green, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Following ${players.length} Player${players.length == 1 ? '' : 's'}',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                );
-              }
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white12, height: 1),
+            // Player list
+            Expanded(
+              child: players.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No players followed yet',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.green.withValues(alpha: 0.2),
+                            backgroundImage: player.photoUrl != null
+                                ? NetworkImage(player.photoUrl!)
+                                : null,
+                            child: player.photoUrl == null
+                                ? Text(
+                                    player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
+                                    style: const TextStyle(color: Colors.green),
+                                  )
+                                : null,
+                          ),
+                          title: Text(
+                            player.name,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            'Rating: ${player.rating.toStringAsFixed(1)}',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.favorite, color: Colors.red),
+                            onPressed: () async {
+                              await checkInState.unfollowPlayer(player.playerId);
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            tooltip: 'Unfollow',
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            context.go('/player/${player.playerId}');
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              // Case 3: Has court-related activity - show using same card style as All feed
-              return RefreshIndicator(
-                onRefresh: () => _loadFeed(filter: 'courts'),
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 100),
-                  itemCount: courtItems.length + 1, // +1 for header
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      // Header showing followed courts count - CLICKABLE
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.location_on, color: Colors.blue, size: 18),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Following ',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
+  /// Show modal with list of followed courts
+  void _showFollowedCourtsModal(BuildContext context, CheckInState checkInState) async {
+    final courts = await checkInState.getFollowedCourtsWithActivity();
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.8,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Following ${courts.length} Court${courts.length == 1 ? '' : 's'}',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white12, height: 1),
+            // Court list
+            Expanded(
+              child: courts.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No courts followed yet',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: courts.length,
+                      itemBuilder: (context, index) {
+                        final court = courts[index];
+                        return ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            GestureDetector(
-                              onTap: () => _showFollowedCourtsModal(context, followedCourts),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    '${followedCourts.length} court${followedCourts.length == 1 ? '' : 's'}',
-                                    style: const TextStyle(
-                                      color: Colors.blue,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      decoration: TextDecoration.underline,
-                                      decorationColor: Colors.blue,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.chevron_right, color: Colors.blue, size: 16),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '• ${courtItems.length} update${courtItems.length == 1 ? '' : 's'}',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    return _buildFeedItemCard(courtItems[index - 1]);
-                  },
-                ),
-              );
-            }
-
-            /// Show modal with list of followed courts
-            void _showFollowedCourtsModal(BuildContext context, Set<String> followedCourts) async {
-              final checkInState = context.read<CheckInState>();
-              final courtsWithActivity = await checkInState.getFollowedCourtsWithActivity();
-              
-              if (!context.mounted) return;
-              
-              showModalBottomSheet(
-                context: context,
-                backgroundColor: const Color(0xFF1E1E1E),
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                isScrollControlled: true,
-                builder: (context) {
-                  return StatefulBuilder(
-                    builder: (context, setModalState) {
-                      return DraggableScrollableSheet(
-                        initialChildSize: 0.5,
-                        minChildSize: 0.3,
-                        maxChildSize: 0.8,
-                        expand: false,
-                        builder: (context, scrollController) {
-                          return Column(
-                            children: [
-                              // Handle bar
-                              Container(
-                                margin: const EdgeInsets.only(top: 12, bottom: 8),
-                                width: 40,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: Colors.white24,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              // Title
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.location_on, color: Colors.blue, size: 20),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Following ${courtsWithActivity.length} Court${courtsWithActivity.length == 1 ? '' : 's'}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Divider(color: Colors.white12, height: 1),
-                              // Court list
-                              Expanded(
-                                child: courtsWithActivity.isEmpty
-                                    ? Center(
-                                        child: Text(
-                                          'No courts followed yet',
-                                          style: TextStyle(color: Colors.white.withOpacity(0.5)),
-                                        ),
-                                      )
-                                    : ListView.builder(
-                                        controller: scrollController,
-                                        itemCount: courtsWithActivity.length,
-                                        itemBuilder: (context, index) {
-                                          final court = courtsWithActivity[index];
-                                          final isFollowing = checkInState.isFollowing(court.courtId);
-                                          final hasAlert = checkInState.isAlertEnabled(court.courtId);
-                                          
-                                          return ListTile(
-                                            leading: Container(
-                                              width: 40,
-                                              height: 40,
-                                              decoration: BoxDecoration(
-                                                color: Colors.blue.withOpacity(0.2),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: const Icon(Icons.sports_basketball, color: Colors.blue, size: 24),
-                                            ),
-                                            title: Text(
-                                              court.courtName,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            subtitle: court.address != null
-                                                ? Text(
-                                                    court.address!,
-                                                    style: TextStyle(
-                                                      color: Colors.white.withOpacity(0.5),
-                                                      fontSize: 12,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  )
-                                                : null,
-                                            trailing: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                // Alert/Bell button
-                                                IconButton(
-                                                  icon: Icon(
-                                                    hasAlert ? Icons.notifications_active : Icons.notifications_none,
-                                                    color: hasAlert ? Colors.amber : Colors.white38,
-                                                  ),
-                                                  onPressed: () async {
-                                                    await checkInState.toggleAlert(court.courtId);
-                                                    setModalState(() {}); // Refresh modal
-                                                  },
-                                                  tooltip: hasAlert ? 'Disable alerts' : 'Enable alerts',
-                                                ),
-                                                // Heart/Follow button
-                                                IconButton(
-                                                  icon: Icon(
-                                                    isFollowing ? Icons.favorite : Icons.favorite_border,
-                                                    color: isFollowing ? Colors.red : Colors.white38,
-                                                  ),
-                                                  onPressed: () async {
-                                                    await checkInState.toggleFollow(court.courtId);
-                                                    // Refresh the list after unfollowing
-                                                    final updatedCourts = await checkInState.getFollowedCourtsWithActivity();
-                                                    setModalState(() {
-                                                      courtsWithActivity.clear();
-                                                      courtsWithActivity.addAll(updatedCourts);
-                                                    });
-                                                  },
-                                                  tooltip: isFollowing ? 'Unfollow' : 'Follow',
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            }
-
-
+                            child: const Icon(Icons.sports_basketball, color: Colors.blue, size: 24),
+                          ),
+                          title: Text(
+                            court.courtName,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: court.address != null
+                              ? Text(
+                                  court.address!,
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.favorite, color: Colors.red),
+                            onPressed: () async {
+                              await checkInState.unfollowCourt(court.courtId);
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            tooltip: 'Unfollow',
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            context.go('/court/${court.courtId}');
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildEmptyState(String title, String subtitle, {Widget? extraContent}) {
     return Padding(
@@ -598,7 +624,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Icon(Icons.feed_outlined, size: 48, color: Colors.white.withOpacity(0.2)),
+          Icon(Icons.feed_outlined, size: 48, color: Colors.white.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(title, style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),

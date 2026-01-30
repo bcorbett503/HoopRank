@@ -256,10 +256,12 @@ export class StatusesService {
 
     // ========== Unified Feed ==========
 
-    async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50): Promise<any[]> {
+    async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50, lat?: number, lng?: number): Promise<any[]> {
         try {
-            // Full query with engagement counts now that tables are fixed
-            const query = `
+            console.log('getUnifiedFeed: filter=', filter, 'userId=', userId, 'lat=', lat, 'lng=', lng);
+
+            // Base SELECT clause for all queries
+            const selectClause = `
                 SELECT 
                     'status' as type,
                     ps.id::TEXT as id,
@@ -283,16 +285,91 @@ export class StatusesService {
                 FROM player_statuses ps
                 LEFT JOIN users u ON ps.user_id::TEXT = u.id::TEXT
                 LEFT JOIN courts c ON ps.court_id::TEXT = c.id::TEXT
-                WHERE ps.user_id = $1
-                   OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
-                   OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
-                ORDER BY ps.created_at DESC
-                LIMIT $4
             `;
 
-            console.log('getUnifiedFeed: executing full query for user:', userId);
-            const results = await this.dataSource.query(query, [userId, userId, userId, limit]);
-            console.log('getUnifiedFeed: got', results.length, 'results');
+            let query: string;
+            let params: any[];
+
+            if (filter === 'foryou' && lat !== undefined && lng !== undefined) {
+                // FOR YOU: Expanding radius search
+                // Start at 50 miles, expand until we find activity, max is entire network
+                // Radius tiers in meters: 50mi, 100mi, 250mi, 500mi, 1000mi, then unlimited
+                const radiusTiers = [
+                    80467,    // 50 miles
+                    160934,   // 100 miles  
+                    402336,   // 250 miles
+                    804672,   // 500 miles
+                    1609344,  // 1000 miles
+                ];
+
+                let results: any[] = [];
+                let usedRadius = 0;
+
+                // Try each radius tier until we find results
+                for (const radius of radiusTiers) {
+                    query = `
+                        ${selectClause}
+                        WHERE c.geog IS NOT NULL 
+                          AND ST_DWithin(
+                              c.geog, 
+                              ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 
+                              $4
+                          )
+                        ORDER BY ps.created_at DESC
+                        LIMIT $5
+                    `;
+                    params = [userId, lng, lat, radius, limit];
+                    results = await this.dataSource.query(query, params);
+                    usedRadius = radius;
+
+                    if (results.length > 0) {
+                        console.log(`getUnifiedFeed: found ${results.length} results at ${Math.round(radius / 1609)}mi radius`);
+                        break;
+                    }
+                }
+
+                // If still no results, fall back to entire network (no geo filter)
+                if (results.length === 0) {
+                    console.log('getUnifiedFeed: no nearby results, falling back to entire network');
+                    query = `
+                        ${selectClause}
+                        ORDER BY ps.created_at DESC
+                        LIMIT $2
+                    `;
+                    params = [userId, limit];
+                    results = await this.dataSource.query(query, params);
+                    console.log(`getUnifiedFeed: found ${results.length} results from entire network`);
+                }
+
+                return results;
+            } else if (filter === 'following') {
+                // FOLLOWING: Only posts from followed players/courts (and own posts)
+                query = `
+                    ${selectClause}
+                    WHERE ps.user_id = $1
+                       OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
+                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
+                    ORDER BY ps.created_at DESC
+                    LIMIT $4
+                `;
+                params = [userId, userId, userId, limit];
+                console.log('getUnifiedFeed: using FOLLOWING query');
+            } else {
+                // ALL: Default behavior - own posts + followed players + followed courts
+                query = `
+                    ${selectClause}
+                    WHERE ps.user_id = $1
+                       OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
+                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
+                    ORDER BY ps.created_at DESC
+                    LIMIT $4
+                `;
+                params = [userId, userId, userId, limit];
+                console.log('getUnifiedFeed: using ALL query (default)');
+            }
+
+            const results = await this.dataSource.query(query, params);
+            console.log('getUnifiedFeed: got', results.length, 'results for filter:', filter);
             return results;
         } catch (error) {
             console.error('getUnifiedFeed error:', error.message);
