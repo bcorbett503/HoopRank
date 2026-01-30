@@ -356,14 +356,16 @@ export class MessagesService {
             const count = await this.dataSource.query(`SELECT COUNT(*) as count FROM messages`);
 
             // Try a test insert and rollback
-            const testId = 'test-' + Date.now();
+            const { v4: uuidv4 } = require('uuid');
+            const testId = uuidv4();
+            const testThreadId = uuidv4();
             let insertError = null;
             try {
                 await this.dataSource.query(`
-                    INSERT INTO messages (id, thread_id, from_id, to_id, body, is_challenge, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                    INSERT INTO messages (id, thread_id, from_id, to_id, body, read, is_challenge, created_at)
+                    VALUES ($1, $2, $3, $4, $5, false, false, NOW())
                     RETURNING id
-                `, [testId, testId, 'test-user', 'test-user2', 'test', false]);
+                `, [testId, testThreadId, 'test-user', 'test-user2', 'test']);
                 // Delete test row
                 await this.dataSource.query(`DELETE FROM messages WHERE id = $1`, [testId]);
             } catch (e) {
