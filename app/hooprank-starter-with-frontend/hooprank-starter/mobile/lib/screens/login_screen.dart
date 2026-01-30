@@ -42,9 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final firebaseUser = credential.user!;
       final userId = firebaseUser.uid;
 
+      // Get ID token first so it's available for both success and fallback cases
+      final idToken = await firebaseUser.getIdToken();
+      
       // Try to authenticate with backend (required)
       try {
-        final idToken = await firebaseUser.getIdToken();
         if (idToken != null) {
           final user = await ApiService.authenticate(
             idToken,
@@ -71,7 +73,8 @@ class _LoginScreenState extends State<LoginScreen> {
           photoUrl: firebaseUser.photoURL,
           // position is null, so isProfileComplete will be false
         );
-        await auth.login(user);
+        // IMPORTANT: Pass token even on fallback so authenticated API calls work
+        await auth.login(user, token: idToken);
         
         if (mounted) {
           context.go('/play'); // Router will redirect to /profile/setup

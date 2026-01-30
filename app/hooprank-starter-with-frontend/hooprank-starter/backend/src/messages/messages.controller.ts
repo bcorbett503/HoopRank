@@ -12,8 +12,14 @@ export class MessagesController {
     ) { }
 
     @Post()
-    @UseGuards(AuthGuard)
-    async sendMessage(@Body() body: { senderId: string; receiverId: string; content: string; matchId?: string; isChallenge?: boolean }) {
+    async sendMessage(
+        @Headers('x-user-id') userId: string,
+        @Body() body: { senderId: string; receiverId: string; content: string; matchId?: string; isChallenge?: boolean }
+    ) {
+        // Validate that the authenticated user matches the sender
+        if (!userId || userId !== body.senderId) {
+            throw new Error('Unauthorized: sender must match authenticated user');
+        }
         return this.messagesService.sendMessage(body.senderId, body.receiverId, body.content, body.matchId, body.isChallenge);
     }
 
