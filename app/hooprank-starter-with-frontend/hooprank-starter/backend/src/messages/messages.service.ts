@@ -18,12 +18,19 @@ export class MessagesService {
         const threadId = uuidv4();
 
         if (isPostgres) {
-            const result = await this.dataSource.query(`
-                INSERT INTO messages (id, thread_id, from_id, to_id, body, is_challenge, challenge_status, match_id, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-                RETURNING *
-            `, [id, threadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null]);
-            return result[0];
+            try {
+                console.log('sendMessage: inserting message:', { id, threadId, senderId, receiverId, content, isChallenge, matchId });
+                const result = await this.dataSource.query(`
+                    INSERT INTO messages (id, thread_id, from_id, to_id, body, is_challenge, challenge_status, match_id, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                    RETURNING *
+                `, [id, threadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null]);
+                console.log('sendMessage: success:', result[0]);
+                return result[0];
+            } catch (error) {
+                console.error('sendMessage error:', error.message, error.stack);
+                throw error;
+            }
         }
 
         const message = this.messagesRepository.create({
