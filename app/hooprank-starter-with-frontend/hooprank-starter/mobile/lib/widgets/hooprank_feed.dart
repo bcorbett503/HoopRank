@@ -812,31 +812,50 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 ),
               ),
             const SizedBox(height: 16),
-            // Accept / Decline buttons
+            // Reply / Decline / Start Match buttons
             Row(
               children: [
+                // Decline button
                 Expanded(
+                  flex: 1,
                   child: OutlinedButton.icon(
                     onPressed: () => _declineChallenge(challenge),
-                    icon: const Icon(Icons.close, size: 18),
-                    label: const Text('Decline'),
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Decline', style: TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white70,
                       side: const BorderSide(color: Colors.white30),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
+                // Reply button - navigate to chat
                 Expanded(
+                  flex: 1,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _replyToChallenge(challenge),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                    label: const Text('Reply', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.orange),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Start Match button
+                Expanded(
+                  flex: 2,
                   child: ElevatedButton.icon(
                     onPressed: () => _acceptChallenge(challenge),
-                    icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Accept'),
+                    icon: const Icon(Icons.sports_basketball, size: 18),
+                    label: const Text('Start Match'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
                 ),
@@ -848,18 +867,23 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     );
   }
 
-  /// Accept a challenge
+  /// Accept a challenge and start a match
   Future<void> _acceptChallenge(ChallengeRequest challenge) async {
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
-      await _messagesService.acceptChallenge(userId, challenge.message.id);
+      final result = await _messagesService.acceptChallenge(userId, challenge.message.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Challenge accepted! 🏀'), backgroundColor: Colors.green),
-        );
         _loadPendingChallenges(); // Refresh challenges
+        // Navigate to match setup with opponent info
+        // The acceptChallenge should return match info, navigate to match flow
+        if (result['matchId'] != null) {
+          context.go('/match/live');
+        } else {
+          // No match created yet, go to match setup
+          context.go('/match/setup');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -868,6 +892,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         );
       }
     }
+  }
+
+  /// Reply to a challenge - navigate to chat
+  void _replyToChallenge(ChallengeRequest challenge) {
+    // Navigate to chat with the challenger
+    context.go('/messages/chat/${challenge.sender.id}');
   }
 
   /// Decline a challenge
