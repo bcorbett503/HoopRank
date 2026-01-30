@@ -274,8 +274,9 @@ export class MessagesService {
      * Mark all messages from a specific sender as read
      * Called when user opens a conversation
      */
-    async markConversationAsRead(userId: string, otherUserId: string): Promise<{ userId: string, otherUserId: string, foundUnread: number, updated: boolean }> {
+    async markConversationAsRead(userId: string, otherUserId: string): Promise<{ userId: string, otherUserId: string, foundUnread: number, updated: boolean, error?: string }> {
         const isPostgres = !!process.env.DATABASE_URL;
+        console.log(`markConversationAsRead: isPostgres=${isPostgres}`);
 
         if (isPostgres) {
             try {
@@ -302,11 +303,11 @@ export class MessagesService {
 
                 return { userId, otherUserId, foundUnread, updated: true };
             } catch (error) {
-                console.error('markConversationAsRead error:', error.message);
-                return { userId, otherUserId, foundUnread: 0, updated: false };
+                console.error('markConversationAsRead error:', error);
+                return { userId, otherUserId, foundUnread: 0, updated: false, error: error.message };
             }
         }
-        return { userId, otherUserId, foundUnread: 0, updated: false };
+        return { userId, otherUserId, foundUnread: 0, updated: false, error: 'Not PostgreSQL' };
     }
 
     /**
