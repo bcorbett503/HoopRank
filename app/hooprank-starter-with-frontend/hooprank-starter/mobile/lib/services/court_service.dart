@@ -88,7 +88,62 @@ class CourtService {
       }).toList();
       
       // Process indoor venues - NOT all are signature, only famous ones
-      final indoorCourts = indoorData.map((json) {
+      // First, filter out false positives (non-basketball venues that got included)
+      final blockedTerms = <String>[
+        'fashion institute',
+        'fashion design',
+        'art institute',
+        'art school',
+        'beauty school',
+        'cosmetology',
+        'culinary',
+        'cooking school',
+        'barber school',
+        'massage school',
+        'music school',
+        'dance studio',
+        'ballet',
+        'yoga studio',
+        'pilates',
+        'karate',
+        'martial arts',
+        'taekwondo',
+        'jiu jitsu',
+        'boxing gym',
+        'crossfit',
+        'spinning',
+        'cycle',
+        'nail salon',
+        'hair salon',
+        'spa',
+        'tattoo',
+        'driving school',
+        'auto school',
+        'flight school',
+        'language school',
+        'tutoring',
+        'preschool',
+        'daycare',
+        'montessori',
+        'nursing home',
+        'assisted living',
+        'funeral',
+        'mortuary',
+        'church',
+        'synagogue',
+        'mosque',
+        'temple',
+        'chapel',
+      ];
+      
+      bool isBlockedVenue(String name) {
+        final nameLower = name.toLowerCase();
+        return blockedTerms.any((term) => nameLower.contains(term));
+      }
+      
+      final indoorCourts = indoorData
+          .where((json) => !isBlockedVenue((json['name'] as String?) ?? ''))
+          .map((json) {
         final id = (json['id'] as String?) ?? 'unknown';
         final name = (json['name'] as String?) ?? 'Indoor Court';
         final category = (json['category'] as String?) ?? 'other';
@@ -108,6 +163,7 @@ class CourtService {
           isIndoor: true,
         );
       }).toList();
+
       
       // Merge both datasets
       _courts = [...outdoorCourts, ...indoorCourts];
