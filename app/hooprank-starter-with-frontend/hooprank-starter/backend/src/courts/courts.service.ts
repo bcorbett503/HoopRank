@@ -154,7 +154,7 @@ export class CourtsService {
             SELECT 
                 ci.id,
                 ci.user_id as "userId",
-                u.display_name as "userName",
+                u.name as "userName",
                 u.avatar_url as "userPhotoUrl",
                 ci.checked_in_at as "checkedInAt",
                 ci.checked_out_at as "checkedOutAt"
@@ -174,7 +174,7 @@ export class CourtsService {
             SELECT 
                 ci.id,
                 ci.user_id as "userId",
-                u.display_name as "userName",
+                u.name as "userName",
                 u.avatar_url as "userPhotoUrl",
                 ci.checked_in_at as "checkedInAt"
             FROM check_ins ci

@@ -70,7 +70,7 @@ export class StatusesService {
             SELECT 
                 ps.id,
                 ps.user_id as "userId",
-                u.display_name as "userName",
+                u.name as "userName",
                 u.avatar_url as "userPhotoUrl",
                 ps.content,
                 ps.image_url as "imageUrl",
@@ -99,7 +99,7 @@ export class StatusesService {
                 SELECT 
                     ps.id,
                     ps.user_id as "userId",
-                    u.display_name as "userName",
+                    u.name as "userName",
                     u.avatar_url as "userPhotoUrl",
                     ps.content,
                     ps.image_url as "imageUrl",
@@ -129,7 +129,7 @@ export class StatusesService {
             SELECT 
                 ps.id,
                 ps.user_id as "userId",
-                u.display_name as "userName",
+                u.name as "userName",
                 u.avatar_url as "userPhotoUrl",
                 ps.content,
                 ps.image_url as "imageUrl",
@@ -174,7 +174,7 @@ export class StatusesService {
         const query = `
             SELECT 
                 sl.user_id as "userId",
-                u.display_name as "userName",
+                u.name as "userName",
                 u.avatar_url as "userPhotoUrl",
                 sl.created_at as "createdAt"
             FROM status_likes sl
@@ -198,7 +198,7 @@ export class StatusesService {
             SELECT 
                 sc.id,
                 sc.user_id as "userId",
-                u.display_name as "userName",
+                u.name as "userName",
                 u.avatar_url as "userPhotoUrl",
                 sc.content,
                 sc.created_at as "createdAt"
@@ -243,7 +243,7 @@ export class StatusesService {
         const query = `
             SELECT 
                 ea.user_id as "userId",
-                u.display_name as "userName",
+                u.name as "userName",
                 u.avatar_url as "userPhotoUrl",
                 ea.created_at as "createdAt"
             FROM event_attendees ea
@@ -267,7 +267,7 @@ export class StatusesService {
                     ps.id::TEXT as id,
                     ps.created_at as "createdAt",
                     ps.user_id as "userId",
-                    COALESCE(u.display_name, 'Unknown') as "userName",
+                    COALESCE(u.name, 'Unknown') as "userName",
                     u.avatar_url as "userPhotoUrl",
                     ps.content,
                     ps.image_url as "imageUrl",
@@ -413,7 +413,7 @@ export class StatusesService {
 
             // Get users table sample (to check id type and data)
             const users = await this.dataSource.query(`
-                SELECT id, email, display_name, avatar_url FROM users LIMIT 5
+                SELECT id, email, name, avatar_url FROM users LIMIT 5
             `);
 
             // Get player_statuses schema

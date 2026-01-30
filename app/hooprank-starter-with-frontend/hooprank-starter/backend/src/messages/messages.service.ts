@@ -48,7 +48,7 @@ export class MessagesService {
                 // Get challenges where user is sender OR receiver with pending status
                 const results = await this.dataSource.query(`
                     SELECT m.*, 
-                        u.id as sender_id, u.display_name as sender_name, u.avatar_url as sender_avatar_url, u.rating as sender_rating,
+                        u.id as sender_id, u.name as sender_name, u.avatar_url as sender_avatar_url, u.hoop_rank as sender_rating,
                         CASE 
                             WHEN m.from_id = $1 THEN 'sent'
                             ELSE 'received'
@@ -117,7 +117,7 @@ export class MessagesService {
                         WHERE to_id = $1 AND (read = false OR read IS NULL)
                         GROUP BY from_id
                     )
-                    SELECT rm.*, u.id as user_id, u.display_name, u.avatar_url, u.rating,
+                    SELECT rm.*, u.id as user_id, u.name, u.avatar_url, u.hoop_rank as rating,
                            COALESCE(uc.unread_count, 0) as unread_count
                     FROM ranked_messages rm
                     JOIN users u ON u.id = rm.other_user_id
@@ -131,7 +131,7 @@ export class MessagesService {
                     threadId: r.thread_id,
                     user: {
                         id: r.user_id,
-                        name: r.display_name,
+                        name: r.name,
                         photoUrl: r.avatar_url,
                         rating: r.rating,
                     },
