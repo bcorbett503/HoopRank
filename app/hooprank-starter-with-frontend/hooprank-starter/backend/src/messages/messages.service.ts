@@ -132,7 +132,8 @@ export class MessagesService {
                         isChallenge: r.is_challenge,
                         challengeStatus: r.challenge_status,
                     },
-                    unreadCount: 0, // TODO: implement unread tracking
+                    // Simple unread logic: if last message was from the other user, treat as unread
+                    unreadCount: r.from_id !== userId ? 1 : 0,
                 }));
             } catch (error) {
                 console.error('getConversations error:', error.message);
@@ -221,6 +222,37 @@ export class MessagesService {
 
         // SQLite fallback
         return 0;
+    }
+
+    /**
+     * Update challenge status (accept/decline)
+     */
+    async updateChallengeStatus(messageId: string, status: 'accepted' | 'declined', userId: string): Promise<any> {
+        const isPostgres = !!process.env.DATABASE_URL;
+
+        if (isPostgres) {
+            try {
+                // Update the challenge status
+                await this.dataSource.query(`
+                    UPDATE messages 
+                    SET challenge_status = $1, updated_at = NOW()
+                    WHERE id = $2 AND is_challenge = true
+                `, [status, messageId]);
+
+                // Return the updated message
+                const result = await this.dataSource.query(`
+                    SELECT * FROM messages WHERE id = $1
+                `, [messageId]);
+
+                return result.length > 0 ? result[0] : null;
+            } catch (error) {
+                console.error('updateChallengeStatus error:', error.message);
+                throw error;
+            }
+        }
+
+        // SQLite fallback
+        return null;
     }
 }
 

@@ -20,6 +20,7 @@ class ScaffoldWithNavBar extends StatefulWidget {
 class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
   int _unreadCount = 0;
   int _teamInvitesCount = 0;
+  int _challengeCount = 0;
   bool _hasLoadedInitially = false;
 
   @override
@@ -46,20 +47,25 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
 
   Future<void> _loadBadgeCounts() async {
     try {
-      // Load both counts in parallel
+      // Load all counts in parallel
       final results = await Future.wait([
         ApiService.getUnreadMessageCount(),
         ApiService.getTeamInvites(),
+        ApiService.getPendingChallenges(),
       ]);
       if (mounted) {
         setState(() {
           _unreadCount = results[0] as int;
           _teamInvitesCount = (results[1] as List).length;
+          // Count incoming challenges (where user is receiver)
+          final challenges = results[2] as List;
+          _challengeCount = challenges.where((c) => c['direction'] == 'incoming').length;
           _hasLoadedInitially = true;
         });
       }
     } catch (e) {
       // Silently fail - badge not critical
+      debugPrint('Failed to load badge counts: $e');
     }
   }
 
@@ -91,7 +97,17 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
             ),
             label: 'Messages',
           ),
-          const NavigationDestination(icon: Icon(Icons.sports_basketball), label: 'Play'),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: _challengeCount > 0,
+              label: Text(
+                _challengeCount > 99 ? '99+' : _challengeCount.toString(),
+                style: const TextStyle(fontSize: 10),
+              ),
+              child: const Icon(Icons.sports_basketball),
+            ),
+            label: 'Play',
+          ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: _teamInvitesCount > 0,

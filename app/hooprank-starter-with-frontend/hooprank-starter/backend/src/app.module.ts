@@ -15,6 +15,7 @@ import { Team, TeamMember, TeamMessage } from './teams/team.entity';
 import { PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn } from './statuses/status.entity';
 import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
+import { ChallengesModule } from './challenges/challenges.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ActivityModule } from './activity/activity.module';
 import { RankingsModule } from './rankings/rankings.module';
@@ -59,6 +60,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     StatusesModule,
     TeamsModule,
     MessagesModule,
+    ChallengesModule,
     FirebaseModule,
     NotificationsModule,
     ActivityModule,

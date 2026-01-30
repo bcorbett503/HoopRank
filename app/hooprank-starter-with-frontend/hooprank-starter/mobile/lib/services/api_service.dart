@@ -250,6 +250,30 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  /// Get pending challenges for the current user
+  static Future<List<Map<String, dynamic>>> getPendingChallenges() async {
+    if (_userId == null || _userId!.isEmpty) return [];
+    
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/challenges'),
+        headers: {
+          'x-user-id': _userId!,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is List) {
+          return data.cast<Map<String, dynamic>>();
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to get pending challenges: $e');
+    }
+    return [];
+  }
+
   /// Get rankings (players for 1v1, teams for 3v3/5v5)
   static Future<List<Map<String, dynamic>>> getRankings({required String mode}) async {
     final response = await http.get(
