@@ -122,22 +122,33 @@ class ApiService {
   }
 
   static Future<void> updateProfile(String userId, Map<String, dynamic> data) async {
-    if (_authToken == null && _userId == null) throw Exception('Not authenticated');
+    debugPrint('updateProfile: userId=$userId, _authToken=${_authToken != null}, _userId=$_userId');
+    
+    // Don't require auth for profile setup - new users won't have tokens set yet
+    // Just use the userId passed in directly
+    
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/$userId/profile'),
+        headers: {
+          if (_authToken != null) 'Authorization': 'Bearer $_authToken',
+          'x-user-id': userId,  // Use the passed userId directly
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 30));
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/users/$userId/profile'),
-      headers: {
-        'Authorization': 'Bearer $_authToken',
-        'x-user-id': _userId ?? '',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(data),
-    );
-
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to update profile');
+      debugPrint('updateProfile: status=${response.statusCode}');
+      
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Failed to update profile: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('updateProfile error: $e');
+      rethrow;
     }
   }
+
 
   /// Upload an image for profile or team
   /// [type] - 'profile' or 'team'

@@ -136,66 +136,95 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
-  Future<void> _save() async {
-    final auth = context.read<AuthState>();
-    final userId = auth.currentUser?.id;
-    final playerId = auth.currentUser?.id;
+  bool _saving = false;
 
-    if (userId != null && playerId != null) {
-      // Upload image if a new one was selected - convert to base64 data URL
-      String? avatarUrl;
-      if (_imageFile != null) {
-        try {
-          final bytes = await _imageFile!.readAsBytes();
-          final base64Image = base64Encode(bytes);
-          final mimeType = _imageFile!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-          avatarUrl = 'data:$mimeType;base64,$base64Image';
-          debugPrint('Profile photo encoded: ${avatarUrl.length} chars');
-        } catch (e) {
-          debugPrint('Failed to encode profile photo: $e');
+  Future<void> _save() async {
+    if (_saving) return;
+    
+    setState(() => _saving = true);
+    
+    try {
+      final auth = context.read<AuthState>();
+      final userId = auth.currentUser?.id;
+      final playerId = auth.currentUser?.id;
+
+      if (userId != null && playerId != null) {
+        // Upload image if a new one was selected - convert to base64 data URL
+        String? avatarUrl;
+        if (_imageFile != null) {
+          try {
+            final bytes = await _imageFile!.readAsBytes();
+            final base64Image = base64Encode(bytes);
+            final mimeType = _imageFile!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+            avatarUrl = 'data:$mimeType;base64,$base64Image';
+            debugPrint('Profile photo encoded: ${avatarUrl.length} chars');
+          } catch (e) {
+            debugPrint('Failed to encode profile photo: $e');
+          }
+        } else if (_profilePictureUrl != null && !_profilePictureUrl!.startsWith('/')) {
+          // Keep existing network URL
+          avatarUrl = _profilePictureUrl;
         }
-      } else if (_profilePictureUrl != null && !_profilePictureUrl!.startsWith('/')) {
-        // Keep existing network URL
-        avatarUrl = _profilePictureUrl;
+        
+        // Save profile data including avatar via API
+        final profileUpdates = <String, dynamic>{
+          'name': '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}',
+          'position': _pos,
+          'height': "$_ft'$_inch\"",
+        };
+        if (avatarUrl != null) {
+          profileUpdates['avatarUrl'] = avatarUrl;
+        }
+        
+        try {
+          await ApiService.updateProfile(userId, profileUpdates);
+          debugPrint('Profile updated successfully');
+        } catch (e) {
+          debugPrint('Profile update failed: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to save profile: $e'), backgroundColor: Colors.red),
+            );
+            setState(() => _saving = false);
+            return;
+          }
+        }
+        
+        final data = ProfileData(
+          firstName: _firstNameCtrl.text.trim(),
+          lastName: _lastNameCtrl.text.trim(),
+          birthdate: _birthdate,
+          zip: _zipCtrl.text.trim(),
+          heightFt: _ft,
+          heightIn: _inch,
+          position: _pos,
+          profilePictureUrl: avatarUrl ?? _profilePictureUrl,
+          visibility: _visibility,
+        );
+        await ProfileService.saveProfile(userId, data);
+        ProfileService.applyProfileToPlayer(playerId, data);
+        
+        // Refresh user data from API to update the app state
+        try {
+          await auth.refreshUser();
+        } catch (e) {
+          debugPrint('Refresh user failed (continuing anyway): $e');
+        }
+        
+        if (mounted) context.go('/play');
       }
-      
-      // Save profile data including avatar via API
-      final profileUpdates = <String, dynamic>{
-        'name': '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}',
-        'position': _pos,
-        'height': "$_ft'$_inch\"",
-      };
-      if (avatarUrl != null) {
-        profileUpdates['avatarUrl'] = avatarUrl;
+    } catch (e) {
+      debugPrint('Profile save error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
-      
-      try {
-        await ApiService.updateProfile(userId, profileUpdates);
-        debugPrint('Profile updated successfully');
-      } catch (e) {
-        debugPrint('Profile update failed: $e');
-      }
-      
-      final data = ProfileData(
-        firstName: _firstNameCtrl.text.trim(),
-        lastName: _lastNameCtrl.text.trim(),
-        birthdate: _birthdate,
-        zip: _zipCtrl.text.trim(),
-        heightFt: _ft,
-        heightIn: _inch,
-        position: _pos,
-        profilePictureUrl: avatarUrl ?? _profilePictureUrl,
-        visibility: _visibility,
-      );
-      await ProfileService.saveProfile(userId, data);
-      ProfileService.applyProfileToPlayer(playerId, data);
-      
-      // Refresh user data from API to update the app state
-      await auth.refreshUser();
-      
-      if (mounted) context.go('/play');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
+
 
   int _calculateAge(DateTime birthdate) {
     final now = DateTime.now();
@@ -443,13 +472,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: canSave ? _save : null,
+                onPressed: canSave && !_saving ? _save : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepOrange,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('Save & Continue'),
+                child: _saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Save & Continue'),
               ),
             ),
           ],
