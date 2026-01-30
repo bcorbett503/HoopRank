@@ -64,7 +64,9 @@ class ApiService {
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
+      debugPrint('AUTHENTICATE: raw response.body = ${response.body}');
       final data = jsonDecode(response.body);
+      debugPrint('AUTHENTICATE: parsed json position = ${data['position']}');
       return User.fromJson(data);
     } else {
       throw Exception('Failed to authenticate');

@@ -1,6 +1,7 @@
 // =============================================================================
 // HoopRank Data Models
 // =============================================================================
+import 'package:flutter/foundation.dart'; // for debugPrint
 // This file defines the core data models used throughout the application.
 //
 // Model Hierarchy:
@@ -76,12 +77,14 @@ class User {
         : (gamesPlayed > 0 ? gamesContested / gamesPlayed : 0.0);
 
     // Handle both camelCase (app) and snake_case (production backend) field names
+    final position = json['position']?.toString();
+    debugPrint('USER.fromJson: id=$id, json[position]=${json['position']}, parsed position=$position');
     return User(
       id: id,
       name: json['name']?.toString() ?? json['display_name']?.toString() ?? 'Unknown',
       photoUrl: json['photoUrl']?.toString() ?? json['avatar_url']?.toString(),
       team: json['team']?.toString(),
-      position: json['position']?.toString(),
+      position: position,
       rating: _parseDouble(json['rating'] ?? json['hoop_rank'], fallback: 3.0),
       matchesPlayed: _parseInt(json['matchesPlayed'] ?? json['matches_played']),
       height: json['height']?.toString(),

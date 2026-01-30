@@ -18,7 +18,10 @@ export class UsersController {
     // This ensures existing users get their real profile instead of a new one
     const uid = body.id || req.user?.uid || '';
     const email = body.email || req.user?.email || '';
-    return this.usersService.findOrCreate(uid, email);
+    console.log(`[AUTHENTICATE] uid=${uid}, email=${email}`);
+    const user = await this.usersService.findOrCreate(uid, email);
+    console.log(`[AUTHENTICATE] returned user.id=${user.id}, position=${user.position}`);
+    return user;
   }
 
 

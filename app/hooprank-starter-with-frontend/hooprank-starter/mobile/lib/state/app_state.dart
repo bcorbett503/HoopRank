@@ -131,6 +131,7 @@ class AuthState extends ChangeNotifier {
 
   Future<void> login(User user, {String? token}) async {
     _currentUser = user;
+    debugPrint('AUTH_STATE.login: user.id=${user.id}, user.position=${user.position}, isProfileComplete=${user.isProfileComplete}');
     ApiService.setUserId(user.id);
     if (token != null) {
       ApiService.setAuthToken(token);
