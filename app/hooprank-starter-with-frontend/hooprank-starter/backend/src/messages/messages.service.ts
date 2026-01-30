@@ -316,19 +316,29 @@ export class MessagesService {
     private async ensureReadColumnsExist(): Promise<void> {
         try {
             // Check if 'read' column exists
-            const columns = await this.dataSource.query(`
+            const readCol = await this.dataSource.query(`
                 SELECT column_name FROM information_schema.columns 
                 WHERE table_name = 'messages' AND column_name = 'read'
             `);
 
-            if (columns.length === 0) {
-                // Add read and read_at columns
+            if (readCol.length === 0) {
                 await this.dataSource.query(`
-                    ALTER TABLE messages 
-                    ADD COLUMN IF NOT EXISTS read BOOLEAN DEFAULT false,
-                    ADD COLUMN IF NOT EXISTS read_at TIMESTAMP
+                    ALTER TABLE messages ADD COLUMN read BOOLEAN DEFAULT false
                 `);
-                console.log('Added read tracking columns to messages table');
+                console.log('Added read column to messages table');
+            }
+
+            // Check if 'read_at' column exists  
+            const readAtCol = await this.dataSource.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'messages' AND column_name = 'read_at'
+            `);
+
+            if (readAtCol.length === 0) {
+                await this.dataSource.query(`
+                    ALTER TABLE messages ADD COLUMN read_at TIMESTAMP
+                `);
+                console.log('Added read_at column to messages table');
             }
         } catch (error) {
             console.error('ensureReadColumnsExist error:', error.message);
