@@ -274,7 +274,7 @@ export class MessagesService {
      * Mark all messages from a specific sender as read
      * Called when user opens a conversation
      */
-    async markConversationAsRead(userId: string, otherUserId: string): Promise<void> {
+    async markConversationAsRead(userId: string, otherUserId: string): Promise<{ userId: string, otherUserId: string, foundUnread: number, updated: boolean }> {
         const isPostgres = !!process.env.DATABASE_URL;
 
         if (isPostgres) {
@@ -289,7 +289,8 @@ export class MessagesService {
                     SELECT COUNT(*) as count FROM messages 
                     WHERE from_id = $1 AND to_id = $2 AND (read = false OR read IS NULL)
                 `, [otherUserId, userId]);
-                console.log(`markConversationAsRead: Found ${countResult[0]?.count} unread messages to mark`);
+                const foundUnread = parseInt(countResult[0]?.count || '0', 10);
+                console.log(`markConversationAsRead: Found ${foundUnread} unread messages to mark`);
 
                 // Mark all messages FROM the other user TO the current user as read
                 const result = await this.dataSource.query(`
@@ -298,10 +299,14 @@ export class MessagesService {
                     WHERE from_id = $1 AND to_id = $2 AND (read = false OR read IS NULL)
                 `, [otherUserId, userId]);
                 console.log(`markConversationAsRead: Update result:`, result);
+
+                return { userId, otherUserId, foundUnread, updated: true };
             } catch (error) {
                 console.error('markConversationAsRead error:', error.message);
+                return { userId, otherUserId, foundUnread: 0, updated: false };
             }
         }
+        return { userId, otherUserId, foundUnread: 0, updated: false };
     }
 
     /**

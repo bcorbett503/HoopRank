@@ -54,7 +54,7 @@ export class MessagesController {
         @Headers('x-user-id') userId: string,
         @Param('otherUserId') otherUserId: string
     ) {
-        await this.messagesService.markConversationAsRead(userId, otherUserId);
-        return { success: true };
+        const result = await this.messagesService.markConversationAsRead(userId, otherUserId);
+        return { success: true, ...result };
     }
 }
