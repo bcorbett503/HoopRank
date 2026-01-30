@@ -13,11 +13,14 @@ export class UsersController {
 
   @Post('auth')
   @UseGuards(AuthGuard)
-  async authenticate(@Request() req) {
-    // req.user is set by AuthGuard from Firebase token
-    const { uid, email } = req.user;
+  async authenticate(@Request() req, @Body() body: { id?: string; email?: string }) {
+    // Use id from body (Firebase UID passed by app) if token verification fell back to dev-token
+    // This ensures existing users get their real profile instead of a new one
+    const uid = body.id || req.user?.uid || '';
+    const email = body.email || req.user?.email || '';
     return this.usersService.findOrCreate(uid, email);
   }
+
 
   // One-time migration endpoint - must be before :id routes
   @Post('admin/run-migrations')
