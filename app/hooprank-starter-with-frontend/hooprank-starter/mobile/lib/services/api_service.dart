@@ -6,7 +6,7 @@ import '../models.dart';
 
 class ApiService {
   // Production URL - Railway deployment
-  static const String _productionUrl = 'https://hooprank-production.up.railway.app';
+  static const String _productionUrl = 'https://heartfelt-appreciation-production-65f1.up.railway.app';
   
   // Development URLs
   static const String _emulatorUrl = 'http://10.0.2.2:3000';  // Android emulator

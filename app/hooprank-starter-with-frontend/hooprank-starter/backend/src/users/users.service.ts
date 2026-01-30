@@ -595,6 +595,79 @@ export class UsersService {
       }
       results.push('Finished checking missing columns');
 
+      // Fix 8: Create teams tables if missing
+      results.push('Checking teams tables...');
+
+      // Check if teams table exists
+      const teamsTableCheck = await this.dataSource.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_name = 'teams'
+      `);
+
+      if (teamsTableCheck.length === 0) {
+        await this.dataSource.query(`
+          CREATE TABLE teams (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            team_type TEXT NOT NULL,
+            owner_id VARCHAR(255) NOT NULL,
+            rating NUMERIC(2,1) DEFAULT 3.0,
+            wins INTEGER DEFAULT 0,
+            losses INTEGER DEFAULT 0,
+            logo_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        results.push('Created teams table');
+      } else {
+        results.push('teams table already exists');
+      }
+
+      // Check if team_members table exists
+      const teamMembersCheck = await this.dataSource.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_name = 'team_members'
+      `);
+
+      if (teamMembersCheck.length === 0) {
+        await this.dataSource.query(`
+          CREATE TABLE team_members (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+            user_id VARCHAR(255) NOT NULL,
+            status TEXT DEFAULT 'pending',
+            role TEXT DEFAULT 'member',
+            joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(team_id, user_id)
+          )
+        `);
+        results.push('Created team_members table');
+      } else {
+        results.push('team_members table already exists');
+      }
+
+      // Check if team_messages table exists
+      const teamMessagesCheck = await this.dataSource.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_name = 'team_messages'
+      `);
+
+      if (teamMessagesCheck.length === 0) {
+        await this.dataSource.query(`
+          CREATE TABLE team_messages (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+            sender_id VARCHAR(255) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        results.push('Created team_messages table');
+      } else {
+        results.push('team_messages table already exists');
+      }
+
       return { success: true, results };
     } catch (error) {
       results.push(`Error: ${error.message}`);
