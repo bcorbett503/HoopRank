@@ -273,15 +273,43 @@ export class MessagesService {
 
         if (isPostgres) {
             try {
+                // Ensure the 'read' and 'read_at' columns exist (auto-migration)
+                await this.ensureReadColumnsExist();
+
                 // Mark all messages FROM the other user TO the current user as read
                 await this.dataSource.query(`
                     UPDATE messages 
                     SET read = true, read_at = NOW()
-                    WHERE from_id = $1 AND to_id = $2 AND read = false
+                    WHERE from_id = $1 AND to_id = $2 AND (read = false OR read IS NULL)
                 `, [otherUserId, userId]);
             } catch (error) {
                 console.error('markConversationAsRead error:', error.message);
             }
+        }
+    }
+
+    /**
+     * Ensure the read tracking columns exist in the messages table
+     */
+    private async ensureReadColumnsExist(): Promise<void> {
+        try {
+            // Check if 'read' column exists
+            const columns = await this.dataSource.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'messages' AND column_name = 'read'
+            `);
+
+            if (columns.length === 0) {
+                // Add read and read_at columns
+                await this.dataSource.query(`
+                    ALTER TABLE messages 
+                    ADD COLUMN IF NOT EXISTS read BOOLEAN DEFAULT false,
+                    ADD COLUMN IF NOT EXISTS read_at TIMESTAMP
+                `);
+                console.log('Added read tracking columns to messages table');
+            }
+        } catch (error) {
+            console.error('ensureReadColumnsExist error:', error.message);
         }
     }
 }
