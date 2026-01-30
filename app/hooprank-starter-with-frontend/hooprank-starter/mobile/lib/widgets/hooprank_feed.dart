@@ -55,25 +55,38 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     }
   }
 
-  /// Get user's location for "For You" feed
+  /// Initialize feeds immediately, then fetch location in background
   Future<void> _initLocation() async {
+    // Load feeds immediately without waiting for location
+    _loadForYouFeed();
+    _loadFollowingFeed();
+    
+    // Fetch location asynchronously in background
+    _fetchLocationAndRefresh();
+  }
+  
+  /// Fetch location in background and refresh For You feed when available
+  Future<void> _fetchLocationAndRefresh() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        _userLocation = await Geolocator.getCurrentPosition(
+        final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.low,
         );
-        debugPrint('FEED: Got location: ${_userLocation?.latitude}, ${_userLocation?.longitude}');
+        _userLocation = position;
+        debugPrint('FEED: Got location: ${position.latitude}, ${position.longitude}');
+        
+        // Refresh For You feed with location for better results
+        if (mounted) {
+          _loadForYouFeed();
+        }
       }
     } catch (e) {
       debugPrint('FEED: Location error: $e');
     }
-    // Load initial feed (For You tab is default)
-    _loadForYouFeed();
-    _loadFollowingFeed();
   }
 
   Future<void> _loadForYouFeed() async {
