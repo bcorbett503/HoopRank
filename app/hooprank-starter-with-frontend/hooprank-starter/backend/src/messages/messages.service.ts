@@ -355,6 +355,28 @@ export class MessagesService {
             // Count messages
             const count = await this.dataSource.query(`SELECT COUNT(*) as count FROM messages`);
 
+            // Check foreign key constraints
+            const fkConstraints = await this.dataSource.query(`
+                SELECT
+                    tc.constraint_name,
+                    kcu.column_name,
+                    ccu.table_name AS foreign_table_name,
+                    ccu.column_name AS foreign_column_name
+                FROM information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                  ON ccu.constraint_name = tc.constraint_name
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_name = 'messages'
+            `);
+
+            // Check if message_threads table exists
+            const threads = await this.dataSource.query(`
+                SELECT table_name FROM information_schema.tables 
+                WHERE table_name LIKE '%thread%';
+            `);
+
             // Try a test insert and rollback
             const { v4: uuidv4 } = require('uuid');
             const testId = uuidv4();
@@ -376,6 +398,8 @@ export class MessagesService {
                 success: true,
                 schema,
                 messageCount: count[0]?.count,
+                fkConstraints,
+                threadTables: threads,
                 testInsertError: insertError
             };
         } catch (error) {
