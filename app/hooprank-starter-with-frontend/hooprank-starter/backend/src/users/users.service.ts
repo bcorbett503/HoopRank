@@ -30,10 +30,10 @@ export class UsersService {
       }
 
       // Create new user with correct production column names
-      // Production table has: id, email, display_name, avatar_url, rating, created_at, updated_at, fcm_token
+      // Production table has: id, email, name, avatar_url, hoop_rank, created_at, updated_at, fcm_token
       console.log('findOrCreate: creating new user with id=', authToken);
       const result = await this.dataSource.query(`
-        INSERT INTO users (id, email, display_name, rating, created_at, updated_at)
+        INSERT INTO users (id, email, name, hoop_rank, created_at, updated_at)
         VALUES ($1, $2, 'New Player', 3.0, NOW(), NOW())
         RETURNING *
       `, [authToken, email]);
@@ -88,14 +88,14 @@ export class UsersService {
       let paramIndex = 1;
 
       // Map camelCase to snake_case for production columns
-      // Production table has: id, email, display_name, avatar_url, rating, created_at, updated_at, fcm_token
+      // Production table has: id, email, name, avatar_url, hoop_rank, created_at, updated_at, fcm_token
       const columnMap: Record<string, string> = {
-        name: 'display_name',       // app sends 'name', production uses 'display_name'
-        displayName: 'display_name',
+        name: 'name',                // app sends 'name', production uses 'name'
+        displayName: 'name',
         email: 'email',
         avatarUrl: 'avatar_url',
-        hoopRank: 'rating',         // app sends 'hoopRank', production uses 'rating'
-        rating: 'rating',
+        hoopRank: 'hoop_rank',       // app sends 'hoopRank', production uses 'hoop_rank'
+        rating: 'hoop_rank',
         position: 'position',
         height: 'height',
         weight: 'weight',
