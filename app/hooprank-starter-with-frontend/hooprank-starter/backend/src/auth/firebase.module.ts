@@ -25,9 +25,15 @@ import { ConfigService } from '@nestjs/config';
                     privateKey: privateKey?.replace(/\\n/g, '\n'),
                 };
 
-                return admin.initializeApp({
-                    credential: admin.credential.cert(firebaseConfig),
-                });
+                try {
+                    return admin.initializeApp({
+                        credential: admin.credential.cert(firebaseConfig),
+                    });
+                } catch (error) {
+                    console.error('[Firebase] Failed to initialize:', error.message);
+                    console.log('[Firebase] Falling back to dev-token authentication');
+                    return null;
+                }
             },
         },
     ],
