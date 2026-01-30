@@ -250,7 +250,7 @@ export class MessagesService {
                 // Update the challenge status
                 await this.dataSource.query(`
                     UPDATE messages 
-                    SET challenge_status = $1, updated_at = NOW()
+                    SET challenge_status = $1
                     WHERE id = $2 AND is_challenge = true
                 `, [status, messageId]);
 
