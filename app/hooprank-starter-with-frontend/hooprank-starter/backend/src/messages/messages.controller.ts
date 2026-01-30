@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, Headers, Inject, forwardRef } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, Headers, Inject, forwardRef } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { TeamsService } from '../teams/teams.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -47,5 +47,14 @@ export class MessagesController {
     @Get(':userId/:otherUserId')
     async getMessages(@Param('userId') userId: string, @Param('otherUserId') otherUserId: string) {
         return this.messagesService.getMessages(userId, otherUserId);
+    }
+
+    @Put(':otherUserId/read')
+    async markAsRead(
+        @Headers('x-user-id') userId: string,
+        @Param('otherUserId') otherUserId: string
+    ) {
+        await this.messagesService.markConversationAsRead(userId, otherUserId);
+        return { success: true };
     }
 }

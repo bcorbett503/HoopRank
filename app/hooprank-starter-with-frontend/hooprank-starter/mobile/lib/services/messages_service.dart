@@ -301,6 +301,22 @@ class MessagesService {
     }
   }
 
+  /// Mark all messages from otherUserId as read
+  Future<void> markConversationAsRead(String userId, String otherUserId) async {
+    final token = await _getToken();
+    try {
+      await http.put(
+        Uri.parse('$baseUrl/messages/$otherUserId/read'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'x-user-id': userId,
+        },
+      );
+    } catch (e) {
+      print('Error marking conversation as read: $e');
+    }
+  }
+
   Future<Message> sendMessage(String senderId, String receiverId, String content, {String? matchId}) async {
     final token = await _getToken();
     

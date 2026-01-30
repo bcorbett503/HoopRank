@@ -71,6 +71,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final messages = await _messagesService.getMessages(userId, _otherUser!.id);
+      // Mark all messages from the other user as read
+      await _messagesService.markConversationAsRead(userId, _otherUser!.id);
       setState(() {
         _messages = messages;
         _isLoading = false;

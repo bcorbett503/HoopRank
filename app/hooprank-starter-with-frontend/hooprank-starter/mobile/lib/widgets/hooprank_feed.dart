@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import '../state/check_in_state.dart';
+import '../state/app_state.dart';
 import '../services/api_service.dart';
+import '../services/messages_service.dart';
 import 'feed_video_player.dart';
 import 'dart:math' as math;
 
@@ -17,8 +19,10 @@ class HoopRankFeed extends StatefulWidget {
 
 class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final MessagesService _messagesService = MessagesService();
   List<Map<String, dynamic>> _forYouPosts = [];
   List<Map<String, dynamic>> _followingPosts = [];
+  List<ChallengeRequest> _pendingChallenges = []; // Pinned challenges
   bool _isLoadingForYou = true;
   bool _isLoadingFollowing = true;
   Position? _userLocation;
@@ -57,12 +61,30 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Initialize feeds immediately, then fetch location in background
   Future<void> _initLocation() async {
-    // Load feeds immediately without waiting for location
+    // Load feeds and challenges immediately without waiting for location
     _loadForYouFeed();
     _loadFollowingFeed();
+    _loadPendingChallenges();
     
     // Fetch location asynchronously in background
     _fetchLocationAndRefresh();
+  }
+
+  /// Load pending challenges to pin at top of feed
+  Future<void> _loadPendingChallenges() async {
+    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      final challenges = await _messagesService.getPendingChallenges(userId);
+      // Only show incoming challenges
+      final incoming = challenges.where((c) => c.direction == 'received').toList();
+      if (mounted) {
+        setState(() => _pendingChallenges = incoming);
+      }
+    } catch (e) {
+      debugPrint('Error loading pending challenges: $e');
+    }
   }
   
   /// Fetch location in background and refresh For You feed when available
@@ -202,7 +224,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_forYouPosts.isEmpty) {
+    if (_forYouPosts.isEmpty && _pendingChallenges.isEmpty) {
       return _buildEmptyState(
         'No local activity yet',
         'Be the first to post at a court near you!',
@@ -221,13 +243,23 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
     // Pin scheduled runs to top
     final sortedPosts = _sortPostsWithScheduledFirst(_forYouPosts);
+    final totalItems = _pendingChallenges.length + sortedPosts.length;
 
     return RefreshIndicator(
-      onRefresh: _loadForYouFeed,
+      onRefresh: () async {
+        await Future.wait([_loadForYouFeed(), _loadPendingChallenges()]);
+      },
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: sortedPosts.length,
-        itemBuilder: (context, index) => _buildFeedItemCard(sortedPosts[index]),
+        itemCount: totalItems,
+        itemBuilder: (context, index) {
+          // First items are challenges
+          if (index < _pendingChallenges.length) {
+            return _buildChallengeCard(_pendingChallenges[index]);
+          }
+          // Then regular posts
+          return _buildFeedItemCard(sortedPosts[index - _pendingChallenges.length]);
+        },
       ),
     );
   }
@@ -368,15 +400,26 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
     // Pin scheduled runs to top
     final sortedPosts = _sortPostsWithScheduledFirst(_followingPosts);
+    // +1 for header, then challenges, then posts
+    final totalItems = 1 + _pendingChallenges.length + sortedPosts.length;
 
     return RefreshIndicator(
-      onRefresh: _loadFollowingFeed,
+      onRefresh: () async {
+        await Future.wait([_loadFollowingFeed(), _loadPendingChallenges()]);
+      },
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: sortedPosts.length + 1, // +1 for header
+        itemCount: totalItems,
         itemBuilder: (context, index) {
           if (index == 0) return followingHeader;
-          return _buildFeedItemCard(sortedPosts[index - 1]);
+          // After header come challenges
+          final challengeOffset = index - 1;
+          if (challengeOffset < _pendingChallenges.length) {
+            return _buildChallengeCard(_pendingChallenges[challengeOffset]);
+          }
+          // Then regular posts
+          final postIndex = challengeOffset - _pendingChallenges.length;
+          return _buildFeedItemCard(sortedPosts[postIndex]);
         },
       ),
     );
@@ -659,6 +702,193 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       case 'status':
       default:
         return _buildPostCard(item);
+    }
+  }
+
+  /// Build a challenge card with accept/decline buttons
+  Widget _buildChallengeCard(ChallengeRequest challenge) {
+    final sender = challenge.sender;
+    final message = challenge.message;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.orange.shade900.withOpacity(0.3), Colors.deepOrange.withOpacity(0.15)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.withOpacity(0.4), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header: Challenge icon + "Challenge from X"
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.sports_basketball, color: Colors.orange, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.bolt, size: 16, color: Colors.orange),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'CHALLENGE',
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        sender.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Sender avatar
+                GestureDetector(
+                  onTap: () => context.go('/player/${sender.id}'),
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: Colors.orange.withOpacity(0.3),
+                    backgroundImage: sender.photoUrl != null ? NetworkImage(sender.photoUrl!) : null,
+                    child: sender.photoUrl == null
+                        ? Text(
+                            sender.name.isNotEmpty ? sender.name[0].toUpperCase() : '?',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          )
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Challenge message
+            if (message.content.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '"${message.content}"',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontStyle: FontStyle.italic,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
+            // Accept / Decline buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _declineChallenge(challenge),
+                    icon: const Icon(Icons.close, size: 18),
+                    label: const Text('Decline'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white30),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _acceptChallenge(challenge),
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Accept'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Accept a challenge
+  Future<void> _acceptChallenge(ChallengeRequest challenge) async {
+    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _messagesService.acceptChallenge(userId, challenge.message.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Challenge accepted! 🏀'), backgroundColor: Colors.green),
+        );
+        _loadPendingChallenges(); // Refresh challenges
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to accept: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  /// Decline a challenge
+  Future<void> _declineChallenge(ChallengeRequest challenge) async {
+    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _messagesService.declineChallenge(userId, challenge.message.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Challenge declined'), backgroundColor: Colors.grey),
+        );
+        _loadPendingChallenges(); // Refresh challenges
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to decline: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

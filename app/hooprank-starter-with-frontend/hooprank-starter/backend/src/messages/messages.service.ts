@@ -96,6 +96,7 @@ export class MessagesService {
         if (isPostgres) {
             try {
                 // Get the most recent message with each unique conversation partner
+                // Also count unread messages from each conversation partner
                 const results = await this.dataSource.query(`
                     WITH ranked_messages AS (
                         SELECT m.*, 
@@ -106,10 +107,18 @@ export class MessagesService {
                             ) as rn
                         FROM messages m
                         WHERE m.from_id = $1 OR m.to_id = $1
+                    ),
+                    unread_counts AS (
+                        SELECT from_id as other_user_id, COUNT(*) as unread_count
+                        FROM messages
+                        WHERE to_id = $1 AND (read = false OR read IS NULL)
+                        GROUP BY from_id
                     )
-                    SELECT rm.*, u.id as user_id, u.display_name, u.avatar_url, u.rating
+                    SELECT rm.*, u.id as user_id, u.display_name, u.avatar_url, u.rating,
+                           COALESCE(uc.unread_count, 0) as unread_count
                     FROM ranked_messages rm
                     JOIN users u ON u.id = rm.other_user_id
+                    LEFT JOIN unread_counts uc ON uc.other_user_id = rm.other_user_id
                     WHERE rm.rn = 1
                     ORDER BY rm.created_at DESC
                 `, [userId]);
@@ -131,9 +140,10 @@ export class MessagesService {
                         createdAt: r.created_at,
                         isChallenge: r.is_challenge,
                         challengeStatus: r.challenge_status,
+                        read: r.read,
                     },
-                    // Simple unread logic: if last message was from the other user, treat as unread
-                    unreadCount: r.from_id !== userId ? 1 : 0,
+                    // Use actual unread count from database
+                    unreadCount: parseInt(r.unread_count || '0', 10),
                 }));
             } catch (error) {
                 console.error('getConversations error:', error.message);
@@ -206,12 +216,11 @@ export class MessagesService {
 
         if (isPostgres) {
             try {
-                // Count distinct senders who sent messages to this user
-                // This is a simplified version - a full implementation would need read_at tracking
+                // Count actual unread messages (where user is receiver and read is false or null)
                 const result = await this.dataSource.query(`
-                    SELECT COUNT(DISTINCT from_id) as count
+                    SELECT COUNT(*) as count
                     FROM messages
-                    WHERE to_id = $1
+                    WHERE to_id = $1 AND (read = false OR read IS NULL)
                 `, [userId]);
                 return parseInt(result[0]?.count || '0', 10);
             } catch (error) {
@@ -253,6 +262,27 @@ export class MessagesService {
 
         // SQLite fallback
         return null;
+    }
+
+    /**
+     * Mark all messages from a specific sender as read
+     * Called when user opens a conversation
+     */
+    async markConversationAsRead(userId: string, otherUserId: string): Promise<void> {
+        const isPostgres = !!process.env.DATABASE_URL;
+
+        if (isPostgres) {
+            try {
+                // Mark all messages FROM the other user TO the current user as read
+                await this.dataSource.query(`
+                    UPDATE messages 
+                    SET read = true, read_at = NOW()
+                    WHERE from_id = $1 AND to_id = $2 AND read = false
+                `, [otherUserId, userId]);
+            } catch (error) {
+                console.error('markConversationAsRead error:', error.message);
+            }
+        }
     }
 }
 
