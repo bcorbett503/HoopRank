@@ -214,7 +214,7 @@ class MessagesService {
   /// Accept a challenge and get the created matchId
   Future<Map<String, dynamic>> acceptChallenge(String userId, String challengeId) async {
     final token = await _getToken();
-    final response = await http.post(
+    final response = await http.put(
       Uri.parse('$baseUrl/challenges/$challengeId/accept'),
       headers: {
         'Authorization': 'Bearer $token',
@@ -234,7 +234,7 @@ class MessagesService {
   /// Decline a challenge
   Future<void> declineChallenge(String userId, String challengeId) async {
     final token = await _getToken();
-    final response = await http.post(
+    final response = await http.put(
       Uri.parse('$baseUrl/challenges/$challengeId/decline'),
       headers: {
         'Authorization': 'Bearer $token',
