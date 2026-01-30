@@ -484,6 +484,41 @@ export class UsersService {
         results.push('player_statuses.court_id already exists');
       }
 
+      // Fix 4b: Add video columns to player_statuses if missing
+      results.push('Checking player_statuses video columns...');
+      const videoUrlCheck = await this.dataSource.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'player_statuses' AND column_name = 'video_url'
+      `);
+      if (videoUrlCheck.length === 0) {
+        await this.dataSource.query(`
+          ALTER TABLE player_statuses ADD COLUMN video_url VARCHAR(500) NULL
+        `);
+        results.push('Added video_url column to player_statuses');
+      }
+
+      const videoThumbnailCheck = await this.dataSource.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'player_statuses' AND column_name = 'video_thumbnail_url'
+      `);
+      if (videoThumbnailCheck.length === 0) {
+        await this.dataSource.query(`
+          ALTER TABLE player_statuses ADD COLUMN video_thumbnail_url VARCHAR(500) NULL
+        `);
+        results.push('Added video_thumbnail_url column to player_statuses');
+      }
+
+      const videoDurationCheck = await this.dataSource.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'player_statuses' AND column_name = 'video_duration_ms'
+      `);
+      if (videoDurationCheck.length === 0) {
+        await this.dataSource.query(`
+          ALTER TABLE player_statuses ADD COLUMN video_duration_ms INTEGER NULL
+        `);
+        results.push('Added video_duration_ms column to player_statuses');
+      }
+
       // Fix 5: Fix player_statuses.user_id from INTEGER to VARCHAR (for Firebase UIDs)
       results.push('Checking player_statuses.user_id type...');
       const statusUserIdType = await this.dataSource.query(`
