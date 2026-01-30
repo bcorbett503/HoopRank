@@ -19,12 +19,48 @@ export class MessagesService {
 
         if (isPostgres) {
             try {
-                console.log('sendMessage: inserting message:', { id, threadId, senderId, receiverId, content, isChallenge, matchId });
+                console.log('sendMessage: checking for existing thread between:', { senderId, receiverId });
+
+                // Check if thread already exists between these two users
+                // Thread participants are stored in thread_participants table
+                const existingThread = await this.dataSource.query(`
+                    SELECT tp1.thread_id 
+                    FROM thread_participants tp1
+                    JOIN thread_participants tp2 ON tp1.thread_id = tp2.thread_id
+                    WHERE tp1.user_id = $1 AND tp2.user_id = $2
+                    LIMIT 1
+                `, [senderId, receiverId]);
+
+                let actualThreadId = threadId;
+
+                if (existingThread.length > 0) {
+                    // Use existing thread
+                    actualThreadId = existingThread[0].thread_id;
+                    console.log('sendMessage: using existing thread:', actualThreadId);
+                } else {
+                    // Create new thread (minimal insert - just id and created_at)
+                    console.log('sendMessage: creating new thread:', threadId);
+                    try {
+                        await this.dataSource.query(`
+                            INSERT INTO threads (id, created_at) VALUES ($1, NOW())
+                        `, [threadId]);
+
+                        // Add both users as thread participants
+                        await this.dataSource.query(`
+                            INSERT INTO thread_participants (thread_id, user_id) VALUES ($1, $2), ($1, $3)
+                        `, [threadId, senderId, receiverId]);
+                    } catch (threadError) {
+                        console.error('sendMessage: thread creation error:', threadError.message);
+                        // If thread creation fails, try to find an existing thread as fallback
+                    }
+                }
+
+                console.log('sendMessage: inserting message with thread:', actualThreadId);
                 const result = await this.dataSource.query(`
                     INSERT INTO messages (id, thread_id, from_id, to_id, body, read, is_challenge, challenge_status, match_id, created_at)
                     VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, NOW())
                     RETURNING *
-                `, [id, threadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null]);
+                `, [id, actualThreadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null]);
                 console.log('sendMessage: success:', result[0]);
                 return result[0];
             } catch (error) {
