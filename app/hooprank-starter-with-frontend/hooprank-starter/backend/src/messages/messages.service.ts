@@ -282,12 +282,22 @@ export class MessagesService {
                 // Ensure the 'read' and 'read_at' columns exist (auto-migration)
                 await this.ensureReadColumnsExist();
 
+                console.log(`markConversationAsRead: userId=${userId}, otherUserId=${otherUserId}`);
+
+                // First count how many messages we expect to update
+                const countResult = await this.dataSource.query(`
+                    SELECT COUNT(*) as count FROM messages 
+                    WHERE from_id = $1 AND to_id = $2 AND (read = false OR read IS NULL)
+                `, [otherUserId, userId]);
+                console.log(`markConversationAsRead: Found ${countResult[0]?.count} unread messages to mark`);
+
                 // Mark all messages FROM the other user TO the current user as read
-                await this.dataSource.query(`
+                const result = await this.dataSource.query(`
                     UPDATE messages 
                     SET read = true, read_at = NOW()
                     WHERE from_id = $1 AND to_id = $2 AND (read = false OR read IS NULL)
                 `, [otherUserId, userId]);
+                console.log(`markConversationAsRead: Update result:`, result);
             } catch (error) {
                 console.error('markConversationAsRead error:', error.message);
             }
