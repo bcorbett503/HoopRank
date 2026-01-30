@@ -48,7 +48,7 @@ export class MessagesService {
                 // Get challenges where user is sender OR receiver with pending status
                 const results = await this.dataSource.query(`
                     SELECT m.*, 
-                        u.id as sender_id, u.name as sender_name, u.avatar_url as sender_avatar_url, u.hoop_rank as sender_hoop_rank,
+                        u.id as sender_id, u.display_name as sender_name, u.avatar_url as sender_avatar_url, u.rating as sender_rating,
                         CASE 
                             WHEN m.from_id = $1 THEN 'sent'
                             ELSE 'received'
@@ -76,7 +76,7 @@ export class MessagesService {
                         id: r.sender_id,
                         name: r.sender_name,
                         photoUrl: r.sender_avatar_url,
-                        hoopRank: r.sender_hoop_rank,
+                        rating: r.sender_rating,
                     },
                     direction: r.direction,
                 }));
