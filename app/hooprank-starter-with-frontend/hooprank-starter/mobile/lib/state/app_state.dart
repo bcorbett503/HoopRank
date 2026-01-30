@@ -153,6 +153,34 @@ class AuthState extends ChangeNotifier {
     }
   }
   
+  /// Update the user's position locally (used after profile setup to ensure isProfileComplete works)
+  Future<void> updateUserPosition(String position) async {
+    if (_currentUser == null) return;
+    debugPrint('Updating user position locally to: $position');
+    _currentUser = User(
+      id: _currentUser!.id,
+      name: _currentUser!.name,
+      photoUrl: _currentUser!.photoUrl,
+      team: _currentUser!.team,
+      position: position,
+      rating: _currentUser!.rating,
+      matchesPlayed: _currentUser!.matchesPlayed,
+    );
+    notifyListeners();
+    
+    // Persist the updated user
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('hooprank:user', jsonEncode({
+      'id': _currentUser!.id,
+      'name': _currentUser!.name,
+      'photoUrl': _currentUser!.photoUrl,
+      'team': _currentUser!.team,
+      'position': _currentUser!.position,
+      'rating': _currentUser!.rating,
+      'matchesPlayed': _currentUser!.matchesPlayed,
+    }));
+  }
+  
   Future<void> _registerFcmToken() async {
     if (_currentUser == null) return;
     try {

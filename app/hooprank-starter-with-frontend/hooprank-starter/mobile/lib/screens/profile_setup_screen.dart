@@ -211,6 +211,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           debugPrint('Refresh user failed (continuing anyway): $e');
         }
         
+        // CRITICAL: Update local user position to ensure isProfileComplete returns true
+        // This is needed because refreshUser might fail but we know the profile was saved
+        await auth.updateUserPosition(_pos);
+        debugPrint('Local user position updated to: $_pos');
+        
         if (mounted) context.go('/play');
       }
     } catch (e) {
