@@ -341,5 +341,44 @@ export class MessagesService {
             console.error('ensureReadColumnsExist error:', error.message);
         }
     }
+
+    async debugMessagesTable(): Promise<any> {
+        try {
+            // Get table schema
+            const schema = await this.dataSource.query(`
+                SELECT column_name, data_type, is_nullable 
+                FROM information_schema.columns 
+                WHERE table_name = 'messages'
+                ORDER BY ordinal_position
+            `);
+
+            // Count messages
+            const count = await this.dataSource.query(`SELECT COUNT(*) as count FROM messages`);
+
+            // Try a test insert and rollback
+            const testId = 'test-' + Date.now();
+            let insertError = null;
+            try {
+                await this.dataSource.query(`
+                    INSERT INTO messages (id, thread_id, from_id, to_id, body, is_challenge, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                    RETURNING id
+                `, [testId, testId, 'test-user', 'test-user2', 'test', false]);
+                // Delete test row
+                await this.dataSource.query(`DELETE FROM messages WHERE id = $1`, [testId]);
+            } catch (e) {
+                insertError = e.message;
+            }
+
+            return {
+                success: true,
+                schema,
+                messageCount: count[0]?.count,
+                testInsertError: insertError
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }
 

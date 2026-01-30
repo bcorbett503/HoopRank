@@ -57,4 +57,9 @@ export class MessagesController {
         const result = await this.messagesService.markConversationAsRead(userId, otherUserId);
         return { success: true, markedCount: result.markedCount };
     }
+
+    @Get('debug-messages')
+    async debugMessages() {
+        return this.messagesService.debugMessagesTable();
+    }
 }
