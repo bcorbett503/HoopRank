@@ -95,6 +95,9 @@ export class MessagesService {
 
         if (isPostgres) {
             try {
+                // Ensure read columns exist for unread tracking
+                await this.ensureReadColumnsExist();
+
                 // Get the most recent message with each unique conversation partner
                 // Also count unread messages from each conversation partner
                 const results = await this.dataSource.query(`
@@ -216,6 +219,9 @@ export class MessagesService {
 
         if (isPostgres) {
             try {
+                // Ensure read columns exist
+                await this.ensureReadColumnsExist();
+
                 // Count actual unread messages (where user is receiver and read is false or null)
                 const result = await this.dataSource.query(`
                     SELECT COUNT(*) as count
