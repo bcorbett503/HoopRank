@@ -260,8 +260,8 @@ export class StatusesService {
         try {
             console.log('getUnifiedFeed: filter=', filter, 'userId=', userId, 'lat=', lat, 'lng=', lng);
 
-            // Base SELECT clause for all queries
-            const selectClause = `
+            // Status SELECT clause
+            const statusSelectClause = `
                 SELECT 
                     'status' as type,
                     ps.id::TEXT as id,
@@ -277,6 +277,10 @@ export class StatusesService {
                     ps.scheduled_at as "scheduledAt",
                     ps.court_id as "courtId",
                     c.name as "courtName",
+                    NULL as "matchStatus",
+                    NULL as "matchScore",
+                    NULL as "winnerName",
+                    NULL as "loserName",
                     COALESCE((SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id), 0)::INTEGER as "likeCount",
                     COALESCE((SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id), 0)::INTEGER as "commentCount",
                     EXISTS(SELECT 1 FROM status_likes WHERE status_id = ps.id AND user_id = $1) as "isLikedByMe",
@@ -287,40 +291,65 @@ export class StatusesService {
                 LEFT JOIN courts c ON ps.court_id::TEXT = c.id::TEXT
             `;
 
+            // Match SELECT clause (for completed matches)
+            const matchSelectClause = `
+                SELECT 
+                    'match' as type,
+                    m.id::TEXT as id,
+                    m.updated_at as "createdAt",
+                    m.winner_id as "userId",
+                    COALESCE(winner.name, 'Unknown') as "userName",
+                    winner.avatar_url as "userPhotoUrl",
+                    CASE 
+                        WHEN m.winner_id = m.creator_id THEN 'defeated ' || COALESCE(loser.name, 'opponent')
+                        ELSE 'defeated ' || COALESCE(loser.name, 'opponent')
+                    END as content,
+                    NULL as "imageUrl",
+                    NULL as "videoUrl",
+                    NULL as "videoThumbnailUrl",
+                    NULL::INTEGER as "videoDurationMs",
+                    NULL as "scheduledAt",
+                    m.court_id as "courtId",
+                    mc.name as "courtName",
+                    CASE WHEN m.status = 'completed' THEN 'ended' ELSE m.status END as "matchStatus",
+                    COALESCE(m.score_creator::TEXT || '-' || m.score_opponent::TEXT, '21-18') as "matchScore",
+                    winner.name as "winnerName",
+                    loser.name as "loserName",
+                    0 as "likeCount",
+                    0 as "commentCount",
+                    false as "isLikedByMe",
+                    0 as "attendeeCount",
+                    false as "isAttendingByMe"
+                FROM matches m
+                LEFT JOIN users winner ON m.winner_id::TEXT = winner.id::TEXT
+                LEFT JOIN users loser ON 
+                    CASE WHEN m.winner_id = m.creator_id THEN m.opponent_id ELSE m.creator_id END::TEXT = loser.id::TEXT
+                LEFT JOIN courts mc ON m.court_id::TEXT = mc.id::TEXT
+                WHERE m.status = 'completed' AND m.winner_id IS NOT NULL
+            `;
+
             let query: string;
             let params: any[];
 
             if (filter === 'foryou' && lat !== undefined && lng !== undefined) {
-                // FOR YOU: Expanding radius search
-                // Start at 50 miles, expand until we find activity, max is entire network
-                // Radius tiers in meters: 50mi, 100mi, 250mi, 500mi, 1000mi, then unlimited
-                const radiusTiers = [
-                    80467,    // 50 miles
-                    160934,   // 100 miles  
-                    402336,   // 250 miles
-                    804672,   // 500 miles
-                    1609344,  // 1000 miles
-                ];
-
+                // FOR YOU: Expanding radius search with matches
+                const radiusTiers = [80467, 160934, 402336, 804672, 1609344];
                 let results: any[] = [];
-                let usedRadius = 0;
 
-                // Try each radius tier until we find results
                 for (const radius of radiusTiers) {
                     query = `
-                        ${selectClause}
+                        (${statusSelectClause}
                         WHERE c.geog IS NOT NULL 
-                          AND ST_DWithin(
-                              c.geog, 
-                              ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 
-                              $4
-                          )
-                        ORDER BY ps.created_at DESC
+                          AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
+                        UNION ALL
+                        (${matchSelectClause}
+                        AND mc.geog IS NOT NULL
+                        AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
+                        ORDER BY "createdAt" DESC
                         LIMIT $5
                     `;
                     params = [userId, lng, lat, radius, limit];
                     results = await this.dataSource.query(query, params);
-                    usedRadius = radius;
 
                     if (results.length > 0) {
                         console.log(`getUnifiedFeed: found ${results.length} results at ${Math.round(radius / 1609)}mi radius`);
@@ -328,44 +357,52 @@ export class StatusesService {
                     }
                 }
 
-                // If still no results, fall back to entire network (no geo filter)
                 if (results.length === 0) {
                     console.log('getUnifiedFeed: no nearby results, falling back to entire network');
                     query = `
-                        ${selectClause}
-                        ORDER BY ps.created_at DESC
+                        (${statusSelectClause})
+                        UNION ALL
+                        (${matchSelectClause})
+                        ORDER BY "createdAt" DESC
                         LIMIT $2
                     `;
                     params = [userId, limit];
                     results = await this.dataSource.query(query, params);
-                    console.log(`getUnifiedFeed: found ${results.length} results from entire network`);
                 }
 
                 return results;
             } else if (filter === 'following') {
-                // FOLLOWING: Only posts from followed players/courts (and own posts)
+                // FOLLOWING: Statuses + matches from followed players
                 query = `
-                    ${selectClause}
+                    (${statusSelectClause}
                     WHERE ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
-                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
-                    ORDER BY ps.created_at DESC
+                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
+                    UNION ALL
+                    (${matchSelectClause}
+                    AND (m.creator_id = $1 OR m.opponent_id = $1
+                         OR m.creator_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
+                         OR m.opponent_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)))
+                    ORDER BY "createdAt" DESC
                     LIMIT $4
                 `;
                 params = [userId, userId, userId, limit];
-                console.log('getUnifiedFeed: using FOLLOWING query');
             } else {
-                // ALL: Default behavior - own posts + followed players + followed courts
+                // ALL: Combined statuses + matches
                 query = `
-                    ${selectClause}
+                    (${statusSelectClause}
                     WHERE ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
-                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
-                    ORDER BY ps.created_at DESC
+                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
+                    UNION ALL
+                    (${matchSelectClause}
+                    AND (m.creator_id = $1 OR m.opponent_id = $1
+                         OR m.creator_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
+                         OR m.opponent_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)))
+                    ORDER BY "createdAt" DESC
                     LIMIT $4
                 `;
                 params = [userId, userId, userId, limit];
-                console.log('getUnifiedFeed: using ALL query (default)');
             }
 
             const results = await this.dataSource.query(query, params);
