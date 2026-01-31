@@ -274,42 +274,61 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final playerCount = checkInState.followedPlayerCount;
     final totalFollowing = courtCount + playerCount;
 
-    // No following anyone yet - show empty state with follow buttons
+    // No following anyone yet - show challenges first, then empty state with follow buttons
     if (totalFollowing == 0) {
-      return _buildEmptyState(
-        'Not following anyone yet', 
-        'Follow courts and players to see their updates here.',
-        extraContent: Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => context.go('/rankings'),
-                  icon: const Icon(Icons.person, size: 18),
-                  label: const Text('Follow Players'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+      return RefreshIndicator(
+        onRefresh: _loadPendingChallenges,
+        child: ListView(
+          children: [
+            // Show challenges at the top even if not following anyone
+            ...(_pendingChallenges.map((c) => _buildChallengeCard(c)).toList()),
+            // Then show empty state to encourage following
+            Padding(
+              padding: EdgeInsets.only(top: _pendingChallenges.isEmpty ? 40 : 16, left: 32, right: 32, bottom: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  Icon(Icons.feed_outlined, size: 48, color: Colors.white.withValues(alpha: 0.2)),
+                  const SizedBox(height: 16),
+                  const Text('Not following anyone yet', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 8),
+                  const Text('Follow courts and players to see their updates here.', style: TextStyle(color: Colors.white38, fontSize: 13), textAlign: TextAlign.center),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.go('/rankings'),
+                            icon: const Icon(Icons.person, size: 18),
+                            label: const Text('Follow Players'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.go('/courts'),
+                            icon: const Icon(Icons.location_on, size: 18),
+                            label: const Text('Follow Courts'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => context.go('/courts'),
-                  icon: const Icon(Icons.location_on, size: 18),
-                  label: const Text('Follow Courts'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
