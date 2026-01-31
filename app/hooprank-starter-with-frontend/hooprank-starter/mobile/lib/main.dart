@@ -155,7 +155,15 @@ class _HoopRankAppState extends State<HoopRankApp> {
               routes: [
                 GoRoute(
                   path: '/rankings',
-                  builder: (context, state) => const RankingsScreen(),
+                  builder: (context, state) {
+                    // Support query params for deep linking to Teams tab with specific filter
+                    final tab = state.uri.queryParameters['tab'];
+                    final teamType = state.uri.queryParameters['teamType'];
+                    return RankingsScreen(
+                      initialTab: tab == 'teams' ? 1 : 0,
+                      initialTeamType: teamType,
+                    );
+                  },
                 ),
               ],
             ),

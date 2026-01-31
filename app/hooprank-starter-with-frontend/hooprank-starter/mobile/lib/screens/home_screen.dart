@@ -841,14 +841,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: const Icon(Icons.groups, color: Colors.blue),
                 ),
                 title: const Text('3v3', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(_has3v3Team() ? 'Challenge another 3v3 team' : 'Join a team first'),
-                enabled: _has3v3Team(),
-                onTap: _has3v3Team()
-                    ? () {
-                        Navigator.pop(ctx);
-                        _showTeamChallengeFlow('3v3');
-                      }
-                    : null,
+                subtitle: const Text('Find 3v3 teams to challenge'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  // Navigate to Rankings -> Teams tab with 3v3 filter
+                  context.go('/rankings?tab=teams&teamType=3v3');
+                },
               ),
               const Divider(),
               // 5v5 - team matches
@@ -862,14 +860,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: const Icon(Icons.groups, color: Colors.purple),
                 ),
                 title: const Text('5v5', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(_has5v5Team() ? 'Challenge another 5v5 team' : 'Join a team first'),
-                enabled: _has5v5Team(),
-                onTap: _has5v5Team()
-                    ? () {
-                        Navigator.pop(ctx);
-                        _showTeamChallengeFlow('5v5');
-                      }
-                    : null,
+                subtitle: const Text('Find 5v5 teams to challenge'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  // Navigate to Rankings -> Teams tab with 5v5 filter
+                  context.go('/rankings?tab=teams&teamType=5v5');
+                },
               ),
               const SizedBox(height: 16),
             ],

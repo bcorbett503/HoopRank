@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import 'team_detail_screen.dart';
@@ -355,13 +356,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 Navigator.pop(ctx);
-                // Navigate to Team Rankings with 3v3 and Local filter
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const _TeamRankingsWithFilter(teamType: '3v3'),
-                  ),
-                );
+                // Navigate to Rankings -> Teams tab with 3v3 filter
+                context.go('/rankings?tab=teams&teamType=3v3');
               },
             ),
             const SizedBox(height: 8),
@@ -383,13 +379,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 Navigator.pop(ctx);
-                // Navigate to Team Rankings with 5v5 and Local filter
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const _TeamRankingsWithFilter(teamType: '5v5'),
-                  ),
-                );
+                // Navigate to Rankings -> Teams tab with 5v5 filter
+                context.go('/rankings?tab=teams&teamType=5v5');
               },
             ),
             const SizedBox(height: 16),

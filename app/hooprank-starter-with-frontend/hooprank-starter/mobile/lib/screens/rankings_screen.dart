@@ -13,7 +13,14 @@ import 'team_detail_screen.dart';
 
 /// Rankings Screen with Players (1v1) and Teams (3v3/5v5) tabs
 class RankingsScreen extends StatefulWidget {
-  const RankingsScreen({super.key});
+  final int initialTab;
+  final String? initialTeamType;
+  
+  const RankingsScreen({
+    super.key,
+    this.initialTab = 0,
+    this.initialTeamType,
+  });
 
   @override
   State<RankingsScreen> createState() => _RankingsScreenState();
@@ -50,16 +57,27 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       if (_tabController.index == 1 && _teams.isEmpty) {
         _fetchTeams();
       }
     });
+    
+    // Apply initial team type if provided (for deep linking)
+    if (widget.initialTeamType != null) {
+      _teamFilter = widget.initialTeamType!;
+    }
+    
     _fetchPlayers();
     _fetchMyTeams();
     _fetchMyRating();
+    
+    // If starting on Teams tab, fetch teams immediately
+    if (widget.initialTab == 1) {
+      _fetchTeams();
+    }
   }
 
   @override
@@ -873,7 +891,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                             ),
                             if (player.team == null) ...[
                               const SizedBox(width: 4),
-                              Icon(Icons.add_circle_outline, size: 14, color: Colors.white30),
+                              Icon(Icons.add_circle_outline, size: 14, color: Colors.blue),
                             ],
                           ],
                         ),
@@ -1196,6 +1214,10 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
 
   void _showTeamActionSheet(Map<String, dynamic> team) {
     final hasTeamOfType = _myTeams.any((t) => t['teamType'] == team['teamType']);
+    // Check if this is the user's own team
+    final isOwnTeam = _myTeams.any((t) => t['id'] == team['id']);
+    // Can only challenge if user has a team of this type AND it's not their own team
+    final canChallenge = hasTeamOfType && !isOwnTeam;
     
     showModalBottomSheet(
       context: context,
@@ -1227,6 +1249,16 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ),
+                  if (isOwnTeam)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.green.withOpacity(0.5)),
+                      ),
+                      child: const Text('Your Team', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1248,40 +1280,44 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 },
               ),
               
-              // Message Team
-              ListTile(
-                leading: const Icon(Icons.chat_bubble_outline, color: Colors.blue),
-                title: const Text('Message Team', style: TextStyle(color: Colors.white)),
-                subtitle: Text('Chat with ${team['name']}', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  // Navigate to team chat (using team's chat_id if available)
-                  final chatId = team['chatId'];
-                  if (chatId != null) {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(userId: chatId)));
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Team chat not available')),
-                    );
-                  }
-                },
-              ),
-              
-              // Challenge Team
-              ListTile(
-                leading: Icon(Icons.sports_basketball, 
-                    color: hasTeamOfType ? Colors.deepOrange : Colors.grey),
-                title: Text('Challenge Team', 
-                    style: TextStyle(color: hasTeamOfType ? Colors.white : Colors.grey)),
-                subtitle: Text(
-                  hasTeamOfType ? 'Send a ${team['teamType']} challenge' : 'You need a ${team['teamType']} team to challenge',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              // Message Team (only show if not own team)
+              if (!isOwnTeam)
+                ListTile(
+                  leading: const Icon(Icons.chat_bubble_outline, color: Colors.blue),
+                  title: const Text('Message Team', style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Chat with ${team['name']}', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    // Navigate to team chat (using team's chat_id if available)
+                    final chatId = team['chatId'];
+                    if (chatId != null) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(userId: chatId)));
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Team chat not available')),
+                      );
+                    }
+                  },
                 ),
-                onTap: hasTeamOfType ? () {
-                  Navigator.pop(ctx);
-                  _showChallengeTeamDialog(team);
-                } : null,
-              ),
+              
+              // Challenge Team (disabled if own team or no team of same type)
+              if (!isOwnTeam)
+                ListTile(
+                  leading: Icon(Icons.sports_basketball, 
+                      color: canChallenge ? Colors.deepOrange : Colors.grey),
+                  title: Text('Challenge Team', 
+                      style: TextStyle(color: canChallenge ? Colors.white : Colors.grey)),
+                  subtitle: Text(
+                    canChallenge 
+                        ? 'Send a ${team['teamType']} challenge' 
+                        : 'You need a ${team['teamType']} team to challenge',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
+                  onTap: canChallenge ? () {
+                    Navigator.pop(ctx);
+                    _showChallengeTeamDialog(team);
+                  } : null,
+                ),
             ],
           ),
         ),
