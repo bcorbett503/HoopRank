@@ -491,4 +491,126 @@ class MessagesService {
       throw Exception('Failed to send team message');
     }
   }
+
+  // === Team Challenge Methods ===
+
+  /// Get pending team challenges for all teams the user is a member of
+  Future<List<TeamChallengeRequest>> getPendingTeamChallenges(String userId, List<String> teamIds) async {
+    final token = await _getToken();
+    final List<TeamChallengeRequest> allChallenges = [];
+
+    for (final teamId in teamIds) {
+      try {
+        final response = await http.get(
+          Uri.parse('$baseUrl/teams/$teamId/challenges'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'x-user-id': userId,
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+          for (final c in data) {
+            allChallenges.add(TeamChallengeRequest.fromJson(c, teamId));
+          }
+        }
+      } catch (e) {
+        print('Error fetching challenges for team $teamId: $e');
+      }
+    }
+
+    return allChallenges;
+  }
+
+  /// Accept a team challenge
+  Future<Map<String, dynamic>> acceptTeamChallenge(String userId, String teamId, String challengeId) async {
+    final token = await _getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/challenges/$challengeId/accept'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'x-user-id': userId,
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return json.decode(response.body);
+    } else {
+      final body = json.decode(response.body);
+      throw Exception(body['message'] ?? 'Failed to accept team challenge');
+    }
+  }
+
+  /// Decline a team challenge
+  Future<void> declineTeamChallenge(String userId, String teamId, String challengeId) async {
+    final token = await _getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/challenges/$challengeId/decline'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'x-user-id': userId,
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final body = json.decode(response.body);
+      throw Exception(body['message'] ?? 'Failed to decline team challenge');
+    }
+  }
 }
+
+/// Team challenge request model for display in feed
+class TeamChallengeRequest {
+  final String id;
+  final String fromTeamId;
+  final String fromTeamName;
+  final String toTeamId;
+  final String toTeamName;
+  final String teamType;
+  final String message;
+  final String status;
+  final DateTime createdAt;
+  final String direction; // 'incoming' or 'outgoing'
+  final String myTeamId; // The team that the current user is on
+
+  TeamChallengeRequest({
+    required this.id,
+    required this.fromTeamId,
+    required this.fromTeamName,
+    required this.toTeamId,
+    required this.toTeamName,
+    required this.teamType,
+    required this.message,
+    required this.status,
+    required this.createdAt,
+    required this.direction,
+    required this.myTeamId,
+  });
+
+  factory TeamChallengeRequest.fromJson(Map<String, dynamic> json, String myTeamId) {
+    return TeamChallengeRequest(
+      id: json['id'] ?? '',
+      fromTeamId: json['fromTeamId'] ?? '',
+      fromTeamName: json['fromTeamName'] ?? 'Unknown Team',
+      toTeamId: json['toTeamId'] ?? '',
+      toTeamName: json['toTeamName'] ?? 'Unknown Team',
+      teamType: json['teamType'] ?? '3v3',
+      message: json['message'] ?? 'Team challenge!',
+      status: json['status'] ?? 'pending',
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt']) 
+          : DateTime.now(),
+      direction: json['direction'] ?? 'incoming',
+      myTeamId: myTeamId,
+    );
+  }
+
+  bool get isIncoming => direction == 'incoming';
+  bool get isOutgoing => direction == 'outgoing';
+  String get opponentTeamName => isIncoming ? fromTeamName : toTeamName;
+  String get opponentTeamId => isIncoming ? fromTeamId : toTeamId;
+}
+

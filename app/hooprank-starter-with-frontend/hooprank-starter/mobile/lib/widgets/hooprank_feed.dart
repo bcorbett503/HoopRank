@@ -23,7 +23,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   final MessagesService _messagesService = MessagesService();
   List<Map<String, dynamic>> _forYouPosts = [];
   List<Map<String, dynamic>> _followingPosts = [];
-  List<ChallengeRequest> _pendingChallenges = []; // Pinned challenges
+  List<ChallengeRequest> _pendingChallenges = []; // Pinned 1v1 challenges
+  List<TeamChallengeRequest> _pendingTeamChallenges = []; // Pinned team challenges
   bool _isLoadingForYou = true;
   bool _isLoadingFollowing = true;
   Position? _userLocation;
@@ -66,12 +67,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     _loadForYouFeed();
     _loadFollowingFeed();
     _loadPendingChallenges();
+    _loadPendingTeamChallenges();
     
     // Fetch location asynchronously in background
     _fetchLocationAndRefresh();
   }
 
-  /// Load pending challenges to pin at top of feed
+  /// Load pending 1v1 challenges to pin at top of feed
   Future<void> _loadPendingChallenges() async {
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
     debugPrint('FEED: Loading challenges for userId=$userId');
@@ -96,6 +98,30 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     } catch (e, stack) {
       debugPrint('Error loading pending challenges: $e');
       debugPrint('Stack: $stack');
+    }
+  }
+
+  /// Load pending team challenges to pin at top of feed
+  Future<void> _loadPendingTeamChallenges() async {
+    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      // Get user's teams first
+      final teams = await ApiService.getMyTeams();
+      final teamIds = teams.map((t) => t['id']?.toString() ?? '').where((id) => id.isNotEmpty).toList();
+      debugPrint('FEED: Loading team challenges for ${teamIds.length} teams');
+
+      if (teamIds.isEmpty) return;
+
+      final teamChallenges = await _messagesService.getPendingTeamChallenges(userId, teamIds);
+      debugPrint('FEED: Got ${teamChallenges.length} team challenges');
+
+      if (mounted) {
+        setState(() => _pendingTeamChallenges = teamChallenges);
+      }
+    } catch (e) {
+      debugPrint('Error loading team challenges: $e');
     }
   }
   
@@ -232,12 +258,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   Widget _buildForYouFeed() {
-    debugPrint('FEED: _buildForYouFeed called - _isLoadingForYou=$_isLoadingForYou, _forYouPosts.length=${_forYouPosts.length}, _pendingChallenges.length=${_pendingChallenges.length}');
+    debugPrint('FEED: _buildForYouFeed called - _isLoadingForYou=$_isLoadingForYou, _forYouPosts.length=${_forYouPosts.length}, _pendingChallenges.length=${_pendingChallenges.length}, _pendingTeamChallenges.length=${_pendingTeamChallenges.length}');
     if (_isLoadingForYou) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_forYouPosts.isEmpty && _pendingChallenges.isEmpty) {
+    if (_forYouPosts.isEmpty && _pendingChallenges.isEmpty && _pendingTeamChallenges.isEmpty) {
       debugPrint('FEED: Showing empty state - no posts and no challenges');
       return _buildEmptyState(
         'No local activity yet',
@@ -257,26 +283,35 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
     // Pin scheduled runs to top
     final sortedPosts = _sortPostsWithScheduledFirst(_forYouPosts);
-    final totalItems = _pendingChallenges.length + sortedPosts.length;
+    // Total items = team challenges + 1v1 challenges + posts
+    final totalChallenges = _pendingTeamChallenges.length + _pendingChallenges.length;
+    final totalItems = totalChallenges + sortedPosts.length;
 
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.wait([_loadForYouFeed(), _loadPendingChallenges()]);
+        await Future.wait([_loadForYouFeed(), _loadPendingChallenges(), _loadPendingTeamChallenges()]);
       },
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
         itemCount: totalItems,
         itemBuilder: (context, index) {
-          // First items are challenges
-          if (index < _pendingChallenges.length) {
-            return _buildChallengeCard(_pendingChallenges[index]);
+          // First: team challenges
+          if (index < _pendingTeamChallenges.length) {
+            return _buildTeamChallengeCard(_pendingTeamChallenges[index]);
           }
-          // Then regular posts
-          return _buildFeedItemCard(sortedPosts[index - _pendingChallenges.length]);
+          // Then: 1v1 challenges
+          final challengeIndex = index - _pendingTeamChallenges.length;
+          if (challengeIndex < _pendingChallenges.length) {
+            return _buildChallengeCard(_pendingChallenges[challengeIndex]);
+          }
+          // Finally: regular posts
+          final postIndex = index - totalChallenges;
+          return _buildFeedItemCard(sortedPosts[postIndex]);
         },
       ),
     );
   }
+
 
   Widget _buildFollowingFeed() {
     if (_isLoadingFollowing) {
@@ -933,6 +968,251 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       ),
     );
   }
+
+  /// Build team challenge card (similar to 1v1 but for team vs team)
+  Widget _buildTeamChallengeCard(TeamChallengeRequest challenge) {
+    debugPrint('FEED: Building team challenge card: ${challenge.fromTeamName} vs ${challenge.toTeamName}');
+
+    final isIncoming = challenge.isIncoming;
+    final opponentTeamName = challenge.opponentTeamName;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.purple.shade900.withOpacity(0.3), Colors.deepPurple.withOpacity(0.15)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.purple.withOpacity(0.4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header: Team challenge icon + team names
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Team icon
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.groups, color: Colors.purple, size: 18),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.bolt, size: 12, color: Colors.purple),
+                          const SizedBox(width: 4),
+                          Text(
+                            isIncoming ? 'TEAM CHALLENGE' : 'CHALLENGE SENT',
+                            style: TextStyle(
+                              color: Colors.purple.shade200,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              challenge.teamType,
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isIncoming ? 'From: $opponentTeamName' : 'To: $opponentTeamName',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Team type avatar
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.purple.withOpacity(0.3),
+                  child: Text(
+                    challenge.teamType,
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            
+            // Challenge message
+            if (challenge.message.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Text(
+                    '"${challenge.message}"',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 13,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+            else 
+               const SizedBox(height: 8),
+
+            // Buttons: Decline / Accept (only for incoming)
+            if (isIncoming)
+              Row(
+                children: [
+                  // Decline button
+                  Expanded(
+                    flex: 2, 
+                    child: SizedBox(
+                      height: 32,
+                      child: OutlinedButton(
+                        onPressed: () => _declineTeamChallenge(challenge),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          side: const BorderSide(color: Colors.white24),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        child: const Text('Decline', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Accept button
+                  Expanded(
+                    flex: 3,
+                    child: SizedBox(
+                      height: 32,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _acceptTeamChallenge(challenge),
+                        icon: const Icon(Icons.groups, size: 14),
+                        label: const Text('Accept', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              // Outgoing: show "Pending" indicator
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.hourglass_empty, size: 14, color: Colors.purple.shade200),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Waiting for ${challenge.toTeamName} to respond',
+                      style: TextStyle(color: Colors.purple.shade200, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Accept a team challenge
+  Future<void> _acceptTeamChallenge(TeamChallengeRequest challenge) async {
+    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _messagesService.acceptTeamChallenge(userId, challenge.myTeamId, challenge.id);
+      
+      if (mounted) {
+        _loadPendingTeamChallenges(); // Refresh
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Challenge accepted! Match started vs ${challenge.opponentTeamName}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  /// Decline a team challenge
+  Future<void> _declineTeamChallenge(TeamChallengeRequest challenge) async {
+    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _messagesService.declineTeamChallenge(userId, challenge.myTeamId, challenge.id);
+      
+      if (mounted) {
+        _loadPendingTeamChallenges(); // Refresh
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Challenge declined')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
 
   /// Accept a challenge and start a match
   Future<void> _acceptChallenge(ChallengeRequest challenge) async {
