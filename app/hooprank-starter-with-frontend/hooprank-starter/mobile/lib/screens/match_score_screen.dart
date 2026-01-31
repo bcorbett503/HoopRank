@@ -71,6 +71,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         );
       } else {
         // Submit 1v1 score with court if available
+        debugPrint('SCORE_SUBMIT: matchId=$matchId, court=${match.court?.name}, courtId=${match.court?.id}');
         await ApiService.submitScore(
           matchId: matchId,
           myScore: userScore,

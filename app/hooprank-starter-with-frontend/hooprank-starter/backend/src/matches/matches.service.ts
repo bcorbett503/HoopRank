@@ -103,8 +103,11 @@ export class MatchesService {
       }
 
       // Complete match with scores and court (always update scores even if already completed)
-      // If courtId provided, update it - otherwise keep existing court_id
-      if (courtId) {
+      // If courtId provided AND is a valid UUID, update it - otherwise keep existing court_id
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isValidUUID = courtId && uuidRegex.test(courtId);
+
+      if (isValidUUID) {
         await this.dataSource.query(`
           UPDATE matches SET status = 'completed', winner_id = $2, 
             score_creator = $3, score_opponent = $4, court_id = $5, updated_at = NOW()
@@ -112,6 +115,9 @@ export class MatchesService {
         `, [id, winnerId, scoreCreator, scoreOpponent, courtId]);
         console.log(`[completeWithScores] Updated match ${id} with court_id=${courtId}`);
       } else {
+        if (courtId) {
+          console.log(`[completeWithScores] Skipping invalid courtId=${courtId} (not a UUID)`);
+        }
         await this.dataSource.query(`
           UPDATE matches SET status = 'completed', winner_id = $2, 
             score_creator = $3, score_opponent = $4, updated_at = NOW()
