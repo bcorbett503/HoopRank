@@ -144,7 +144,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
           try {
             final challenges = await _messagesService.getPendingChallenges(currentUser.id);
             for (final c in challenges) {
-              if (c.isSent) pendingIds.add(c.sender.id);
+              if (c.isSent) pendingIds.add(c.otherUser.id);
             }
           } catch (e) {
             debugPrint('Error loading challenges: $e');
