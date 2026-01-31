@@ -165,5 +165,89 @@ export class TeamsController {
     ) {
         return this.teamsService.sendTeamMessage(teamId, userId, body.content);
     }
+
+    // ====================
+    // TEAM CHALLENGES
+    // ====================
+
+    /**
+     * Challenge another team
+     */
+    @Post(':id/challenge/:opponentTeamId')
+    @HttpCode(201)
+    async challengeTeam(
+        @Param('id') teamId: string,
+        @Param('opponentTeamId') opponentTeamId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: { message?: string },
+    ) {
+        return this.teamsService.createTeamChallenge(teamId, opponentTeamId, userId, body.message);
+    }
+
+    /**
+     * Get team's challenges (incoming and outgoing)
+     */
+    @Get(':id/challenges')
+    async getTeamChallenges(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.teamsService.getTeamChallenges(teamId, userId);
+    }
+
+    /**
+     * Accept a team challenge
+     */
+    @Post(':id/challenges/:challengeId/accept')
+    @HttpCode(200)
+    async acceptTeamChallenge(
+        @Param('id') teamId: string,
+        @Param('challengeId') challengeId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.teamsService.acceptTeamChallenge(challengeId, teamId, userId);
+    }
+
+    /**
+     * Decline a team challenge
+     */
+    @Post(':id/challenges/:challengeId/decline')
+    @HttpCode(200)
+    async declineTeamChallenge(
+        @Param('id') teamId: string,
+        @Param('challengeId') challengeId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        await this.teamsService.declineTeamChallenge(challengeId, teamId, userId);
+        return { success: true };
+    }
+
+    /**
+     * Cancel a team challenge
+     */
+    @Delete(':id/challenges/:challengeId')
+    @HttpCode(200)
+    async cancelTeamChallenge(
+        @Param('id') teamId: string,
+        @Param('challengeId') challengeId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        await this.teamsService.cancelTeamChallenge(challengeId, teamId, userId);
+        return { success: true };
+    }
+
+    /**
+     * Submit score for a team match
+     */
+    @Post(':id/matches/:matchId/score')
+    @HttpCode(200)
+    async submitTeamMatchScore(
+        @Param('id') teamId: string,
+        @Param('matchId') matchId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: { me: number; opponent: number },
+    ) {
+        return this.teamsService.submitTeamMatchScore(matchId, teamId, userId, body.me, body.opponent);
+    }
 }
 

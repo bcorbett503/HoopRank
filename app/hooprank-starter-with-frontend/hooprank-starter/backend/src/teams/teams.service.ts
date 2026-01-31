@@ -453,4 +453,270 @@ export class TeamsService {
             console.error('Error sending team message notifications:', error);
         }
     }
+
+    // ====================
+    // TEAM CHALLENGES
+    // ====================
+
+    /**
+     * Create a challenge from one team to another
+     */
+    async createTeamChallenge(fromTeamId: string, toTeamId: string, userId: string, message?: string): Promise<any> {
+        // Verify user is a member of the challenging team
+        const membership = await this.membersRepository.findOne({
+            where: { teamId: fromTeamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team to send challenges');
+        }
+
+        // Verify target team exists
+        const toTeam = await this.teamsRepository.findOne({ where: { id: toTeamId } });
+        if (!toTeam) {
+            throw new NotFoundException('Target team not found');
+        }
+
+        // Check for existing pending challenge
+        const existing = await this.dataSource.query(`
+            SELECT id FROM team_challenges 
+            WHERE from_team_id = $1 AND to_team_id = $2 AND status = 'pending'
+        `, [fromTeamId, toTeamId]);
+        if (existing.length > 0) {
+            throw new BadRequestException('A pending challenge already exists');
+        }
+
+        // Create challenge
+        const result = await this.dataSource.query(`
+            INSERT INTO team_challenges (from_team_id, to_team_id, message, status, created_by)
+            VALUES ($1, $2, $3, 'pending', $4)
+            RETURNING *
+        `, [fromTeamId, toTeamId, message || 'Team challenge!', userId]);
+
+        console.log(`[TeamsService] Created team challenge: ${fromTeamId} -> ${toTeamId}`);
+        return result[0];
+    }
+
+    /**
+     * Get challenges for a team (both incoming and outgoing)
+     */
+    async getTeamChallenges(teamId: string, userId: string): Promise<any[]> {
+        // Verify user is a member
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        const challenges = await this.dataSource.query(`
+            SELECT 
+                tc.*,
+                ft.name as from_team_name,
+                ft.team_type as from_team_type,
+                tt.name as to_team_name,
+                tt.team_type as to_team_type
+            FROM team_challenges tc
+            JOIN teams ft ON tc.from_team_id = ft.id
+            JOIN teams tt ON tc.to_team_id = tt.id
+            WHERE (tc.from_team_id = $1 OR tc.to_team_id = $1)
+              AND tc.status = 'pending'
+            ORDER BY tc.created_at DESC
+        `, [teamId]);
+
+        return challenges.map((c: any) => ({
+            id: c.id,
+            fromTeamId: c.from_team_id,
+            fromTeamName: c.from_team_name,
+            toTeamId: c.to_team_id,
+            toTeamName: c.to_team_name,
+            teamType: c.from_team_type,
+            message: c.message,
+            status: c.status,
+            createdAt: c.created_at,
+            direction: c.to_team_id === teamId ? 'incoming' : 'outgoing',
+        }));
+    }
+
+    /**
+     * Accept a team challenge - creates a team match
+     */
+    async acceptTeamChallenge(challengeId: string, teamId: string, userId: string): Promise<any> {
+        // Verify user is a member of the receiving team
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        // Get challenge
+        const challenges = await this.dataSource.query(`
+            SELECT * FROM team_challenges WHERE id = $1 AND status = 'pending'
+        `, [challengeId]);
+        if (challenges.length === 0) {
+            throw new NotFoundException('Challenge not found or already resolved');
+        }
+        const challenge = challenges[0];
+
+        // Verify this team is the target
+        if (challenge.to_team_id !== teamId) {
+            throw new ForbiddenException('Only the challenged team can accept');
+        }
+
+        // Create team match
+        const matchResult = await this.dataSource.query(`
+            INSERT INTO matches (creator_id, opponent_id, match_type, status, team_match, creator_team_id, opponent_team_id)
+            VALUES ($1, $2, '3v3', 'in_progress', true, $3, $4)
+            RETURNING *
+        `, [challenge.created_by, userId, challenge.from_team_id, challenge.to_team_id]);
+        const match = matchResult[0];
+
+        // Update challenge
+        await this.dataSource.query(`
+            UPDATE team_challenges SET status = 'accepted', match_id = $1, updated_at = NOW()
+            WHERE id = $2
+        `, [match.id, challengeId]);
+
+        console.log(`[TeamsService] Accepted team challenge ${challengeId}, created match ${match.id}`);
+        return { challenge: { ...challenge, status: 'accepted' }, match };
+    }
+
+    /**
+     * Decline a team challenge
+     */
+    async declineTeamChallenge(challengeId: string, teamId: string, userId: string): Promise<void> {
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        const result = await this.dataSource.query(`
+            UPDATE team_challenges SET status = 'declined', updated_at = NOW()
+            WHERE id = $1 AND to_team_id = $2 AND status = 'pending'
+            RETURNING id
+        `, [challengeId, teamId]);
+
+        if (result.length === 0) {
+            throw new NotFoundException('Challenge not found or already resolved');
+        }
+    }
+
+    /**
+     * Cancel a team challenge (only challenger can cancel)
+     */
+    async cancelTeamChallenge(challengeId: string, teamId: string, userId: string): Promise<void> {
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        const result = await this.dataSource.query(`
+            UPDATE team_challenges SET status = 'cancelled', updated_at = NOW()
+            WHERE id = $1 AND from_team_id = $2 AND status = 'pending'
+            RETURNING id
+        `, [challengeId, teamId]);
+
+        if (result.length === 0) {
+            throw new NotFoundException('Challenge not found or cannot be cancelled');
+        }
+    }
+
+    /**
+     * Submit scores for a team match and update team ratings
+     */
+    async submitTeamMatchScore(
+        matchId: string,
+        teamId: string,
+        userId: string,
+        myScore: number,
+        opponentScore: number,
+    ): Promise<any> {
+        // Verify user is a member of this team
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        // Get match
+        const matches = await this.dataSource.query(`
+            SELECT * FROM matches WHERE id = $1 AND team_match = true
+        `, [matchId]);
+        if (matches.length === 0) {
+            throw new NotFoundException('Team match not found');
+        }
+        const match = matches[0];
+
+        // Determine which team submitted and set scores
+        const isCreatorTeam = match.creator_team_id === teamId;
+        const creatorScore = isCreatorTeam ? myScore : opponentScore;
+        const opponentTeamScore = isCreatorTeam ? opponentScore : myScore;
+        const winnerTeamId = myScore > opponentScore ? teamId : (isCreatorTeam ? match.opponent_team_id : match.creator_team_id);
+
+        // Get current team ratings
+        const teams = await this.dataSource.query(`
+            SELECT id, rating FROM teams WHERE id IN ($1, $2)
+        `, [match.creator_team_id, match.opponent_team_id]);
+
+        const creatorTeam = teams.find((t: any) => t.id === match.creator_team_id);
+        const opponentTeam = teams.find((t: any) => t.id === match.opponent_team_id);
+
+        const creatorRating = parseFloat(creatorTeam?.rating || '3.0');
+        const opponentRating = parseFloat(opponentTeam?.rating || '3.0');
+
+        // Calculate new Elo ratings (same formula as 1v1)
+        const K = 0.2;
+        const expectedCreator = 1 / (1 + Math.pow(10, (opponentRating - creatorRating) / 1));
+        const creatorWon = match.creator_team_id === winnerTeamId ? 1 : 0;
+
+        const newCreatorRating = Math.max(1, Math.min(5, creatorRating + K * (creatorWon - expectedCreator)));
+        const newOpponentRating = Math.max(1, Math.min(5, opponentRating + K * ((1 - creatorWon) - (1 - expectedCreator))));
+
+        // Update match
+        await this.dataSource.query(`
+            UPDATE matches SET 
+                status = 'completed',
+                winner_id = $1,
+                score_creator = $2,
+                score_opponent = $3,
+                completed_at = NOW()
+            WHERE id = $4
+        `, [winnerTeamId, creatorScore, opponentTeamScore, matchId]);
+
+        // Update team ratings and W/L records
+        await this.dataSource.query(`
+            UPDATE teams SET 
+                rating = $1,
+                wins = wins + CASE WHEN id = $3 THEN 1 ELSE 0 END,
+                losses = losses + CASE WHEN id != $3 THEN 1 ELSE 0 END
+            WHERE id = $2
+        `, [newCreatorRating.toFixed(2), match.creator_team_id, winnerTeamId]);
+
+        await this.dataSource.query(`
+            UPDATE teams SET 
+                rating = $1,
+                wins = wins + CASE WHEN id = $3 THEN 1 ELSE 0 END,
+                losses = losses + CASE WHEN id != $3 THEN 1 ELSE 0 END
+            WHERE id = $2
+        `, [newOpponentRating.toFixed(2), match.opponent_team_id, winnerTeamId]);
+
+        console.log(`[TeamsService] Team match ${matchId} completed. Winner: ${winnerTeamId}`);
+        console.log(`[TeamsService] Rating changes: ${match.creator_team_id}: ${creatorRating} -> ${newCreatorRating.toFixed(2)}, ${match.opponent_team_id}: ${opponentRating} -> ${newOpponentRating.toFixed(2)}`);
+
+        return {
+            matchId,
+            winnerTeamId,
+            scores: { creator: creatorScore, opponent: opponentTeamScore },
+            ratingChanges: {
+                [match.creator_team_id]: { old: creatorRating, new: newCreatorRating },
+                [match.opponent_team_id]: { old: opponentRating, new: newOpponentRating },
+            },
+        };
+    }
 }
+

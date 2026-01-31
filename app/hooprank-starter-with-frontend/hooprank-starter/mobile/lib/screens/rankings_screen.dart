@@ -187,21 +187,19 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   Future<void> _fetchTeams() async {
     setState(() => _isLoadingTeams = true);
     try {
-      // Call /teams endpoint (returns all teams) and filter by teamType client-side
+      // Use /rankings endpoint with mode=3v3 or 5v5 to get all teams (not just user's teams)
+      final scope = _isTeamLocal ? 'local' : 'global';
       final response = await http.get(
-        Uri.parse('${ApiService.baseUrl}/teams'),
+        Uri.parse('${ApiService.baseUrl}/rankings?mode=$_teamFilter&scope=$scope'),
         headers: {'x-user-id': ApiService.userId ?? ''},
       );
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final rawTeams = (data as List?)?.cast<Map<String, dynamic>>() ?? [];
-        // Filter teams by selected team type (3v3 or 5v5)
-        final filteredTeams = rawTeams.where((t) =>
-            (t['teamType'] ?? t['team_type'] ?? '3v3').toString().toLowerCase() == _teamFilter.toLowerCase()
-        ).toList();
+        debugPrint('_fetchTeams: got ${rawTeams.length} teams from /rankings?mode=$_teamFilter');
         setState(() {
-          _teams = filteredTeams;
+          _teams = rawTeams;
           _isLoadingTeams = false;
         });
       } else {
