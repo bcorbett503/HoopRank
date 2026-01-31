@@ -67,4 +67,9 @@ export class MessagesController {
     async migrateCourtId() {
         return this.messagesService.migrateCourtIdColumn();
     }
+
+    @Post('cleanup-duplicate-challenges')
+    async cleanupDuplicateChallenges() {
+        return this.messagesService.cleanupDuplicateChallenges();
+    }
 }

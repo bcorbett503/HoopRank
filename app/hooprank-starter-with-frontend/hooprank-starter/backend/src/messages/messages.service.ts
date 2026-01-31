@@ -508,5 +508,42 @@ export class MessagesService {
             return { success: false, error: error.message };
         }
     }
+
+    /**
+     * Clean up duplicate challenges - keep only the most recent one per user pair
+     */
+    async cleanupDuplicateChallenges(): Promise<any> {
+        const isPostgres = !!process.env.DATABASE_URL;
+        if (!isPostgres) {
+            return { success: false, error: 'Only PostgreSQL supported' };
+        }
+
+        try {
+            // Delete all but the most recent active challenge for each user pair
+            const result = await this.dataSource.query(`
+                WITH ranked AS (
+                    SELECT id, from_id, to_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY LEAST(from_id, to_id), GREATEST(from_id, to_id)
+                            ORDER BY created_at DESC
+                        ) as rn
+                    FROM messages
+                    WHERE is_challenge = true AND challenge_status IN ('pending', 'accepted')
+                )
+                DELETE FROM messages WHERE id IN (
+                    SELECT id FROM ranked WHERE rn > 1
+                )
+                RETURNING id
+            `);
+
+            return {
+                success: true,
+                message: `Deleted ${result.length} duplicate challenges`,
+                deletedIds: result.map((r: any) => r.id)
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }
 
