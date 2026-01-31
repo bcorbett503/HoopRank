@@ -82,21 +82,26 @@ class Conversation {
 
 class ChallengeRequest {
   final Message message;
-  final User sender; // Actually the "other" user (opponent)
+  final User otherUser; // The opponent (challenger or challengee)
   final String direction; // 'sent' or 'received'
+  final Map<String, dynamic>? court; // Optional tagged court
 
-  ChallengeRequest({required this.message, required this.sender, required this.direction});
+  ChallengeRequest({required this.message, required this.otherUser, required this.direction, this.court});
 
   factory ChallengeRequest.fromJson(Map<String, dynamic> json) {
     return ChallengeRequest(
       message: Message.fromJson(json['message']),
-      sender: User.fromJson(json['sender']),
+      // Support both 'otherUser' (new) and 'sender' (legacy) keys
+      otherUser: User.fromJson(json['otherUser'] ?? json['sender']),
       direction: json['direction'] ?? 'received',
+      court: json['court'] as Map<String, dynamic>?,
     );
   }
 
   bool get isSent => direction == 'sent';
   bool get isReceived => direction == 'received';
+  String? get courtName => court?['name'];
+  String? get courtCity => court?['city'];
 }
 
 // Team group chat message
@@ -356,23 +361,26 @@ class MessagesService {
   }
 
   /// Send a challenge to another player
-  Future<void> sendChallenge(String senderId, String receiverId, String message) async {
+  /// Optionally tag a court where the game will be played
+  Future<void> sendChallenge(String senderId, String receiverId, String message, {String? courtId}) async {
     final token = await _getToken();
     
     print('=== SENDING CHALLENGE ===');
     print('senderId: $senderId');
     print('receiverId: $receiverId');
     print('message: $message');
+    print('courtId: $courtId');
     
     final body = <String, dynamic>{
-      'senderId': senderId,
-      'receiverId': receiverId,
-      'content': message,
-      'isChallenge': true,
+      'toUserId': receiverId,
+      'message': message,
     };
+    if (courtId != null) {
+      body['courtId'] = courtId;
+    }
     
     final response = await http.post(
-      Uri.parse('$baseUrl/messages'),
+      Uri.parse('$baseUrl/challenges'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

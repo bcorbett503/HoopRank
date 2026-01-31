@@ -707,7 +707,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Build a challenge card with accept/decline buttons
   Widget _buildChallengeCard(ChallengeRequest challenge) {
-    final sender = challenge.sender;
+    final opponent = challenge.otherUser;
     final message = challenge.message;
 
     return Container(
@@ -766,7 +766,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        sender.name,
+                        opponent.name,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -776,16 +776,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     ],
                   ),
                 ),
-                // Sender avatar
+                // Opponent avatar
                 GestureDetector(
-                  onTap: () => context.go('/player/${sender.id}'),
+                  onTap: () => context.go('/player/${opponent.id}'),
                   child: CircleAvatar(
                     radius: 22,
                     backgroundColor: Colors.orange.withOpacity(0.3),
-                    backgroundImage: sender.photoUrl != null ? NetworkImage(sender.photoUrl!) : null,
-                    child: sender.photoUrl == null
+                    backgroundImage: opponent.photoUrl != null ? NetworkImage(opponent.photoUrl!) : null,
+                    child: opponent.photoUrl == null
                         ? Text(
-                            sender.name.isNotEmpty ? sender.name[0].toUpperCase() : '?',
+                            opponent.name.isNotEmpty ? opponent.name[0].toUpperCase() : '?',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           )
                         : null,
@@ -896,8 +896,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Reply to a challenge - navigate to chat
   void _replyToChallenge(ChallengeRequest challenge) {
-    // Navigate to chat with the challenger
-    context.go('/messages/chat/${challenge.sender.id}');
+    // Navigate to chat with the opponent
+    context.go('/messages/chat/${challenge.otherUser.id}');
   }
 
   /// Decline a challenge
