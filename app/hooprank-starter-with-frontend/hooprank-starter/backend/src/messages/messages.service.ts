@@ -83,6 +83,28 @@ export class MessagesService {
         return Array.isArray(saved) ? saved[0] : saved;
     }
 
+    /**
+     * Check if there's already an active challenge between two users
+     * Active = pending or accepted (not declined)
+     */
+    async hasActiveChallenge(userId1: string, userId2: string): Promise<boolean> {
+        const isPostgres = !!process.env.DATABASE_URL;
+        if (!isPostgres) return false;
+
+        try {
+            const result = await this.dataSource.query(`
+                SELECT COUNT(*) as count FROM messages 
+                WHERE is_challenge = true 
+                    AND challenge_status IN ('pending', 'accepted')
+                    AND ((from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1))
+            `, [userId1, userId2]);
+            return parseInt(result[0]?.count || '0', 10) > 0;
+        } catch (error) {
+            console.error('hasActiveChallenge error:', error.message);
+            return false;
+        }
+    }
+
     async getPendingChallenges(userId: string): Promise<any[]> {
         const isPostgres = !!process.env.DATABASE_URL;
 
@@ -106,6 +128,7 @@ export class MessagesService {
                         AND m.challenge_status IN ('pending', 'accepted')
                         AND (m.from_id = $1 OR m.to_id = $1)
                     ORDER BY m.created_at DESC
+                    LIMIT 1
                 `, [userId]);
 
                 return results.map((r: any) => ({
