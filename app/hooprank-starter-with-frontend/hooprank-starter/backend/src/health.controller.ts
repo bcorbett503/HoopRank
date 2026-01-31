@@ -31,10 +31,11 @@ export class HealthController {
                 return { success: true, message: 'Olympic Club already exists', id: olympicClubId };
             }
 
-            // Insert The Olympic Club
+            // Insert The Olympic Club with PostGIS geography
+            // geog column is ST_Point(longitude, latitude)
             await this.dataSource.query(`
-                INSERT INTO courts (id, name, latitude, longitude, address, city, created_at, updated_at)
-                VALUES ($1, 'The Olympic Club', 37.7878, -122.4099, '524 Post Street', 'San Francisco', NOW(), NOW())
+                INSERT INTO courts (id, name, city, indoor, signature, geog, created_at, updated_at)
+                VALUES ($1, 'The Olympic Club', 'San Francisco', true, true, ST_SetSRID(ST_MakePoint(-122.4099, 37.7878), 4326)::geography, NOW(), NOW())
             `, [olympicClubId]);
 
             return { success: true, message: 'Olympic Club created', id: olympicClubId };
