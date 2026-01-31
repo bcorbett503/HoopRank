@@ -62,6 +62,10 @@ export class MatchesService {
   }
 
   async complete(id: string, winnerId: string): Promise<Match> {
+    return this.completeWithScores(id, winnerId, null, null);
+  }
+
+  async completeWithScores(id: string, winnerId: string, scoreCreator: number | null, scoreOpponent: number | null): Promise<Match> {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
@@ -92,11 +96,18 @@ export class MatchesService {
         WHERE id = $2
       `, [newOpponentRating, opponent.id]);
 
-      // Complete match
+      // Complete match with scores
       await this.dataSource.query(`
-        UPDATE matches SET status = 'completed', winner_id = $2, updated_at = NOW()
+        UPDATE matches SET status = 'completed', winner_id = $2, 
+          score_creator = $3, score_opponent = $4, updated_at = NOW()
         WHERE id = $1
-      `, [id, winnerId]);
+      `, [id, winnerId, scoreCreator, scoreOpponent]);
+
+      // Update associated challenge to 'completed' status
+      await this.dataSource.query(`
+        UPDATE messages SET challenge_status = 'completed', updated_at = NOW()
+        WHERE match_id = $1 AND is_challenge = true
+      `, [id]);
 
       const result = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [id]);
       return result[0];
@@ -108,6 +119,8 @@ export class MatchesService {
 
     m.status = 'completed';
     m.winnerId = winnerId;
+    if (scoreCreator !== null) (m as any).scoreCreator = scoreCreator;
+    if (scoreOpponent !== null) (m as any).scoreOpponent = scoreOpponent;
     return await this.matchesRepository.save(m);
   }
 

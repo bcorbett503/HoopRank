@@ -46,8 +46,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
       final followedIds = checkInState.followedCourts;
       _followedCourts = _allCourts.where((c) => followedIds.contains(c.id)).toList();
       
-      // Auto-detect nearby court if none selected
-      await _detectNearbyCourt();
+      // Don't auto-detect - let user select court manually
       
       if (mounted) setState(() => _isLoadingCourt = false);
     } catch (e) {
@@ -284,9 +283,9 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                 children: [
                   const Text('Mode: 1 v 1', style: TextStyle(color: Colors.grey)),
                   const SizedBox(height: 8),
-                  // Tappable court selection row
+                  // Tappable court selection row - always tappable
                   InkWell(
-                    onTap: _isLoadingCourt ? null : _showCourtPicker,
+                    onTap: _showCourtPicker,
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

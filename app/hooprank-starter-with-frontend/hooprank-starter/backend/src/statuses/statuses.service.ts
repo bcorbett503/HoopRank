@@ -300,19 +300,20 @@ export class StatusesService {
                     m.winner_id as "userId",
                     COALESCE(winner.name, 'Unknown') as "userName",
                     winner.avatar_url as "userPhotoUrl",
-                    CASE 
-                        WHEN m.winner_id = m.creator_id THEN 'defeated ' || COALESCE(loser.name, 'opponent')
-                        ELSE 'defeated ' || COALESCE(loser.name, 'opponent')
-                    END as content,
+                    COALESCE(winner.name, 'Player') || ' vs ' || COALESCE(loser.name, 'Opponent') as content,
                     NULL as "imageUrl",
                     NULL as "videoUrl",
                     NULL as "videoThumbnailUrl",
                     NULL::INTEGER as "videoDurationMs",
                     NULL as "scheduledAt",
                     m.court_id as "courtId",
-                    mc.name as "courtName",
+                    COALESCE(mc.name, 'Unknown Court') as "courtName",
                     CASE WHEN m.status = 'completed' THEN 'ended' ELSE m.status END as "matchStatus",
-                    COALESCE(m.score_creator::TEXT || '-' || m.score_opponent::TEXT, '21-18') as "matchScore",
+                    CASE 
+                        WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
+                        THEN m.score_creator::TEXT || '-' || m.score_opponent::TEXT
+                        ELSE NULL
+                    END as "matchScore",
                     winner.name as "winnerName",
                     loser.name as "loserName",
                     0 as "likeCount",

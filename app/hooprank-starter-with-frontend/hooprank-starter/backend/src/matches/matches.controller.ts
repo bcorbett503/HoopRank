@@ -58,14 +58,18 @@ export class MatchesController {
     const creatorId = (match as any).creator_id || match.creatorId;
     const opponentId = (match as any).opponent_id || match.opponentId;
 
-    // Determine the opponent of the submitter
-    const submitterOpponentId = submitterId === creatorId ? opponentId : creatorId;
+    // Determine scores based on who is submitting
+    // If submitter is creator, their score is score_creator
+    const isSubmitterCreator = submitterId === creatorId;
+    const scoreCreator = isSubmitterCreator ? body.me : body.opponent;
+    const scoreOpponent = isSubmitterCreator ? body.opponent : body.me;
 
     // Determine winner based on scores: if me > opponent, submitter wins
+    const submitterOpponentId = submitterId === creatorId ? opponentId : creatorId;
     const winnerId = body.me > body.opponent ? submitterId : submitterOpponentId;
 
-    // Complete the match (this updates ratings)
-    const completedMatch = await this.matches.complete(id, winnerId);
+    // Complete the match with scores (this updates ratings and challenge status)
+    const completedMatch = await this.matches.completeWithScores(id, winnerId, scoreCreator, scoreOpponent);
 
     return { match: completedMatch };
   }

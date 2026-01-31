@@ -453,7 +453,7 @@ class ApiService {
     if (_userId == null) throw Exception('Not authenticated');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/matches/$matchId/score'),
+      Uri.parse('$baseUrl/api/v1/matches/$matchId/score'),
       headers: {
         'x-user-id': _userId!,
         'Content-Type': 'application/json',
@@ -464,7 +464,7 @@ class ApiService {
       }),
     );
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body);
     } else {
       final body = response.body;
