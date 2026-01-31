@@ -1,11 +1,13 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChallengesController } from './challenges.controller';
-import { MessagesModule } from '../messages/messages.module';
+import { ChallengesService } from './challenges.service';
+import { Challenge } from './challenge.entity';
 
 @Module({
-    imports: [forwardRef(() => MessagesModule)],
+    imports: [TypeOrmModule.forFeature([Challenge])],
     controllers: [ChallengesController],
-    providers: [],
-    exports: [],
+    providers: [ChallengesService],
+    exports: [ChallengesService],
 })
 export class ChallengesModule { }

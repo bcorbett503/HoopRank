@@ -16,6 +16,7 @@ import { PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCou
 import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
 import { ChallengesModule } from './challenges/challenges.module';
+import { Challenge } from './challenges/challenge.entity';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ActivityModule } from './activity/activity.module';
 import { RankingsModule } from './rankings/rankings.module';
@@ -38,7 +39,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
           return {
             type: 'postgres',
             url: databaseUrl,
-            entities: [User, Court, Match, Message, Team, TeamMember, TeamMessage, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
+            entities: [User, Court, Match, Message, Challenge, Team, TeamMember, TeamMessage, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
             synchronize: false, // Disabled for production - use migrations instead
             ssl: false, // Railway internal connection doesn't need SSL
             namingStrategy: new SnakeNamingStrategy(),
@@ -48,7 +49,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
           return {
             type: 'better-sqlite3',
             database: 'hooprank.db',
-            entities: [User, Court, Match, Message, Team, TeamMember, TeamMessage, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
+            entities: [User, Court, Match, Message, Challenge, Team, TeamMember, TeamMessage, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn],
             synchronize: true,
           } as any;
         }

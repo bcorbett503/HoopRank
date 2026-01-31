@@ -1,16 +1,15 @@
-import { Controller, Get, Post, Body, Param, Headers, Put, HttpException, HttpStatus } from '@nestjs/common';
-import { MessagesService } from '../messages/messages.service';
+import { Controller, Get, Post, Body, Param, Headers, Put, Delete, HttpException, HttpStatus } from '@nestjs/common';
+import { ChallengesService } from './challenges.service';
 
 @Controller('challenges')
 export class ChallengesController {
     constructor(
-        private readonly messagesService: MessagesService,
+        private readonly challengesService: ChallengesService,
     ) { }
 
     /**
-     * Create a new challenge (creates a message with isChallenge=true)
-     * Optionally tag a court where the game will be played
-     * Only one active challenge allowed between two users at a time
+     * Create a new challenge
+     * Optionally include a court where the game will be played
      */
     @Post()
     async createChallenge(
@@ -21,31 +20,29 @@ export class ChallengesController {
             throw new HttpException('Unauthorized: x-user-id header required', HttpStatus.UNAUTHORIZED);
         }
 
-        // Check if there's already an active challenge between these users
-        const hasExisting = await this.messagesService.hasActiveChallenge(userId, body.toUserId);
-        if (hasExisting) {
-            throw new HttpException('You already have an active challenge with this player', HttpStatus.CONFLICT);
-        }
-
-        // Create challenge as a message with isChallenge flag
-        const challenge = await this.messagesService.sendMessage(
-            userId,
-            body.toUserId,
-            body.message || 'Want to play?',
-            undefined, // no matchId
-            true, // isChallenge = true
-            body.courtId // optional court tag
-        );
-
-        return challenge;
+        return this.challengesService.create(userId, body.toUserId, body.message, body.courtId);
     }
 
     /**
-     * Get pending challenges for the current user
+     * Get challenges for the current user
      */
     @Get()
     async getChallenges(@Headers('x-user-id') userId: string) {
-        return this.messagesService.getPendingChallenges(userId);
+        if (!userId) {
+            throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+        }
+        return this.challengesService.getAllForUser(userId);
+    }
+
+    /**
+     * Get only pending challenges (incoming)
+     */
+    @Get('pending')
+    async getPendingChallenges(@Headers('x-user-id') userId: string) {
+        if (!userId) {
+            throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+        }
+        return this.challengesService.getPendingForUser(userId);
     }
 
     /**
@@ -56,7 +53,10 @@ export class ChallengesController {
         @Headers('x-user-id') userId: string,
         @Param('id') challengeId: string
     ) {
-        return this.messagesService.updateChallengeStatus(challengeId, 'accepted', userId);
+        if (!userId) {
+            throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+        }
+        return this.challengesService.accept(challengeId, userId);
     }
 
     /**
@@ -67,6 +67,23 @@ export class ChallengesController {
         @Headers('x-user-id') userId: string,
         @Param('id') challengeId: string
     ) {
-        return this.messagesService.updateChallengeStatus(challengeId, 'declined', userId);
+        if (!userId) {
+            throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+        }
+        return this.challengesService.decline(challengeId, userId);
+    }
+
+    /**
+     * Cancel a challenge (sender only)
+     */
+    @Delete(':id')
+    async cancelChallenge(
+        @Headers('x-user-id') userId: string,
+        @Param('id') challengeId: string
+    ) {
+        if (!userId) {
+            throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+        }
+        return this.challengesService.cancel(challengeId, userId);
     }
 }

@@ -109,26 +109,12 @@ export class MatchesService {
         WHERE id = $1
       `, [id, winnerId, scoreCreator, scoreOpponent]);
 
-      // Update associated challenge to 'completed' status
-      // Log for debugging
-      console.log(`[completeWithScores] Updating challenge for match_id: ${id}`);
-
-      // Check if any challenge exists for this match
-      const existingChallenge = await this.dataSource.query(`
-        SELECT id, challenge_status, match_id FROM messages 
-        WHERE match_id = $1 AND is_challenge = true
+      // Update associated challenge to 'completed' status in new challenges table
+      await this.dataSource.query(`
+        UPDATE challenges SET status = 'completed', updated_at = NOW()
+        WHERE match_id = $1
       `, [id]);
-      console.log(`[completeWithScores] Found challenges:`, existingChallenge);
-
-      if (existingChallenge.length > 0) {
-        await this.dataSource.query(`
-          UPDATE messages SET challenge_status = 'completed', updated_at = NOW()
-          WHERE match_id = $1 AND is_challenge = true
-        `, [id]);
-        console.log(`[completeWithScores] Challenge updated to completed`);
-      } else {
-        console.log(`[completeWithScores] No challenge found for match ${id}`);
-      }
+      console.log(`[completeWithScores] Marked challenge completed for match ${id}`);
 
       const result = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [id]);
       return result[0];
