@@ -829,6 +829,7 @@ export class UsersService {
   /**
    * Get users within specified radius of the requesting user.
    * Uses Haversine formula to calculate distance between coordinates.
+   * Falls back to zip code geocoding if lat/lng not available.
    */
   async getNearbyUsers(userId: string, radiusMiles: number = 25): Promise<any[]> {
     const isPostgres = !!process.env.DATABASE_URL;
@@ -837,10 +838,33 @@ export class UsersService {
       return [];
     }
 
+    // Simple zip code to lat/lng lookup (approximate center of zip code area)
+    const zipCoords: Record<string, { lat: number; lng: number }> = {
+      // Oregon
+      '97027': { lat: 45.3762, lng: -122.5967 }, // Gladstone, OR
+      '97034': { lat: 45.4206, lng: -122.6706 }, // Lake Oswego, OR
+      '97201': { lat: 45.5152, lng: -122.6784 }, // Portland, OR
+      '97202': { lat: 45.4829, lng: -122.6515 }, // Portland, OR
+      '97206': { lat: 45.4765, lng: -122.6001 }, // Portland, OR
+      '97045': { lat: 45.3542, lng: -122.5765 }, // Oregon City, OR
+      // California - Bay Area
+      '94102': { lat: 37.7786, lng: -122.4159 }, // San Francisco, CA
+      '94103': { lat: 37.7726, lng: -122.4110 }, // San Francisco, CA
+      '94107': { lat: 37.7649, lng: -122.3955 }, // San Francisco, CA
+      '94501': { lat: 37.7652, lng: -122.2416 }, // Alameda, CA
+      '94541': { lat: 37.6688, lng: -122.0860 }, // Hayward, CA
+      '94542': { lat: 37.6338, lng: -122.0469 }, // Hayward, CA
+      '94544': { lat: 37.6332, lng: -122.0971 }, // Hayward, CA
+      '94545': { lat: 37.6336, lng: -122.1092 }, // Hayward, CA
+      // Washington
+      '98362': { lat: 48.1181, lng: -123.4307 }, // Port Angeles, WA
+      '98363': { lat: 48.0633, lng: -123.8859 }, // Port Angeles, WA
+    };
+
     try {
-      // Get the requesting user's location
+      // Get the requesting user's location (with zip fallback)
       const currentUser = await this.dataSource.query(
-        `SELECT lat, lng, city FROM users WHERE id = $1`,
+        `SELECT lat, lng, zip, city FROM users WHERE id = $1`,
         [userId]
       );
 
@@ -849,11 +873,18 @@ export class UsersService {
         return [];
       }
 
-      const { lat, lng, city } = currentUser[0];
+      let { lat, lng, zip, city } = currentUser[0];
 
-      // If user has no location, return all users as fallback
+      // Fallback to zip code coordinates if no GPS
+      if ((!lat || !lng) && zip && zipCoords[zip]) {
+        lat = zipCoords[zip].lat;
+        lng = zipCoords[zip].lng;
+        console.log(`getNearbyUsers: using zip ${zip} coords (${lat}, ${lng}) for user ${userId}`);
+      }
+
+      // If still no location, return all users as fallback
       if (!lat || !lng) {
-        console.log('getNearbyUsers: user has no location, returning all users');
+        console.log('getNearbyUsers: user has no location or zip, returning all users');
         return await this.dataSource.query(`
           SELECT 
             id,
@@ -873,38 +904,93 @@ export class UsersService {
       }
 
       // Query users within radius using Haversine formula
+      // Use COALESCE to fall back to zip coordinates for other users too
       // 3959 = Earth's radius in miles
       const nearbyUsers = await this.dataSource.query(`
+        WITH user_locations AS (
+          SELECT 
+            id,
+            name,
+            avatar_url as "avatarUrl",
+            hoop_rank as rating,
+            position,
+            city,
+            games_played as "gamesPlayed",
+            zip,
+            COALESCE(lat, 
+              CASE zip
+                WHEN '97027' THEN 45.3762
+                WHEN '97034' THEN 45.4206
+                WHEN '97201' THEN 45.5152
+                WHEN '97202' THEN 45.4829
+                WHEN '97206' THEN 45.4765
+                WHEN '97045' THEN 45.3542
+                WHEN '94102' THEN 37.7786
+                WHEN '94103' THEN 37.7726
+                WHEN '94107' THEN 37.7649
+                WHEN '94501' THEN 37.7652
+                WHEN '94541' THEN 37.6688
+                WHEN '94542' THEN 37.6338
+                WHEN '94544' THEN 37.6332
+                WHEN '94545' THEN 37.6336
+                WHEN '98362' THEN 48.1181
+                WHEN '98363' THEN 48.0633
+                ELSE NULL
+              END
+            ) as effective_lat,
+            COALESCE(lng, 
+              CASE zip
+                WHEN '97027' THEN -122.5967
+                WHEN '97034' THEN -122.6706
+                WHEN '97201' THEN -122.6784
+                WHEN '97202' THEN -122.6515
+                WHEN '97206' THEN -122.6001
+                WHEN '97045' THEN -122.5765
+                WHEN '94102' THEN -122.4159
+                WHEN '94103' THEN -122.4110
+                WHEN '94107' THEN -122.3955
+                WHEN '94501' THEN -122.2416
+                WHEN '94541' THEN -122.0860
+                WHEN '94542' THEN -122.0469
+                WHEN '94544' THEN -122.0971
+                WHEN '94545' THEN -122.1092
+                WHEN '98362' THEN -123.4307
+                WHEN '98363' THEN -123.8859
+                ELSE NULL
+              END
+            ) as effective_lng
+          FROM users 
+          WHERE name IS NOT NULL 
+            AND name != ''
+            AND name != 'New Player'
+            AND id != $1
+        )
         SELECT 
           id,
           name,
-          avatar_url as "avatarUrl",
-          hoop_rank as rating,
+          "avatarUrl",
+          rating,
           position,
           city,
-          games_played as "gamesPlayed",
+          "gamesPlayed",
           (
             3959 * acos(
-              cos(radians($2)) * cos(radians(lat)) *
-              cos(radians(lng) - radians($3)) +
-              sin(radians($2)) * sin(radians(lat))
+              cos(radians($2)) * cos(radians(effective_lat)) *
+              cos(radians(effective_lng) - radians($3)) +
+              sin(radians($2)) * sin(radians(effective_lat))
             )
           ) as distance
-        FROM users 
-        WHERE lat IS NOT NULL 
-          AND lng IS NOT NULL
-          AND name IS NOT NULL 
-          AND name != ''
-          AND name != 'New Player'
-          AND id != $1
+        FROM user_locations
+        WHERE effective_lat IS NOT NULL 
+          AND effective_lng IS NOT NULL
           AND (
             3959 * acos(
-              cos(radians($2)) * cos(radians(lat)) *
-              cos(radians(lng) - radians($3)) +
-              sin(radians($2)) * sin(radians(lat))
+              cos(radians($2)) * cos(radians(effective_lat)) *
+              cos(radians(effective_lng) - radians($3)) +
+              sin(radians($2)) * sin(radians(effective_lat))
             )
           ) <= $4
-        ORDER BY hoop_rank DESC
+        ORDER BY rating DESC
         LIMIT 100
       `, [userId, lat, lng, radiusMiles]);
 
