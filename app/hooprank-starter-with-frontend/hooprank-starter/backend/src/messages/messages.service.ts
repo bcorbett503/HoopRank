@@ -317,6 +317,7 @@ export class MessagesService {
 
     /**
      * Update challenge status (accept/decline)
+     * When accepting, creates a match record and links it to the challenge
      */
     async updateChallengeStatus(messageId: string, status: 'accepted' | 'declined', userId: string): Promise<any> {
         const isPostgres = !!process.env.DATABASE_URL;
@@ -330,12 +331,49 @@ export class MessagesService {
                     WHERE id = $2 AND is_challenge = true
                 `, [status, messageId]);
 
-                // Return the updated message
-                const result = await this.dataSource.query(`
+                // Get the challenge details
+                const challengeResult = await this.dataSource.query(`
                     SELECT * FROM messages WHERE id = $1
                 `, [messageId]);
 
-                return result.length > 0 ? result[0] : null;
+                if (challengeResult.length === 0) {
+                    throw new Error('Challenge not found');
+                }
+
+                const challenge = challengeResult[0];
+
+                // If accepting, create a match record
+                if (status === 'accepted') {
+                    // Create match: challenger (from_id) is creator, accepter (to_id) is opponent
+                    const matchResult = await this.dataSource.query(`
+                        INSERT INTO matches (id, status, match_type, creator_id, opponent_id, court_id, started_by, created_at, updated_at)
+                        VALUES (gen_random_uuid(), 'accepted', '1v1', $1, $2, $3, '{}', NOW(), NOW())
+                        RETURNING id
+                    `, [challenge.from_id, challenge.to_id, challenge.court_id || null]);
+
+                    const matchId = matchResult[0]?.id;
+
+                    if (matchId) {
+                        // Link match to challenge message
+                        await this.dataSource.query(`
+                            UPDATE messages SET match_id = $1 WHERE id = $2
+                        `, [matchId, messageId]);
+
+                        // Get sender info to return to mobile
+                        const senderResult = await this.dataSource.query(`
+                            SELECT id, name, avatar_url, hoop_rank FROM users WHERE id = $1
+                        `, [challenge.from_id]);
+
+                        return {
+                            ...challenge,
+                            matchId,
+                            sender: senderResult[0] || null,
+                            courtId: challenge.court_id
+                        };
+                    }
+                }
+
+                return challenge;
             } catch (error) {
                 console.error('updateChallengeStatus error:', error.message);
                 throw error;

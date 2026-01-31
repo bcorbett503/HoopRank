@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../state/app_state.dart';
+import '../state/check_in_state.dart';
 import '../services/api_service.dart';
 import '../services/court_service.dart';
 import '../models.dart';
@@ -19,26 +20,47 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
   List<User> _players = [];
   bool _isLoading = true;
   
-  // Court detection
-  Court? _nearestCourt;
+  // Court selection
+  Court? _selectedCourt;
   bool _isLoadingCourt = true;
   String? _courtError;
+  List<Court> _allCourts = [];
+  List<Court> _followedCourts = [];
 
   @override
   void initState() {
     super.initState();
     _loadPlayers();
-    _detectNearbyCourt();
+    _loadCourts();
+  }
+
+  Future<void> _loadCourts() async {
+    setState(() => _isLoadingCourt = true);
+    try {
+      // Load all courts
+      await CourtService().loadCourts();
+      _allCourts = CourtService().getAllCourts();
+      
+      // Get followed court IDs and resolve to Court objects
+      final checkInState = Provider.of<CheckInState>(context, listen: false);
+      final followedIds = checkInState.followedCourts;
+      _followedCourts = _allCourts.where((c) => followedIds.contains(c.id)).toList();
+      
+      // Auto-detect nearby court if none selected
+      await _detectNearbyCourt();
+      
+      if (mounted) setState(() => _isLoadingCourt = false);
+    } catch (e) {
+      debugPrint('Error loading courts: $e');
+      if (mounted) setState(() {
+        _courtError = 'Failed to load courts';
+        _isLoadingCourt = false;
+      });
+    }
   }
 
   Future<void> _detectNearbyCourt() async {
-    setState(() {
-      _isLoadingCourt = true;
-      _courtError = null;
-    });
-    
     try {
-      // Check location permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -46,48 +68,141 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
       
       if (permission == LocationPermission.denied || 
           permission == LocationPermission.deniedForever) {
-        setState(() {
-          _courtError = 'Location permission required';
-          _isLoadingCourt = false;
-        });
-        return;
+        return; // No auto-detection, user can still select manually
       }
       
-      // Get current position
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
       
-      // Load courts if not loaded
-      await CourtService().loadCourts();
-      
-      // Find courts within 200 meters (tight radius)
-      final courts = CourtService().getCourtsNear(
+      // Find courts within 200 meters
+      final nearbyCourts = CourtService().getCourtsNear(
         position.latitude,
         position.longitude,
-        radiusKm: 0.2, // 200 meters
+        radiusKm: 0.2,
       );
       
-      if (mounted) {
-        setState(() {
-          _nearestCourt = courts.isNotEmpty ? courts.first : null;
-          _isLoadingCourt = false;
-        });
-        
-        // Update MatchState with selected court
-        if (_nearestCourt != null) {
-          Provider.of<MatchState>(context, listen: false).setCourt(_nearestCourt!);
-        }
+      if (mounted && nearbyCourts.isNotEmpty && _selectedCourt == null) {
+        setState(() => _selectedCourt = nearbyCourts.first);
+        Provider.of<MatchState>(context, listen: false).setCourt(nearbyCourts.first);
       }
     } catch (e) {
-      debugPrint('Error detecting court: $e');
-      if (mounted) {
-        setState(() {
-          _courtError = 'Could not detect location';
-          _isLoadingCourt = false;
-        });
-      }
+      debugPrint('Error detecting nearby court: $e');
     }
+  }
+
+  void _showCourtPicker() {
+    String searchText = '';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final filteredCourts = searchText.isEmpty
+                ? [..._followedCourts, ..._allCourts.where((c) => !_followedCourts.any((f) => f.id == c.id))]
+                : _allCourts.where((c) => c.name.toLowerCase().contains(searchText.toLowerCase())).toList();
+            
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 40, height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[600],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('Select Court', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 12),
+                          TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Search courts...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                              filled: true,
+                              fillColor: Colors.grey[850],
+                            ),
+                            onChanged: (val) => setModalState(() => searchText = val),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_followedCourts.isNotEmpty && searchText.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('FOLLOWED COURTS', style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filteredCourts.length,
+                        itemBuilder: (context, index) {
+                          final court = filteredCourts[index];
+                          final isFollowed = _followedCourts.any((f) => f.id == court.id);
+                          final isSelected = _selectedCourt?.id == court.id;
+                          
+                          // Add divider before "All Courts" section
+                          final showAllCourtsHeader = searchText.isEmpty && 
+                              _followedCourts.isNotEmpty && 
+                              index == _followedCourts.length;
+                          
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (showAllCourtsHeader)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                                  child: Text('ALL COURTS', style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.bold)),
+                                ),
+                              ListTile(
+                                leading: Image.asset('assets/court_marker.jpg', width: 32, height: 26),
+                                title: Text(court.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                                subtitle: court.city != null ? Text(court.city!, style: TextStyle(color: Colors.grey[500], fontSize: 12)) : null,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isFollowed) Icon(Icons.star, size: 16, color: Colors.orange[300]),
+                                    if (isSelected) const Icon(Icons.check, color: Colors.green),
+                                  ],
+                                ),
+                                onTap: () {
+                                  setState(() => _selectedCourt = court);
+                                  Provider.of<MatchState>(context, listen: false).setCourt(court);
+                                  Navigator.pop(context);
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _loadPlayers() async {
@@ -111,56 +226,36 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     if (_isLoadingCourt) {
       return Row(
         children: [
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
           const SizedBox(width: 8),
-          Text('Detecting nearby court...', style: TextStyle(color: Colors.grey[500])),
+          Text('Loading courts...', style: TextStyle(color: Colors.grey[500])),
         ],
       );
     }
     
-    if (_courtError != null) {
-      return Row(
-        children: [
-          Icon(Icons.location_off, size: 18, color: Colors.grey[500]),
-          const SizedBox(width: 8),
-          Text(_courtError!, style: TextStyle(color: Colors.grey[500])),
-          const Spacer(),
-          TextButton(
-            onPressed: _detectNearbyCourt,
-            child: const Text('Retry'),
-          ),
-        ],
-      );
-    }
-    
-    if (_nearestCourt != null) {
+    if (_selectedCourt != null) {
       return Row(
         children: [
           Image.asset('assets/court_marker.jpg', width: 24, height: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              _nearestCourt!.name,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(_selectedCourt!.name, style: const TextStyle(fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
           Icon(Icons.check_circle, size: 18, color: Colors.green[400]),
+          const SizedBox(width: 8),
+          Icon(Icons.edit, size: 16, color: Colors.grey[400]),
         ],
       );
     }
     
-    // No courts nearby
+    // No court selected
     return Row(
       children: [
-        Icon(Icons.location_searching, size: 18, color: Colors.grey[500]),
+        Icon(Icons.add_location_alt, size: 18, color: Colors.orange[300]),
         const SizedBox(width: 8),
-        Text('No courts nearby', style: TextStyle(color: Colors.grey[500])),
+        Text('Tap to select court', style: TextStyle(color: Colors.orange[300])),
+        const Spacer(),
+        Icon(Icons.chevron_right, size: 18, color: Colors.grey[400]),
       ],
     );
   }
@@ -189,14 +284,18 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                 children: [
                   const Text('Mode: 1 v 1', style: TextStyle(color: Colors.grey)),
                   const SizedBox(height: 8),
-                  // Court detection row
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[850],
-                      borderRadius: BorderRadius.circular(8),
+                  // Tappable court selection row
+                  InkWell(
+                    onTap: _isLoadingCourt ? null : _showCourtPicker,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: _buildCourtRow(),
                     ),
-                    child: _buildCourtRow(),
                   ),
                   const Divider(height: 24),
                   // Only show player picker if opponent not already set
