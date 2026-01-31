@@ -449,8 +449,17 @@ class ApiService {
     required String matchId,
     required int myScore,
     required int opponentScore,
+    String? courtId,
   }) async {
     if (_userId == null) throw Exception('Not authenticated');
+
+    final body = <String, dynamic>{
+      'me': myScore,
+      'opponent': opponentScore,
+    };
+    if (courtId != null && courtId.isNotEmpty) {
+      body['courtId'] = courtId;
+    }
 
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/matches/$matchId/score'),
@@ -458,10 +467,7 @@ class ApiService {
         'x-user-id': _userId!,
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({
-        'me': myScore,
-        'opponent': opponentScore,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {

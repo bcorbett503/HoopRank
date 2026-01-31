@@ -44,11 +44,11 @@ export class MatchesController {
   @Post(':id/score')
   async submitScore(
     @Param('id') id: string,
-    @Body() body: { me: number; opponent: number },
+    @Body() body: { me: number; opponent: number; courtId?: string },
     @Headers('x-user-id') userId: string
   ): Promise<{ match: Match; ratingChange?: { myChange: number; opponentChange: number } }> {
     try {
-      console.log(`[submitScore] Starting for match ${id}, user ${userId}, scores: me=${body.me}, opponent=${body.opponent}`);
+      console.log(`[submitScore] Starting for match ${id}, user ${userId}, scores: me=${body.me}, opponent=${body.opponent}, courtId=${body.courtId || 'none'}`);
 
       // Get match to determine who is who
       const match = await this.matches.get(id);
@@ -76,7 +76,7 @@ export class MatchesController {
       console.log(`[submitScore] Calculated: scoreCreator=${scoreCreator}, scoreOpponent=${scoreOpponent}, winnerId=${winnerId}`);
 
       // Complete the match with scores (this updates ratings and challenge status)
-      const completedMatch = await this.matches.completeWithScores(id, winnerId, scoreCreator, scoreOpponent);
+      const completedMatch = await this.matches.completeWithScores(id, winnerId, scoreCreator, scoreOpponent, body.courtId);
 
       console.log(`[submitScore] Match completed successfully`);
       return { match: completedMatch };

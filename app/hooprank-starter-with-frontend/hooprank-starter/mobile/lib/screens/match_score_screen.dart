@@ -70,11 +70,12 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           rkAfter: 0,
         );
       } else {
-        // Submit 1v1 score
+        // Submit 1v1 score with court if available
         await ApiService.submitScore(
           matchId: matchId,
           myScore: userScore,
           opponentScore: oppScore,
+          courtId: match.court?.id,
         );
 
         if (!mounted) return;

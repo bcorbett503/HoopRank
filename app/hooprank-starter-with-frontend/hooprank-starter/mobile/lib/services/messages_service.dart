@@ -180,8 +180,9 @@ class MessagesService {
   Future<List<ChallengeRequest>> getPendingChallenges(String userId) async {
     final token = await _getToken();
     print('Getting challenges for userId: $userId');
+    // Use new /challenges endpoint instead of /messages/challenges
     final response = await http.get(
-      Uri.parse('$baseUrl/messages/challenges'),
+      Uri.parse('$baseUrl/challenges'),
       headers: {
         'Authorization': 'Bearer $token',
         'x-user-id': userId,
@@ -194,7 +195,32 @@ class MessagesService {
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       print('Parsed ${data.length} challenges');
-      return data.map((json) => ChallengeRequest.fromJson(json)).toList();
+      // Transform new API format to ChallengeRequest format
+      return data.map((c) {
+        // New API returns challenges with fromUser/toUser objects
+        final fromUser = c['fromUser'] ?? {};
+        final toUser = c['toUser'] ?? {};
+        final court = c['court'];
+        
+        // Create a pseudo-message for compatibility
+        final message = Message(
+          id: c['id'] ?? '',
+          senderId: c['from_user_id'] ?? '',
+          receiverId: c['to_user_id'] ?? '',
+          content: c['message'] ?? '',
+          createdAt: c['created_at'] != null ? DateTime.parse(c['created_at']) : DateTime.now(),
+          matchId: c['match_id'],
+          isChallenge: true,
+          challengeStatus: c['status'],
+        );
+        
+        return ChallengeRequest(
+          message: message,
+          otherUser: User.fromJson(fromUser.isEmpty ? {'id': c['from_user_id'], 'name': 'Unknown'} : fromUser),
+          direction: 'received',
+          court: court,
+        );
+      }).toList();
     } else {
       throw Exception('Failed to load challenges');
     }
@@ -219,6 +245,7 @@ class MessagesService {
   /// Accept a challenge and get the created matchId
   Future<Map<String, dynamic>> acceptChallenge(String userId, String challengeId) async {
     final token = await _getToken();
+    print('Accepting challenge: $challengeId for user: $userId');
     final response = await http.put(
       Uri.parse('$baseUrl/challenges/$challengeId/accept'),
       headers: {
@@ -228,17 +255,21 @@ class MessagesService {
       },
     );
 
-    if (response.statusCode == 200) {
+    print('Accept response status: ${response.statusCode}');
+    print('Accept response body: ${response.body}');
+    
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body);
     } else {
       final body = json.decode(response.body);
-      throw Exception(body['error'] ?? 'Failed to accept challenge');
+      throw Exception(body['message'] ?? body['error'] ?? 'Failed to accept challenge');
     }
   }
 
   /// Decline a challenge
   Future<void> declineChallenge(String userId, String challengeId) async {
     final token = await _getToken();
+    print('Declining challenge: $challengeId for user: $userId');
     final response = await http.put(
       Uri.parse('$baseUrl/challenges/$challengeId/decline'),
       headers: {
@@ -248,9 +279,12 @@ class MessagesService {
       },
     );
 
-    if (response.statusCode != 200) {
+    print('Decline response status: ${response.statusCode}');
+    print('Decline response body: ${response.body}');
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
       final body = json.decode(response.body);
-      throw Exception(body['error'] ?? 'Failed to decline challenge');
+      throw Exception(body['message'] ?? body['error'] ?? 'Failed to decline challenge');
     }
   }
 

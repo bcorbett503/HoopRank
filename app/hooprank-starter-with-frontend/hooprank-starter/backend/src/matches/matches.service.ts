@@ -65,7 +65,7 @@ export class MatchesService {
     return this.completeWithScores(id, winnerId, null, null);
   }
 
-  async completeWithScores(id: string, winnerId: string, scoreCreator: number | null, scoreOpponent: number | null): Promise<Match> {
+  async completeWithScores(id: string, winnerId: string, scoreCreator: number | null, scoreOpponent: number | null, courtId?: string): Promise<Match> {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
@@ -102,12 +102,22 @@ export class MatchesService {
         `, [newOpponentRating, opponent.id]);
       }
 
-      // Complete match with scores (always update scores even if already completed)
-      await this.dataSource.query(`
-        UPDATE matches SET status = 'completed', winner_id = $2, 
-          score_creator = $3, score_opponent = $4, updated_at = NOW()
-        WHERE id = $1
-      `, [id, winnerId, scoreCreator, scoreOpponent]);
+      // Complete match with scores and court (always update scores even if already completed)
+      // If courtId provided, update it - otherwise keep existing court_id
+      if (courtId) {
+        await this.dataSource.query(`
+          UPDATE matches SET status = 'completed', winner_id = $2, 
+            score_creator = $3, score_opponent = $4, court_id = $5, updated_at = NOW()
+          WHERE id = $1
+        `, [id, winnerId, scoreCreator, scoreOpponent, courtId]);
+        console.log(`[completeWithScores] Updated match ${id} with court_id=${courtId}`);
+      } else {
+        await this.dataSource.query(`
+          UPDATE matches SET status = 'completed', winner_id = $2, 
+            score_creator = $3, score_opponent = $4, updated_at = NOW()
+          WHERE id = $1
+        `, [id, winnerId, scoreCreator, scoreOpponent]);
+      }
 
       // Update associated challenge to 'completed' status in new challenges table
       await this.dataSource.query(`

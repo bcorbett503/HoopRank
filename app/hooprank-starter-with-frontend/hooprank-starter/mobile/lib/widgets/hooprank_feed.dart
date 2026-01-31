@@ -1084,11 +1084,24 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   Widget _buildMatchCard(Map<String, dynamic> item) {
     final userName = item['userName']?.toString() ?? 'Unknown';
     final userPhotoUrl = item['userPhotoUrl']?.toString();
-    final courtName = item['courtName']?.toString() ?? 'Unknown Court';
+    final courtName = item['courtName']?.toString();
     final matchStatus = item['matchStatus']?.toString() ?? '';
     final createdAt = item['createdAt'];
-    // For match results, we often get a score
     final matchScore = item['matchScore']?.toString(); // e.g. "21-18" or null
+    
+    // Get both winner and loser names for proper display
+    final winnerName = item['winnerName']?.toString() ?? userName;
+    final loserName = item['loserName']?.toString();
+    
+    // Display text: "Winner vs Loser" if both available, else just winner
+    final displayName = loserName != null && loserName.isNotEmpty 
+        ? '$winnerName vs $loserName' 
+        : winnerName;
+    
+    // Show "Pickup Game" instead of "Unknown Court" for better UX
+    final displayCourtName = (courtName == null || courtName == 'Unknown Court' || courtName.isEmpty)
+        ? 'Pickup Game'
+        : courtName;
 
     String timeAgo = _formatTimeAgo(createdAt);
 
@@ -1134,8 +1147,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text('played at $courtName', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                      Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text('played at $displayCourtName', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
                     ],
                   ),
                 ),
