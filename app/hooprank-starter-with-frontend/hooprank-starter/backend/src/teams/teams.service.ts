@@ -566,7 +566,7 @@ export class TeamsService {
         // Create team match - use NULL for creator_id since this is a team match
         const matchResult = await this.dataSource.query(`
             INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id)
-            VALUES ('3v3', 'in_progress', true, $1, $2)
+            VALUES ('3v3', 'accepted', true, $1, $2)
             RETURNING *
         `, [challenge.from_team_id, challenge.to_team_id]);
         const match = matchResult[0];
