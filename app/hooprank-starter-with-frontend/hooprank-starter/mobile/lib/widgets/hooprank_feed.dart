@@ -741,157 +741,188 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   /// Build a challenge card with accept/decline buttons
+  /// Build a challenge card with accept/decline buttons
   Widget _buildChallengeCard(ChallengeRequest challenge) {
     debugPrint('FEED: Building challenge card for ${challenge.otherUser.name}');
     final opponent = challenge.otherUser;
     final message = challenge.message;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8), // Reduced from 12
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.orange.shade900.withOpacity(0.3), Colors.deepOrange.withOpacity(0.15)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.orange.withOpacity(0.4), width: 2),
+        borderRadius: BorderRadius.circular(12), // Reduced radius slightly
+        border: Border.all(color: Colors.orange.withOpacity(0.4), width: 1.5), // Thinner border
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withOpacity(0.15),
-            blurRadius: 8,
+            color: Colors.orange.withOpacity(0.1),
+            blurRadius: 4, // Reduced blur
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), // Compact padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Hug content
           children: [
-            // Header: Challenge icon + "Challenge from X"
+            // Header: Challenge icon + "Challenge from X" + Avatar
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Compact Icon
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6), // Reduced from 8
                   decoration: BoxDecoration(
                     color: Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.sports_basketball, color: Colors.orange, size: 24),
+                  child: const Icon(Icons.sports_basketball, color: Colors.orange, size: 18), // Reduced size
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.bolt, size: 16, color: Colors.orange),
+                          const Icon(Icons.bolt, size: 12, color: Colors.orange), // Smaller bolt
                           const SizedBox(width: 4),
                           const Text(
                             'CHALLENGE',
                             style: TextStyle(
                               color: Colors.orange,
                               fontWeight: FontWeight.w900,
-                              fontSize: 12,
-                              letterSpacing: 1,
+                              fontSize: 10, // Smaller font
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        opponent.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                      const SizedBox(height: 2),
+                      Row(
+                         children: [
+                           Text(
+                            opponent.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14, // Slightly smaller
+                            ),
+                          ),
+                          // Maybe add rating here if we had it easily available, but name is fine
+                         ],
                       ),
                     ],
                   ),
                 ),
-                // Opponent avatar
+                // Opponent avatar - smaller
                 GestureDetector(
                   onTap: () => context.go('/player/${opponent.id}'),
                   child: CircleAvatar(
-                    radius: 22,
+                    radius: 18, // Reduced from 22
                     backgroundColor: Colors.orange.withOpacity(0.3),
                     backgroundImage: opponent.photoUrl != null ? NetworkImage(opponent.photoUrl!) : null,
                     child: opponent.photoUrl == null
                         ? Text(
                             opponent.name.isNotEmpty ? opponent.name[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                           )
                         : null,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // Challenge message
+            
+            // Challenge message - leaner container
             if (message.content.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '"${message.content}"',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontStyle: FontStyle.italic,
-                    fontSize: 14,
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8), // Tighter spacing
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Text(
+                    '"${message.content}"',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 13,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-            const SizedBox(height: 16),
-            // Reply / Decline / Start Match buttons
+              )
+            else 
+               const SizedBox(height: 8),
+
+            // Reply / Decline / Start Match buttons - Compact row
             Row(
               children: [
                 // Decline button
                 Expanded(
-                  flex: 1,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _declineChallenge(challenge),
-                    icon: const Icon(Icons.close, size: 16),
-                    label: const Text('Decline', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      side: const BorderSide(color: Colors.white30),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                  flex: 2, 
+                  child: SizedBox(
+                    height: 32, // Fixed smaller height
+                    child: OutlinedButton(
+                      onPressed: () => _declineChallenge(challenge),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        side: const BorderSide(color: Colors.white24),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      child: const Text('Decline', style: TextStyle(fontSize: 12)),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Reply button - navigate to chat
+                // Reply button
                 Expanded(
-                  flex: 1,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _replyToChallenge(challenge),
-                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                    label: const Text('Reply', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.orange),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                  flex: 2,
+                  child: SizedBox(
+                    height: 32,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _replyToChallenge(challenge),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                      label: const Text('Reply', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.orange.withOpacity(0.5)),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 // Start Match button
                 Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _acceptChallenge(challenge),
-                    icon: const Icon(Icons.sports_basketball, size: 18),
-                    label: const Text('Start Match'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                  flex: 3, // Give more space
+                  child: SizedBox(
+                    height: 32,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _acceptChallenge(challenge),
+                      icon: const Icon(Icons.sports_basketball, size: 14),
+                      label: const Text('Start Match', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.zero,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
                     ),
                   ),
                 ),
