@@ -373,41 +373,63 @@ export class StatusesService {
                 return results;
             } else if (filter === 'following') {
                 // FOLLOWING: Statuses + matches from followed players
-                query = `
-                    (${statusSelectClause}
+                const statusQuery = `
+                    ${statusSelectClause}
                     WHERE ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
-                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
-                    UNION ALL
-                    (${matchSelectClause}
-                    AND (m.creator_id = $1 OR m.opponent_id = $1
-                         OR m.creator_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
-                         OR m.opponent_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)))
+                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
                     ORDER BY "createdAt" DESC
                     LIMIT $4
                 `;
+                const matchQuery = `
+                    ${matchSelectClause}
+                    AND (m.creator_id = $1 OR m.opponent_id = $1
+                         OR m.creator_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
+                         OR m.opponent_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2))
+                    ORDER BY "createdAt" DESC
+                    LIMIT $3
+                `;
                 params = [userId, userId, userId, limit];
+                const [statusResults, matchResults] = await Promise.all([
+                    this.dataSource.query(statusQuery, params),
+                    this.dataSource.query(matchQuery, [userId, userId, limit])
+                ]);
+                // Merge and sort by createdAt
+                const merged = [...statusResults, ...matchResults]
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, limit);
+                console.log('getUnifiedFeed: FOLLOWING merged', statusResults.length, 'statuses +', matchResults.length, 'matches');
+                return merged;
             } else {
-                // ALL: Combined statuses + matches
-                query = `
-                    (${statusSelectClause}
+                // ALL: Combined statuses + matches - run both queries separately then merge
+                const statusQuery = `
+                    ${statusSelectClause}
                     WHERE ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
-                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
-                    UNION ALL
-                    (${matchSelectClause}
-                    AND (m.creator_id = $1 OR m.opponent_id = $1
-                         OR m.creator_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
-                         OR m.opponent_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)))
+                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
                     ORDER BY "createdAt" DESC
                     LIMIT $4
                 `;
+                const matchQuery = `
+                    ${matchSelectClause}
+                    AND (m.creator_id = $1 OR m.opponent_id = $1
+                         OR m.creator_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
+                         OR m.opponent_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2))
+                    ORDER BY "createdAt" DESC
+                    LIMIT $3
+                `;
                 params = [userId, userId, userId, limit];
+                const [statusResults, matchResults] = await Promise.all([
+                    this.dataSource.query(statusQuery, params),
+                    this.dataSource.query(matchQuery, [userId, userId, limit])
+                ]);
+                // Merge and sort by createdAt
+                const merged = [...statusResults, ...matchResults]
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, limit);
+                console.log('getUnifiedFeed: ALL merged', statusResults.length, 'statuses +', matchResults.length, 'matches');
+                return merged;
             }
-
-            const results = await this.dataSource.query(query, params);
-            console.log('getUnifiedFeed: got', results.length, 'results for filter:', filter);
-            return results;
         } catch (error) {
             console.error('getUnifiedFeed error:', error.message);
             return [];
