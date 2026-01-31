@@ -101,6 +101,8 @@ export class UsersService {
         weight: 'weight',
         city: 'city',
         fcmToken: 'fcm_token',
+        lat: 'lat',
+        lng: 'lng',
       };
 
       for (const [key, value] of Object.entries(data)) {
