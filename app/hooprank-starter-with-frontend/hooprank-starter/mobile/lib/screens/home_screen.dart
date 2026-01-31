@@ -1205,7 +1205,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Cancel Challenge?'),
-        content: Text('Cancel your challenge to ${challenge.sender.name}?'),
+        content: Text('Cancel your challenge to ${challenge.otherUser.name}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1247,7 +1247,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Decline Challenge?'),
-        content: Text('Decline the challenge from ${challenge.sender.name}?'),
+        content: Text('Decline the challenge from ${challenge.otherUser.name}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1267,7 +1267,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         await _messagesService.declineChallenge(userId, challenge.message.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Declined challenge from ${challenge.sender.name}')),
+            SnackBar(content: Text('Declined challenge from ${challenge.otherUser.name}')),
           );
           _loadChallenges();
         }
@@ -1294,15 +1294,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       // Set up the opponent in MatchState
       final p = Player(
-        id: challenge.sender.id,
-        slug: challenge.sender.id,
-        name: challenge.sender.name,
-        team: challenge.sender.team ?? 'Free Agent',
-        position: challenge.sender.position ?? 'G',
+        id: challenge.otherUser.id,
+        slug: challenge.otherUser.id,
+        name: challenge.otherUser.name,
+        team: challenge.otherUser.team ?? 'Free Agent',
+        position: challenge.otherUser.position ?? 'G',
         age: 25,
         height: '6\'0"',
         weight: '180 lbs',
-        rating: challenge.sender.rating,
+        rating: challenge.otherUser.rating,
         offense: 80,
         defense: 80,
         shooting: 80,
