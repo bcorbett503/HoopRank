@@ -823,5 +823,95 @@ export class UsersService {
       return { success: false, results };
     }
   }
+
+  /**
+   * Get users within specified radius of the requesting user.
+   * Uses Haversine formula to calculate distance between coordinates.
+   */
+  async getNearbyUsers(userId: string, radiusMiles: number = 25): Promise<any[]> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (!isPostgres) {
+      return [];
+    }
+
+    try {
+      // Get the requesting user's location
+      const currentUser = await this.dataSource.query(
+        `SELECT lat, lng, city FROM users WHERE id = $1`,
+        [userId]
+      );
+
+      if (!currentUser[0]) {
+        console.log('getNearbyUsers: user not found');
+        return [];
+      }
+
+      const { lat, lng, city } = currentUser[0];
+
+      // If user has no location, return all users as fallback
+      if (!lat || !lng) {
+        console.log('getNearbyUsers: user has no location, returning all users');
+        return await this.dataSource.query(`
+          SELECT 
+            id,
+            name,
+            avatar_url as "avatarUrl",
+            hoop_rank as rating,
+            position,
+            city,
+            games_played as "gamesPlayed"
+          FROM users 
+          WHERE name IS NOT NULL 
+            AND name != ''
+            AND name != 'New Player'
+          ORDER BY hoop_rank DESC
+          LIMIT 100
+        `);
+      }
+
+      // Query users within radius using Haversine formula
+      // 3959 = Earth's radius in miles
+      const nearbyUsers = await this.dataSource.query(`
+        SELECT 
+          id,
+          name,
+          avatar_url as "avatarUrl",
+          hoop_rank as rating,
+          position,
+          city,
+          games_played as "gamesPlayed",
+          (
+            3959 * acos(
+              cos(radians($2)) * cos(radians(lat)) *
+              cos(radians(lng) - radians($3)) +
+              sin(radians($2)) * sin(radians(lat))
+            )
+          ) as distance
+        FROM users 
+        WHERE lat IS NOT NULL 
+          AND lng IS NOT NULL
+          AND name IS NOT NULL 
+          AND name != ''
+          AND name != 'New Player'
+          AND id != $1
+          AND (
+            3959 * acos(
+              cos(radians($2)) * cos(radians(lat)) *
+              cos(radians(lng) - radians($3)) +
+              sin(radians($2)) * sin(radians(lat))
+            )
+          ) <= $4
+        ORDER BY hoop_rank DESC
+        LIMIT 100
+      `, [userId, lat, lng, radiusMiles]);
+
+      console.log(`getNearbyUsers: found ${nearbyUsers.length} users within ${radiusMiles} miles of (${lat}, ${lng})`);
+      return nearbyUsers;
+    } catch (error) {
+      console.error('getNearbyUsers error:', error.message);
+      return [];
+    }
+  }
 }
 

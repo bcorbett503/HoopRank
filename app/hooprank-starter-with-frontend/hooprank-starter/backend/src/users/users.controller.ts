@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards, Request, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { User } from './user.entity';
@@ -209,6 +209,18 @@ export class UsersController {
       console.error('saveFcmToken error:', error.message);
       return { success: false, error: 'Failed to save FCM token' };
     }
+  }
+
+  @Get('nearby')
+  async getNearbyUsers(
+    @Headers('x-user-id') userId: string,
+    @Query('radiusMiles') radiusMiles?: string,
+  ) {
+    if (!userId) {
+      return [];
+    }
+    const radius = parseInt(radiusMiles || '25', 10);
+    return this.usersService.getNearbyUsers(userId, radius);
   }
 
   @Get(':id')
