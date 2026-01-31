@@ -73,17 +73,28 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   /// Load pending challenges to pin at top of feed
   Future<void> _loadPendingChallenges() async {
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
-    if (userId == null) return;
+    debugPrint('FEED: Loading challenges for userId=$userId');
+    if (userId == null) {
+      debugPrint('FEED: userId is null, skipping challenge load');
+      return;
+    }
 
     try {
       final challenges = await _messagesService.getPendingChallenges(userId);
+      debugPrint('FEED: Got ${challenges.length} total challenges from API');
+      for (var c in challenges) {
+        debugPrint('FEED: Challenge from ${c.otherUser.name}, direction=${c.direction}');
+      }
       // Only show incoming challenges
       final incoming = challenges.where((c) => c.direction == 'received').toList();
+      debugPrint('FEED: ${incoming.length} incoming challenges after filter');
       if (mounted) {
         setState(() => _pendingChallenges = incoming);
+        debugPrint('FEED: setState complete, _pendingChallenges.length=${_pendingChallenges.length}');
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error loading pending challenges: $e');
+      debugPrint('Stack: $stack');
     }
   }
   
