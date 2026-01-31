@@ -20,12 +20,9 @@ export class HealthController {
     @Post('migrate/challenges')
     async migrateChalllenges() {
         try {
-            // Drop and recreate to ensure correct column names
-            await this.dataSource.query(`DROP TABLE IF EXISTS challenges CASCADE`);
-
-            // Create challenges table with snake_case columns
+            // Create challenges table with snake_case columns (if not exists)
             await this.dataSource.query(`
-                CREATE TABLE challenges (
+                CREATE TABLE IF NOT EXISTS challenges (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     from_user_id TEXT NOT NULL,
                     to_user_id TEXT NOT NULL,
