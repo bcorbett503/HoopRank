@@ -74,29 +74,35 @@ export class MatchesService {
       if (!matchResult[0] || !matchResult[0].opponent_id) throw new Error('invalid match');
 
       const m = matchResult[0];
-      const creator = await this.users.get(m.creator_id);
-      const opponent = await this.users.get(m.opponent_id);
 
-      if (!creator || !opponent) throw new Error('users not found');
+      // Only update ratings if match is not already completed
+      const isFirstCompletion = m.status !== 'completed';
 
-      const creatorWon = winnerId === m.creator_id;
+      if (isFirstCompletion) {
+        const creator = await this.users.get(m.creator_id);
+        const opponent = await this.users.get(m.opponent_id);
 
-      // Update ratings using new HoopRank logic
-      const newCreatorRating = this.rater.updateRating(creator.hoopRank || 3.0, opponent.hoopRank || 3.0, creator.gamesPlayed || 0, creatorWon ? 1 : 0);
-      const newOpponentRating = this.rater.updateRating(opponent.hoopRank || 3.0, creator.hoopRank || 3.0, opponent.gamesPlayed || 0, creatorWon ? 0 : 1);
+        if (!creator || !opponent) throw new Error('users not found');
 
-      // Update users
-      await this.dataSource.query(`
-        UPDATE users SET hoop_rank = $1, games_played = COALESCE(games_played, 0) + 1, updated_at = NOW()
-        WHERE id = $2
-      `, [newCreatorRating, creator.id]);
+        const creatorWon = winnerId === m.creator_id;
 
-      await this.dataSource.query(`
-        UPDATE users SET hoop_rank = $1, games_played = COALESCE(games_played, 0) + 1, updated_at = NOW()
-        WHERE id = $2
-      `, [newOpponentRating, opponent.id]);
+        // Update ratings using new HoopRank logic
+        const newCreatorRating = this.rater.updateRating(creator.hoopRank || 3.0, opponent.hoopRank || 3.0, creator.gamesPlayed || 0, creatorWon ? 1 : 0);
+        const newOpponentRating = this.rater.updateRating(opponent.hoopRank || 3.0, creator.hoopRank || 3.0, opponent.gamesPlayed || 0, creatorWon ? 0 : 1);
 
-      // Complete match with scores
+        // Update users
+        await this.dataSource.query(`
+          UPDATE users SET hoop_rank = $1, games_played = COALESCE(games_played, 0) + 1, updated_at = NOW()
+          WHERE id = $2
+        `, [newCreatorRating, creator.id]);
+
+        await this.dataSource.query(`
+          UPDATE users SET hoop_rank = $1, games_played = COALESCE(games_played, 0) + 1, updated_at = NOW()
+          WHERE id = $2
+        `, [newOpponentRating, opponent.id]);
+      }
+
+      // Complete match with scores (always update scores even if already completed)
       await this.dataSource.query(`
         UPDATE matches SET status = 'completed', winner_id = $2, 
           score_creator = $3, score_opponent = $4, updated_at = NOW()
@@ -104,9 +110,10 @@ export class MatchesService {
       `, [id, winnerId, scoreCreator, scoreOpponent]);
 
       // Update associated challenge to 'completed' status
+      // Use TEXT casting to ensure match comparison works 
       await this.dataSource.query(`
         UPDATE messages SET challenge_status = 'completed', updated_at = NOW()
-        WHERE match_id = $1 AND is_challenge = true
+        WHERE match_id::TEXT = $1::TEXT AND is_challenge = true
       `, [id]);
 
       const result = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [id]);
