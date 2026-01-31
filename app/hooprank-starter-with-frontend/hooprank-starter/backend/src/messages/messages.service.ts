@@ -12,7 +12,7 @@ export class MessagesService {
         private dataSource: DataSource,
     ) { }
 
-    async sendMessage(senderId: string, receiverId: string, content: string, matchId?: string, isChallenge?: boolean): Promise<Message> {
+    async sendMessage(senderId: string, receiverId: string, content: string, matchId?: string, isChallenge?: boolean, courtId?: string): Promise<Message> {
         const isPostgres = !!process.env.DATABASE_URL;
         const id = uuidv4();
         const threadId = uuidv4();
@@ -55,12 +55,12 @@ export class MessagesService {
                     }
                 }
 
-                console.log('sendMessage: inserting message with thread:', actualThreadId);
+                console.log('sendMessage: inserting message with thread:', actualThreadId, 'courtId:', courtId);
                 const result = await this.dataSource.query(`
-                    INSERT INTO messages (id, thread_id, from_id, to_id, body, read, is_challenge, challenge_status, match_id, created_at)
-                    VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, NOW())
+                    INSERT INTO messages (id, thread_id, from_id, to_id, body, read, is_challenge, challenge_status, match_id, court_id, created_at)
+                    VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, NOW())
                     RETURNING *
-                `, [id, actualThreadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null]);
+                `, [id, actualThreadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null, courtId || null]);
                 console.log('sendMessage: success:', result[0]);
                 return result[0];
             } catch (error) {
@@ -88,18 +88,22 @@ export class MessagesService {
 
         if (isPostgres) {
             try {
-                // Get challenges where user is sender OR receiver with pending status
+                // Get challenges where user is sender OR receiver
+                // Include pending AND accepted challenges (until match is completed)
+                // Exclude declined challenges
                 const results = await this.dataSource.query(`
                     SELECT m.*, 
-                        u.id as sender_id, u.name as sender_name, u.avatar_url as sender_avatar_url, u.hoop_rank as sender_rating,
+                        u.id as other_user_id, u.name as other_user_name, u.avatar_url as other_user_avatar_url, u.hoop_rank as other_user_rating,
+                        c.id as court_id, c.name as court_name, c.city as court_city,
                         CASE 
                             WHEN m.from_id = $1 THEN 'sent'
                             ELSE 'received'
                         END as direction
                     FROM messages m
                     JOIN users u ON u.id = CASE WHEN m.from_id = $1 THEN m.to_id ELSE m.from_id END
+                    LEFT JOIN courts c ON c.id = m.court_id
                     WHERE m.is_challenge = true 
-                        AND m.challenge_status = 'pending'
+                        AND m.challenge_status IN ('pending', 'accepted')
                         AND (m.from_id = $1 OR m.to_id = $1)
                     ORDER BY m.created_at DESC
                 `, [userId]);
@@ -114,13 +118,19 @@ export class MessagesService {
                         isChallenge: r.is_challenge,
                         challengeStatus: r.challenge_status,
                         matchId: r.match_id,
+                        courtId: r.court_id,
                     },
-                    sender: {
-                        id: r.sender_id,
-                        name: r.sender_name,
-                        photoUrl: r.sender_avatar_url,
-                        rating: r.sender_rating,
+                    otherUser: {
+                        id: r.other_user_id,
+                        name: r.other_user_name,
+                        photoUrl: r.other_user_avatar_url,
+                        rating: r.other_user_rating,
                     },
+                    court: r.court_id ? {
+                        id: r.court_id,
+                        name: r.court_name,
+                        city: r.court_city,
+                    } : null,
                     direction: r.direction,
                 }));
             } catch (error) {
@@ -438,6 +448,39 @@ export class MessagesService {
                 threadTables: threads,
                 testInsertError: insertError
             };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Migration: Add court_id column to messages table
+     * This allows challenges to be tagged with a court location
+     */
+    async migrateCourtIdColumn(): Promise<any> {
+        const isPostgres = !!process.env.DATABASE_URL;
+        if (!isPostgres) {
+            return { success: false, error: 'Only PostgreSQL supported' };
+        }
+
+        try {
+            // Check if column already exists
+            const exists = await this.dataSource.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'messages' AND column_name = 'court_id'
+            `);
+
+            if (exists.length > 0) {
+                return { success: true, message: 'court_id column already exists' };
+            }
+
+            // Add the column
+            await this.dataSource.query(`
+                ALTER TABLE messages 
+                ADD COLUMN court_id UUID REFERENCES courts(id) ON DELETE SET NULL
+            `);
+
+            return { success: true, message: 'court_id column added to messages table' };
         } catch (error) {
             return { success: false, error: error.message };
         }

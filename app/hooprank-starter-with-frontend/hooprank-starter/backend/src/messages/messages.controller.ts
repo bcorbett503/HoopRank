@@ -62,4 +62,9 @@ export class MessagesController {
     async debugMessages() {
         return this.messagesService.debugMessagesTable();
     }
+
+    @Post('migrate-court-id')
+    async migrateCourtId() {
+        return this.messagesService.migrateCourtIdColumn();
+    }
 }

@@ -9,11 +9,12 @@ export class ChallengesController {
 
     /**
      * Create a new challenge (creates a message with isChallenge=true)
+     * Optionally tag a court where the game will be played
      */
     @Post()
     async createChallenge(
         @Headers('x-user-id') userId: string,
-        @Body() body: { toUserId: string; message: string }
+        @Body() body: { toUserId: string; message?: string; courtId?: string }
     ) {
         if (!userId) {
             throw new Error('Unauthorized: x-user-id header required');
@@ -25,7 +26,8 @@ export class ChallengesController {
             body.toUserId,
             body.message || 'Want to play?',
             undefined, // no matchId
-            true // isChallenge = true
+            true, // isChallenge = true
+            body.courtId // optional court tag
         );
 
         return challenge;
