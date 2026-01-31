@@ -169,9 +169,10 @@ class CourtService {
       _courts = [...outdoorCourts, ...indoorCourts];
 
       // Add The Olympic Club San Francisco as a featured signature court
+      // Use a proper UUID that matches the backend
       const brettUserId = '3zIDc7PjlYYksXxZp6nH6EbILeh1';
       final olympicClub = Court(
-        id: 'olympic_club_sf',
+        id: '44444444-4444-4444-4444-444444444444',  // UUID matching backend
         name: 'The Olympic Club',
         lat: 37.7878,
         lng: -122.4099,

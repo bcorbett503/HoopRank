@@ -14,6 +14,36 @@ export class HealthController {
     }
 
     /**
+     * Seed The Olympic Club court for testing
+     */
+    @Post('seed/olympic-club')
+    async seedOlympicClub() {
+        try {
+            // Use a fixed UUID for The Olympic Club
+            const olympicClubId = '44444444-4444-4444-4444-444444444444';
+
+            // Check if already exists
+            const existing = await this.dataSource.query(
+                `SELECT id FROM courts WHERE id = $1`, [olympicClubId]
+            );
+
+            if (existing.length > 0) {
+                return { success: true, message: 'Olympic Club already exists', id: olympicClubId };
+            }
+
+            // Insert The Olympic Club
+            await this.dataSource.query(`
+                INSERT INTO courts (id, name, latitude, longitude, address, city, created_at, updated_at)
+                VALUES ($1, 'The Olympic Club', 37.7878, -122.4099, '524 Post Street', 'San Francisco', NOW(), NOW())
+            `, [olympicClubId]);
+
+            return { success: true, message: 'Olympic Club created', id: olympicClubId };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Cleanup endpoint to purge all challenges and matches
      * USE WITH CAUTION - deletes all test data
      */
