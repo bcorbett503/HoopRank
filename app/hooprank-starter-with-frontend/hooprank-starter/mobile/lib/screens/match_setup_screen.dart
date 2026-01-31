@@ -39,7 +39,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     try {
       // Load all courts
       await CourtService().loadCourts();
-      _allCourts = CourtService().getAllCourts();
+      _allCourts = CourtService().getCourts();
       
       // Get followed court IDs and resolve to Court objects
       final checkInState = Provider.of<CheckInState>(context, listen: false);
@@ -176,7 +176,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                               ListTile(
                                 leading: Image.asset('assets/court_marker.jpg', width: 32, height: 26),
                                 title: Text(court.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                                subtitle: court.city != null ? Text(court.city!, style: TextStyle(color: Colors.grey[500], fontSize: 12)) : null,
+                                subtitle: court.address != null ? Text(court.address!, style: TextStyle(color: Colors.grey[500], fontSize: 12)) : null,
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
