@@ -105,4 +105,17 @@ export class HealthController {
             };
         }
     }
+
+    /**
+     * Debug endpoint to show all challenges
+     */
+    @Get('debug/challenges')
+    async debugChallenges() {
+        const all = await this.dataSource.query(`
+            SELECT id, from_user_id, to_user_id, status, match_id, created_at
+            FROM challenges
+            ORDER BY created_at DESC
+        `);
+        return all;
+    }
 }
