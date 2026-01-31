@@ -37,6 +37,33 @@ export class MatchesController {
     return await this.matches.complete(id, body.winner);
   }
 
+  /**
+   * Submit score for a match
+   * Determines winner from scores and calls complete to update ratings
+   */
+  @Post(':id/score')
+  async submitScore(
+    @Param('id') id: string,
+    @Body() body: { me: number; opponent: number }
+  ): Promise<{ match: Match; ratingChange?: { myChange: number; opponentChange: number } }> {
+    // Get match to determine who is who
+    const match = await this.matches.get(id);
+    if (!match) throw new Error('Match not found');
+
+    // Need to know which user is submitting
+    // Handle both camelCase (entity) and snake_case (raw SQL) property names
+    const submitterId = (match as any).opponent_id || match.opponentId;
+    const creatorId = (match as any).creator_id || match.creatorId;
+
+    // Determine winner based on scores
+    const winnerId = body.me > body.opponent ? submitterId : creatorId;
+
+    // Complete the match (this updates ratings)
+    const completedMatch = await this.matches.complete(id, winnerId);
+
+    return { match: completedMatch };
+  }
+
   @Get(':id')
   async get(@Param('id') id: string): Promise<Match | { error: string }> {
     const match = await this.matches.get(id);
