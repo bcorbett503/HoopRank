@@ -732,6 +732,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         return _buildCheckinCard(item);
       case 'match':
         return _buildMatchCard(item);
+      case 'new_player':
+        return _buildNewPlayerCard(item);
       case 'status':
       default:
         return _buildPostCard(item);
@@ -1186,6 +1188,144 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Build a card for new player registration activity
+  Widget _buildNewPlayerCard(Map<String, dynamic> item) {
+    final player = item['player'] ?? {};
+    final playerName = player['name'] ?? 'New Player';
+    final photoUrl = player['photoUrl'];
+    final rating = (player['rating'] is num ? player['rating'].toDouble() : double.tryParse(player['rating']?.toString() ?? '3.0')) ?? 3.0;
+    final position = player['position'] ?? '';
+    final city = player['city'] ?? '';
+    final playerId = player['id'] ?? '';
+    final timeAgo = _formatTimeAgo(item['createdAt']);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.green.withOpacity(0.15),
+            Colors.teal.withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.withOpacity(0.3)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            if (playerId.isNotEmpty) {
+              context.push('/players/$playerId');
+            }
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Player avatar with badge
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Colors.green.withOpacity(0.3),
+                      backgroundImage: photoUrl != null && photoUrl.toString().isNotEmpty
+                          ? (photoUrl.toString().startsWith('data:')
+                              ? MemoryImage(Uri.parse(photoUrl).data!.contentAsBytes())
+                              : NetworkImage(photoUrl) as ImageProvider)
+                          : null,
+                      child: (photoUrl == null || photoUrl.toString().isEmpty)
+                          ? Text(
+                              playerName.isNotEmpty ? playerName[0].toUpperCase() : '?',
+                              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                            )
+                          : null,
+                    ),
+                    Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey[900]!, width: 2),
+                        ),
+                        child: const Icon(Icons.person_add, color: Colors.white, size: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                // Player info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.celebration, color: Colors.green, size: 16),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'New Player Joined!',
+                            style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          const Spacer(),
+                          Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        playerName,
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (position.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(position, style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            '⭐ ${rating.toStringAsFixed(2)}',
+                            style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                          ),
+                          if (city.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Icon(Icons.location_on, color: Colors.grey[500], size: 12),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                city,
+                                style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

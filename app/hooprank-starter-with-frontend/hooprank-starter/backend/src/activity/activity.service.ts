@@ -53,7 +53,7 @@ export class ActivityService {
                     FROM users u
                     WHERE u.name IS NOT NULL 
                       AND u.name != ''
-                      AND u.is_profile_complete = true
+                      AND u.name != 'New Player'
                     ORDER BY u.created_at DESC
                     LIMIT $1
                 `, [limit]);
