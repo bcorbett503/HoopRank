@@ -14,6 +14,37 @@ export class HealthController {
     }
 
     /**
+     * Cleanup endpoint to purge all challenges and matches
+     * USE WITH CAUTION - deletes all test data
+     */
+    @Post('cleanup/matches-challenges')
+    async cleanupMatchesAndChallenges() {
+        try {
+            // Delete all challenges
+            const deletedChallenges = await this.dataSource.query(`DELETE FROM challenges`);
+
+            // Delete all matches
+            const deletedMatches = await this.dataSource.query(`DELETE FROM matches`);
+
+            // Also delete challenge messages (legacy)
+            const deletedMessages = await this.dataSource.query(`DELETE FROM messages WHERE is_challenge = true`);
+
+            return {
+                success: true,
+                message: 'All challenges and matches purged',
+                deletedChallenges: deletedChallenges[1] || 0,
+                deletedMatches: deletedMatches[1] || 0,
+                deletedMessages: deletedMessages[1] || 0,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
      * One-time migration endpoint to create challenges table
      * Safe to call multiple times (uses IF NOT EXISTS)
      */
