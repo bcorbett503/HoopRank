@@ -123,6 +123,50 @@ class ApiService {
     }
   }
 
+  /// Fetch courts from the backend API with proper UUIDs
+  /// Used for match setup to ensure court_id matches backend
+  static Future<List<Court>> getCourtsFromApi({
+    double? lat,
+    double? lng,
+    int limit = 100,
+  }) async {
+    try {
+      String url = '$baseUrl/courts?limit=$limit';
+      if (lat != null && lng != null) {
+        url += '&lat=$lat&lng=$lng';
+      }
+      
+      debugPrint('>>> getCourtsFromApi: calling $url');
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'x-user-id': _userId ?? '',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        debugPrint('>>> getCourtsFromApi: received ${data.length} courts');
+        
+        return data.map((json) => Court(
+          id: json['id'] as String,
+          name: json['name'] as String? ?? 'Court',
+          lat: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+          lng: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+          address: json['city'] as String?,
+          isSignature: json['signature'] == true,
+          isIndoor: json['indoor'] == true,
+        )).toList();
+      } else {
+        debugPrint('>>> getCourtsFromApi: failed with status ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('>>> getCourtsFromApi: error $e');
+      return [];
+    }
+  }
+
   static Future<void> updateProfile(String userId, Map<String, dynamic> data) async {
     debugPrint('updateProfile: userId=$userId, _authToken=${_authToken != null}, _userId=$_userId');
     
@@ -1029,7 +1073,7 @@ class ApiService {
     final body = {
       'content': content,
       if (imageUrl != null) 'imageUrl': imageUrl,
-      if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
+      if (scheduledAt != null) 'scheduledAt': scheduledAt.toUtc().toIso8601String(),
       if (courtId != null) 'courtId': courtId,
       if (videoUrl != null) 'videoUrl': videoUrl,
       if (videoThumbnailUrl != null) 'videoThumbnailUrl': videoThumbnailUrl,

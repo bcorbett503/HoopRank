@@ -467,7 +467,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       final scheduledAt = post['scheduledAt'];
       if (scheduledAt != null) {
         try {
-          final schedDate = DateTime.parse(scheduledAt.toString());
+          final schedDate = DateTime.parse(scheduledAt.toString()).toLocal();
           return schedDate.isAfter(now);
         } catch (_) {
           return true;
@@ -1369,7 +1369,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     // Hide expired scheduled runs (real-time check)
     if (isScheduledEvent) {
       try {
-        final schedDate = DateTime.parse(scheduledAt.toString());
+        final schedDate = DateTime.parse(scheduledAt.toString()).toLocal();
         if (schedDate.isBefore(DateTime.now())) {
           return const SizedBox.shrink(); // Hide expired scheduled runs
         }
@@ -1403,7 +1403,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     
     if (isScheduledEvent) {
       try {
-        scheduledDate = DateTime.parse(scheduledAt.toString());
+        // Parse UTC time and convert to local for display
+        scheduledDate = DateTime.parse(scheduledAt.toString()).toLocal();
         final now = DateTime.now();
         final todayStart = DateTime(now.year, now.month, now.day);
         final tomorrowStart = todayStart.add(const Duration(days: 1));

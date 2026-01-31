@@ -45,6 +45,22 @@ export class HealthController {
     }
 
     /**
+     * Migrate image_url column to TEXT to support larger base64 images
+     */
+    @Post('migrate/image-url-text')
+    async migrateImageUrlToText() {
+        try {
+            await this.dataSource.query(`
+                ALTER TABLE player_statuses 
+                ALTER COLUMN image_url TYPE TEXT
+            `);
+            return { success: true, message: 'image_url column migrated to TEXT type' };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Cleanup endpoint to purge all challenges and matches
      * USE WITH CAUTION - deletes all test data
      */

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:geolocator/geolocator.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
 import '../services/api_service.dart';
-import '../services/court_service.dart';
+// CourtService no longer needed - using ApiService.getCourtsFromApi for proper UUIDs
 import '../models.dart';
 
 class MatchSetupScreen extends StatefulWidget {
@@ -37,9 +36,10 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
   Future<void> _loadCourts() async {
     setState(() => _isLoadingCourt = true);
     try {
-      // Load all courts
-      await CourtService().loadCourts();
-      _allCourts = CourtService().getCourts();
+      // Load courts from backend API which has proper UUIDs
+      // This ensures court_id on matches will be valid UUIDs
+      _allCourts = await ApiService.getCourtsFromApi(limit: 200);
+      debugPrint('Loaded ${_allCourts.length} courts from API');
       
       // Get followed court IDs and resolve to Court objects
       final checkInState = Provider.of<CheckInState>(context, listen: false);
@@ -50,7 +50,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
       
       if (mounted) setState(() => _isLoadingCourt = false);
     } catch (e) {
-      debugPrint('Error loading courts: $e');
+      debugPrint('Error loading courts from API: $e');
       if (mounted) setState(() {
         _courtError = 'Failed to load courts';
         _isLoadingCourt = false;
@@ -58,37 +58,6 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     }
   }
 
-  Future<void> _detectNearbyCourt() async {
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      
-      if (permission == LocationPermission.denied || 
-          permission == LocationPermission.deniedForever) {
-        return; // No auto-detection, user can still select manually
-      }
-      
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      
-      // Find courts within 200 meters
-      final nearbyCourts = CourtService().getCourtsNear(
-        position.latitude,
-        position.longitude,
-        radiusKm: 0.2,
-      );
-      
-      if (mounted && nearbyCourts.isNotEmpty && _selectedCourt == null) {
-        setState(() => _selectedCourt = nearbyCourts.first);
-        Provider.of<MatchState>(context, listen: false).setCourt(nearbyCourts.first);
-      }
-    } catch (e) {
-      debugPrint('Error detecting nearby court: $e');
-    }
-  }
 
   void _showCourtPicker() {
     String searchText = '';
