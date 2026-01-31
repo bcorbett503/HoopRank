@@ -47,31 +47,43 @@ export class MatchesController {
     @Body() body: { me: number; opponent: number },
     @Headers('x-user-id') userId: string
   ): Promise<{ match: Match; ratingChange?: { myChange: number; opponentChange: number } }> {
-    // Get match to determine who is who
-    const match = await this.matches.get(id);
-    if (!match) throw new Error('Match not found');
+    try {
+      console.log(`[submitScore] Starting for match ${id}, user ${userId}, scores: me=${body.me}, opponent=${body.opponent}`);
 
-    // Get the submitter ID from the header
-    const submitterId = userId;
+      // Get match to determine who is who
+      const match = await this.matches.get(id);
+      if (!match) throw new Error('Match not found');
 
-    // Handle both camelCase (entity) and snake_case (raw SQL) property names
-    const creatorId = (match as any).creator_id || match.creatorId;
-    const opponentId = (match as any).opponent_id || match.opponentId;
+      // Get the submitter ID from the header
+      const submitterId = userId;
 
-    // Determine scores based on who is submitting
-    // If submitter is creator, their score is score_creator
-    const isSubmitterCreator = submitterId === creatorId;
-    const scoreCreator = isSubmitterCreator ? body.me : body.opponent;
-    const scoreOpponent = isSubmitterCreator ? body.opponent : body.me;
+      // Handle both camelCase (entity) and snake_case (raw SQL) property names
+      const creatorId = (match as any).creator_id || match.creatorId;
+      const opponentId = (match as any).opponent_id || match.opponentId;
 
-    // Determine winner based on scores: if me > opponent, submitter wins
-    const submitterOpponentId = submitterId === creatorId ? opponentId : creatorId;
-    const winnerId = body.me > body.opponent ? submitterId : submitterOpponentId;
+      console.log(`[submitScore] Match found: creator=${creatorId}, opponent=${opponentId}`);
 
-    // Complete the match with scores (this updates ratings and challenge status)
-    const completedMatch = await this.matches.completeWithScores(id, winnerId, scoreCreator, scoreOpponent);
+      // Determine scores based on who is submitting
+      // If submitter is creator, their score is score_creator
+      const isSubmitterCreator = submitterId === creatorId;
+      const scoreCreator = isSubmitterCreator ? body.me : body.opponent;
+      const scoreOpponent = isSubmitterCreator ? body.opponent : body.me;
 
-    return { match: completedMatch };
+      // Determine winner based on scores: if me > opponent, submitter wins
+      const submitterOpponentId = submitterId === creatorId ? opponentId : creatorId;
+      const winnerId = body.me > body.opponent ? submitterId : submitterOpponentId;
+
+      console.log(`[submitScore] Calculated: scoreCreator=${scoreCreator}, scoreOpponent=${scoreOpponent}, winnerId=${winnerId}`);
+
+      // Complete the match with scores (this updates ratings and challenge status)
+      const completedMatch = await this.matches.completeWithScores(id, winnerId, scoreCreator, scoreOpponent);
+
+      console.log(`[submitScore] Match completed successfully`);
+      return { match: completedMatch };
+    } catch (error) {
+      console.error(`[submitScore] Error for match ${id}:`, error);
+      throw error;
+    }
   }
 
   @Get(':id')

@@ -110,11 +110,25 @@ export class MatchesService {
       `, [id, winnerId, scoreCreator, scoreOpponent]);
 
       // Update associated challenge to 'completed' status
-      // Use TEXT casting to ensure match comparison works 
-      await this.dataSource.query(`
-        UPDATE messages SET challenge_status = 'completed', updated_at = NOW()
-        WHERE match_id::TEXT = $1::TEXT AND is_challenge = true
+      // Log for debugging
+      console.log(`[completeWithScores] Updating challenge for match_id: ${id}`);
+
+      // Check if any challenge exists for this match
+      const existingChallenge = await this.dataSource.query(`
+        SELECT id, challenge_status, match_id FROM messages 
+        WHERE match_id = $1 AND is_challenge = true
       `, [id]);
+      console.log(`[completeWithScores] Found challenges:`, existingChallenge);
+
+      if (existingChallenge.length > 0) {
+        await this.dataSource.query(`
+          UPDATE messages SET challenge_status = 'completed', updated_at = NOW()
+          WHERE match_id = $1 AND is_challenge = true
+        `, [id]);
+        console.log(`[completeWithScores] Challenge updated to completed`);
+      } else {
+        console.log(`[completeWithScores] No challenge found for match ${id}`);
+      }
 
       const result = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [id]);
       return result[0];
