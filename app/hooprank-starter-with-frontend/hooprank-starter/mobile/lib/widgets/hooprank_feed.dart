@@ -231,11 +231,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   Widget _buildForYouFeed() {
+    debugPrint('FEED: _buildForYouFeed called - _isLoadingForYou=$_isLoadingForYou, _forYouPosts.length=${_forYouPosts.length}, _pendingChallenges.length=${_pendingChallenges.length}');
     if (_isLoadingForYou) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (_forYouPosts.isEmpty && _pendingChallenges.isEmpty) {
+      debugPrint('FEED: Showing empty state - no posts and no challenges');
       return _buildEmptyState(
         'No local activity yet',
         'Be the first to post at a court near you!',
