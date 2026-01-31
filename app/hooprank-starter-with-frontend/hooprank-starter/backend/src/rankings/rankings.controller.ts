@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Post, Query } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 /**
@@ -60,6 +60,48 @@ export class RankingsController {
         } catch (error) {
             console.error('getRankings error:', error.message);
             return [];
+        }
+    }
+
+    /**
+     * Admin endpoint to run team challenges migration
+     * POST /rankings/migrate-team-challenges
+     */
+    @Post('migrate-team-challenges')
+    async migrateTeamChallenges() {
+        try {
+            // Create team_challenges table
+            await this.dataSource.query(`
+                CREATE TABLE IF NOT EXISTS team_challenges (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    from_team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+                    to_team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+                    message TEXT,
+                    status VARCHAR(20) DEFAULT 'pending',
+                    match_id INTEGER,
+                    created_by VARCHAR(255),
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            `);
+            console.log('Created team_challenges table');
+
+            // Add team match columns to matches table
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false;`);
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS creator_team_id VARCHAR(255);`);
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_team_id VARCHAR(255);`);
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_type VARCHAR(10) DEFAULT '1v1';`);
+            console.log('Added team match columns');
+
+            // Create indexes
+            await this.dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_challenges_from ON team_challenges(from_team_id);`);
+            await this.dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_challenges_to ON team_challenges(to_team_id);`);
+            console.log('Created indexes');
+
+            return { success: true, message: 'Team challenges migration complete' };
+        } catch (error) {
+            console.error('Migration error:', error);
+            return { success: false, error: error.message };
         }
     }
 }
