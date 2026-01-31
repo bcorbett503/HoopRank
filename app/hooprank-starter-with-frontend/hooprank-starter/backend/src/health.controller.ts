@@ -34,8 +34,8 @@ export class HealthController {
             // Insert The Olympic Club with PostGIS geography
             // geog column is ST_Point(longitude, latitude)
             await this.dataSource.query(`
-                INSERT INTO courts (id, name, city, indoor, signature, geog, created_at, updated_at)
-                VALUES ($1, 'The Olympic Club', 'San Francisco', true, true, ST_SetSRID(ST_MakePoint(-122.4099, 37.7878), 4326)::geography, NOW(), NOW())
+                INSERT INTO courts (id, name, city, indoor, signature, geog)
+                VALUES ($1, 'The Olympic Club', 'San Francisco', true, true, ST_SetSRID(ST_MakePoint(-122.4099, 37.7878), 4326)::geography)
             `, [olympicClubId]);
 
             return { success: true, message: 'Olympic Club created', id: olympicClubId };
