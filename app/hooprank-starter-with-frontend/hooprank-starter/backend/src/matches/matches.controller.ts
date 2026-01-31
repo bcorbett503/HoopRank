@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
 import { MatchesService } from './matches.service';
 import { Match } from './match.entity';
 import { CreateMatchDto } from './dto/create-match.dto';
@@ -44,19 +44,25 @@ export class MatchesController {
   @Post(':id/score')
   async submitScore(
     @Param('id') id: string,
-    @Body() body: { me: number; opponent: number }
+    @Body() body: { me: number; opponent: number },
+    @Headers('x-user-id') userId: string
   ): Promise<{ match: Match; ratingChange?: { myChange: number; opponentChange: number } }> {
     // Get match to determine who is who
     const match = await this.matches.get(id);
     if (!match) throw new Error('Match not found');
 
-    // Need to know which user is submitting
-    // Handle both camelCase (entity) and snake_case (raw SQL) property names
-    const submitterId = (match as any).opponent_id || match.opponentId;
-    const creatorId = (match as any).creator_id || match.creatorId;
+    // Get the submitter ID from the header
+    const submitterId = userId;
 
-    // Determine winner based on scores
-    const winnerId = body.me > body.opponent ? submitterId : creatorId;
+    // Handle both camelCase (entity) and snake_case (raw SQL) property names
+    const creatorId = (match as any).creator_id || match.creatorId;
+    const opponentId = (match as any).opponent_id || match.opponentId;
+
+    // Determine the opponent of the submitter
+    const submitterOpponentId = submitterId === creatorId ? opponentId : creatorId;
+
+    // Determine winner based on scores: if me > opponent, submitter wins
+    const winnerId = body.me > body.opponent ? submitterId : submitterOpponentId;
 
     // Complete the match (this updates ratings)
     const completedMatch = await this.matches.complete(id, winnerId);
