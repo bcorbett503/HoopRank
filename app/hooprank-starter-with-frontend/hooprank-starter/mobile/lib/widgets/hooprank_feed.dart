@@ -6,6 +6,7 @@ import '../state/check_in_state.dart';
 import '../state/app_state.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
+import '../models.dart';
 import 'feed_video_player.dart';
 import 'dart:math' as math;
 
@@ -739,6 +740,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Build a challenge card with accept/decline buttons
   Widget _buildChallengeCard(ChallengeRequest challenge) {
+    debugPrint('FEED: Building challenge card for ${challenge.otherUser.name}');
     final opponent = challenge.otherUser;
     final message = challenge.message;
 
@@ -905,17 +907,33 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     if (userId == null) return;
 
     try {
+      // Accept on backend (updates challenge status)
       final result = await _messagesService.acceptChallenge(userId, challenge.message.id);
+      
       if (mounted) {
         _loadPendingChallenges(); // Refresh challenges
-        // Navigate to match setup with opponent info
-        // The acceptChallenge should return match info, navigate to match flow
+        
+        // CRITICAL: Set opponent in MatchState from challenge data BEFORE navigating
+        final matchState = Provider.of<MatchState>(context, listen: false);
+        matchState.setOpponent(challenge.otherUser.toPlayer());
+        
+        // Set matchId if backend returned one
         if (result['matchId'] != null) {
-          context.go('/match/live');
-        } else {
-          // No match created yet, go to match setup
-          context.go('/match/setup');
+          matchState.setMatchId(result['matchId'].toString());
         }
+        
+        // Set court if challenge had one
+        if (challenge.court != null) {
+          final court = Court(
+            id: challenge.court!['id']?.toString() ?? '',
+            name: challenge.court!['name']?.toString() ?? 'Unknown',
+            lat: 0, lng: 0, // coords not needed for display
+          );
+          matchState.setCourt(court);
+        }
+        
+        // Navigate to match setup (opponent will be pre-populated)
+        context.go('/match/setup');
       }
     } catch (e) {
       if (mounted) {
