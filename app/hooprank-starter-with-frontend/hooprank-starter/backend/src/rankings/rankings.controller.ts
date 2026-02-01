@@ -48,7 +48,8 @@ export class RankingsController {
                     avatar_url as "photoUrl",
                     hoop_rank as "rating",
                     position,
-                    city
+                    city,
+                    age
                 FROM users
                 WHERE hoop_rank IS NOT NULL AND name IS NOT NULL
                 ORDER BY hoop_rank DESC
