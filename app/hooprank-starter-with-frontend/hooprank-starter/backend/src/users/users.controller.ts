@@ -223,6 +223,20 @@ export class UsersController {
     return this.usersService.getNearbyUsers(userId, radius);
   }
 
+  @Get(':id/rating')
+  async getUserRating(@Param('id') id: string) {
+    const user = await this.usersService.findOne(id);
+    if (!user) {
+      return { error: 'User not found' };
+    }
+    // Return camelCase keys for mobile compatibility
+    // Raw SQL returns hoop_rank, games_played - convert to camelCase
+    return {
+      hoopRank: parseFloat((user as any).hoop_rank) || 3.0,
+      gamesPlayed: parseInt((user as any).games_played) || 0,
+    };
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
