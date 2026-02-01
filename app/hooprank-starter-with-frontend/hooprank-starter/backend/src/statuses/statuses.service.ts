@@ -330,39 +330,48 @@ export class StatusesService {
             `;
 
             // Team Match SELECT clause (for completed team matches)
+            // Join on creator_team_id and opponent_team_id directly, then determine winner/loser
             const teamMatchSelectClause = `
                 SELECT 
                     'team_match' as type,
                     m.id::TEXT as id,
                     m.updated_at as "createdAt",
                     m.winner_id as "userId",
-                    COALESCE(winner_team.name, 'Unknown Team') as "userName",
+                    CASE 
+                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN COALESCE(ct.name, 'Team A')
+                        ELSE COALESCE(ot.name, 'Team A')
+                    END as "userName",
                     NULL as "userPhotoUrl",
-                    COALESCE(winner_team.name, 'Team') || ' vs ' || COALESCE(loser_team.name, 'Opponent Team') as content,
+                    COALESCE(ct.name, 'Team A') || ' vs ' || COALESCE(ot.name, 'Team B') as content,
                     NULL as "imageUrl",
                     NULL as "videoUrl",
                     NULL as "videoThumbnailUrl",
                     NULL::INTEGER as "videoDurationMs",
                     NULL as "scheduledAt",
                     m.court_id as "courtId",
-                    COALESCE(mc.name, 'Unknown Court') as "courtName",
+                    COALESCE(mc.name, '') as "courtName",
                     'ended' as "matchStatus",
                     CASE 
                         WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
                         THEN m.score_creator::TEXT || '-' || m.score_opponent::TEXT
                         ELSE NULL
                     END as "matchScore",
-                    winner_team.name as "winnerName",
-                    loser_team.name as "loserName",
+                    CASE 
+                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ct.name
+                        ELSE ot.name
+                    END as "winnerName",
+                    CASE 
+                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ot.name
+                        ELSE ct.name
+                    END as "loserName",
                     0 as "likeCount",
                     0 as "commentCount",
                     false as "isLikedByMe",
                     0 as "attendeeCount",
                     false as "isAttendingByMe"
                 FROM matches m
-                LEFT JOIN teams winner_team ON m.winner_id::TEXT = winner_team.id::TEXT
-                LEFT JOIN teams loser_team ON 
-                    CASE WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN m.opponent_team_id ELSE m.creator_team_id END::TEXT = loser_team.id::TEXT
+                LEFT JOIN teams ct ON m.creator_team_id::TEXT = ct.id::TEXT
+                LEFT JOIN teams ot ON m.opponent_team_id::TEXT = ot.id::TEXT
                 LEFT JOIN courts mc ON m.court_id::TEXT = mc.id::TEXT
                 WHERE m.status = 'completed' AND m.team_match = true AND m.winner_id IS NOT NULL
             `;
