@@ -41,6 +41,19 @@ export class RankingsController {
 
             // For 1v1, return individual players
             // Production database uses 'name' and 'hoop_rank' columns
+            // First, check if age column exists
+            let hasAgeColumn = false;
+            try {
+                const colCheck = await this.dataSource.query(`
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'users' AND column_name = 'age'
+                `);
+                hasAgeColumn = colCheck.length > 0;
+            } catch (e) {
+                console.log('Could not check for age column:', e.message);
+            }
+
+            const ageSelect = hasAgeColumn ? ', age' : ', NULL as age';
             const players = await this.dataSource.query(`
                 SELECT 
                     id,
@@ -48,8 +61,8 @@ export class RankingsController {
                     avatar_url as "photoUrl",
                     hoop_rank as "rating",
                     position,
-                    city,
-                    age
+                    city
+                    ${ageSelect}
                 FROM users
                 WHERE hoop_rank IS NOT NULL AND name IS NOT NULL
                 ORDER BY hoop_rank DESC
