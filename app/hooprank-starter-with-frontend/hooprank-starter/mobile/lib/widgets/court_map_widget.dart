@@ -632,7 +632,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // Follower count badge
-                              if (court.followerCount > 0)
+                              if ((court.followerCount ?? 0) > 0)
                                 Container(
                                   margin: const EdgeInsets.only(right: 4),
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

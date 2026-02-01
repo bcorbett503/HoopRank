@@ -273,7 +273,7 @@ class Court {
   final String? address;
   final bool isSignature; // Signature courts are high-traffic/famous venues
   final bool isIndoor; // Indoor venues (gyms, schools, rec centers)
-  final int followerCount; // Number of users following this court
+  final int? followerCount; // Number of users following this court
   // King of the Court for each mode (name, rating, and user ID for challenges)
   final String? king1v1;
   final String? king1v1Id;
