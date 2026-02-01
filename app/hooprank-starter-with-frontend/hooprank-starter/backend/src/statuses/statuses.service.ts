@@ -3,6 +3,7 @@ import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PlayerStatus, StatusLike, StatusComment, EventAttendee } from './status.entity';
 import { DbDialect } from '../common/db-utils';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class StatusesService {
@@ -18,6 +19,7 @@ export class StatusesService {
         private commentRepo: Repository<StatusComment>,
         @InjectRepository(EventAttendee)
         private attendeeRepo: Repository<EventAttendee>,
+        private notificationsService: NotificationsService,
     ) {
         this.dialect = new DbDialect(dataSource);
     }
@@ -57,10 +59,73 @@ export class StatusesService {
                 }
             }
 
+            // Send push notification to court followers for scheduled runs
+            if (scheduledAt && courtId) {
+                this.sendScheduledRunNotification(userId, courtId, scheduledAt, content).catch(err => {
+                    console.error('Failed to send scheduled run notification:', err.message);
+                });
+            }
+
             return createdStatus;
         } catch (error) {
             console.error('createStatus error:', error.message);
             throw error;
+        }
+    }
+
+    // Helper method to send scheduled run notifications to court followers
+    private async sendScheduledRunNotification(
+        userId: string,
+        courtId: string,
+        scheduledAt: string,
+        content: string,
+    ): Promise<void> {
+        try {
+            // Get user name and court name
+            const [userResult, courtResult] = await Promise.all([
+                this.dataSource.query(`SELECT name FROM users WHERE id = $1`, [userId]),
+                this.dataSource.query(`SELECT name FROM courts WHERE id = $1`, [courtId]),
+            ]);
+
+            const userName = userResult[0]?.name || 'Someone';
+            const courtName = courtResult[0]?.name || 'a court';
+
+            // Format scheduled time
+            const scheduledDate = new Date(scheduledAt);
+            const timeStr = scheduledDate.toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+            });
+
+            // Get all users following this court with alerts enabled
+            const followers = await this.dataSource.query(`
+                SELECT DISTINCT u.fcm_token, u.id
+                FROM users u
+                JOIN user_court_alerts a ON u.id::TEXT = a.user_id::TEXT
+                WHERE a.court_id = $1 AND u.fcm_token IS NOT NULL AND u.id != $2
+            `, [courtId, userId]);
+
+            if (followers.length === 0) {
+                console.log('No followers to notify for scheduled run at', courtName);
+                return;
+            }
+
+            console.log(`Sending scheduled run notification to ${followers.length} followers of ${courtName}`);
+
+            // Send notification to each follower
+            for (const follower of followers) {
+                this.notificationsService.sendToUser(
+                    follower.id,
+                    `🏀 Run scheduled at ${courtName}`,
+                    `${userName} scheduled a run: ${timeStr}`,
+                    { type: 'scheduled_run', courtId, scheduledAt },
+                ).catch(() => { });
+            }
+        } catch (error) {
+            console.error('sendScheduledRunNotification error:', error.message);
         }
     }
 
