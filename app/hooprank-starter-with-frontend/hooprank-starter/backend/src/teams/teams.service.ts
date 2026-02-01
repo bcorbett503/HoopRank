@@ -661,88 +661,109 @@ export class TeamsService {
         myScore: number,
         opponentScore: number,
     ): Promise<any> {
-        // Verify user is a member of this team
-        const membership = await this.membersRepository.findOne({
-            where: { teamId, userId, status: 'active' },
-        });
-        if (!membership) {
-            throw new ForbiddenException('You must be a member of the team');
+        console.log(`[TeamsService] submitTeamMatchScore called: matchId=${matchId}, teamId=${teamId}, userId=${userId}, myScore=${myScore}, oppScore=${opponentScore}`);
+
+        try {
+            // Verify user is a member of this team
+            const membership = await this.membersRepository.findOne({
+                where: { teamId, userId, status: 'active' },
+            });
+            if (!membership) {
+                console.log(`[TeamsService] User ${userId} is not a member of team ${teamId}`);
+                throw new ForbiddenException('You must be a member of the team');
+            }
+
+            // Ensure required columns exist on teams table
+            await this.dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0`);
+            await this.dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0`);
+            await this.dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS rating DECIMAL(3,2) DEFAULT 3.00`);
+
+            // Ensure required columns exist on matches table
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_creator INTEGER`);
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_opponent INTEGER`);
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS winner_id UUID`);
+
+            // Get match
+            const matches = await this.dataSource.query(`
+                SELECT * FROM matches WHERE id = $1 AND team_match = true
+            `, [matchId]);
+            if (matches.length === 0) {
+                console.log(`[TeamsService] No team match found with id=${matchId}`);
+                throw new NotFoundException('Team match not found');
+            }
+            const match = matches[0];
+            console.log(`[TeamsService] Found match: creator_team=${match.creator_team_id}, opponent_team=${match.opponent_team_id}`);
+
+            // Determine which team submitted and set scores
+            const isCreatorTeam = match.creator_team_id === teamId;
+            const creatorScore = isCreatorTeam ? myScore : opponentScore;
+            const opponentTeamScore = isCreatorTeam ? opponentScore : myScore;
+            const winnerTeamId = myScore > opponentScore ? teamId : (isCreatorTeam ? match.opponent_team_id : match.creator_team_id);
+
+            // Get current team ratings - use separate queries to avoid IN clause issues
+            const creatorTeamResult = await this.dataSource.query(`
+                SELECT id, rating FROM teams WHERE id = $1
+            `, [match.creator_team_id]);
+            const opponentTeamResult = await this.dataSource.query(`
+                SELECT id, rating FROM teams WHERE id = $1
+            `, [match.opponent_team_id]);
+
+            const creatorTeam = creatorTeamResult[0];
+            const opponentTeam = opponentTeamResult[0];
+
+            const creatorRating = parseFloat(creatorTeam?.rating || '3.0');
+            const opponentRating = parseFloat(opponentTeam?.rating || '3.0');
+            console.log(`[TeamsService] Current ratings: creator=${creatorRating}, opponent=${opponentRating}`);
+
+            // Calculate new Elo ratings (same formula as 1v1)
+            const K = 0.2;
+            const expectedCreator = 1 / (1 + Math.pow(10, (opponentRating - creatorRating) / 1));
+            const creatorWon = match.creator_team_id === winnerTeamId ? 1 : 0;
+
+            const newCreatorRating = Math.max(1, Math.min(5, creatorRating + K * (creatorWon - expectedCreator)));
+            const newOpponentRating = Math.max(1, Math.min(5, opponentRating + K * ((1 - creatorWon) - (1 - expectedCreator))));
+
+            // Update match
+            await this.dataSource.query(`
+                UPDATE matches SET 
+                    status = 'completed',
+                    winner_id = $1,
+                    score_creator = $2,
+                    score_opponent = $3,
+                    completed_at = NOW()
+                WHERE id = $4
+            `, [winnerTeamId, creatorScore, opponentTeamScore, matchId]);
+
+            // Update team ratings and W/L records - separate queries for clarity
+            if (match.creator_team_id === winnerTeamId) {
+                await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
+                    [newCreatorRating.toFixed(2), match.creator_team_id]);
+                await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
+                    [newOpponentRating.toFixed(2), match.opponent_team_id]);
+            } else {
+                await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
+                    [newCreatorRating.toFixed(2), match.creator_team_id]);
+                await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
+                    [newOpponentRating.toFixed(2), match.opponent_team_id]);
+            }
+
+            console.log(`[TeamsService] Team match ${matchId} completed. Winner: ${winnerTeamId}`);
+            console.log(`[TeamsService] Rating changes: ${match.creator_team_id}: ${creatorRating} -> ${newCreatorRating.toFixed(2)}, ${match.opponent_team_id}: ${opponentRating} -> ${newOpponentRating.toFixed(2)}`);
+
+            return {
+                matchId,
+                winnerTeamId,
+                scores: { creator: creatorScore, opponent: opponentTeamScore },
+                ratingChanges: {
+                    [match.creator_team_id]: { old: creatorRating, new: newCreatorRating },
+                    [match.opponent_team_id]: { old: opponentRating, new: newOpponentRating },
+                },
+            };
+        } catch (error) {
+            console.error(`[TeamsService] submitTeamMatchScore ERROR:`, error);
+            throw error;
         }
-
-        // Get match
-        const matches = await this.dataSource.query(`
-            SELECT * FROM matches WHERE id = $1 AND team_match = true
-        `, [matchId]);
-        if (matches.length === 0) {
-            throw new NotFoundException('Team match not found');
-        }
-        const match = matches[0];
-
-        // Determine which team submitted and set scores
-        const isCreatorTeam = match.creator_team_id === teamId;
-        const creatorScore = isCreatorTeam ? myScore : opponentScore;
-        const opponentTeamScore = isCreatorTeam ? opponentScore : myScore;
-        const winnerTeamId = myScore > opponentScore ? teamId : (isCreatorTeam ? match.opponent_team_id : match.creator_team_id);
-
-        // Get current team ratings
-        const teams = await this.dataSource.query(`
-            SELECT id, rating FROM teams WHERE id IN ($1, $2)
-        `, [match.creator_team_id, match.opponent_team_id]);
-
-        const creatorTeam = teams.find((t: any) => t.id === match.creator_team_id);
-        const opponentTeam = teams.find((t: any) => t.id === match.opponent_team_id);
-
-        const creatorRating = parseFloat(creatorTeam?.rating || '3.0');
-        const opponentRating = parseFloat(opponentTeam?.rating || '3.0');
-
-        // Calculate new Elo ratings (same formula as 1v1)
-        const K = 0.2;
-        const expectedCreator = 1 / (1 + Math.pow(10, (opponentRating - creatorRating) / 1));
-        const creatorWon = match.creator_team_id === winnerTeamId ? 1 : 0;
-
-        const newCreatorRating = Math.max(1, Math.min(5, creatorRating + K * (creatorWon - expectedCreator)));
-        const newOpponentRating = Math.max(1, Math.min(5, opponentRating + K * ((1 - creatorWon) - (1 - expectedCreator))));
-
-        // Update match
-        await this.dataSource.query(`
-            UPDATE matches SET 
-                status = 'completed',
-                winner_id = $1,
-                score_creator = $2,
-                score_opponent = $3,
-                completed_at = NOW()
-            WHERE id = $4
-        `, [winnerTeamId, creatorScore, opponentTeamScore, matchId]);
-
-        // Update team ratings and W/L records
-        await this.dataSource.query(`
-            UPDATE teams SET 
-                rating = $1,
-                wins = wins + CASE WHEN id = $3 THEN 1 ELSE 0 END,
-                losses = losses + CASE WHEN id != $3 THEN 1 ELSE 0 END
-            WHERE id = $2
-        `, [newCreatorRating.toFixed(2), match.creator_team_id, winnerTeamId]);
-
-        await this.dataSource.query(`
-            UPDATE teams SET 
-                rating = $1,
-                wins = wins + CASE WHEN id = $3 THEN 1 ELSE 0 END,
-                losses = losses + CASE WHEN id != $3 THEN 1 ELSE 0 END
-            WHERE id = $2
-        `, [newOpponentRating.toFixed(2), match.opponent_team_id, winnerTeamId]);
-
-        console.log(`[TeamsService] Team match ${matchId} completed. Winner: ${winnerTeamId}`);
-        console.log(`[TeamsService] Rating changes: ${match.creator_team_id}: ${creatorRating} -> ${newCreatorRating.toFixed(2)}, ${match.opponent_team_id}: ${opponentRating} -> ${newOpponentRating.toFixed(2)}`);
-
-        return {
-            matchId,
-            winnerTeamId,
-            scores: { creator: creatorScore, opponent: opponentTeamScore },
-            ratingChanges: {
-                [match.creator_team_id]: { old: creatorRating, new: newCreatorRating },
-                [match.opponent_team_id]: { old: opponentRating, new: newOpponentRating },
-            },
-        };
     }
 }
 
