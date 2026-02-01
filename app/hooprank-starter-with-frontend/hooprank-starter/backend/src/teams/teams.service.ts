@@ -568,21 +568,31 @@ export class TeamsService {
         // Try to add columns first, then alter type if they exist with wrong type
         try {
             await this.dataSource.query(`ALTER TABLE matches ADD COLUMN creator_team_id UUID`);
-        } catch (e) {
+        } catch (e: any) {
             // Column exists - alter its type
-            await this.dataSource.query(`ALTER TABLE matches ALTER COLUMN creator_team_id TYPE UUID USING NULL`);
+            console.log(`[TeamsService] creator_team_id exists, altering type: ${e.message}`);
+            try {
+                await this.dataSource.query(`ALTER TABLE matches ALTER COLUMN creator_team_id TYPE UUID USING NULL`);
+            } catch (e2: any) {
+                console.log(`[TeamsService] ALTER creator_team_id failed: ${e2.message}`);
+            }
         }
         try {
             await this.dataSource.query(`ALTER TABLE matches ADD COLUMN opponent_team_id UUID`);
-        } catch (e) {
+        } catch (e: any) {
             // Column exists - alter its type
-            await this.dataSource.query(`ALTER TABLE matches ALTER COLUMN opponent_team_id TYPE UUID USING NULL`);
+            console.log(`[TeamsService] opponent_team_id exists, altering type: ${e.message}`);
+            try {
+                await this.dataSource.query(`ALTER TABLE matches ALTER COLUMN opponent_team_id TYPE UUID USING NULL`);
+            } catch (e2: any) {
+                console.log(`[TeamsService] ALTER opponent_team_id failed: ${e2.message}`);
+            }
         }
 
-        // Create team match - generate UUID explicitly, creator_id is required (NOT NULL)
+        // Create team match - let database handle id generation (works whether id is uuid or serial)
         const matchResult = await this.dataSource.query(`
-            INSERT INTO matches (id, match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
-            VALUES (gen_random_uuid(), '3v3', 'accepted', true, $1, $2, $3)
+            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
+            VALUES ('3v3', 'accepted', true, $1::uuid, $2::uuid, $3)
             RETURNING *
         `, [challenge.from_team_id, challenge.to_team_id, userId]);
         const match = matchResult[0];
