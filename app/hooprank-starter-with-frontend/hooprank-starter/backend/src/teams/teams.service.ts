@@ -563,36 +563,30 @@ export class TeamsService {
             throw new ForbiddenException('Only the challenged team can accept');
         }
 
-        // Fix column types - ALTER to UUID if they exist as wrong type, or ADD if missing
-        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false`);
-        // Try to add columns first, then alter type if they exist with wrong type
-        try {
-            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN creator_team_id UUID`);
-        } catch (e: any) {
-            // Column exists - alter its type
-            console.log(`[TeamsService] creator_team_id exists, altering type: ${e.message}`);
-            try {
-                await this.dataSource.query(`ALTER TABLE matches ALTER COLUMN creator_team_id TYPE UUID USING NULL`);
-            } catch (e2: any) {
-                console.log(`[TeamsService] ALTER creator_team_id failed: ${e2.message}`);
-            }
-        }
-        try {
-            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN opponent_team_id UUID`);
-        } catch (e: any) {
-            // Column exists - alter its type
-            console.log(`[TeamsService] opponent_team_id exists, altering type: ${e.message}`);
-            try {
-                await this.dataSource.query(`ALTER TABLE matches ALTER COLUMN opponent_team_id TYPE UUID USING NULL`);
-            } catch (e2: any) {
-                console.log(`[TeamsService] ALTER opponent_team_id failed: ${e2.message}`);
-            }
-        }
+        // Log actual column types for debugging
+        const colTypes = await this.dataSource.query(`
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'matches' 
+            AND column_name IN ('creator_team_id', 'opponent_team_id', 'creator_id', 'id')
+        `);
+        console.log('[TeamsService] Column types before fix:', JSON.stringify(colTypes));
 
-        // Create team match - let database handle id generation (works whether id is uuid or serial)
+        // Ensure team_match column exists
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false`);
+
+        // Force drop and recreate columns with correct UUID type
+        // This is necessary because ALTER TYPE doesn't always work
+        await this.dataSource.query(`ALTER TABLE matches DROP COLUMN IF EXISTS creator_team_id`);
+        await this.dataSource.query(`ALTER TABLE matches DROP COLUMN IF EXISTS opponent_team_id`);
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN creator_team_id UUID`);
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN opponent_team_id UUID`);
+        console.log('[TeamsService] Recreated team id columns as UUID');
+
+        // Create team match - let database handle id generation
         const matchResult = await this.dataSource.query(`
             INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
-            VALUES ('3v3', 'accepted', true, $1::uuid, $2::uuid, $3)
+            VALUES ('3v3', 'accepted', true, $1, $2, $3)
             RETURNING *
         `, [challenge.from_team_id, challenge.to_team_id, userId]);
         const match = matchResult[0];
