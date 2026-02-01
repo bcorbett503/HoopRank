@@ -273,6 +273,7 @@ class Court {
   final String? address;
   final bool isSignature; // Signature courts are high-traffic/famous venues
   final bool isIndoor; // Indoor venues (gyms, schools, rec centers)
+  final int followerCount; // Number of users following this court
   // King of the Court for each mode (name, rating, and user ID for challenges)
   final String? king1v1;
   final String? king1v1Id;
@@ -292,6 +293,7 @@ class Court {
     this.address,
     this.isSignature = false,
     this.isIndoor = false,
+    this.followerCount = 0,
     this.king1v1,
     this.king1v1Id,
     this.king1v1Rating,
@@ -321,6 +323,7 @@ class Court {
     String? king5v5,
     String? king5v5Id,
     double? king5v5Rating,
+    int? followerCount,
   }) {
     return Court(
       id: id,
@@ -329,6 +332,7 @@ class Court {
       lng: lng,
       address: address,
       isSignature: isSignature,
+      followerCount: followerCount ?? this.followerCount,
       king1v1: king1v1 ?? this.king1v1,
       king1v1Id: king1v1Id ?? this.king1v1Id,
       king1v1Rating: king1v1Rating ?? this.king1v1Rating,
@@ -349,6 +353,7 @@ class Court {
       lng: _parseDouble(json['lng']),
       address: json['address']?.toString(),
       isSignature: json['signature'] == true || json['isSignature'] == true,
+      followerCount: _parseInt(json['follower_count'] ?? json['followerCount']),
       king1v1: json['king1v1']?.toString() ?? json['king']?.toString(),
       king1v1Id: json['king1v1Id']?.toString(),
       king1v1Rating: json['king1v1Rating'] != null ? _parseDouble(json['king1v1Rating']) : null,

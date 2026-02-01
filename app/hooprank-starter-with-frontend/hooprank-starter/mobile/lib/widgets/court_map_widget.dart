@@ -631,6 +631,32 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                           return Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              // Follower count badge
+                              if (court.followerCount > 0)
+                                Container(
+                                  margin: const EdgeInsets.only(right: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.favorite, size: 12, color: Colors.red.shade300),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '${court.followerCount}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red.shade300,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               // Bell for alerts
                               IconButton(
                                 icon: Icon(

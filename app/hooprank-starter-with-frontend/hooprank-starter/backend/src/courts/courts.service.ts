@@ -72,7 +72,8 @@ export class CourtsService {
                 SELECT 
                     id, name, city, indoor, rims, source, signature,
                     ST_Y(geog::geometry) as lat,
-                    ST_X(geog::geometry) as lng
+                    ST_X(geog::geometry) as lng,
+                    (SELECT COUNT(*) FROM user_court_alerts WHERE court_id = courts.id) as follower_count
                 FROM courts
                 WHERE geog && ST_MakeEnvelope($1, $2, $3, $4, 4326)
                 ORDER BY name ASC
@@ -80,6 +81,7 @@ export class CourtsService {
             `, [minLng, minLat, maxLng, maxLat]);
             return courts;
         }
+
 
         // SQLite fallback - use simple bounding box
         return this.courtsRepository.createQueryBuilder('court')
