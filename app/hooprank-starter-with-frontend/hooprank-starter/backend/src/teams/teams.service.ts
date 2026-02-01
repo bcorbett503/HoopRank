@@ -563,10 +563,21 @@ export class TeamsService {
             throw new ForbiddenException('Only the challenged team can accept');
         }
 
-        // Ensure team match columns exist (migration might not have run)
+        // Fix column types - ALTER to UUID if they exist as wrong type, or ADD if missing
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false`);
-        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS creator_team_id UUID`);
-        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_team_id UUID`);
+        // Try to add columns first, then alter type if they exist with wrong type
+        try {
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN creator_team_id UUID`);
+        } catch (e) {
+            // Column exists - alter its type
+            await this.dataSource.query(`ALTER TABLE matches ALTER COLUMN creator_team_id TYPE UUID USING NULL`);
+        }
+        try {
+            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN opponent_team_id UUID`);
+        } catch (e) {
+            // Column exists - alter its type
+            await this.dataSource.query(`ALTER TABLE matches ALTER COLUMN opponent_team_id TYPE UUID USING NULL`);
+        }
 
         // Create team match - generate UUID explicitly, creator_id is required (NOT NULL)
         const matchResult = await this.dataSource.query(`
