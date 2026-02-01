@@ -364,6 +364,14 @@ export class StatusesService {
                         WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ot.name
                         ELSE ct.name
                     END as "loserName",
+                    CASE 
+                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ct.rating
+                        ELSE ot.rating
+                    END as "winnerRating",
+                    CASE 
+                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ot.rating
+                        ELSE ct.rating
+                    END as "loserRating",
                     0 as "likeCount",
                     0 as "commentCount",
                     false as "isLikedByMe",

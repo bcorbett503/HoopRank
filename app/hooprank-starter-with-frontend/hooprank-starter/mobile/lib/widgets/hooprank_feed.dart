@@ -766,6 +766,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       case 'checkin':
         return _buildCheckinCard(item);
       case 'match':
+      case 'team_match':  // Team matches use the same card format as 1v1 matches
         return _buildMatchCard(item);
       case 'new_player':
         return _buildNewPlayerCard(item);
@@ -1418,10 +1419,20 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final matchStatus = item['matchStatus']?.toString() ?? '';
     final createdAt = item['createdAt'];
     final matchScore = item['matchScore']?.toString(); // e.g. "21-18" or null
+    final itemType = item['type']?.toString() ?? 'match';
+    final isTeamMatch = itemType == 'team_match';
     
     // Get both winner and loser names for proper display
     final winnerName = item['winnerName']?.toString() ?? userName;
     final loserName = item['loserName']?.toString();
+    
+    // Get ratings for team matches
+    final winnerRating = item['winnerRating'] != null 
+        ? double.tryParse(item['winnerRating'].toString()) 
+        : null;
+    final loserRating = item['loserRating'] != null 
+        ? double.tryParse(item['loserRating'].toString()) 
+        : null;
     
     // Display text: "Winner vs Loser" if both available, else just winner
     final displayName = loserName != null && loserName.isNotEmpty 
@@ -1435,7 +1446,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
     String timeAgo = _formatTimeAgo(createdAt);
 
-    final statusColor = matchStatus == 'ended' ? Colors.green : Colors.orange;
+    // Use purple for team matches, green for 1v1
+    final statusColor = isTeamMatch ? Colors.purple : (matchStatus == 'ended' ? Colors.green : Colors.orange);
     final statusText = matchStatus == 'ended' ? 'Final Score' : (matchStatus == 'live' ? 'Live Game' : 'Upcoming');
 
     return Container(
@@ -1477,7 +1489,15 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      Row(
+                        children: [
+                          if (isTeamMatch) ...[
+                            Icon(Icons.groups, size: 14, color: Colors.purple.shade300),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(child: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis)),
+                        ],
+                      ),
                       Text('played at $displayCourtName', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
                     ],
                   ),
@@ -1511,10 +1531,37 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  Icon(Icons.emoji_events_outlined, color: statusColor.withOpacity(0.8), size: 28),
+                  Icon(isTeamMatch ? Icons.groups : Icons.emoji_events_outlined, color: statusColor.withOpacity(0.8), size: 28),
                 ],
               ),
             ),
+            // Team ratings row (only for team matches with ratings)
+            if (isTeamMatch && winnerRating != null && loserRating != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Winner rating
+                  Row(
+                    children: [
+                      Icon(Icons.star, size: 14, color: statusColor),
+                      const SizedBox(width: 4),
+                      Text('${winnerName ?? 'Winner'}: ', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
+                      Text(winnerRating.toStringAsFixed(2), style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ],
+                  ),
+                  // Loser rating
+                  Row(
+                    children: [
+                      Icon(Icons.star_border, size: 14, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Text('${loserName ?? 'Loser'}: ', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
+                      Text(loserRating.toStringAsFixed(2), style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.bold, fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
