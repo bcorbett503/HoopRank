@@ -1229,10 +1229,6 @@ class _MapScreenState extends State<MapScreen> {
     final courtId = GoRouterState.of(context).uri.queryParameters['courtId'];
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Courts'),
-        centerTitle: true,
-      ),
       body: CourtMapWidget(
         onCourtSelected: _showCourtDetails,
         initialCourtId: courtId,

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
+import '../state/tutorial_state.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
@@ -625,21 +626,24 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Rankings'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Players (1v1)'),
-            Tab(text: 'Teams'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildPlayersTab(),
-          _buildTeamsTab(),
+          TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Players (1v1)'),
+              Tab(text: 'Teams'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildPlayersTab(),
+                _buildTeamsTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -757,11 +761,17 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 ),
                 const SizedBox(width: 6),
                 ChoiceChip(
+                  key: TutorialKeys.getKey(TutorialKeys.rankingsLocalChip),
                   label: const Text('Local'),
                   selected: _isLocal,
                   onSelected: (_) {
                     setState(() => _isLocal = true);
                     _fetchPlayers();
+                    // Complete tutorial step if active
+                    final tutorial = context.read<TutorialState>();
+                    if (tutorial.isActive && tutorial.currentStep?.id == 'local_players') {
+                      tutorial.completeStep('local_players');
+                    }
                   },
                 ),
                 const SizedBox(width: 12),
@@ -814,7 +824,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                       onRefresh: _fetchPlayers,
                       child: ListView.builder(
                         itemCount: filtered.length,
-                        itemBuilder: (context, index) => _buildPlayerCard(filtered[index]),
+                        itemBuilder: (context, index) => _buildPlayerCard(filtered[index], index),
                       ),
                     ),
         ),
@@ -822,7 +832,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildPlayerCard(User player) {
+  Widget _buildPlayerCard(User player, int index) {
     final hasPending = _pendingChallengeUserIds.contains(player.id);
     
     return Container(
@@ -908,8 +918,9 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                     ),
                     child: const Text('Pending', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold)),
                   ),
-                // Quick action buttons
+                // Quick action buttons (tutorial target for first player)
                 Row(
+                  key: index == 0 ? TutorialKeys.getKey(TutorialKeys.playerActionButtons) : null,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
@@ -918,10 +929,17 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                       tooltip: 'Message',
                       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       padding: EdgeInsets.zero,
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => ChatScreen(userId: player.id)),
-                      ),
+                      onPressed: () {
+                        // Complete tutorial step if active
+                        final tutorial = context.read<TutorialState>();
+                        if (tutorial.isActive && tutorial.currentStep?.id == 'player_actions') {
+                          tutorial.completeStep('player_actions');
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ChatScreen(userId: player.id)),
+                        );
+                      },
                     ),
                     IconButton(
                       icon: const Icon(Icons.sports_basketball, size: 20),
@@ -929,7 +947,14 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                       tooltip: 'Challenge',
                       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       padding: EdgeInsets.zero,
-                      onPressed: () => _showChallengeDialog(player),
+                      onPressed: () {
+                        // Complete tutorial step if active
+                        final tutorial = context.read<TutorialState>();
+                        if (tutorial.isActive && tutorial.currentStep?.id == 'player_actions') {
+                          tutorial.completeStep('player_actions');
+                        }
+                        _showChallengeDialog(player);
+                      },
                     ),
                     // Follow heart button
                     Consumer<CheckInState>(
@@ -944,7 +969,14 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                           tooltip: isFollowing ? 'Unfollow' : 'Follow',
                           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                           padding: EdgeInsets.zero,
-                          onPressed: () => checkInState.toggleFollowPlayer(player.id),
+                          onPressed: () {
+                            checkInState.toggleFollowPlayer(player.id);
+                            // Complete tutorial step if active
+                            final tutorial = context.read<TutorialState>();
+                            if (tutorial.isActive && tutorial.currentStep?.id == 'player_actions') {
+                              tutorial.completeStep('player_actions');
+                            }
+                          },
                         );
                       },
                     ),

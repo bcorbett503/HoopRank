@@ -82,19 +82,16 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Messages'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() => _isLoading = true);
-              _loadAllConversations();
-            },
-          ),
-        ],
-      ),
       body: _buildBody(),
+      floatingActionButton: FloatingActionButton.small(
+        heroTag: 'refreshMessages',
+        onPressed: () {
+          setState(() => _isLoading = true);
+          _loadAllConversations();
+        },
+        backgroundColor: Colors.grey[800],
+        child: const Icon(Icons.refresh, size: 20),
+      ),
     );
   }
   

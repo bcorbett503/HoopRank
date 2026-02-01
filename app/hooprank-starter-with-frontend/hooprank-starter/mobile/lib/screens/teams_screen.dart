@@ -405,46 +405,49 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Teams'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            const Tab(text: 'My Teams'),
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Invites'),
-                  if (_invites.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
+      body: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            tabs: [
+              const Tab(text: 'My Teams'),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Invites'),
+                    if (_invites.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${_invites.length}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
                       ),
-                      child: Text(
-                        '${_invites.length}',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Colors.deepOrange))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildMyTeamsTab(),
+                      _buildInvitesTab(),
+                    ],
+                  ),
+          ),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.deepOrange))
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildMyTeamsTab(),
-                _buildInvitesTab(),
-              ],
-            ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),

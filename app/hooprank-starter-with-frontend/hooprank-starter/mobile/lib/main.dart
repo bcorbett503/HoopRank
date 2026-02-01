@@ -8,7 +8,9 @@ import 'firebase_options.dart';
 
 import 'state/app_state.dart';
 import 'state/check_in_state.dart';
+import 'state/tutorial_state.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
+import 'widgets/tutorial_overlay.dart';
 import 'screens/home_screen.dart';
 import 'screens/rankings_screen.dart';
 
@@ -26,7 +28,6 @@ import 'screens/messages_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/network_test_screen.dart';
 import 'screens/map_screen.dart';
-import 'screens/onboarding_screen.dart';
 import 'services/notification_service.dart';
 import 'services/court_service.dart';
 
@@ -55,6 +56,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthState()),
         ChangeNotifierProvider(create: (_) => MatchState()),
         ChangeNotifierProvider(create: (_) => CheckInState()),
+        ChangeNotifierProvider(create: (_) => TutorialState()),
         Provider(create: (_) => CourtService()),
       ],
       child: const HoopRankApp(),
@@ -78,31 +80,41 @@ class HoopRankApp extends StatefulWidget {
 }
 
 class _HoopRankAppState extends State<HoopRankApp> {
-  late final GoRouter _router;
+  GoRouter? _router;
+  bool _initialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    final authState = context.read<AuthState>();
-    final checkInState = context.read<CheckInState>();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     
-    // Initialize CheckInState when user changes
-    authState.addListener(() {
-      final user = authState.currentUser;
-      if (user != null) {
-        checkInState.initialize(user.id);
+    if (!_initialized) {
+      _initialized = true;
+      
+      final authState = context.read<AuthState>();
+      final checkInState = context.read<CheckInState>();
+      final tutorialState = context.read<TutorialState>();
+      
+      // Initialize states
+      tutorialState.initialize();
+      
+      // Initialize CheckInState when user changes
+      authState.addListener(() {
+        final user = authState.currentUser;
+        if (user != null) {
+          checkInState.initialize(user.id);
+        }
+      });
+      
+      // Initialize now if user already logged in
+      if (authState.currentUser != null) {
+        checkInState.initialize(authState.currentUser!.id);
       }
-    });
-    
-    // Initialize now if user already logged in
-    if (authState.currentUser != null) {
-      checkInState.initialize(authState.currentUser!.id);
+      
+      _router = _createRouter(authState, tutorialState);
     }
-    
-    _router = _createRouter(authState);
   }
 
-  GoRouter _createRouter(AuthState authState) {
+  GoRouter _createRouter(AuthState authState, TutorialState tutorialState) {
     return GoRouter(
       navigatorKey: _rootNavigatorKey,
       initialLocation: '/play',
@@ -112,9 +124,8 @@ class _HoopRankAppState extends State<HoopRankApp> {
         final loggedIn = user != null;
         final isLoggingIn = state.uri.toString() == '/login';
         final isProfileSetup = state.uri.toString() == '/profile/setup';
-        final isOnboarding = state.uri.toString() == '/onboarding';
 
-        debugPrint('ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}, onboardingComplete=${authState.onboardingComplete}');
+        debugPrint('ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}');
 
         // Not logged in - redirect to login (unless already there)
         if (!loggedIn && !isLoggingIn) {
@@ -128,10 +139,14 @@ class _HoopRankAppState extends State<HoopRankApp> {
           return '/profile/setup';
         }
         
-        // Profile complete but onboarding not done - show onboarding (unless already there)
-        if (loggedIn && user.isProfileComplete && !authState.onboardingComplete && !isOnboarding && !isProfileSetup) {
-          debugPrint('ROUTER: -> /onboarding (first time user)');
-          return '/onboarding';
+        // Profile complete - start tutorial if not done, then go to courts
+        if (loggedIn && user.isProfileComplete && !tutorialState.tutorialComplete && !tutorialState.isActive && !isProfileSetup) {
+          debugPrint('ROUTER: Starting interactive tutorial');
+          // Start tutorial and navigate to courts
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            tutorialState.startTutorial();
+          });
+          return '/courts';
         }
         
         // Profile complete and on login screen - go to home
@@ -272,18 +287,28 @@ class _HoopRankAppState extends State<HoopRankApp> {
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
         ),
+        // Root path fallback - redirect to play
         GoRoute(
-          path: '/onboarding',
-          builder: (context, state) => OnboardingScreen(
-            onComplete: () => context.go('/play'),
-          ),
+          path: '/',
+          redirect: (context, state) => '/play',
         ),
+        // Old onboarding removed - now using interactive tutorial overlay
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while router is initializing
+    if (_router == null) {
+      return const MaterialApp(
+        home: Scaffold(
+          backgroundColor: Color(0xFF1A252F),
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    
     return MaterialApp.router(
       title: 'HoopRank',
       debugShowCheckedModeBanner: false,
@@ -320,7 +345,9 @@ class _HoopRankAppState extends State<HoopRankApp> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
         ),
       ),
-      routerConfig: _router,
+      routerConfig: _router!,
+      // Wrap all routes with TutorialOverlay inside MaterialApp for proper Directionality
+      builder: (context, child) => TutorialOverlay(child: child ?? const SizedBox()),
     );
   }
 }

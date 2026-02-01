@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../state/tutorial_state.dart';
 import '../services/api_service.dart';
+import 'hooprank_app_bar.dart';
 
 class ScaffoldWithNavBar extends StatefulWidget {
   const ScaffoldWithNavBar({
@@ -70,6 +73,15 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
   }
 
   void _onTap(BuildContext context, int index) {
+    // Check for tutorial step completion for Rankings (index 0)
+    if (index == 0) {
+      final tutorial = Provider.of<TutorialState>(context, listen: false);
+      // Only complete if we're on the specific step
+      if (tutorial.isActive && tutorial.currentStep?.id == 'go_to_rankings') {
+        tutorial.completeStep('go_to_rankings');
+      }
+    }
+
     // If navigating to messages tab, badge will be refreshed when they exit a chat
     widget.navigationShell.goBranch(
       index,
@@ -79,13 +91,21 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
 
   @override
   Widget build(BuildContext context) {
+    // Check if current screen is Play (index 2) - Play has its own app bar
+    final isPlayScreen = widget.navigationShell.currentIndex == 2;
+    
     return Scaffold(
+      appBar: isPlayScreen ? null : const HoopRankAppBar(),
       body: widget.navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: widget.navigationShell.currentIndex,
         onDestinationSelected: (int index) => _onTap(context, index),
         destinations: [
-          const NavigationDestination(icon: Icon(Icons.leaderboard), label: 'Rankings'),
+          NavigationDestination(
+            key: TutorialKeys.getKey(TutorialKeys.rankingsTab),
+            icon: const Icon(Icons.leaderboard),
+            label: 'Rankings',
+          ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: _unreadCount > 0,
@@ -125,3 +145,4 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
     );
   }
 }
+

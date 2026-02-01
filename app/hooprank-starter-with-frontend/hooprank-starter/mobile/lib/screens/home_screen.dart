@@ -12,6 +12,7 @@ import '../services/messages_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../state/app_state.dart';
+import '../state/tutorial_state.dart';
 import '../state/check_in_state.dart';
 import '../models.dart';
 import '../services/court_service.dart';
@@ -1427,10 +1428,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.help_outline),
             tooltip: 'View Tutorial',
             onPressed: () async {
-              final auth = Provider.of<AuthState>(context, listen: false);
-              await auth.resetOnboarding();
+              final tutorial = Provider.of<TutorialState>(context, listen: false);
+              await tutorial.resetTutorial();
               if (context.mounted) {
-                context.go('/onboarding');
+                context.go('/courts');
               }
             },
           ),

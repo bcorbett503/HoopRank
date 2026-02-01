@@ -9,6 +9,7 @@ import '../services/profile_service.dart';
 import '../services/zipcode_service.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
+import '../state/tutorial_state.dart';
 
 class CourtMapWidget extends StatefulWidget {
   final Function(Court) onCourtSelected;
@@ -645,25 +646,41 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                     ],
                                   ),
                                 ),
-                              // Bell for alerts
+                              // Bell for alerts (tutorial target for first court)
                               IconButton(
+                                key: index == 0 ? TutorialKeys.getKey(TutorialKeys.courtAlertBell) : null,
                                 icon: Icon(
                                   hasAlert ? Icons.notifications_active : Icons.notifications_none,
                                   size: 20,
                                 ),
                                 color: hasAlert ? Colors.orange : Colors.grey[500],
-                                onPressed: () => checkInState.toggleAlert(court.id),
+                                onPressed: () {
+                                  checkInState.toggleAlert(court.id);
+                                  // Complete tutorial step if active
+                                  final tutorial = context.read<TutorialState>();
+                                  if (tutorial.isActive && tutorial.currentStep?.id == 'enable_notifications') {
+                                    tutorial.completeStep('enable_notifications');
+                                  }
+                                },
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                               ),
-                              // Heart for follow
+                              // Heart for follow (tutorial target for first court)
                               IconButton(
+                                key: index == 0 ? TutorialKeys.getKey(TutorialKeys.courtFollowButton) : null,
                                 icon: Icon(
                                   isFollowing ? Icons.favorite : Icons.favorite_border,
                                   size: 22,
                                 ),
                                 color: isFollowing ? Colors.red : Colors.grey[500],
-                                onPressed: () => checkInState.toggleFollow(court.id),
+                                onPressed: () {
+                                  checkInState.toggleFollow(court.id);
+                                  // Complete tutorial step if active
+                                  final tutorial = context.read<TutorialState>();
+                                  if (tutorial.isActive && tutorial.currentStep?.id == 'follow_court') {
+                                    tutorial.completeStep('follow_court');
+                                  }
+                                },
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                               ),
