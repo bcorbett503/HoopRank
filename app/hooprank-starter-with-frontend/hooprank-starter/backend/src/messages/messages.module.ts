@@ -5,12 +5,14 @@ import { MessagesController } from './messages.controller';
 import { Message } from './message.entity';
 import { UsersModule } from '../users/users.module';
 import { TeamsModule } from '../teams/teams.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Message]),
         UsersModule,
         forwardRef(() => TeamsModule),
+        NotificationsModule,
     ],
     controllers: [MessagesController],
     providers: [MessagesService],

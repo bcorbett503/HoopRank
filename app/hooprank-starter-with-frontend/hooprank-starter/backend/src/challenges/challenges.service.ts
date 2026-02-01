@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Challenge } from './challenge.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ChallengesService {
@@ -10,6 +11,7 @@ export class ChallengesService {
         @InjectRepository(Challenge)
         private challengesRepository: Repository<Challenge>,
         private dataSource: DataSource,
+        private notificationsService: NotificationsService,
     ) { }
 
     /**
@@ -37,6 +39,11 @@ export class ChallengesService {
             `, [id, fromUserId, toUserId, courtId || null, message || 'Want to play?']);
 
             const result = await this.dataSource.query(`SELECT * FROM challenges WHERE id = $1`, [id]);
+
+            // Send notification to recipient
+            const senderName = await this.getUserName(fromUserId);
+            this.notificationsService.sendChallengeNotification(toUserId, senderName, 'received', id).catch(() => { });
+
             return result[0];
         }
 
@@ -49,7 +56,22 @@ export class ChallengesService {
             message: message || 'Want to play?',
             status: 'pending',
         });
-        return this.challengesRepository.save(challenge);
+        const saved = await this.challengesRepository.save(challenge);
+
+        // Send notification
+        const senderName = await this.getUserName(fromUserId);
+        this.notificationsService.sendChallengeNotification(toUserId, senderName, 'received', saved.id).catch(() => { });
+
+        return saved;
+    }
+
+    private async getUserName(userId: string): Promise<string> {
+        const isPostgres = !!process.env.DATABASE_URL;
+        const query = isPostgres
+            ? `SELECT name FROM users WHERE id = $1`
+            : `SELECT name FROM users WHERE id = ?`;
+        const result = await this.dataSource.query(query, [userId]);
+        return result[0]?.name || 'Someone';
     }
 
     /**
@@ -185,6 +207,10 @@ export class ChallengesService {
                 SELECT * FROM challenges WHERE id = $1
             `, [challengeId]);
 
+            // Notify challenger their challenge was accepted
+            const accepterName = await this.getUserName(userId);
+            this.notificationsService.sendChallengeNotification(challenge.from_user_id, accepterName, 'accepted', challengeId).catch(() => { });
+
             return { challenge: updated[0], matchId };
         }
 
@@ -198,6 +224,10 @@ export class ChallengesService {
         challenge.status = 'accepted';
         challenge.matchId = matchId;
         await this.challengesRepository.save(challenge);
+
+        // Notify challenger
+        const accepterName = await this.getUserName(userId);
+        this.notificationsService.sendChallengeNotification(challenge.fromUserId, accepterName, 'accepted', challengeId).catch(() => { });
 
         return { challenge, matchId };
     }
@@ -236,6 +266,11 @@ export class ChallengesService {
             const updated = await this.dataSource.query(`
                 SELECT * FROM challenges WHERE id = $1
             `, [challengeId]);
+
+            // Notify challenger their challenge was declined
+            const declinerName = await this.getUserName(userId);
+            this.notificationsService.sendChallengeNotification(challenge.from_user_id, declinerName, 'declined', challengeId).catch(() => { });
+
             return updated[0];
         }
 
@@ -244,7 +279,13 @@ export class ChallengesService {
         if (challenge.toUserId !== userId) throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
 
         challenge.status = 'declined';
-        return this.challengesRepository.save(challenge);
+        const saved = await this.challengesRepository.save(challenge);
+
+        // Notify challenger
+        const declinerName = await this.getUserName(userId);
+        this.notificationsService.sendChallengeNotification(challenge.fromUserId, declinerName, 'declined', challengeId).catch(() => { });
+
+        return saved;
     }
 
     /**

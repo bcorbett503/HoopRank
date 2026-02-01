@@ -4,6 +4,7 @@ import { Repository, DataSource } from 'typeorm';
 import { Match } from './match.entity';
 import { UsersService } from '../users/users.service';
 import { HoopRankService } from '../ratings/hooprank.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class MatchesService {
@@ -14,6 +15,7 @@ export class MatchesService {
     private matchesRepository: Repository<Match>,
     private readonly users: UsersService,
     private dataSource: DataSource,
+    private notificationsService: NotificationsService,
   ) { }
 
   async create(creatorId: string, opponentId?: string, courtId?: string): Promise<Match> {
@@ -111,6 +113,20 @@ export class MatchesService {
           UPDATE users SET hoop_rank = $1, games_played = COALESCE(games_played, 0) + 1, updated_at = NOW()
           WHERE id = $2
         `, [newOpponentRating, opponent.id]);
+
+        // Send notifications to both players
+        const creatorDelta = newCreatorRating - creatorRating;
+        const opponentDelta = newOpponentRating - opponentRating;
+        const creatorName = (creator as any).name || 'Opponent';
+        const opponentName = (opponent as any).name || 'Opponent';
+
+        this.notificationsService.sendMatchCompletedNotification(
+          m.creator_id, newCreatorRating, creatorDelta, opponentName, creatorWon
+        ).catch(() => { });
+
+        this.notificationsService.sendMatchCompletedNotification(
+          m.opponent_id, newOpponentRating, opponentDelta, creatorName, !creatorWon
+        ).catch(() => { });
       }
 
       // Complete match with scores and court (always update scores even if already completed)

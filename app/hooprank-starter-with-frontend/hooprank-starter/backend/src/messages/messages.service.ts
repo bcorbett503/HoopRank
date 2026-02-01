@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Message } from './message.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class MessagesService {
@@ -10,6 +11,7 @@ export class MessagesService {
         @InjectRepository(Message)
         private messagesRepository: Repository<Message>,
         private dataSource: DataSource,
+        private notificationsService: NotificationsService,
     ) { }
 
     async sendMessage(senderId: string, receiverId: string, content: string, matchId?: string, isChallenge?: boolean, courtId?: string): Promise<Message> {
@@ -62,6 +64,13 @@ export class MessagesService {
                     RETURNING *
                 `, [id, actualThreadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null, courtId || null]);
                 console.log('sendMessage: success:', result[0]);
+
+                // Send push notification for non-challenge messages
+                if (!isChallenge) {
+                    const senderName = await this.getSenderName(senderId);
+                    this.notificationsService.sendMessageNotification(receiverId, senderName, content, actualThreadId).catch(() => { });
+                }
+
                 return result[0];
             } catch (error) {
                 console.error('sendMessage error:', error.message, error.stack);
@@ -80,7 +89,23 @@ export class MessagesService {
             matchId
         } as any);
         const saved = await this.messagesRepository.save(message);
+
+        // Send push notification for non-challenge messages
+        if (!isChallenge) {
+            const senderName = await this.getSenderName(senderId);
+            this.notificationsService.sendMessageNotification(receiverId, senderName, content, threadId).catch(() => { });
+        }
+
         return Array.isArray(saved) ? saved[0] : saved;
+    }
+
+    private async getSenderName(userId: string): Promise<string> {
+        const isPostgres = !!process.env.DATABASE_URL;
+        const query = isPostgres
+            ? `SELECT name FROM users WHERE id = $1`
+            : `SELECT name FROM users WHERE id = ?`;
+        const result = await this.dataSource.query(query, [userId]);
+        return result[0]?.name || 'Someone';
     }
 
     /**

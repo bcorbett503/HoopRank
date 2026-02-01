@@ -167,4 +167,131 @@ export class NotificationsService {
         const result = await this.dataSource.query(query, [userId]);
         return result.map((r: any) => r.court_id);
     }
+
+    /**
+     * Generic helper to send a push notification to a single user
+     */
+    async sendToUser(
+        userId: string,
+        title: string,
+        body: string,
+        data: Record<string, string> = {},
+    ): Promise<boolean> {
+        try {
+            // Get user's FCM token
+            const query = this.isPostgres
+                ? `SELECT fcm_token FROM users WHERE id = $1 AND fcm_token IS NOT NULL`
+                : `SELECT "fcmToken" as fcm_token FROM users WHERE id = ? AND "fcmToken" IS NOT NULL`;
+
+            const result = await this.dataSource.query(query, [userId]);
+            if (result.length === 0 || !result[0].fcm_token) {
+                console.log(`[Notifications] No FCM token for user ${userId}`);
+                return false;
+            }
+
+            const token = result[0].fcm_token;
+
+            const message: admin.messaging.Message = {
+                token,
+                notification: { title, body },
+                data,
+                apns: {
+                    payload: {
+                        aps: { sound: 'default', badge: 1 },
+                    },
+                },
+            };
+
+            await admin.messaging().send(message);
+            console.log(`[Notifications] Sent to ${userId}: ${title}`);
+            return true;
+        } catch (error) {
+            console.error(`[Notifications] Failed to send to ${userId}:`, error.message);
+
+            // Clean up invalid token
+            if (error.code === 'messaging/registration-token-not-registered') {
+                if (this.isPostgres) {
+                    await this.dataSource.query(`UPDATE users SET fcm_token = NULL WHERE id = $1`, [userId]);
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Send challenge notification (received, accepted, or declined)
+     */
+    async sendChallengeNotification(
+        toUserId: string,
+        fromUserName: string,
+        type: 'received' | 'accepted' | 'declined',
+        challengeId?: string,
+    ): Promise<void> {
+        const titles = {
+            received: '🏀 New Challenge!',
+            accepted: '🏀 Challenge Accepted!',
+            declined: '🏀 Challenge Declined',
+        };
+        const bodies = {
+            received: `${fromUserName} challenged you to 1v1`,
+            accepted: `${fromUserName} accepted your challenge!`,
+            declined: `${fromUserName} declined your challenge`,
+        };
+
+        await this.sendToUser(toUserId, titles[type], bodies[type], {
+            type: 'challenge',
+            challengeType: type,
+            challengeId: challengeId || '',
+        });
+    }
+
+    /**
+     * Send new message notification
+     */
+    async sendMessageNotification(
+        toUserId: string,
+        fromUserName: string,
+        messagePreview: string,
+        threadId?: string,
+    ): Promise<void> {
+        const preview = messagePreview.length > 50
+            ? messagePreview.substring(0, 47) + '...'
+            : messagePreview;
+
+        await this.sendToUser(toUserId, fromUserName, preview, {
+            type: 'message',
+            threadId: threadId || '',
+        });
+    }
+
+    /**
+     * Send match completed notification
+     */
+    async sendMatchCompletedNotification(
+        userId: string,
+        newRating: number,
+        ratingDelta: number,
+        opponentName: string,
+        won: boolean,
+    ): Promise<void> {
+        const title = won ? '🏆 Victory!' : '📊 Match Complete';
+        const deltaStr = ratingDelta >= 0 ? `+${ratingDelta.toFixed(2)}` : ratingDelta.toFixed(2);
+        const body = won
+            ? `You beat ${opponentName}! Rating: ${newRating.toFixed(2)} (${deltaStr})`
+            : `${opponentName} won. Rating: ${newRating.toFixed(2)} (${deltaStr})`;
+
+        await this.sendToUser(userId, title, body, {
+            type: 'match_completed',
+            newRating: newRating.toString(),
+        });
+    }
+
+    /**
+     * Send follow notification
+     */
+    async sendFollowNotification(userId: string, followerName: string): Promise<void> {
+        await this.sendToUser(userId, '👋 New Follower', `${followerName} started following you`, {
+            type: 'follow',
+        });
+    }
 }
