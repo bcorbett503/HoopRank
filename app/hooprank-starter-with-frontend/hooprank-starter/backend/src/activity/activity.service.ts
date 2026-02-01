@@ -10,7 +10,7 @@ export class ActivityService {
 
         if (isPostgres) {
             try {
-                // Get recent completed matches with player info
+                // Get recent completed 1v1 matches with player info
                 const matchResults = await this.dataSource.query(`
                     SELECT 
                         m.id,
@@ -19,6 +19,9 @@ export class ActivityService {
                         m.match_type,
                         m.created_at,
                         m.winner_id,
+                        m.team_match,
+                        m.score_creator,
+                        m.score_opponent,
                         c.id as court_id,
                         c.name as court_name,
                         c.city as court_city,
@@ -34,7 +37,37 @@ export class ActivityService {
                     LEFT JOIN courts c ON m.court_id = c.id
                     LEFT JOIN users creator ON m.creator_id = creator.id
                     LEFT JOIN users opponent ON m.opponent_id = opponent.id
-                    WHERE m.status = 'completed'
+                    WHERE m.status = 'completed' AND (m.team_match = false OR m.team_match IS NULL)
+                    ORDER BY m.created_at DESC
+                    LIMIT $1
+                `, [limit]);
+
+                // Get recent completed team matches
+                const teamMatchResults = await this.dataSource.query(`
+                    SELECT 
+                        m.id,
+                        'team_match' as activity_type,
+                        m.status,
+                        m.match_type,
+                        m.created_at,
+                        m.winner_id,
+                        m.team_match,
+                        m.score_creator,
+                        m.score_opponent,
+                        c.id as court_id,
+                        c.name as court_name,
+                        c.city as court_city,
+                        ct.id as creator_team_id,
+                        ct.name as creator_team_name,
+                        ct.rating as creator_team_rating,
+                        ot.id as opponent_team_id,
+                        ot.name as opponent_team_name,
+                        ot.rating as opponent_team_rating
+                    FROM matches m
+                    LEFT JOIN courts c ON m.court_id = c.id
+                    LEFT JOIN teams ct ON m.creator_team_id = ct.id
+                    LEFT JOIN teams ot ON m.opponent_team_id = ot.id
+                    WHERE m.status = 'completed' AND m.team_match = true
                     ORDER BY m.created_at DESC
                     LIMIT $1
                 `, [limit]);
@@ -61,7 +94,7 @@ export class ActivityService {
                 // Combine and sort by date
                 const activities: any[] = [];
 
-                // Add match activities
+                // Add 1v1 match activities
                 matchResults.forEach((r: any) => {
                     activities.push({
                         id: r.id,
@@ -70,6 +103,8 @@ export class ActivityService {
                         matchType: r.match_type,
                         createdAt: r.created_at,
                         winnerId: r.winner_id,
+                        scoreCreator: r.score_creator,
+                        scoreOpponent: r.score_opponent,
                         court: r.court_id ? {
                             id: r.court_id,
                             name: r.court_name,
@@ -86,6 +121,36 @@ export class ActivityService {
                             name: r.opponent_name,
                             photoUrl: r.opponent_avatar_url,
                             rating: r.opponent_rating,
+                        } : null,
+                    });
+                });
+
+                // Add team match activities
+                teamMatchResults.forEach((r: any) => {
+                    activities.push({
+                        id: r.id,
+                        type: 'team_match',
+                        status: r.status,
+                        matchType: r.match_type,
+                        createdAt: r.created_at,
+                        winnerId: r.winner_id,
+                        scoreCreator: r.score_creator,
+                        scoreOpponent: r.score_opponent,
+                        isTeamMatch: true,
+                        court: r.court_id ? {
+                            id: r.court_id,
+                            name: r.court_name,
+                            city: r.court_city,
+                        } : null,
+                        creatorTeam: r.creator_team_id ? {
+                            id: r.creator_team_id,
+                            name: r.creator_team_name,
+                            rating: r.creator_team_rating,
+                        } : null,
+                        opponentTeam: r.opponent_team_id ? {
+                            id: r.opponent_team_id,
+                            name: r.opponent_team_name,
+                            rating: r.opponent_team_rating,
                         } : null,
                     });
                 });
@@ -121,3 +186,4 @@ export class ActivityService {
         return [];
     }
 }
+

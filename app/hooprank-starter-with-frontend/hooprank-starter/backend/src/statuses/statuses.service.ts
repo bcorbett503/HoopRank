@@ -291,7 +291,7 @@ export class StatusesService {
                 LEFT JOIN courts c ON ps.court_id::TEXT = c.id::TEXT
             `;
 
-            // Match SELECT clause (for completed matches)
+            // Match SELECT clause (for completed 1v1 matches only)
             const matchSelectClause = `
                 SELECT 
                     'match' as type,
@@ -326,7 +326,45 @@ export class StatusesService {
                 LEFT JOIN users loser ON 
                     CASE WHEN m.winner_id = m.creator_id THEN m.opponent_id ELSE m.creator_id END::TEXT = loser.id::TEXT
                 LEFT JOIN courts mc ON m.court_id::TEXT = mc.id::TEXT
-                WHERE m.status = 'completed' AND m.winner_id IS NOT NULL
+                WHERE m.status = 'completed' AND m.winner_id IS NOT NULL AND (m.team_match IS NULL OR m.team_match = false)
+            `;
+
+            // Team Match SELECT clause (for completed team matches)
+            const teamMatchSelectClause = `
+                SELECT 
+                    'team_match' as type,
+                    m.id::TEXT as id,
+                    m.updated_at as "createdAt",
+                    m.winner_id as "userId",
+                    COALESCE(winner_team.name, 'Unknown Team') as "userName",
+                    NULL as "userPhotoUrl",
+                    COALESCE(winner_team.name, 'Team') || ' vs ' || COALESCE(loser_team.name, 'Opponent Team') as content,
+                    NULL as "imageUrl",
+                    NULL as "videoUrl",
+                    NULL as "videoThumbnailUrl",
+                    NULL::INTEGER as "videoDurationMs",
+                    NULL as "scheduledAt",
+                    m.court_id as "courtId",
+                    COALESCE(mc.name, 'Unknown Court') as "courtName",
+                    'ended' as "matchStatus",
+                    CASE 
+                        WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
+                        THEN m.score_creator::TEXT || '-' || m.score_opponent::TEXT
+                        ELSE NULL
+                    END as "matchScore",
+                    winner_team.name as "winnerName",
+                    loser_team.name as "loserName",
+                    0 as "likeCount",
+                    0 as "commentCount",
+                    false as "isLikedByMe",
+                    0 as "attendeeCount",
+                    false as "isAttendingByMe"
+                FROM matches m
+                LEFT JOIN teams winner_team ON m.winner_id::TEXT = winner_team.id::TEXT
+                LEFT JOIN teams loser_team ON 
+                    CASE WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN m.opponent_team_id ELSE m.creator_team_id END::TEXT = loser_team.id::TEXT
+                LEFT JOIN courts mc ON m.court_id::TEXT = mc.id::TEXT
+                WHERE m.status = 'completed' AND m.team_match = true AND m.winner_id IS NOT NULL
             `;
 
             let query: string;
@@ -344,6 +382,10 @@ export class StatusesService {
                           AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
                         UNION ALL
                         (${matchSelectClause}
+                        AND mc.geog IS NOT NULL
+                        AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
+                        UNION ALL
+                        (${teamMatchSelectClause}
                         AND mc.geog IS NOT NULL
                         AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
                         ORDER BY "createdAt" DESC
@@ -364,6 +406,8 @@ export class StatusesService {
                         (${statusSelectClause})
                         UNION ALL
                         (${matchSelectClause})
+                        UNION ALL
+                        (${teamMatchSelectClause})
                         ORDER BY "createdAt" DESC
                         LIMIT $2
                     `;
@@ -390,19 +434,26 @@ export class StatusesService {
                     ORDER BY "createdAt" DESC
                     LIMIT $3
                 `;
+                // Team matches - include all since they're team-based not user-based
+                const teamMatchQuery = `
+                    ${teamMatchSelectClause}
+                    ORDER BY "createdAt" DESC
+                    LIMIT $1
+                `;
                 params = [userId, userId, userId, limit];
-                const [statusResults, matchResults] = await Promise.all([
+                const [statusResults, matchResults, teamMatchResults] = await Promise.all([
                     this.dataSource.query(statusQuery, params),
-                    this.dataSource.query(matchQuery, [userId, userId, limit])
+                    this.dataSource.query(matchQuery, [userId, userId, limit]),
+                    this.dataSource.query(teamMatchQuery, [limit])
                 ]);
                 // Merge and sort by createdAt
-                const merged = [...statusResults, ...matchResults]
+                const merged = [...statusResults, ...matchResults, ...teamMatchResults]
                     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                     .slice(0, limit);
-                console.log('getUnifiedFeed: FOLLOWING merged', statusResults.length, 'statuses +', matchResults.length, 'matches');
+                console.log('getUnifiedFeed: FOLLOWING merged', statusResults.length, 'statuses +', matchResults.length, 'matches +', teamMatchResults.length, 'team matches');
                 return merged;
             } else {
-                // ALL: Combined statuses + matches - run both queries separately then merge
+                // ALL: Combined statuses + matches + team matches
                 const statusQuery = `
                     ${statusSelectClause}
                     WHERE ps.user_id = $1
@@ -419,16 +470,23 @@ export class StatusesService {
                     ORDER BY "createdAt" DESC
                     LIMIT $3
                 `;
+                // Team matches - include all since they're team-based not user-based
+                const teamMatchQuery = `
+                    ${teamMatchSelectClause}
+                    ORDER BY "createdAt" DESC
+                    LIMIT $1
+                `;
                 params = [userId, userId, userId, limit];
-                const [statusResults, matchResults] = await Promise.all([
+                const [statusResults, matchResults, teamMatchResults] = await Promise.all([
                     this.dataSource.query(statusQuery, params),
-                    this.dataSource.query(matchQuery, [userId, userId, limit])
+                    this.dataSource.query(matchQuery, [userId, userId, limit]),
+                    this.dataSource.query(teamMatchQuery, [limit])
                 ]);
                 // Merge and sort by createdAt
-                const merged = [...statusResults, ...matchResults]
+                const merged = [...statusResults, ...matchResults, ...teamMatchResults]
                     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                     .slice(0, limit);
-                console.log('getUnifiedFeed: ALL merged', statusResults.length, 'statuses +', matchResults.length, 'matches');
+                console.log('getUnifiedFeed: ALL merged', statusResults.length, 'statuses +', matchResults.length, 'matches +', teamMatchResults.length, 'team matches');
                 return merged;
             }
         } catch (error) {
