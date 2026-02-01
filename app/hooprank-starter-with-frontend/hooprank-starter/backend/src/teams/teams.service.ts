@@ -673,16 +673,7 @@ export class TeamsService {
                 throw new ForbiddenException('You must be a member of the team');
             }
 
-            // Ensure required columns exist on teams table
-            await this.dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0`);
-            await this.dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0`);
-            await this.dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS rating DECIMAL(3,2) DEFAULT 3.00`);
-
-            // Ensure required columns exist on matches table
-            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_creator INTEGER`);
-            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_opponent INTEGER`);
-            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
-            await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS winner_id UUID`);
+            // Schema migrations are now handled by schema-evolution.ts at startup
 
             // Get match
             const matches = await this.dataSource.query(`

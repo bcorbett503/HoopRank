@@ -66,6 +66,19 @@ export class Match {
     @Column({ type: 'text', array: true, nullable: true })
     participants: string[];
 
+    // Team match fields
+    @Column({ name: 'team_match', type: 'boolean', default: false })
+    teamMatch: boolean;
+
+    @Column({ name: 'creator_team_id', type: 'uuid', nullable: true })
+    creatorTeamId: string;
+
+    @Column({ name: 'opponent_team_id', type: 'uuid', nullable: true })
+    opponentTeamId: string;
+
+    @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
+    completedAt: Date;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

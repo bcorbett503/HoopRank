@@ -3,10 +3,14 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
 import { DataSource } from 'typeorm';
+import { runSchemaEvolution } from './common/schema-evolution';
 
 // Run necessary database migrations at startup
 async function runStartupMigrations(dataSource: DataSource): Promise<void> {
   console.log('Running startup migrations...');
+
+  // Run consolidated schema evolution first
+  await runSchemaEvolution(dataSource);
 
   try {
     // Check and fix user_id column types for engagement tables
