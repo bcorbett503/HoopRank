@@ -55,7 +55,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           return;
         }
         
-        await ApiService.submitTeamScore(
+        final response = await ApiService.submitTeamScore(
           teamId: teamId,
           matchId: matchId,
           myTeamScore: userScore,
@@ -65,14 +65,28 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         if (!mounted) return;
         match.setScores(userScore, oppScore);
         
-        // For team matches, just show estimated rating change
-        // The actual team rating update happens on the backend
+        // Use actual rating changes from backend response
         final won = userScore > oppScore;
-        final delta = won ? 0.1 : -0.1;
+        double delta = won ? 0.1 : -0.1;  // Default fallback
+        double ratingBefore = 3.0;
+        double ratingAfter = 3.0;
+        
+        if (response != null) {
+          final ratingChanges = response['ratingChanges'] as Map<String, dynamic>?;
+          if (ratingChanges != null && teamId != null) {
+            final teamRatingChange = ratingChanges[teamId];
+            if (teamRatingChange != null) {
+              ratingBefore = (teamRatingChange['old'] as num?)?.toDouble() ?? 3.0;
+              ratingAfter = (teamRatingChange['new'] as num?)?.toDouble() ?? 3.0;
+              delta = ratingAfter - ratingBefore;
+            }
+          }
+        }
+        
         match.setOutcome(
           deltaVal: delta,
-          rBefore: 3.0,
-          rAfter: 3.0 + delta,
+          rBefore: ratingBefore,
+          rAfter: ratingAfter,
           rkBefore: 0,
           rkAfter: 0,
         );
