@@ -632,7 +632,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // Follower count badge
-                              if ((court.followerCount ?? 0) > 0)
+                              if (checkInState.getFollowerCount(court.id) > 0)
                                 Container(
                                   margin: const EdgeInsets.only(right: 4),
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -647,7 +647,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                       Icon(Icons.favorite, size: 12, color: Colors.red.shade300),
                                       const SizedBox(width: 2),
                                       Text(
-                                        '${court.followerCount}',
+                                        '${checkInState.getFollowerCount(court.id)}',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,

@@ -91,6 +91,26 @@ class ApiService {
     return null;
   }
 
+  /// Generic GET request to any endpoint
+  static Future<dynamic> get(String path) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          if (_authToken != null) 'Authorization': 'Bearer $_authToken',
+          if (_userId != null) 'x-user-id': _userId!,
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      debugPrint('ApiService.get error: $e');
+    }
+    return null;
+  }
+
   static Future<User> devLogin(String id, String name) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/dev'),

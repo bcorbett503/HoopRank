@@ -187,6 +187,21 @@ export class CourtsService {
         return this.dataSource.query(query, [courtId]);
     }
 
+    // ==================== FOLLOWER COUNTS ====================
+
+    async getFollowerCounts(): Promise<{ courtId: string; count: number }[]> {
+        const d = this.dialect.reset();
+        const query = d.isPostgres
+            ? `SELECT court_id as "courtId", COUNT(*) as count FROM user_court_alerts GROUP BY court_id`
+            : `SELECT court_id as "courtId", COUNT(*) as count FROM user_court_alerts GROUP BY court_id`;
+
+        const results = await this.dataSource.query(query);
+        return results.map((r: any) => ({
+            courtId: r.courtId,
+            count: parseInt(r.count, 10),
+        }));
+    }
+
     // ==================== COURT STATS ====================
 
     async getCourtStats(courtId: string): Promise<any> {

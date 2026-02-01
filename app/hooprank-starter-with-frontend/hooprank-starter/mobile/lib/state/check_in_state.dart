@@ -150,8 +150,14 @@ class CheckInState extends ChangeNotifier {
   // Map of player ID -> their current status (what they're up to)
   final Map<String, PlayerStatus> _playerStatuses = {};
   
+  // Map of court ID -> follower count (from backend API)
+  final Map<String, int> _courtFollowerCounts = {};
+  
   // Current user ID (set on login)
   String? _currentUserId;
+  
+  /// Get follower count for a court
+  int getFollowerCount(String courtId) => _courtFollowerCounts[courtId] ?? 0;
   
   /// Initialize with mock data for demo purposes
   Future<void> initialize(String? userId) async {
@@ -166,10 +172,33 @@ class CheckInState extends ChangeNotifier {
     // Then sync with backend API (will overwrite local data if successful)
     await _syncFollowsFromApi();
     
+    // Fetch court follower counts from API
+    await _fetchCourtFollowerCounts();
+    
     // Add mock check-in data for popular courts
     _addMockCheckIns();
     
     notifyListeners();
+  }
+  
+  /// Fetch court follower counts from backend API
+  Future<void> _fetchCourtFollowerCounts() async {
+    try {
+      final response = await ApiService.get('/courts/follower-counts');
+      if (response != null && response is List) {
+        _courtFollowerCounts.clear();
+        for (final item in response) {
+          final courtId = item['courtId'] as String?;
+          final count = item['count'];
+          if (courtId != null && count != null) {
+            _courtFollowerCounts[courtId] = count is int ? count : int.tryParse(count.toString()) ?? 0;
+          }
+        }
+        debugPrint('Fetched follower counts for ${_courtFollowerCounts.length} courts');
+      }
+    } catch (e) {
+      debugPrint('Error fetching court follower counts: $e');
+    }
   }
   
   /// Sync follows from backend API (overwrites local cache on success)

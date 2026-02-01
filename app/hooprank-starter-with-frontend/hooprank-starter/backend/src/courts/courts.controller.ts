@@ -48,6 +48,11 @@ export class CourtsController {
         });
     }
 
+    @Get('follower-counts')
+    async getFollowerCounts() {
+        return this.courtsService.getFollowerCounts();
+    }
+
     @Get(':id')
     async findOne(@Param('id') id: string): Promise<Court | undefined> {
         return this.courtsService.findById(id);
