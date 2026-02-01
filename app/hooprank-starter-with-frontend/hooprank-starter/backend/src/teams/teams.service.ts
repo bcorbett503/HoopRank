@@ -563,10 +563,15 @@ export class TeamsService {
             throw new ForbiddenException('Only the challenged team can accept');
         }
 
-        // Create team match - creator_id is required (NOT NULL), use the accepting user
+        // Ensure team match columns exist (migration might not have run)
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false`);
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS creator_team_id UUID`);
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_team_id UUID`);
+
+        // Create team match - generate UUID explicitly, creator_id is required (NOT NULL)
         const matchResult = await this.dataSource.query(`
-            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
-            VALUES ('3v3', 'accepted', true, $1, $2, $3)
+            INSERT INTO matches (id, match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
+            VALUES (gen_random_uuid(), '3v3', 'accepted', true, $1, $2, $3)
             RETURNING *
         `, [challenge.from_team_id, challenge.to_team_id, userId]);
         const match = matchResult[0];
