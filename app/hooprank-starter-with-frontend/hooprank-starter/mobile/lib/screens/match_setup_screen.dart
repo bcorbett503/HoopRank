@@ -234,14 +234,20 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     final match = context.watch<MatchState>();
     final me = auth.currentUser;
     
+    // Detect team mode (3v3 or 5v5 vs 1v1)
+    final isTeamMatch = match.mode == '3v3' || match.mode == '5v5';
+    
     final filteredPlayers = _players.where((p) => 
       p.name.toLowerCase().contains(_search.toLowerCase())
     ).toList();
 
-    final canStart = match.opponent != null;
+    // For team matches, can start when we have team names; for 1v1, need opponent
+    final canStart = isTeamMatch 
+        ? (match.myTeamName != null && match.opponentTeamName != null)
+        : match.opponent != null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Set up your match')),
+      appBar: AppBar(title: Text(isTeamMatch ? 'Team Match Setup' : 'Set up your match')),
       body: Column(
         children: [
           Expanded(
@@ -250,7 +256,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Mode: 1 v 1', style: TextStyle(color: Colors.grey)),
+                  Text('Mode: ${isTeamMatch ? match.mode : "1 v 1"}', style: const TextStyle(color: Colors.grey)),
                   const SizedBox(height: 8),
                   // Tappable court selection row - always tappable
                   InkWell(
@@ -266,8 +272,106 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                     ),
                   ),
                   const Divider(height: 24),
-                  // Only show player picker if opponent not already set
-                  if (match.opponent == null) ...[
+                  
+                  // TEAM MATCH UI
+                  if (isTeamMatch) ...[
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'TEAM ${match.mode} MATCH',
+                              style: const TextStyle(
+                                color: Colors.purple,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          const Icon(Icons.groups, size: 64, color: Colors.purple),
+                          const SizedBox(height: 24),
+                          
+                          // Team vs Team display
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.purple.shade900.withOpacity(0.3), Colors.deepPurple.withOpacity(0.15)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.purple.withOpacity(0.4)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // My team
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      const Text('YOUR TEAM', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        match.myTeamName ?? 'Your Team',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // VS
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  child: const Text(
+                                    'VS',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: Colors.purple,
+                                    ),
+                                  ),
+                                ),
+                                // Opponent team
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      const Text('OPPONENT', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        match.opponentTeamName ?? 'Opponent Team',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Select a court above (optional), then start your game!',
+                            style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ]
+                  // 1V1 MATCH UI (existing code)
+                  else if (match.opponent == null) ...[
                     const Text('Choose opponent', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     TextField(
@@ -331,7 +435,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                         },
                       ),
                   ] else ...[
-                    // Show matchup when opponent is already set
+                    // Show matchup when opponent is already set (1v1)
                     const SizedBox(height: 32),
                     Center(
                       child: Column(
@@ -356,7 +460,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Colors.grey[900],
               boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, -2))],
             ),
             child: Column(
@@ -367,16 +471,22 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('You', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        Text(me?.name ?? 'Me', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(isTeamMatch ? 'Your Team' : 'You', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(
+                          isTeamMatch ? (match.myTeamName ?? 'Your Team') : (me?.name ?? 'Me'), 
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ],
                     ),
                     const Text('VS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text('Opponent', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        Text(match.opponent?.name ?? '—', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(isTeamMatch ? 'Opponent Team' : 'Opponent', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(
+                          isTeamMatch ? (match.opponentTeamName ?? '—') : (match.opponent?.name ?? '—'), 
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ],
                     ),
                   ],
@@ -392,7 +502,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
+                      backgroundColor: isTeamMatch ? Colors.purple : Colors.deepOrange,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),

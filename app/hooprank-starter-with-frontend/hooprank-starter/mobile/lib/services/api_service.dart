@@ -895,19 +895,20 @@ class ApiService {
 
   /// Submit team match score
   static Future<Map<String, dynamic>?> submitTeamScore({
+    required String teamId,
     required String matchId,
     required int myTeamScore,
     required int opponentTeamScore,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/teams/matches/$matchId/score'),
+      Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/score'),
       headers: {
         'x-user-id': _userId ?? '',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'myTeamScore': myTeamScore,
-        'opponentTeamScore': opponentTeamScore,
+        'me': myTeamScore,
+        'opponent': opponentTeamScore,
       }),
     );
     if (response.statusCode == 200) {

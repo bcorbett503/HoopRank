@@ -1167,19 +1167,36 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     );
   }
 
-  /// Accept a team challenge
+  /// Accept a team challenge and navigate to match setup (mirrors 1v1 flow)
   Future<void> _acceptTeamChallenge(TeamChallengeRequest challenge) async {
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
-      await _messagesService.acceptTeamChallenge(userId, challenge.myTeamId, challenge.id);
+      final result = await _messagesService.acceptTeamChallenge(userId, challenge.myTeamId, challenge.id);
       
       if (mounted) {
         _loadPendingTeamChallenges(); // Refresh
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Challenge accepted! Match started vs ${challenge.opponentTeamName}')),
-        );
+        
+        // Set MatchState for team match (mirrors 1v1 _acceptChallenge flow)
+        final matchState = Provider.of<MatchState>(context, listen: false);
+        matchState.reset(); // Clear any previous match state
+        
+        // Set team match mode
+        matchState.mode = challenge.teamType; // '3v3' or '5v5'
+        matchState.myTeamId = challenge.myTeamId; // Store team ID for score submission
+        
+        // Set team names for display
+        matchState.myTeamName = challenge.isIncoming ? challenge.toTeamName : challenge.fromTeamName;
+        matchState.opponentTeamName = challenge.opponentTeamName;
+        
+        // Set matchId from backend response
+        if (result['match'] != null && result['match']['id'] != null) {
+          matchState.setMatchId(result['match']['id'].toString());
+        }
+        
+        // Navigate to match setup (same as 1v1)
+        context.go('/match/setup');
       }
     } catch (e) {
       if (mounted) {

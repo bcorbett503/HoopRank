@@ -49,7 +49,14 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     try {
       if (isTeamMatch) {
         // Submit team match score - uses team endpoint that updates team ratings
+        final teamId = match.myTeamId;
+        if (teamId == null) {
+          setState(() => _error = 'Team ID not found');
+          return;
+        }
+        
         await ApiService.submitTeamScore(
+          teamId: teamId,
           matchId: matchId,
           myTeamScore: userScore,
           opponentTeamScore: oppScore,
