@@ -348,7 +348,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                               markerAsset = 'assets/court_marker_signature_crown.jpg';
                               markerSize = 36;
                             } else if (court.isIndoor) {
-                              // Indoor courts: hardwood floor marker
+                              // Indoor courts: use crown marker with slightly smaller size
                               markerAsset = 'assets/court_marker_signature_crown.jpg';
                               markerSize = 26;
                             } else if (hasKings) {
@@ -586,18 +586,6 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                               ),
                               child: const Text('👑 Legendary', 
                                 style: TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.bold)),
-                            ),
-                          if (court.isIndoor)
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.blue.withOpacity(0.5)),
-                              ),
-                              child: const Text('🪵 Hardwood', 
-                                style: TextStyle(fontSize: 10, color: Colors.lightBlue, fontWeight: FontWeight.bold)),
                             ),
                         ],
                       ),
