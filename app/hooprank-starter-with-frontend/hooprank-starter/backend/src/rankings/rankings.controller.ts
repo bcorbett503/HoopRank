@@ -78,7 +78,7 @@ export class RankingsController {
                     to_team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
                     message TEXT,
                     status VARCHAR(20) DEFAULT 'pending',
-                    match_id INTEGER,
+                    match_id UUID,
                     created_by VARCHAR(255),
                     created_at TIMESTAMPTZ DEFAULT NOW(),
                     updated_at TIMESTAMPTZ DEFAULT NOW()

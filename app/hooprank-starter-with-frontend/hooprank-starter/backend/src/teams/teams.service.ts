@@ -591,6 +591,12 @@ export class TeamsService {
         `, [challenge.from_team_id, challenge.to_team_id, userId]);
         const match = matchResult[0];
 
+        // Fix team_challenges.match_id column type from INTEGER to UUID 
+        // This is the root cause of the "invalid input syntax for type integer" error
+        await this.dataSource.query(`ALTER TABLE team_challenges DROP COLUMN IF EXISTS match_id`);
+        await this.dataSource.query(`ALTER TABLE team_challenges ADD COLUMN match_id UUID`);
+        console.log('[TeamsService] Fixed team_challenges.match_id column to UUID');
+
         // Update challenge
         await this.dataSource.query(`
             UPDATE team_challenges SET status = 'accepted', match_id = $1, updated_at = NOW()
