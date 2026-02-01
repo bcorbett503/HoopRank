@@ -86,9 +86,20 @@ export class MatchesService {
 
         const creatorWon = winnerId === m.creator_id;
 
+        // Get ratings - raw SQL returns snake_case (hoop_rank, games_played)
+        // Cast to any since raw SQL doesn't match User entity type
+        const creatorRating = parseFloat((creator as any).hoop_rank) || 3.0;
+        const opponentRating = parseFloat((opponent as any).hoop_rank) || 3.0;
+        const creatorGames = parseInt((creator as any).games_played) || 0;
+        const opponentGames = parseInt((opponent as any).games_played) || 0;
+
+        console.log(`[completeWithScores] Before update: creator=${creatorRating} (${creatorGames} games), opponent=${opponentRating} (${opponentGames} games)`);
+
         // Update ratings using new HoopRank logic
-        const newCreatorRating = this.rater.updateRating(creator.hoopRank || 3.0, opponent.hoopRank || 3.0, creator.gamesPlayed || 0, creatorWon ? 1 : 0);
-        const newOpponentRating = this.rater.updateRating(opponent.hoopRank || 3.0, creator.hoopRank || 3.0, opponent.gamesPlayed || 0, creatorWon ? 0 : 1);
+        const newCreatorRating = this.rater.updateRating(creatorRating, opponentRating, creatorGames, creatorWon ? 1 : 0);
+        const newOpponentRating = this.rater.updateRating(opponentRating, creatorRating, opponentGames, creatorWon ? 0 : 1);
+
+        console.log(`[completeWithScores] After update: creator=${newCreatorRating}, opponent=${newOpponentRating}`);
 
         // Update users
         await this.dataSource.query(`
