@@ -307,7 +307,7 @@ export class StatusesService {
                     NULL::INTEGER as "videoDurationMs",
                     NULL as "scheduledAt",
                     m.court_id as "courtId",
-                    COALESCE(mc.name, 'Unknown Court') as "courtName",
+                    COALESCE(mc.name, '') as "courtName",
                     CASE WHEN m.status = 'completed' THEN 'ended' ELSE m.status END as "matchStatus",
                     CASE 
                         WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
@@ -316,6 +316,8 @@ export class StatusesService {
                     END as "matchScore",
                     winner.name as "winnerName",
                     loser.name as "loserName",
+                    winner.hoop_rank as "winnerRating",
+                    loser.hoop_rank as "loserRating",
                     0 as "likeCount",
                     0 as "commentCount",
                     false as "isLikedByMe",

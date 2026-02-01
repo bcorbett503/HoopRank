@@ -1535,8 +1535,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 ],
               ),
             ),
-            // Team ratings row (only for team matches with ratings)
-            if (isTeamMatch && winnerRating != null && loserRating != null) ...[
+            // Ratings row for ALL matches (1v1 and team) with ratings
+            if (winnerRating != null && loserRating != null) ...[
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
