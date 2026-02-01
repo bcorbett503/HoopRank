@@ -18,7 +18,7 @@ export class Team {
     @Column({ name: 'owner_id', type: 'text' })
     ownerId: string;
 
-    @Column({ type: 'numeric', precision: 2, scale: 1, default: 3.0 })
+    @Column({ type: 'numeric', precision: 3, scale: 2, default: 3.0 })
     rating: number;
 
     @Column({ type: 'int', default: 0 })

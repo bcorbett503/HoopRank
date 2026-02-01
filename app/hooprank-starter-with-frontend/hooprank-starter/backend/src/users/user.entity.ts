@@ -25,10 +25,10 @@ export class User {
     @Column({ name: 'avatar_url', type: 'text', nullable: true })
     avatarUrl: string;
 
-    @Column({ name: 'hoop_rank', type: 'numeric', precision: 2, scale: 1, default: 3.0 })
+    @Column({ name: 'hoop_rank', type: 'numeric', precision: 3, scale: 2, default: 3.0 })
     hoopRank: number;
 
-    @Column({ type: 'numeric', precision: 2, scale: 1, default: 5.0 })
+    @Column({ type: 'numeric', precision: 3, scale: 2, default: 5.0 })
     reputation: number;
 
     @Column({ type: 'text', nullable: true })

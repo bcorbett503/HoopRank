@@ -50,6 +50,11 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         // Age column for rankings filter
         await dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER`);
 
+        // Standardize rating precision to DECIMAL(3,2)
+        await dataSource.query(`ALTER TABLE users ALTER COLUMN hoop_rank TYPE DECIMAL(3,2)`);
+        await dataSource.query(`ALTER TABLE users ALTER COLUMN reputation TYPE DECIMAL(3,2)`);
+        await dataSource.query(`ALTER TABLE teams ALTER COLUMN rating TYPE DECIMAL(3,2)`);
+
         // ============================================
         // PLAYER_STATUSES TABLE MIGRATIONS
         // ============================================

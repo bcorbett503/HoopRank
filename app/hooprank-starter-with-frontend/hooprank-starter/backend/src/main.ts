@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
 import { DataSource } from 'typeorm';
 import { runSchemaEvolution } from './common/schema-evolution';
+import { HttpExceptionFilter } from './common/http-exception.filter';
 
 // Run necessary database migrations at startup
 async function runStartupMigrations(dataSource: DataSource): Promise<void> {
@@ -106,6 +107,9 @@ async function bootstrap() {
   // Run startup migrations
   const dataSource = app.get(DataSource);
   await runStartupMigrations(dataSource);
+
+  // Register global exception filter
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // Increase JSON body size limit for base64 image uploads
   app.use(bodyParser.json({ limit: '5mb' }));
