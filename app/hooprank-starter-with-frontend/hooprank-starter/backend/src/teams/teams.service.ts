@@ -563,12 +563,12 @@ export class TeamsService {
             throw new ForbiddenException('Only the challenged team can accept');
         }
 
-        // Create team match - use NULL for creator_id since this is a team match
+        // Create team match - creator_id is required (NOT NULL), use the accepting user
         const matchResult = await this.dataSource.query(`
-            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id)
-            VALUES ('3v3', 'accepted', true, $1, $2)
+            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
+            VALUES ('3v3', 'accepted', true, $1, $2, $3)
             RETURNING *
-        `, [challenge.from_team_id, challenge.to_team_id]);
+        `, [challenge.from_team_id, challenge.to_team_id, userId]);
         const match = matchResult[0];
 
         // Update challenge
