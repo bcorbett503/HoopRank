@@ -459,7 +459,7 @@ export class HealthController {
 
         const projectId = process.env.FIREBASE_PROJECT_ID;
         const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+        let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
         if (!projectId || !clientEmail || !privateKey) {
             return {
@@ -471,11 +471,31 @@ export class HealthController {
             };
         }
 
+        // Debug: show raw key format
+        const keyPreview = privateKey.substring(0, 100);
+        const hasLiteralBackslashN = privateKey.includes('\\n');
+        const hasActualNewline = privateKey.includes('\n');
+
         try {
+            // Normalize private key - handle various escape sequences
+            // Handle JSON stringified format
+            if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+                try {
+                    privateKey = JSON.parse(privateKey);
+                } catch (e) {
+                    // Not valid JSON, continue
+                }
+            }
+
+            // Replace escaped newlines with actual newlines
+            privateKey = privateKey
+                .replace(/\\\\n/g, '\n')  // Double escaped
+                .replace(/\\n/g, '\n');   // Single escaped
+
             const firebaseConfig = {
                 projectId,
                 clientEmail,
-                privateKey: privateKey.replace(/\\n/g, '\n'),
+                privateKey,
             };
 
             const app = admin.initializeApp({
@@ -493,6 +513,12 @@ export class HealthController {
                 success: false,
                 error: error.message,
                 stack: error.stack?.substring(0, 500),
+                keyDebug: {
+                    preview: keyPreview,
+                    hasLiteralBackslashN,
+                    hasActualNewline,
+                    length: process.env.FIREBASE_PRIVATE_KEY?.length,
+                },
             };
         }
     }
