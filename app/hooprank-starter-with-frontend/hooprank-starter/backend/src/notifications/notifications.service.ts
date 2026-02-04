@@ -178,14 +178,19 @@ export class NotificationsService {
         data: Record<string, string> = {},
     ): Promise<boolean> {
         try {
-            // Get user's FCM token
+            console.log(`[Notifications] sendToUser called for userId=${userId}, isPostgres=${this.isPostgres}`);
+
+            // Get user's FCM token - cast id to TEXT for safe comparison
             const query = this.isPostgres
-                ? `SELECT fcm_token FROM users WHERE id = $1 AND fcm_token IS NOT NULL`
+                ? `SELECT fcm_token FROM users WHERE id::TEXT = $1 AND fcm_token IS NOT NULL`
                 : `SELECT "fcmToken" as fcm_token FROM users WHERE id = ? AND "fcmToken" IS NOT NULL`;
 
+            console.log(`[Notifications] Executing query: ${query} with userId=${userId}`);
             const result = await this.dataSource.query(query, [userId]);
+            console.log(`[Notifications] Query result: ${JSON.stringify(result)}`);
+
             if (result.length === 0 || !result[0].fcm_token) {
-                console.log(`[Notifications] No FCM token for user ${userId}`);
+                console.log(`[Notifications] No FCM token for user ${userId} - result was empty or token null`);
                 return false;
             }
 
