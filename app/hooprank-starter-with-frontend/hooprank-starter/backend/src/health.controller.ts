@@ -210,8 +210,8 @@ export class HealthController {
                 FROM courts 
                 WHERE name ILIKE '%dev%' 
                    OR name ILIKE '%test%'
-                   OR id LIKE '11111111%'
-                   OR id LIKE '00000000%'
+                   OR id::text LIKE '11111111%'
+                   OR id::text LIKE '00000000%'
             `);
 
             if (devCourts.length === 0) {
@@ -260,8 +260,8 @@ export class HealthController {
                 DELETE FROM courts 
                 WHERE name ILIKE '%dev%' 
                    OR name ILIKE '%test%'
-                   OR id LIKE '11111111%'
-                   OR id LIKE '00000000%'
+                   OR id::text LIKE '11111111%'
+                   OR id::text LIKE '00000000%'
                 RETURNING id, name
             `);
 
