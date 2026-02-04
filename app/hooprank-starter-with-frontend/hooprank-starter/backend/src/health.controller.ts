@@ -403,4 +403,40 @@ export class HealthController {
             return { error: error.message };
         }
     }
+
+    /**
+     * Debug endpoint to check Firebase initialization status
+     */
+    @Get('debug/firebase-status')
+    async debugFirebaseStatus() {
+        const admin = require('firebase-admin');
+
+        const projectId = process.env.FIREBASE_PROJECT_ID;
+        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+        const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+        const apps = admin.apps;
+        const isInitialized = apps && apps.length > 0;
+
+        return {
+            isInitialized,
+            appCount: apps?.length || 0,
+            environment: {
+                hasProjectId: !!projectId,
+                projectId: projectId || 'NOT SET',
+                hasClientEmail: !!clientEmail,
+                clientEmailPrefix: clientEmail ? clientEmail.substring(0, 30) + '...' : 'NOT SET',
+                hasPrivateKey: !!privateKey,
+                privateKeyLength: privateKey?.length || 0,
+                privateKeyStartsCorrectly: privateKey?.startsWith('-----BEGIN') || false,
+            },
+            defaultApp: isInitialized ? {
+                name: apps[0].name,
+                options: {
+                    projectId: apps[0].options?.projectId,
+                    serviceAccountId: apps[0].options?.serviceAccountId,
+                }
+            } : null,
+        };
+    }
 }
