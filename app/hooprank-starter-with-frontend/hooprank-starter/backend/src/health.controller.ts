@@ -302,6 +302,12 @@ export class HealthController {
         }
 
         try {
+            // Run same query we use in notificationService for debugging
+            const debugQuery = await this.dataSource.query(
+                `SELECT id, fcm_token FROM users WHERE id::TEXT = $1 AND fcm_token IS NOT NULL`,
+                [userId]
+            );
+
             const result = await this.notificationsService.sendToUser(
                 userId,
                 '🏀 Test Push Notification',
@@ -315,6 +321,7 @@ export class HealthController {
                     ? 'Notification sent successfully'
                     : 'No FCM token for user or user not found',
                 userId,
+                debugQuery: debugQuery.length > 0 ? { found: true, tokenLength: debugQuery[0].fcm_token?.length || 0 } : { found: false },
             };
         } catch (error) {
             return { success: false, error: error.message };
