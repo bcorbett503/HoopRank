@@ -320,4 +320,36 @@ export class HealthController {
             return { success: false, error: error.message };
         }
     }
+
+    /**
+     * Debug endpoint to check FCM token for a user directly
+     */
+    @Get('debug/fcm-token')
+    async debugFcmToken(@Query('userId') userId: string) {
+        if (!userId) {
+            return { error: 'userId query param required' };
+        }
+
+        try {
+            // Try different queries to diagnose
+            const result1 = await this.dataSource.query(
+                `SELECT id, name, fcm_token FROM users WHERE id = $1`, [userId]
+            );
+            const result2 = await this.dataSource.query(
+                `SELECT id, name, fcm_token FROM users WHERE id::TEXT = $1`, [userId]
+            );
+            const countResult = await this.dataSource.query(
+                `SELECT COUNT(*) as count FROM users WHERE fcm_token IS NOT NULL`
+            );
+
+            return {
+                query1_direct: result1,
+                query2_cast: result2,
+                totalUsersWithToken: countResult[0]?.count,
+                userId,
+            };
+        } catch (error) {
+            return { error: error.message };
+        }
+    }
 }
