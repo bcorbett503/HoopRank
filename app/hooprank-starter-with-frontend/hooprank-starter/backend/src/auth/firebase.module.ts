@@ -1,4 +1,4 @@
-import { Module, Global } from '@nestjs/common';
+import { Module, Global, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { ConfigService } from '@nestjs/config';
 
@@ -9,6 +9,12 @@ import { ConfigService } from '@nestjs/config';
             provide: 'FIREBASE_APP',
             inject: [ConfigService],
             useFactory: (configService: ConfigService) => {
+                // Check if already initialized (prevents re-initialization)
+                if (admin.apps && admin.apps.length > 0) {
+                    console.log('[Firebase] Already initialized, returning existing app');
+                    return admin.apps[0];
+                }
+
                 const projectId = configService.get<string>('FIREBASE_PROJECT_ID');
                 const clientEmail = configService.get<string>('FIREBASE_CLIENT_EMAIL');
                 const privateKey = configService.get<string>('FIREBASE_PRIVATE_KEY');
@@ -49,4 +55,17 @@ import { ConfigService } from '@nestjs/config';
     ],
     exports: ['FIREBASE_APP'],
 })
-export class FirebaseModule { }
+export class FirebaseModule implements OnModuleInit {
+    constructor(
+        @Optional() @Inject('FIREBASE_APP') private firebaseApp: admin.app.App | null,
+    ) { }
+
+    onModuleInit() {
+        // Force the provider to be initialized by accessing it
+        if (this.firebaseApp) {
+            console.log(`[Firebase] Module initialized with app: ${this.firebaseApp.name}`);
+        } else {
+            console.log('[Firebase] Module initialized but Firebase app is null (dev mode)');
+        }
+    }
+}
