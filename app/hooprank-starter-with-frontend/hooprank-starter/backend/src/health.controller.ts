@@ -329,6 +329,50 @@ export class HealthController {
     }
 
     /**
+     * Direct push test - bypasses notification service, sends FCM directly
+     */
+    @Post('debug/test-push-direct')
+    async testPushDirect(@Query('userId') userId: string) {
+        if (!userId) {
+            return { success: false, error: 'userId query param required' };
+        }
+
+        try {
+            // Get token directly
+            const users = await this.dataSource.query(
+                `SELECT fcm_token FROM users WHERE id = $1`, [userId]
+            );
+
+            if (users.length === 0 || !users[0].fcm_token) {
+                return { success: false, error: 'No FCM token for user', query: 'id = $1', result: users };
+            }
+
+            const token = users[0].fcm_token;
+
+            // Import firebase admin and send directly
+            const admin = require('firebase-admin');
+            const message = {
+                token,
+                notification: {
+                    title: '🏀 Direct Test Push',
+                    body: 'Sent directly, bypassing notification service!',
+                },
+                data: { type: 'test' },
+                apns: {
+                    payload: {
+                        aps: { sound: 'default', badge: 1 },
+                    },
+                },
+            };
+
+            await admin.messaging().send(message);
+            return { success: true, message: 'Direct notification sent!', tokenLength: token.length };
+        } catch (error) {
+            return { success: false, error: error.message, errorCode: error.code };
+        }
+    }
+
+    /**
      * Debug endpoint to check FCM token for a user directly
      */
     @Get('debug/fcm-token')
