@@ -13,9 +13,17 @@ import { ConfigService } from '@nestjs/config';
                 const clientEmail = configService.get<string>('FIREBASE_CLIENT_EMAIL');
                 const privateKey = configService.get<string>('FIREBASE_PRIVATE_KEY');
 
-                // Skip Firebase initialization if using dev credentials
-                if (projectId === 'hooprank-dev' || !privateKey || privateKey.includes('MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQD')) {
-                    console.log('[Firebase] Skipping initialization - using dev-token authentication');
+                console.log(`[Firebase] Initializing with projectId=${projectId}, clientEmail=${clientEmail?.substring(0, 20)}...`);
+                console.log(`[Firebase] privateKey length=${privateKey?.length || 0}, starts with -----BEGIN=${privateKey?.startsWith('-----BEGIN') || false}`);
+
+                // Skip Firebase initialization only if using dev project or missing credentials
+                if (projectId === 'hooprank-dev') {
+                    console.log('[Firebase] Skipping initialization - dev project detected');
+                    return null;
+                }
+
+                if (!privateKey || !clientEmail || !projectId) {
+                    console.log('[Firebase] Skipping initialization - missing credentials');
                     return null;
                 }
 
@@ -26,9 +34,11 @@ import { ConfigService } from '@nestjs/config';
                 };
 
                 try {
-                    return admin.initializeApp({
+                    const app = admin.initializeApp({
                         credential: admin.credential.cert(firebaseConfig),
                     });
+                    console.log('[Firebase] Successfully initialized Firebase Admin SDK');
+                    return app;
                 } catch (error) {
                     console.error('[Firebase] Failed to initialize:', error.message);
                     console.log('[Firebase] Falling back to dev-token authentication');
