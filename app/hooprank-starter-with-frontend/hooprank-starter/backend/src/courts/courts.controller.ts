@@ -1,10 +1,16 @@
 import { Controller, Get, Post, Param, Headers, Query, BadRequestException } from '@nestjs/common';
 import { CourtsService } from './courts.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Court } from './court.entity';
+import { DataSource } from 'typeorm';
 
 @Controller('courts')
 export class CourtsController {
-    constructor(private readonly courtsService: CourtsService) { }
+    constructor(
+        private readonly courtsService: CourtsService,
+        private readonly notificationsService: NotificationsService,
+        private readonly dataSource: DataSource,
+    ) { }
 
     @Get()
     async findAll(
@@ -77,6 +83,33 @@ export class CourtsController {
             return { success: false, error: 'User ID required' };
         }
         const checkIn = await this.courtsService.checkIn(userId, courtId);
+
+        // Send push notifications to users who have alerts enabled for this court
+        try {
+            // Get court name and user name for the notification
+            const courtResult = await this.dataSource.query(
+                `SELECT name FROM courts WHERE id = $1`, [courtId]
+            );
+            const courtName = courtResult[0]?.name || 'Unknown Court';
+
+            const userResult = await this.dataSource.query(
+                `SELECT name FROM users WHERE id = $1`, [userId]
+            );
+            const userName = userResult[0]?.name || 'Someone';
+
+            // Fire and forget - don't block the response on notification delivery
+            this.notificationsService.sendCourtActivityNotification(
+                courtId,
+                courtName,
+                userName,
+                'check_in'
+            ).catch(err => console.error('Failed to send court activity notification:', err));
+
+            console.log(`[CheckIn] Triggered notification for ${userName} at ${courtName}`);
+        } catch (err) {
+            console.error('[CheckIn] Error fetching court/user for notification:', err);
+        }
+
         return { success: true, checkIn };
     }
 

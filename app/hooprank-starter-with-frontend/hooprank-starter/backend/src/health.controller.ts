@@ -1,9 +1,13 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get, Post, Query } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { NotificationsService } from './notifications/notifications.service';
 
 @Controller()
 export class HealthController {
-    constructor(private dataSource: DataSource) { }
+    constructor(
+        private dataSource: DataSource,
+        private notificationsService: NotificationsService,
+    ) { }
 
     @Get('health')
     getHealth() {
@@ -281,6 +285,36 @@ export class HealthController {
                     alerts: cleanedAlerts
                 },
                 remainingCourts: remaining.map(c => ({ id: c.id, name: c.name }))
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Test push notification endpoint
+     * Usage: POST /debug/test-push?userId=<USER_ID>
+     */
+    @Post('debug/test-push')
+    async testPush(@Query('userId') userId: string) {
+        if (!userId) {
+            return { success: false, error: 'userId query param required' };
+        }
+
+        try {
+            const result = await this.notificationsService.sendToUser(
+                userId,
+                '🏀 Test Push Notification',
+                'If you see this, push notifications are working!',
+                { type: 'test' }
+            );
+
+            return {
+                success: result,
+                message: result
+                    ? 'Notification sent successfully'
+                    : 'No FCM token for user or user not found',
+                userId,
             };
         } catch (error) {
             return { success: false, error: error.message };
