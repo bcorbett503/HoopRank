@@ -253,7 +253,19 @@ class _HoopRankAppState extends State<HoopRankApp> {
               routes: [
                 GoRoute(
                   path: '/courts',
-                  builder: (context, state) => const MapScreen(),
+                  builder: (context, state) {
+                    // Support deep linking to a specific court via multiple methods
+                    final courtId = state.uri.queryParameters['courtId'];
+                    final lat = double.tryParse(state.uri.queryParameters['lat'] ?? '');
+                    final lng = double.tryParse(state.uri.queryParameters['lng'] ?? '');
+                    final courtName = state.uri.queryParameters['courtName'];
+                    return MapScreen(
+                      initialCourtId: courtId,
+                      initialLat: lat,
+                      initialLng: lng,
+                      initialCourtName: courtName,
+                    );
+                  },
                 ),
               ],
             ),

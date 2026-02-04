@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -29,6 +30,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String? _profilePictureUrl;
   File? _imageFile;
   bool _loading = true;
+  
+  // Track if fields have been touched for validation UI
+  bool _firstNameTouched = false;
+  bool _lastNameTouched = false;
+  bool _zipTouched = false;
 
   @override
   void initState() {
@@ -241,6 +247,48 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     return age;
   }
 
+  /// Builds a field label with optional red/green validation indicator
+  Widget _buildFieldLabel(String label, bool isValid, bool isTouched, {bool required = false, bool optional = false}) {
+    Widget? indicator;
+    
+    if (required && isTouched) {
+      // Required field: show indicator once touched
+      indicator = Icon(
+        isValid ? Icons.check_circle : Icons.cancel,
+        color: isValid ? Colors.green : Colors.red,
+        size: 16,
+      );
+    } else if (!required && isValid) {
+      // Optional field: only show green check if filled
+      indicator = const Icon(
+        Icons.check_circle,
+        color: Colors.green,
+        size: 16,
+      );
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+          if (optional)
+            const Text(
+              ' (optional)',
+              style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
+            ),
+          if (indicator != null) ...[
+            const SizedBox(width: 6),
+            indicator,
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -327,7 +375,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const SizedBox(height: 24),
 
             // First Name
-            const Text('First Name', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            _buildFieldLabel('First Name', _firstNameCtrl.text.trim().isNotEmpty, _firstNameTouched, required: true),
             TextField(
               controller: _firstNameCtrl,
               decoration: const InputDecoration(
@@ -335,11 +383,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 border: OutlineInputBorder(),
               ),
               textCapitalization: TextCapitalization.words,
+              onChanged: (_) => setState(() => _firstNameTouched = true),
             ),
             const SizedBox(height: 16),
 
             // Last Name
-            const Text('Last Name', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            _buildFieldLabel('Last Name', _lastNameCtrl.text.trim().isNotEmpty, _lastNameTouched, required: true),
             TextField(
               controller: _lastNameCtrl,
               decoration: const InputDecoration(
@@ -347,6 +396,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 border: OutlineInputBorder(),
               ),
               textCapitalization: TextCapitalization.words,
+              onChanged: (_) => setState(() => _lastNameTouched = true),
             ),
             const SizedBox(height: 24),
 
@@ -355,8 +405,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const Text('Player Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
 
-            // Birthdate
-            const Text('Birthday', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            // Birthdate (Optional per App Store Guideline 5.1.1)
+            _buildFieldLabel('Birthday', _birthdate != null, true, required: false, optional: true),
             const SizedBox(height: 8),
             InkWell(
               onTap: () async {
@@ -404,16 +454,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
             const SizedBox(height: 16),
 
-            // ZIP
-            const Text('ZIP Code', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            // ZIP - Fixed for iPad compatibility (App Store Guideline 2.1)
+            _buildFieldLabel('ZIP Code', zipValid, _zipTouched, required: true),
             TextField(
               controller: _zipCtrl,
               decoration: InputDecoration(
                 hintText: 'e.g. 94103',
-                errorText: _zipCtrl.text.isNotEmpty && !zipValid ? 'Enter a valid 5-digit ZIP' : null,
+                errorText: _zipTouched && _zipCtrl.text.isNotEmpty && !zipValid ? 'Enter a valid 5-digit ZIP' : null,
                 border: const OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.number,
+              // Use phone keyboard which works consistently on iPad
+              keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: false),
+              // Force digits only - fixes iPad keyboard inserting spaces/special chars
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(5),
+              ],
+              onChanged: (_) => setState(() => _zipTouched = true),
             ),
             const SizedBox(height: 16),
 

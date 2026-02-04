@@ -1,9 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models.dart';
-import 'mock_courts_data.dart';
-import 'indoor_gyms_data.dart';
+import 'api_service.dart';
 
 class CourtService {
   static final CourtService _instance = CourtService._internal();
@@ -17,162 +17,53 @@ class CourtService {
     if (_isLoaded) return;
 
     try {
-      // Load outdoor basketball courts
-      final List<Map<String, dynamic>> outdoorData = mockCourtsData;
+      debugPrint('CourtService: Loading courts from local assets...');
       
-      // Load indoor venues (gyms, schools, rec centers)
-      final List<Map<String, dynamic>> indoorData = indoorGymsData;
-
-      // Curated set of TRUE signature courts - famous streetball/high-traffic locations
-      // Only these specific courts get the signature designation
-      final signatureCourtNames = <String>{
-        // NYC
-        'rucker park', 'holcombe rucker park', 'west 4th', 'the cage', 'dyckman',
-        // LA
-        'drew league', 'king drew', 'venice beach', 'pan pacific', 'jesse owens',
-        // Chicago
-        'seward park', 'washington park', 'foster park',
-        // Detroit
-        'st. cecilia', 'saint cecilia', 'the saint',
-        // DC
-        'barry farm', 'watts branch', 'turkey thicket',
-        // Philadelphia
-        'hank gathers', 'tarken', 'murphy recreation',
-        // Atlanta
-        'run n shoot', 'piedmont park', 'grant park',
-        // Houston
-        'emancipation park', 'fonde recreation',
-        // Bay Area
-        'mosswood', 'kezar pavilion', 'bushrod', 'defremery',
-        // Boston
-        'malcolm x park',
-        // Miami
-        'jose marti', 'overtown youth', 'hadley park',
-        // Seattle
-        'cal anderson', 'rainier playfield',
-        // Denver
-        'rude recreation',
-        // Portland
-        'irving park', 'dishman',
-        // Dallas
-        'kiest park', 'exline',
-        // Indianapolis
-        'tarkington park',
-      };
+      // Load courts from local JSON asset for full map coverage
+      final jsonString = await rootBundle.loadString('assets/data/courts_named.json');
+      final List<dynamic> jsonData = jsonDecode(jsonString);
       
-      // Helper to check if a court name matches any signature court
-      bool isSignatureCourt(String name) {
-        final nameLower = name.toLowerCase();
-        return signatureCourtNames.any((sig) => nameLower.contains(sig));
+      _courts = jsonData.map((json) => Court(
+        id: json['id'] as String? ?? 'unknown',
+        name: json['name'] as String? ?? 'Court',
+        lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
+        lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
+        address: json['city'] as String?,
+        isIndoor: json['indoor'] == true,
+        isSignature: json['signatureCity'] == true,
+      )).toList();
+      
+      debugPrint('CourtService: Loaded ${_courts.length} courts from assets');
+      
+      // Also fetch API courts for proper UUIDs (for match submission)
+      try {
+        final apiCourts = await ApiService.getCourtsFromApi(limit: 200);
+        debugPrint('CourtService: Fetched ${apiCourts.length} courts from API');
+        
+        // Merge API courts - replace or add courts with proper UUIDs
+        for (final apiCourt in apiCourts) {
+          // Always register API court for ID lookup
+          _registerApiCourt(apiCourt);
+          
+          final existingIndex = _courts.indexWhere(
+            (c) => c.name.toLowerCase() == apiCourt.name.toLowerCase() &&
+                   (c.lat - apiCourt.lat).abs() < 0.01 &&
+                   (c.lng - apiCourt.lng).abs() < 0.01
+          );
+          if (existingIndex >= 0) {
+            _courts[existingIndex] = apiCourt; // Replace with API version (has proper UUID)
+          } else {
+            _courts.add(apiCourt); // Add new API court
+          }
+        }
+      } catch (e) {
+        debugPrint('CourtService: API fetch failed, using assets only: $e');
       }
-      
-      // Process outdoor courts
-      final outdoorCourts = outdoorData.map((json) {
-        final id = (json['id'] as String?) ?? 'unknown';
-        final name = (json['name'] as String?) ?? 'Basketball Court';
-        
-        // Only explicitly marked signature courts or those in curated list
-        final isSignature = json['signature'] == true || 
-            json['isSignature'] == true ||
-            isSignatureCourt(name);
 
-        return Court(
-          id: id,
-          name: name,
-          lat: (json['lat'] as num).toDouble(),
-          lng: (json['lng'] as num).toDouble(),
-          address: (json['city'] as String?) ?? (json['address'] as String?),
-          isSignature: isSignature,
-          isIndoor: false,
-        );
-      }).toList();
-      
-      // Process indoor venues - NOT all are signature, only famous ones
-      // First, filter out false positives (non-basketball venues that got included)
-      final blockedTerms = <String>[
-        'fashion institute',
-        'fashion design',
-        'art institute',
-        'art school',
-        'beauty school',
-        'cosmetology',
-        'culinary',
-        'cooking school',
-        'barber school',
-        'massage school',
-        'music school',
-        'dance studio',
-        'ballet',
-        'yoga studio',
-        'pilates',
-        'karate',
-        'martial arts',
-        'taekwondo',
-        'jiu jitsu',
-        'boxing gym',
-        'crossfit',
-        'spinning',
-        'cycle',
-        'nail salon',
-        'hair salon',
-        'spa',
-        'tattoo',
-        'driving school',
-        'auto school',
-        'flight school',
-        'language school',
-        'tutoring',
-        'preschool',
-        'daycare',
-        'montessori',
-        'nursing home',
-        'assisted living',
-        'funeral',
-        'mortuary',
-        'church',
-        'synagogue',
-        'mosque',
-        'temple',
-        'chapel',
-      ];
-      
-      bool isBlockedVenue(String name) {
-        final nameLower = name.toLowerCase();
-        return blockedTerms.any((term) => nameLower.contains(term));
-      }
-      
-      final indoorCourts = indoorData
-          .where((json) => !isBlockedVenue((json['name'] as String?) ?? ''))
-          .map((json) {
-        final id = (json['id'] as String?) ?? 'unknown';
-        final name = (json['name'] as String?) ?? 'Indoor Court';
-        final category = (json['category'] as String?) ?? 'other';
-        
-        // Indoor signature if explicitly marked or in curated list
-        final isSignature = json['signature'] == true ||
-            json['isSignature'] == true ||
-            isSignatureCourt(name);
-        
-        return Court(
-          id: id,
-          name: name,
-          lat: (json['lat'] as num).toDouble(),
-          lng: (json['lng'] as num).toDouble(),
-          address: (json['city'] as String?) ?? (json['address'] as String?),
-          isSignature: isSignature,
-          isIndoor: true,
-        );
-      }).toList();
-
-      
-      // Merge both datasets
-      _courts = [...outdoorCourts, ...indoorCourts];
-
-      // Add The Olympic Club San Francisco as a featured signature court
-      // Use a proper UUID that matches the backend
+      // Always include The Olympic Club as a featured court
       const brettUserId = '3zIDc7PjlYYksXxZp6nH6EbILeh1';
       final olympicClub = Court(
-        id: '44444444-4444-4444-4444-444444444444',  // UUID matching backend
+        id: '44444444-4444-4444-4444-444444444444',
         name: 'The Olympic Club',
         lat: 37.7878,
         lng: -122.4099,
@@ -184,15 +75,37 @@ class CourtService {
         king1v1Rating: 4.95,
       );
       
-      // Insert at the beginning so it appears prominently
-      _courts.insert(0, olympicClub);
+      // Insert at beginning if not already present
+      if (!_courts.any((c) => c.id == olympicClub.id)) {
+        _courts.insert(0, olympicClub);
+      }
 
       _isLoaded = true;
-      print('Loaded ${_courts.length} courts (${outdoorCourts.length} outdoor, ${indoorCourts.length} indoor)');
+      debugPrint('CourtService: Total courts available: ${_courts.length}');
     } catch (e, st) {
-      print('Error loading courts: $e\n$st');
-      _courts = [];
+      debugPrint('CourtService: Error loading courts: $e\n$st');
+      // Use fallback signature courts on error
+      _courts = _getSignatureCourtsFallback();
+      _isLoaded = true;
     }
+  }
+
+  /// Fallback list of famous signature courts when API unavailable
+  List<Court> _getSignatureCourtsFallback() {
+    return [
+      // NYC
+      Court(id: 'rucker', name: 'Rucker Park', lat: 40.8302, lng: -73.9360, isSignature: true, isIndoor: false),
+      Court(id: 'west4th', name: 'West 4th Street Courts (The Cage)', lat: 40.7321, lng: -74.0006, isSignature: true, isIndoor: false),
+      Court(id: 'dyckman', name: 'Dyckman Park', lat: 40.8665, lng: -73.9273, isSignature: true, isIndoor: false),
+      // LA
+      Court(id: 'venice', name: 'Venice Beach Courts', lat: 33.9850, lng: -118.4695, isSignature: true, isIndoor: false),
+      // Chicago
+      Court(id: 'seward', name: 'Seward Park', lat: 41.9022, lng: -87.6564, isSignature: true, isIndoor: false),
+      // Philadelphia
+      Court(id: 'hankgathers', name: 'Hank Gathers Recreation Center', lat: 39.9774, lng: -75.1532, isSignature: true, isIndoor: true),
+      // Bay Area
+      Court(id: 'mosswood', name: 'Mosswood Park', lat: 37.8258, lng: -122.2608, isSignature: true, isIndoor: false),
+    ];
   }
 
   /// Check if courts are loaded
@@ -209,8 +122,68 @@ class CourtService {
     try {
       return _courts.firstWhere((c) => c.id == id);
     } catch (e) {
+      // Fallback: search in API courts map if we have one with this ID
+      final apiCourt = _apiCourtsById[id];
+      if (apiCourt != null) {
+        return apiCourt;
+      }
       return null;
     }
+  }
+  
+  /// Find court by name (for cross-ID-format deep linking)
+  Court? getCourtByName(String name) {
+    try {
+      return _courts.firstWhere(
+        (c) => c.name.toLowerCase() == name.toLowerCase()
+      );
+    } catch (e) {
+      // Try partial match
+      try {
+        return _courts.firstWhere(
+          (c) => c.name.toLowerCase().contains(name.toLowerCase()) ||
+                 name.toLowerCase().contains(c.name.toLowerCase())
+        );
+      } catch (e) {
+        return null;
+      }
+    }
+  }
+  
+  /// Lookup court by ID or fallback to name
+  Court? findCourt({String? id, String? name, double? lat, double? lng}) {
+    // First try by ID
+    if (id != null && id.isNotEmpty) {
+      final byId = getCourtById(id);
+      if (byId != null) return byId;
+    }
+    
+    // Then try by name
+    if (name != null && name.isNotEmpty) {
+      final byName = getCourtByName(name);
+      if (byName != null) return byName;
+    }
+    
+    // Finally try by coordinates (within ~100m)
+    if (lat != null && lng != null) {
+      try {
+        return _courts.firstWhere(
+          (c) => (c.lat - lat).abs() < 0.001 && (c.lng - lng).abs() < 0.001
+        );
+      } catch (e) {
+        return null;
+      }
+    }
+    
+    return null;
+  }
+  
+  // Map to store API courts by their IDs for quick lookup
+  final Map<String, Court> _apiCourtsById = {};
+  
+  /// Register an API court for lookup (called when merging API courts)
+  void _registerApiCourt(Court court) {
+    _apiCourtsById[court.id] = court;
   }
 
   // Helper to find courts near a location

@@ -7,6 +7,7 @@ import '../widgets/player_profile_sheet.dart';
 import '../services/messages_service.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Static helper to show court details sheet from any screen
 class CourtDetailsSheet {
@@ -271,8 +272,18 @@ class _CourtDetailsContent extends StatelessWidget {
 }
 
 class MapScreen extends StatefulWidget {
+  final String? initialCourtId;
+  final double? initialLat;
+  final double? initialLng;
+  final String? initialCourtName;
 
-  const MapScreen({super.key});
+  const MapScreen({
+    super.key, 
+    this.initialCourtId,
+    this.initialLat,
+    this.initialLng,
+    this.initialCourtName,
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -562,6 +573,92 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 );
               },
+            ),
+            const SizedBox(height: 16),
+            
+            // Get Directions section
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      // Apple Maps URL scheme
+                      final appleUrl = Uri.parse(
+                        'https://maps.apple.com/?daddr=${court.lat},${court.lng}&dirflg=d'
+                      );
+                      debugPrint('Launching Apple Maps: $appleUrl');
+                      try {
+                        final launched = await launchUrl(
+                          appleUrl, 
+                          mode: LaunchMode.externalApplication,
+                        );
+                        if (!launched && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Could not open Apple Maps')),
+                          );
+                        }
+                      } catch (e) {
+                        debugPrint('Error launching Apple Maps: $e');
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.apple, size: 20),
+                    label: const Text('Apple Maps'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: Colors.grey[600]!),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      // Google Maps URL - use universal link that works on web too
+                      final googleUrl = Uri.parse(
+                        'https://www.google.com/maps/dir/?api=1&destination=${court.lat},${court.lng}&travelmode=driving'
+                      );
+                      debugPrint('Launching Google Maps: $googleUrl');
+                      try {
+                        final launched = await launchUrl(
+                          googleUrl, 
+                          mode: LaunchMode.externalApplication,
+                        );
+                        if (!launched && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Could not open Google Maps')),
+                          );
+                        }
+                      } catch (e) {
+                        debugPrint('Error launching Google Maps: $e');
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.map, size: 20),
+                    label: const Text('Google Maps'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.blue,
+                      side: const BorderSide(color: Colors.blue),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
           ],
@@ -1225,13 +1322,17 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Extract courtId from query params if navigating to a specific court
-    final courtId = GoRouterState.of(context).uri.queryParameters['courtId'];
+    // Use widget's initialCourtId if provided, otherwise fall back to query params
+    final courtId = widget.initialCourtId ?? 
+        GoRouterState.of(context).uri.queryParameters['courtId'];
     
     return Scaffold(
       body: CourtMapWidget(
         onCourtSelected: _showCourtDetails,
         initialCourtId: courtId,
+        initialLat: widget.initialLat,
+        initialLng: widget.initialLng,
+        initialCourtName: widget.initialCourtName,
       ),
     );
   }

@@ -730,7 +730,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           ),
                           onTap: () {
                             Navigator.pop(context);
-                            context.go('/court/${court.courtId}');
+                            context.go('/courts?courtId=${court.courtId}');
                           },
                         );
                       },
@@ -1859,10 +1859,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final content = post['content']?.toString() ?? '';
     final imageUrl = post['imageUrl']?.toString();
     final scheduledAt = post['scheduledAt'];
-    // Improved extraction logic
+    // Improved extraction logic for court info
     final rawContent = content.trim();
     final courtName = post['courtName']?.toString() ?? 
                      (rawContent.startsWith('@') ? rawContent.substring(1).trim() : null);
+    final courtId = post['courtId']?.toString(); // For deep linking to court
     
     // Use local state if available, otherwise use from API
     final serverLikeCount = post['likeCount'] is int ? post['likeCount'] : int.tryParse(post['likeCount']?.toString() ?? '0') ?? 0;
@@ -2170,24 +2171,38 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       const SizedBox(height: 8),
                       Container(height: 1, width: 40, color: Colors.white.withOpacity(0.1)),
                       const SizedBox(height: 8),
-                      // Location Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                           Icon(Icons.location_on_rounded, size: 16, color: const Color(0xFF00C853)),
-                           const SizedBox(width: 4),
-                           Flexible(
-                             child: Text(
-                              courtName,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF00C853), // Green for location
+                      // Location Row - tappable to navigate to court on map
+                      GestureDetector(
+                        onTap: (courtId != null || courtName != null) ? () {
+                          // Build deep link URL with available params
+                          final params = <String, String>{};
+                          if (courtId != null) params['courtId'] = courtId;
+                          if (courtName != null) params['courtName'] = Uri.encodeComponent(courtName);
+                          final queryString = params.entries.map((e) => '${e.key}=${e.value}').join('&');
+                          context.go('/courts?$queryString');
+                        } : null,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                             Icon(Icons.location_on_rounded, size: 16, color: const Color(0xFF00C853)),
+                             const SizedBox(width: 4),
+                             Flexible(
+                               child: Text(
+                                courtName,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF00C853), // Green for location
+                                  decoration: (courtId != null || courtName != null) ? TextDecoration.underline : null,
+                                  decorationColor: const Color(0xFF00C853).withOpacity(0.5),
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                           ),
-                        ],
+                             ),
+                             if (courtId != null || courtName != null)
+                               Icon(Icons.chevron_right, size: 16, color: const Color(0xFF00C853).withOpacity(0.6)),
+                          ],
+                        ),
                       ),
                     ]
                   ],
@@ -2223,21 +2238,24 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 padding: const EdgeInsets.only(top: 12),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: imageUrl.startsWith('data:')
-                    ? Image.memory(
-                        Uri.parse(imageUrl).data!.contentAsBytes(),
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: 200, // Slightly taller
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      )
-                    : Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: 200,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxHeight: 500, // Allow tall portrait images
+                    ),
+                    child: imageUrl.startsWith('data:')
+                      ? Image.memory(
+                          Uri.parse(imageUrl).data!.contentAsBytes(),
+                          fit: BoxFit.contain, // Preserve original aspect ratio
+                          width: double.infinity,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        )
+                      : Image.network(
+                          imageUrl,
+                          fit: BoxFit.contain, // Preserve original aspect ratio
+                          width: double.infinity,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                  ),
                 ),
               ),
             

@@ -33,6 +33,7 @@ dependencies:
   video_player: ^2.9.1
   video_thumbnail: ^0.5.3
   visibility_detector: ^0.4.0+2
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:

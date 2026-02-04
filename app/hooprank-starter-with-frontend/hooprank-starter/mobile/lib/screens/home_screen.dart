@@ -5,12 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/mock_data.dart';
+import '../services/mock_data.dart'; // Still needed for mockPlayers in build
 import '../services/location_service.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
 import '../services/notification_service.dart';
-import '../widgets/player_profile_sheet.dart';
 import '../state/app_state.dart';
 import '../state/tutorial_state.dart';
 import '../state/check_in_state.dart';
@@ -18,7 +17,6 @@ import '../models.dart';
 import '../services/court_service.dart';
 import '../services/video_upload_service.dart';
 import '../widgets/hooprank_feed.dart';
-import 'map_screen.dart';
 import 'status_composer_screen.dart';
 import 'package:video_player/video_player.dart';
 
@@ -31,11 +29,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final MessagesService _messagesService = MessagesService();
-  List<ChallengeRequest> _challenges = [];
+  List<ChallengeRequest> _challenges = []; // Used in _loadChallenges
   List<Map<String, dynamic>> _pendingConfirmations = [];
-  List<Map<String, dynamic>> _localActivity = [];
-  bool _isLoadingChallenges = true;
-  bool _isLoadingActivity = true;
+  List<Map<String, dynamic>> _localActivity = []; // Used in _loadLocalActivity
+  bool _isLoadingChallenges = true; // Used in loading state
+  bool _isLoadingActivity = true; // Used in loading state
 
   double? _currentRating; // Fresh rating from API
   List<Map<String, dynamic>> _myTeams = []; // User's teams with ratings

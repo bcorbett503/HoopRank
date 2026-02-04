@@ -171,8 +171,8 @@ class ApiService {
         return data.map((json) => Court(
           id: json['id'] as String,
           name: json['name'] as String? ?? 'Court',
-          lat: (json['latitude'] as num?)?.toDouble() ?? 0.0,
-          lng: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+          lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
+          lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
           address: json['city'] as String?,
           isSignature: json['signature'] == true,
           isIndoor: json['indoor'] == true,

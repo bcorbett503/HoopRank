@@ -196,4 +196,94 @@ export class HealthController {
         `);
         return all;
     }
+
+    /**
+     * Remove dev/test courts from the database
+     * Cleans up related records (check-ins, follows, alerts) first
+     */
+    @Post('cleanup/dev-courts')
+    async removeDevCourts() {
+        try {
+            // List dev courts first
+            const devCourts = await this.dataSource.query(`
+                SELECT id, name, city 
+                FROM courts 
+                WHERE name ILIKE '%dev%' 
+                   OR name ILIKE '%test%'
+                   OR id LIKE '11111111%'
+                   OR id LIKE '00000000%'
+            `);
+
+            if (devCourts.length === 0) {
+                return { success: true, message: 'No dev courts found', deleted: 0 };
+            }
+
+            const devCourtIds = devCourts.map(c => c.id);
+
+            // Clean up related records
+            let cleanedCheckIns = 0;
+            let cleanedFollows = 0;
+            let cleanedAlerts = 0;
+
+            try {
+                const result = await this.dataSource.query(
+                    `DELETE FROM check_ins WHERE court_id = ANY($1::text[])`,
+                    [devCourtIds]
+                );
+                cleanedCheckIns = result[1] || 0;
+            } catch (e) {
+                // Table may not exist
+            }
+
+            try {
+                const result = await this.dataSource.query(
+                    `DELETE FROM user_followed_courts WHERE court_id = ANY($1::text[])`,
+                    [devCourtIds]
+                );
+                cleanedFollows = result[1] || 0;
+            } catch (e) {
+                // Table may not exist
+            }
+
+            try {
+                const result = await this.dataSource.query(
+                    `DELETE FROM user_court_alerts WHERE court_id = ANY($1::text[])`,
+                    [devCourtIds]
+                );
+                cleanedAlerts = result[1] || 0;
+            } catch (e) {
+                // Table may not exist
+            }
+
+            // Now delete the courts
+            const deleteResult = await this.dataSource.query(`
+                DELETE FROM courts 
+                WHERE name ILIKE '%dev%' 
+                   OR name ILIKE '%test%'
+                   OR id LIKE '11111111%'
+                   OR id LIKE '00000000%'
+                RETURNING id, name
+            `);
+
+            const deletedCourts = deleteResult[0] || deleteResult;
+
+            // Get remaining courts
+            const remaining = await this.dataSource.query('SELECT id, name FROM courts ORDER BY name');
+
+            return {
+                success: true,
+                message: 'Dev courts removed',
+                deleted: deletedCourts.length,
+                deletedCourts: deletedCourts,
+                cleanedUp: {
+                    checkIns: cleanedCheckIns,
+                    follows: cleanedFollows,
+                    alerts: cleanedAlerts
+                },
+                remainingCourts: remaining.map(c => ({ id: c.id, name: c.name }))
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }

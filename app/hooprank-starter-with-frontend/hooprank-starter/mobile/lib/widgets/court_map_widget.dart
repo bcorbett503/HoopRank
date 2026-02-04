@@ -10,17 +10,24 @@ import '../services/zipcode_service.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
 import '../state/tutorial_state.dart';
+import 'basketball_marker.dart';
 
 class CourtMapWidget extends StatefulWidget {
   final Function(Court) onCourtSelected;
   final double? limitDistanceKm;
   final String? initialCourtId;
+  final double? initialLat;
+  final double? initialLng;
+  final String? initialCourtName;
 
   const CourtMapWidget({
     super.key,
     required this.onCourtSelected,
     this.limitDistanceKm,
     this.initialCourtId,
+    this.initialLat,
+    this.initialLng,
+    this.initialCourtName,
   });
 
   @override
@@ -55,12 +62,35 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   }
   
   void _navigateToCourt(String courtId) {
-    final targetCourt = CourtService().getCourtById(courtId);
-    if (targetCourt != null) {
-      final target = LatLng(targetCourt.lat, targetCourt.lng);
-      _mapController.move(target, 15.0);
-      widget.onCourtSelected(targetCourt);
+    debugPrint('MAP: _navigateToCourt called with courtId: $courtId');
+    
+    // First try direct ID lookup
+    Court? targetCourt = CourtService().getCourtById(courtId);
+    
+    // If not found, try the enhanced findCourt method
+    if (targetCourt == null) {
+      debugPrint('MAP: Court not found by ID, trying findCourt...');
+      targetCourt = CourtService().findCourt(id: courtId);
     }
+    
+    if (targetCourt != null) {
+      _zoomToCourtAndSelect(targetCourt);
+    } else {
+      debugPrint('MAP: Court not found for ID: $courtId');
+    }
+  }
+  
+  /// Zoom to a court's location and show its details
+  void _zoomToCourtAndSelect(Court court) {
+    debugPrint('MAP: Zooming to court: ${court.name} at (${court.lat}, ${court.lng})');
+    final target = LatLng(court.lat, court.lng);
+    _mapController.move(target, 16.0);
+    // Show court details sheet after a brief delay to allow map animation
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        widget.onCourtSelected(court);
+      }
+    });
   }
 
   @override
@@ -70,6 +100,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   }
 
   Future<void> _initializeMap() async {
+    // Check if we have deep link parameters BEFORE doing async work
+    final hasDeepLink = widget.initialCourtId != null || 
+                        widget.initialCourtName != null ||
+                        (widget.initialLat != null && widget.initialLng != null);
+    
     await CourtService().loadCourts();
     
     bool locationObtained = false;
@@ -131,25 +166,57 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     }
 
     if (mounted) {
+      final courts = CourtService().getCourts();
       setState(() {
-        _courts = CourtService().getCourts();
+        _courts = courts;
         _isLoading = false;
       });
       
-      // Handle initial court selection from query params
-      if (widget.initialCourtId != null) {
-        final targetCourt = CourtService().getCourtById(widget.initialCourtId!);
-        if (targetCourt != null) {
-          // Move map to the target court
-          _initialCenter = LatLng(targetCourt.lat, targetCourt.lng);
-          _currentZoom = 15.0;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _mapController.move(_initialCenter, _currentZoom);
-            // Auto-select the court to show its details
-            widget.onCourtSelected(targetCourt);
-          });
-        }
+      // Handle initial court selection from query params or direct coords
+      // Use post-frame callback to ensure map is ready
+      if (hasDeepLink) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handleDeepLinkNavigation();
+        });
       }
+    }
+  }
+  
+  /// Handle deep link navigation after map is ready
+  void _handleDeepLinkNavigation() {
+    Court? targetCourt;
+    
+    // First try by court ID
+    if (widget.initialCourtId != null) {
+      debugPrint('MAP: Deep link court ID: ${widget.initialCourtId}');
+      targetCourt = CourtService().getCourtById(widget.initialCourtId!);
+      if (targetCourt == null) {
+        debugPrint('MAP: Court not found by ID, trying findCourt...');
+        targetCourt = CourtService().findCourt(
+          id: widget.initialCourtId!,
+          name: widget.initialCourtName,
+          lat: widget.initialLat,
+          lng: widget.initialLng,
+        );
+      }
+    }
+    
+    // If still not found, try by name
+    if (targetCourt == null && widget.initialCourtName != null) {
+      debugPrint('MAP: Trying to find court by name: ${widget.initialCourtName}');
+      targetCourt = CourtService().getCourtByName(widget.initialCourtName!);
+    }
+    
+    // If still not found but we have coordinates, navigate to that location anyway
+    if (targetCourt == null && widget.initialLat != null && widget.initialLng != null) {
+      debugPrint('MAP: Court not found, but navigating to coordinates: ${widget.initialLat}, ${widget.initialLng}');
+      final target = LatLng(widget.initialLat!, widget.initialLng!);
+      _mapController.move(target, 16.0);
+    } else if (targetCourt != null) {
+      debugPrint('MAP: Found deep link court: ${targetCourt.name}');
+      _zoomToCourtAndSelect(targetCourt);
+    } else if (widget.initialCourtId != null) {
+      debugPrint('MAP: Court not found for ID: ${widget.initialCourtId}');
     }
   }
 
@@ -340,70 +407,34 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                             final checkInState = Provider.of<CheckInState>(context, listen: false);
                             final hasCheckIns = checkInState.hasCheckIns(court.id);
                             
-                            // Determine marker image and size (circular, so use same width/height)
-                            String markerAsset;
+                            // Determine marker size - slightly larger for the pin design
                             double markerSize;
                             
                             if (isSignature) {
-                              // Legendary courts: crown marker, larger size
-                              markerAsset = 'assets/court_marker_signature_crown.jpg';
-                              markerSize = 36;
+                              markerSize = 50;
                             } else if (court.isIndoor) {
-                              // Indoor courts: use crown marker with slightly smaller size
-                              markerAsset = 'assets/court_marker_signature_crown.jpg';
-                              markerSize = 26;
+                              markerSize = 42;
                             } else if (hasKings) {
-                              // Courts with kings: king marker
-                              markerAsset = 'assets/court_marker_king.jpg';
-                              markerSize = 28;
+                              markerSize = 46;
                             } else {
-                              // Regular outdoor courts
-                              markerAsset = 'assets/court_marker.jpg';
-                              markerSize = 22;
+                              markerSize = 40;
                             }
+                            
+                            // Scale up selected court slightly
+                            // (If we had selected court state easily accessible here)
                             
                             return Marker(
                               point: LatLng(court.lat, court.lng),
                               width: markerSize,
                               height: markerSize,
-                              child: GestureDetector(
-                                onTap: () => widget.onCourtSelected(court),
-                                child: Container(
-                                  width: markerSize,
-                                  height: markerSize,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: hasCheckIns
-                                          ? Colors.green  // Active courts with check-ins
-                                          : (isSignature 
-                                              ? Colors.amber 
-                                              : (hasKings ? Colors.orange : Colors.white)),
-                                      width: hasCheckIns ? 3 : (isSignature ? 2.5 : 2),
-                                    ),
-                                    boxShadow: [
-                                      if (hasCheckIns)
-                                        BoxShadow(
-                                          color: Colors.green.withOpacity(0.5),
-                                          blurRadius: 8,
-                                          spreadRadius: 2,
-                                        ),
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.3),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ClipOval(
-                                    child: Image.asset(
-                                      markerAsset,
-                                      width: markerSize,
-                                      height: markerSize,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
+                              alignment: Alignment.topCenter,
+                              child: BasketballMarker(
+                                size: markerSize,
+                                isLegendary: isSignature,
+                                hasKing: hasKings,
+                                isIndoor: court.isIndoor,
+                                hasActivity: hasCheckIns,
+                                onTap: () => _zoomToCourtAndSelect(court),
                               ),
                             );
                           }).toList(),
@@ -688,7 +719,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                           );
                         },
                       ),
-                      onTap: () => widget.onCourtSelected(court),
+                      onTap: () => _zoomToCourtAndSelect(court),
                     );
                   },
                 ),

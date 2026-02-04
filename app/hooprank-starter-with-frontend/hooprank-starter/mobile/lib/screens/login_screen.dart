@@ -17,6 +17,83 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
+  bool _showDemoLogin = false;
+  final _emailController = TextEditingController(text: 'demo@hooprank.app');
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loginWithEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    final auth = context.read<AuthState>();
+    try {
+      final credential = await AuthService.signInWithEmail(email, password);
+      
+      if (credential == null || credential.user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final firebaseUser = credential.user!;
+      final userId = firebaseUser.uid;
+      final idToken = await firebaseUser.getIdToken();
+      
+      try {
+        if (idToken != null) {
+          final user = await ApiService.authenticate(
+            idToken,
+            uid: userId,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName,
+            photoUrl: firebaseUser.photoURL,
+            provider: 'email',
+          );
+          
+          await auth.login(user, token: idToken);
+          
+          if (mounted) {
+            context.go('/play');
+          }
+        }
+      } catch (e) {
+        debugPrint('Backend auth failed: $e');
+        final user = User(
+          id: userId,
+          name: firebaseUser.displayName ?? 'Demo User',
+          photoUrl: firebaseUser.photoURL,
+        );
+        await auth.login(user, token: idToken);
+        
+        if (mounted) {
+          context.go('/play');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _loginWithProvider(String provider) async {
     setState(() => _isLoading = true);
@@ -238,6 +315,67 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 32),
+                  
+                  // Demo Login for App Reviewers
+                  GestureDetector(
+                    onTap: () => setState(() => _showDemoLogin = !_showDemoLogin),
+                    child: Text(
+                      _showDemoLogin ? 'Hide Demo Login' : 'App Reviewer? Tap here',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                        decoration: TextDecoration.underline,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  
+                  if (_showDemoLogin) ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade900,
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade900,
+                      ),
+                      obscureText: true,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _loginWithEmail,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF6B35),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Sign In', style: TextStyle(fontSize: 16)),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
