@@ -439,4 +439,61 @@ export class HealthController {
             } : null,
         };
     }
+
+    /**
+     * Debug endpoint to manually initialize Firebase and test it
+     */
+    @Post('debug/firebase-init')
+    async debugFirebaseInit() {
+        const admin = require('firebase-admin');
+
+        // Check if already initialized
+        if (admin.apps && admin.apps.length > 0) {
+            return {
+                success: true,
+                message: 'Firebase already initialized',
+                appName: admin.apps[0].name,
+                projectId: admin.apps[0].options?.projectId,
+            };
+        }
+
+        const projectId = process.env.FIREBASE_PROJECT_ID;
+        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+        const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+        if (!projectId || !clientEmail || !privateKey) {
+            return {
+                success: false,
+                error: 'Missing credentials',
+                hasProjectId: !!projectId,
+                hasClientEmail: !!clientEmail,
+                hasPrivateKey: !!privateKey,
+            };
+        }
+
+        try {
+            const firebaseConfig = {
+                projectId,
+                clientEmail,
+                privateKey: privateKey.replace(/\\n/g, '\n'),
+            };
+
+            const app = admin.initializeApp({
+                credential: admin.credential.cert(firebaseConfig),
+            });
+
+            return {
+                success: true,
+                message: 'Firebase initialized successfully!',
+                appName: app.name,
+                projectId: app.options?.projectId,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                stack: error.stack?.substring(0, 500),
+            };
+        }
+    }
 }
