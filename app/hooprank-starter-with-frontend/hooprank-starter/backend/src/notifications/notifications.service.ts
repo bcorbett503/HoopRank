@@ -13,7 +13,11 @@ export class NotificationsService {
     ) { }
 
     private get isPostgres(): boolean {
-        return !!process.env.DATABASE_URL;
+        // Use dataSource.options.type for reliable driver detection
+        const dbType = (this.dataSource.options as any).type;
+        const result = dbType === 'postgres';
+        console.log(`[NotificationsService] isPostgres check: dbType=${dbType}, result=${result}`);
+        return result;
     }
 
     /**
