@@ -8,6 +8,7 @@ import '../services/messages_service.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'status_composer_screen.dart';
 
 /// Static helper to show court details sheet from any screen
 class CourtDetailsSheet {
@@ -445,134 +446,39 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ],
             const SizedBox(height: 20),
-            // Check-in section
-            Consumer2<CheckInState, AuthState>(
-              builder: (context, checkInState, authState, _) {
-                final isCheckedIn = checkInState.isUserCheckedIn(court.id);
-                final checkInCount = checkInState.getCheckInCount(court.id);
-                
-                return Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isCheckedIn 
-                        ? Colors.green.withOpacity(0.15)
-                        : Colors.grey[800]?.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isCheckedIn ? Colors.green : Colors.grey[700]!,
+            // Schedule Run button - large green CTA
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StatusComposerScreen(
+                        initialCourt: court,
+                      ),
                     ),
+                  );
+                },
+                icon: const Icon(Icons.calendar_month, size: 24),
+                label: const Text(
+                  'Schedule Run',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            isCheckedIn ? Icons.check_circle : Icons.location_on,
-                            color: isCheckedIn ? Colors.green : Colors.grey[400],
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isCheckedIn ? 'You play here!' : 'Check in to show interest',
-                            style: TextStyle(
-                              color: isCheckedIn ? Colors.green : Colors.grey[300],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (checkInCount > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '$checkInCount player${checkInCount > 1 ? 's' : ''}',
-                                style: const TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: isCheckedIn
-                                ? ElevatedButton.icon(
-                                    onPressed: () async {
-                                      await checkInState.checkOut(court.id);
-                                    },
-                                    icon: const Icon(Icons.check_circle),
-                                    label: const Text('Checked In'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  )
-                                : OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final user = authState.currentUser;
-                                      if (user != null) {
-                                        await checkInState.checkIn(
-                                          court.id,
-                                          userName: user.name,
-                                          userRating: user.rating,
-                                          userPhotoUrl: user.photoUrl,
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.add_location_alt),
-                                    label: const Text('Check In'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.white,
-                                      side: BorderSide(color: Colors.grey[600]!),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: checkInCount > 0
-                                  ? () {
-                                      Navigator.pop(context);
-                                      _showCheckedInPlayersSheet(court);
-                                    }
-                                  : null,
-                              icon: const Icon(Icons.people),
-                              label: const Text('View Players'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.green,
-                                side: BorderSide(
-                                  color: checkInCount > 0 
-                                      ? Colors.green 
-                                      : Colors.grey[600]!,
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-              },
+                  elevation: 2,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             

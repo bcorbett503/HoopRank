@@ -13,12 +13,14 @@ class StatusComposerScreen extends StatefulWidget {
   final DateTime? initialScheduledTime;
   final String? initialContent;
   final XFile? initialImage;
+  final Court? initialCourt;
   
   const StatusComposerScreen({
     super.key,
     this.initialScheduledTime,
     this.initialContent,
     this.initialImage,
+    this.initialCourt,
   });
 
   @override
@@ -55,6 +57,12 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     _textController.text = widget.initialContent ?? '';
     _selectedImage = widget.initialImage;
     _scheduledTime = widget.initialScheduledTime;
+    _taggedCourt = widget.initialCourt;
+    
+    // If initial court is set, add @courtname to text
+    if (widget.initialCourt != null && _textController.text.isEmpty) {
+      _textController.text = '@${widget.initialCourt!.name} ';
+    }
     
     // Auto-focus the text field
     WidgetsBinding.instance.addPostFrameCallback((_) {
