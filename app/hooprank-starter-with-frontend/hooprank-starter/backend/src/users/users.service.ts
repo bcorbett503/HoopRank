@@ -819,6 +819,39 @@ export class UsersService {
         results.push('team_messages table already exists');
       }
 
+      // Fix 9: Fix check_ins.court_id from UUID to VARCHAR (for OSM/non-UUID court IDs)
+      results.push('Checking check_ins.court_id type...');
+      const checkInsCourtIdType = await this.dataSource.query(`
+        SELECT data_type FROM information_schema.columns 
+        WHERE table_name = 'check_ins' AND column_name = 'court_id'
+      `);
+      if (checkInsCourtIdType.length > 0 && checkInsCourtIdType[0].data_type === 'uuid') {
+        results.push('check_ins.court_id is UUID, converting to VARCHAR...');
+
+        // Drop any foreign key constraints on court_id
+        try {
+          await this.dataSource.query(`
+            ALTER TABLE check_ins 
+            DROP CONSTRAINT IF EXISTS check_ins_court_id_fkey
+          `);
+          results.push('Dropped check_ins_court_id_fkey constraint if it existed');
+        } catch (e) {
+          results.push('No FK constraint to drop or already dropped');
+        }
+
+        // Alter the column type
+        await this.dataSource.query(`
+          ALTER TABLE check_ins 
+          ALTER COLUMN court_id TYPE VARCHAR(255) 
+          USING court_id::TEXT
+        `);
+        results.push('Converted check_ins.court_id to VARCHAR(255)');
+      } else if (checkInsCourtIdType.length === 0) {
+        results.push('check_ins table does not exist or has no court_id column');
+      } else {
+        results.push('check_ins.court_id already correct type: ' + checkInsCourtIdType[0].data_type);
+      }
+
       return { success: true, results };
     } catch (error) {
       results.push(`Error: ${error.message}`);
