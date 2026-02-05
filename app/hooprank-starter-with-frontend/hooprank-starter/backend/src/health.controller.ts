@@ -1060,4 +1060,117 @@ export class HealthController {
         const existing = results.filter(r => r.status === 'already_exists').length;
         return { success: true, cities: ['Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'San Jose'], summary: { created, existing, total: gymCourts.length }, results };
     }
+
+    /**
+     * Seed cities #11-20: Austin, Jacksonville, Fort Worth, Columbus, Indianapolis,
+     * Charlotte, San Francisco, Seattle, Denver, Washington DC
+     */
+    @Post('seed/batch-11-20')
+    async seedBatch11to20() {
+        const gymCourts = [
+            // AUSTIN - YMCAs
+            ['North Austin YMCA', 'Austin', 30.3566, -97.6976, true],
+            ['TownLake YMCA', 'Austin', 30.2676, -97.7499, true],
+            ['East Communities YMCA', 'Austin', 30.2946, -97.6619, true],
+            ['Hays Communities YMCA', 'Buda', 30.0689, -97.8282, true],
+            ['Northwest Family YMCA', 'Austin', 30.4518, -97.7744, true],
+            ['Southwest Family YMCA', 'Austin', 30.2255, -97.8358, true],
+            ['Springs Family YMCA', 'Dripping Springs', 30.1768, -98.0867, true],
+
+            // JACKSONVILLE - YMCAs
+            ['Williams Family YMCA', 'Jacksonville', 30.2253, -81.6068, true],
+            ['Brooks Family YMCA', 'Jacksonville', 30.2273, -81.5726, true],
+            ['Schultz YMCA', 'Jacksonville', 30.3321, -81.4398, true],
+            ['Cecil B. Day YMCA', 'Jacksonville', 30.2087, -81.7212, true],
+
+            // FORT WORTH - YMCAs
+            ['Eastside YMCA', 'Fort Worth', 32.7392, -97.2757, true],
+            ['William M. McDonald YMCA', 'Fort Worth', 32.7201, -97.3188, true],
+            ['Amon G. Carter Jr. Downtown YMCA', 'Fort Worth', 32.7530, -97.3335, true],
+            ['Northpark YMCA', 'Fort Worth', 32.9197, -97.3083, true],
+            ['YMCA Sports Complex', 'Fort Worth', 32.6827, -97.3881, true],
+
+            // COLUMBUS - YMCAs
+            ['Delaware Community Center YMCA', 'Delaware', 40.2987, -83.0680, true],
+            ['Grove City YMCA', 'Grove City', 39.8795, -83.0930, true],
+            ['Hilltop YMCA', 'Columbus', 39.9548, -83.0621, true],
+            ['North YMCA Columbus', 'Columbus', 40.0689, -82.9874, true],
+            ['Reynoldsburg Community Center YMCA', 'Reynoldsburg', 39.9562, -82.8121, true],
+
+            // INDIANAPOLIS - YMCAs
+            ['Avondale Meadows YMCA', 'Indianapolis', 39.8320, -86.0875, true],
+            ['Baxter YMCA', 'Indianapolis', 39.7879, -86.1548, true],
+            ['Benjamin Harrison YMCA', 'Indianapolis', 39.8655, -86.1087, true],
+            ['Fishers YMCA', 'Fishers', 39.9587, -86.0239, true],
+            ['Irsay Family YMCA at CityWay', 'Indianapolis', 39.7518, -86.1572, true],
+            ['Jordan YMCA', 'Indianapolis', 39.8673, -86.1432, true],
+            ['OrthoIndy Foundation YMCA', 'Indianapolis', 39.9211, -86.0878, true],
+            ['Ransburg YMCA', 'Indianapolis', 39.7751, -86.1104, true],
+            ['YMCA at the Athenaeum', 'Indianapolis', 39.7716, -86.1518, true],
+
+            // CHARLOTTE - YMCAs
+            ['Brace Family YMCA', 'Matthews', 35.1275, -80.7206, true],
+            ['Childress Klein YMCA', 'Charlotte', 35.2219, -80.8426, true],
+            ['Dowd YMCA', 'Charlotte', 35.2138, -80.8479, true],
+            ['Harris YMCA', 'Charlotte', 35.1304, -80.8542, true],
+            ['Johnston YMCA', 'Charlotte', 35.2489, -80.8149, true],
+            ['Keith Family YMCA', 'Charlotte', 35.3182, -80.7348, true],
+            ['McCrorey YMCA', 'Charlotte', 35.2628, -80.8777, true],
+            ['Morrison Family YMCA', 'Charlotte', 35.0623, -80.8011, true],
+            ['Simmons YMCA', 'Charlotte', 35.1862, -80.7233, true],
+            ['Stratford Richardson YMCA', 'Charlotte', 35.2134, -80.8826, true],
+
+            // SAN FRANCISCO - YMCAs
+            ['Embarcadero YMCA', 'San Francisco', 37.7915, -122.3936, true],
+            ['Presidio Community YMCA', 'San Francisco', 37.7997, -122.4545, true],
+            ['Stonestown Family YMCA', 'San Francisco', 37.7285, -122.4765, true],
+            ['Treasure Island YMCA', 'San Francisco', 37.8193, -122.3699, true],
+
+            // SEATTLE - YMCAs
+            ['Auburn Valley YMCA', 'Auburn', 47.3073, -122.2285, true],
+            ['Bellevue Family YMCA', 'Bellevue', 47.6132, -122.1892, true],
+            ['Downtown Seattle YMCA', 'Seattle', 47.6097, -122.3331, true],
+            ['Meredith Mathews East Madison YMCA', 'Seattle', 47.6195, -122.3034, true],
+            ['West Seattle Family YMCA', 'Seattle', 47.5629, -122.3868, true],
+            ['Dale Turner Family YMCA', 'Shoreline', 47.7568, -122.3426, true],
+
+            // DENVER - YMCAs
+            ['Arvada Duncan YMCA', 'Arvada', 39.7990, -105.0875, true],
+            ['Aurora YMCA', 'Aurora', 39.7294, -104.8319, true],
+            ['Downtown Denver YMCA', 'Denver', 39.7392, -104.9903, true],
+            ['Littleton Family YMCA', 'Littleton', 39.5943, -105.0167, true],
+            ['Southwest Family YMCA Denver', 'Denver', 39.6523, -105.0835, true],
+            ['University Hills Schlessman YMCA', 'Denver', 39.6713, -104.9428, true],
+            ['Central Park YMCA', 'Denver', 39.7625, -104.8995, true],
+
+            // WASHINGTON DC - YMCAs
+            ['YMCA Anthony Bowen', 'Washington', 38.9178, -77.0317, true],
+            ['YMCA Calomiris Program Center', 'Washington', 38.9319, -76.9893, true],
+            ['YMCA Arlington', 'Arlington', 38.8784, -77.0892, true],
+            ['YMCA Bethesda', 'Bethesda', 39.0066, -77.0987, true],
+        ];
+
+        const results: any[] = [];
+        for (const [name, city, lat, lng, indoor] of gymCourts) {
+            try {
+                const uuidResult = await this.dataSource.query(`SELECT gen_random_uuid() as id`);
+                const courtId = uuidResult[0].id;
+                const existing = await this.dataSource.query(`SELECT id FROM courts WHERE name = $1`, [name]);
+                if (existing.length > 0) {
+                    results.push({ name, status: 'already_exists', id: existing[0].id });
+                    continue;
+                }
+                await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, geog, source)
+                    VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'manual')
+                `, [courtId, name, city, indoor, lng, lat]);
+                results.push({ name, status: 'created', id: courtId });
+            } catch (error) {
+                results.push({ name, status: 'error', error: error.message });
+            }
+        }
+        const created = results.filter(r => r.status === 'created').length;
+        const existing = results.filter(r => r.status === 'already_exists').length;
+        return { success: true, cities: ['Austin', 'Jacksonville', 'Fort Worth', 'Columbus', 'Indianapolis', 'Charlotte', 'San Francisco', 'Seattle', 'Denver', 'Washington DC'], summary: { created, existing, total: gymCourts.length }, results };
+    }
 }
