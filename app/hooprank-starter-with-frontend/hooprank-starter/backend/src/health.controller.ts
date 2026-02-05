@@ -733,13 +733,9 @@ export class HealthController {
 
         for (const [name, city, lat, lng, indoor] of gymCourts) {
             try {
-                // Generate deterministic UUID from name
-                const cleanName = (name as string).toLowerCase().replace(/[^a-z0-9]/g, '');
-                const nameHash = cleanName.split('').reduce((a, b) => {
-                    a = ((a << 5) - a) + b.charCodeAt(0);
-                    return a & a;
-                }, 0);
-                const courtId = `gym-${Math.abs(nameHash).toString(16).padStart(8, '0')}-0000-0000-000000000000`;
+                // Use PostgreSQL to generate a proper UUID
+                const uuidResult = await this.dataSource.query(`SELECT gen_random_uuid() as id`);
+                const courtId = uuidResult[0].id;
 
                 // Check if already exists
                 const existing = await this.dataSource.query(
