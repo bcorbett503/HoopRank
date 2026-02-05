@@ -87,10 +87,15 @@ export class CourtsController {
         // Send push notifications to users who have alerts enabled for this court
         try {
             // Get court name and user name for the notification
-            const courtResult = await this.dataSource.query(
-                `SELECT name FROM courts WHERE id = $1`, [courtId]
-            );
-            const courtName = courtResult[0]?.name || 'Unknown Court';
+            // Some court IDs (like OSM way IDs) are not UUIDs - handle gracefully
+            let courtName = 'Unknown Court';
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidRegex.test(courtId)) {
+                const courtResult = await this.dataSource.query(
+                    `SELECT name FROM courts WHERE id = $1`, [courtId]
+                );
+                courtName = courtResult[0]?.name || 'Unknown Court';
+            }
 
             const userResult = await this.dataSource.query(
                 `SELECT name FROM users WHERE id = $1`, [userId]
