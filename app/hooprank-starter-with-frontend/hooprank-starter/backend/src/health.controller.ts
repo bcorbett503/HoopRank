@@ -1270,4 +1270,95 @@ export class HealthController {
         const existing = results.filter(r => r.status === 'already_exists').length;
         return { success: true, cities: ['Nashville', 'Boston', 'El Paso', 'Oklahoma City', 'Detroit', 'Las Vegas', 'Memphis', 'Louisville', 'Baltimore'], summary: { created, existing, total: gymCourts.length }, results };
     }
+
+    /**
+     * Seed cities #31-40: Milwaukee, Albuquerque, Tucson, Fresno, Sacramento,
+     * Mesa, Kansas City, Atlanta, Omaha, Colorado Springs
+     */
+    @Post('seed/batch-31-40')
+    async seedBatch31to40() {
+        const gymCourts = [
+            // MILWAUKEE - YMCAs
+            ['Northside YMCA Milwaukee', 'Milwaukee', 43.0555, -87.9218, true],
+            ['Rite-Hite Family YMCA', 'Brown Deer', 43.1659, -87.9612, true],
+            ['Briscoe Family YMCA Wellness Center', 'Franklin', 42.8915, -88.0383, true],
+
+            // ALBUQUERQUE - YMCAs
+            ['McLeod Mountainside Family YMCA', 'Albuquerque', 35.1305, -106.5103, true],
+            ['Horn Family YMCA', 'Albuquerque', 35.0932, -106.5808, true],
+            ['Field House YMCA', 'Albuquerque', 35.1601, -106.5746, true],
+            ['Central Branch Downtown YMCA Albuquerque', 'Albuquerque', 35.0831, -106.6226, true],
+
+            // TUCSON - YMCAs
+            ['LightHouse City YMCA', 'Tucson', 32.2533, -110.9107, true],
+            ['Lohse Family YMCA', 'Tucson', 32.2216, -110.9671, true],
+            ['Ott Family YMCA', 'Tucson', 32.2149, -110.8025, true],
+            ['Northwest YMCA Tucson', 'Tucson', 32.3345, -111.0135, true],
+
+            // FRESNO - YMCAs
+            ['Central Valley YMCA', 'Fresno', 36.7416, -119.7847, true],
+            ['Fresno YMCA', 'Fresno', 36.7724, -119.8181, true],
+            ['Reedley YMCA', 'Reedley', 36.5963, -119.4520, true],
+            ['Sanger YMCA', 'Sanger', 36.7087, -119.5559, true],
+
+            // SACRAMENTO - YMCAs
+            ['Sacramento Central YMCA', 'Sacramento', 38.5642, -121.4998, true],
+            ['Capital YMCA Sacramento', 'Sacramento', 38.5824, -121.4944, true],
+
+            // MESA - uses Phoenix area YMCAs (covered earlier)
+
+            // KANSAS CITY - YMCAs
+            ['Cleaver Family YMCA', 'Kansas City', 39.0145, -94.5708, true],
+            ['North Kansas City YMCA', 'North Kansas City', 39.1336, -94.5733, true],
+            ['Linwood Family YMCA', 'Kansas City', 39.0728, -94.5363, true],
+
+            // ATLANTA - YMCAs
+            ['Carl E. Sanders Family YMCA at Buckhead', 'Atlanta', 33.8645, -84.3328, true],
+            ['East Lake Family YMCA', 'Atlanta', 33.7437, -84.3137, true],
+            ['Ed Isakson Alpharetta Family YMCA', 'Alpharetta', 34.0692, -84.2441, true],
+            ['J.M. Tull-Gwinnett Family YMCA', 'Lawrenceville', 33.9656, -84.0505, true],
+            ['McCleskey-East Cobb Family YMCA', 'Marietta', 33.9494, -84.4214, true],
+
+            // OMAHA - YMCAs
+            ['Armbrust YMCA', 'Omaha', 41.2147, -96.1341, true],
+            ['Downtown YMCA Omaha', 'Omaha', 41.2568, -95.9423, true],
+            ['Maple Street YMCA', 'Omaha', 41.2878, -96.0361, true],
+            ['Southwest YMCA Omaha', 'Omaha', 41.2231, -96.0678, true],
+            ['Sarpy YMCA', 'Papillion', 41.1515, -96.0470, true],
+            ['Gretna Crossing YMCA', 'Gretna', 41.1291, -96.2412, true],
+
+            // COLORADO SPRINGS - YMCAs
+            ['Briargate YMCA', 'Colorado Springs', 38.9431, -104.8002, true],
+            ['Cottonwood Creek YMCA', 'Colorado Springs', 38.9201, -104.8233, true],
+            ['Downtown YMCA Colorado Springs', 'Colorado Springs', 38.8345, -104.8259, true],
+            ['First & Main YMCA', 'Colorado Springs', 38.8648, -104.7134, true],
+            ['Fountain Valley YMCA', 'Fountain', 38.6808, -104.7008, true],
+            ['Garden Ranch YMCA', 'Colorado Springs', 38.9120, -104.8606, true],
+            ['Southeast Armed Services YMCA', 'Colorado Springs', 38.7945, -104.7536, true],
+            ['Tri-Lakes YMCA', 'Monument', 39.0545, -104.8548, true],
+        ];
+
+        const results: any[] = [];
+        for (const [name, city, lat, lng, indoor] of gymCourts) {
+            try {
+                const uuidResult = await this.dataSource.query(`SELECT gen_random_uuid() as id`);
+                const courtId = uuidResult[0].id;
+                const existing = await this.dataSource.query(`SELECT id FROM courts WHERE name = $1`, [name]);
+                if (existing.length > 0) {
+                    results.push({ name, status: 'already_exists', id: existing[0].id });
+                    continue;
+                }
+                await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, geog, source)
+                    VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'manual')
+                `, [courtId, name, city, indoor, lng, lat]);
+                results.push({ name, status: 'created', id: courtId });
+            } catch (error) {
+                results.push({ name, status: 'error', error: error.message });
+            }
+        }
+        const created = results.filter(r => r.status === 'created').length;
+        const existing = results.filter(r => r.status === 'already_exists').length;
+        return { success: true, cities: ['Milwaukee', 'Albuquerque', 'Tucson', 'Fresno', 'Sacramento', 'Kansas City', 'Atlanta', 'Omaha', 'Colorado Springs'], summary: { created, existing, total: gymCourts.length }, results };
+    }
 }
