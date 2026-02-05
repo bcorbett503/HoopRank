@@ -569,4 +569,131 @@ export class HealthController {
             return { error: error.message };
         }
     }
+
+    /**
+     * Test all notification types
+     * Usage: GET /debug/test-notifications?userId=<USER_ID>
+     * Returns status of each notification type test
+     */
+    @Get('debug/test-notifications')
+    async testAllNotifications(@Query('userId') userId: string) {
+        if (!userId) {
+            return { error: 'userId query param required' };
+        }
+
+        const results: Record<string, any> = {};
+
+        // 1. Test generic push (direct sendToUser)
+        try {
+            const sent = await this.notificationsService.sendToUser(
+                userId,
+                '🔔 Test Push',
+                'Testing notification system...',
+                { type: 'test' }
+            );
+            results['1_generic_push'] = { success: sent, method: 'sendToUser' };
+        } catch (e) {
+            results['1_generic_push'] = { success: false, error: e.message };
+        }
+
+        // 2. Test challenge received notification
+        try {
+            await this.notificationsService.sendChallengeNotification(
+                userId,
+                'Test Player',
+                'received',
+                'test-challenge-id'
+            );
+            results['2_challenge_received'] = { success: true, method: 'sendChallengeNotification(received)' };
+        } catch (e) {
+            results['2_challenge_received'] = { success: false, error: e.message };
+        }
+
+        // 3. Test challenge accepted notification
+        try {
+            await this.notificationsService.sendChallengeNotification(
+                userId,
+                'Test Player',
+                'accepted',
+                'test-challenge-id'
+            );
+            results['3_challenge_accepted'] = { success: true, method: 'sendChallengeNotification(accepted)' };
+        } catch (e) {
+            results['3_challenge_accepted'] = { success: false, error: e.message };
+        }
+
+        // 4. Test challenge declined notification
+        try {
+            await this.notificationsService.sendChallengeNotification(
+                userId,
+                'Test Player',
+                'declined',
+                'test-challenge-id'
+            );
+            results['4_challenge_declined'] = { success: true, method: 'sendChallengeNotification(declined)' };
+        } catch (e) {
+            results['4_challenge_declined'] = { success: false, error: e.message };
+        }
+
+        // 5. Test message notification
+        try {
+            await this.notificationsService.sendMessageNotification(
+                userId,
+                'Test Sender',
+                'Hey, want to play?',
+                'test-thread-id'
+            );
+            results['5_new_message'] = { success: true, method: 'sendMessageNotification' };
+        } catch (e) {
+            results['5_new_message'] = { success: false, error: e.message };
+        }
+
+        // 6. Test match completed notification
+        try {
+            await this.notificationsService.sendMatchCompletedNotification(
+                userId,
+                4.2,
+                0.3,
+                'Test Opponent',
+                true
+            );
+            results['6_match_completed'] = { success: true, method: 'sendMatchCompletedNotification' };
+        } catch (e) {
+            results['6_match_completed'] = { success: false, error: e.message };
+        }
+
+        // 7. Test follow notification
+        try {
+            await this.notificationsService.sendFollowNotification(
+                userId,
+                'Test Follower'
+            );
+            results['7_new_follower'] = { success: true, method: 'sendFollowNotification' };
+        } catch (e) {
+            results['7_new_follower'] = { success: false, error: e.message };
+        }
+
+        // 8. Test court activity notification (for users with alerts on this court)
+        try {
+            await this.notificationsService.sendCourtActivityNotification(
+                '22222222-2222-2222-2222-222222222222', // Test court
+                'Test Court',
+                'Test Player',
+                'check_in'
+            );
+            results['8_court_activity'] = { success: true, method: 'sendCourtActivityNotification', note: 'Sent to all users with alerts enabled for this court' };
+        } catch (e) {
+            results['8_court_activity'] = { success: false, error: e.message };
+        }
+
+        // Summary
+        const successCount = Object.values(results).filter((r: any) => r.success).length;
+        return {
+            userId,
+            totalTests: 8,
+            successCount,
+            failedCount: 8 - successCount,
+            results
+        };
+    }
 }
