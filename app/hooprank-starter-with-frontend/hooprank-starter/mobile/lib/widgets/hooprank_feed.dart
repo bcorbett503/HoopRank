@@ -2143,65 +2143,113 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(top: 16, bottom: 4),
-                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3), 
+                  color: Colors.black.withOpacity(0.2), 
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
                 child: Column(
                   children: [
-                    // Time Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                         Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white.withOpacity(0.7)),
-                         const SizedBox(width: 8),
-                         Text(
-                          '$scheduledDayStr @ $scheduledTimeStr',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (courtName != null) ...[
-                      const SizedBox(height: 8),
-                      Container(height: 1, width: 40, color: Colors.white.withOpacity(0.1)),
-                      const SizedBox(height: 8),
-                      // Location Row - tappable to navigate to court on map
-                      GestureDetector(
-                        onTap: (courtId != null || courtName != null) ? () {
-                          // Build deep link URL with available params
-                          final params = <String, String>{};
-                          if (courtId != null) params['courtId'] = courtId;
-                          if (courtName != null) params['courtName'] = Uri.encodeComponent(courtName);
-                          final queryString = params.entries.map((e) => '${e.key}=${e.value}').join('&');
-                          context.go('/courts?$queryString');
-                        } : null,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                             Icon(Icons.location_on_rounded, size: 16, color: const Color(0xFF00C853)),
-                             const SizedBox(width: 4),
-                             Flexible(
-                               child: Text(
-                                courtName,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF00C853), // Green for location
-                                  decoration: (courtId != null || courtName != null) ? TextDecoration.underline : null,
-                                  decorationColor: const Color(0xFF00C853).withOpacity(0.5),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                    // Time Section
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                      child: Row(
+                        children: [
+                           Container(
+                             padding: const EdgeInsets.all(8),
+                             decoration: BoxDecoration(
+                               color: Colors.white.withOpacity(0.08),
+                               borderRadius: BorderRadius.circular(8),
                              ),
-                             if (courtId != null || courtName != null)
-                               Icon(Icons.chevron_right, size: 16, color: const Color(0xFF00C853).withOpacity(0.6)),
-                          ],
+                             child: const Icon(Icons.calendar_today_rounded, size: 18, color: Colors.white),
+                           ),
+                           const SizedBox(width: 12),
+                           Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Text(
+                                scheduledDayStr,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                scheduledTimeStr,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                             ],
+                           ),
+                        ],
+                      ),
+                    ),
+                    
+                    if (courtName != null) ...[
+                      // Divider
+                      Divider(height: 1, color: Colors.white.withOpacity(0.08)),
+                      
+                      // Court Location Button
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: (courtId != null || courtName != null) ? () {
+                            final params = <String, String>{};
+                            if (courtId != null) params['courtId'] = courtId;
+                            if (courtName != null) params['courtName'] = Uri.encodeComponent(courtName);
+                            final queryString = params.entries.map((e) => '${e.key}=${e.value}').join('&');
+                            context.go('/courts?$queryString');
+                          } : null,
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                 Container(
+                                   padding: const EdgeInsets.all(6),
+                                   decoration: BoxDecoration(
+                                     color: const Color(0xFF00C853).withOpacity(0.15),
+                                     shape: BoxShape.circle,
+                                   ),
+                                   child: const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF00C853)),
+                                 ),
+                                 const SizedBox(width: 12),
+                                 Expanded(
+                                   child: Column(
+                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                     children: [
+                                       if (courtId != null) // Only show label if it's a real linked court
+                                         Text(
+                                          "LOCATION",
+                                           style: TextStyle(
+                                            fontSize: 9,
+                                            color: const Color(0xFF00C853).withOpacity(0.8),
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.5,
+                                           ),
+                                         ),
+                                       Text(
+                                        courtName,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white.withOpacity(0.95),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                     ],
+                                   ),
+                                 ),
+                                 Icon(Icons.chevron_right, size: 20, color: Colors.white.withOpacity(0.3)),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ]
@@ -2216,6 +2264,48 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 child: Text(
                   content, 
                   style: TextStyle(fontSize: 15, height: 1.4, color: Colors.white.withOpacity(0.9)), 
+                ),
+              ),
+
+            // Location Chip for Regular Posts
+            if (courtName != null && !isScheduledEvent)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GestureDetector(
+                  onTap: (courtId != null || courtName != null) ? () {
+                    final params = <String, String>{};
+                    if (courtId != null) params['courtId'] = courtId;
+                    if (courtName != null) params['courtName'] = Uri.encodeComponent(courtName);
+                    final queryString = params.entries.map((e) => '${e.key}=${e.value}').join('&');
+                    context.go('/courts?$queryString');
+                  } : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00C853).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF00C853).withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_on, size: 14, color: Color(0xFF00C853)),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            courtName,
+                            style: const TextStyle(
+                              color: Color(0xFF00C853),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               

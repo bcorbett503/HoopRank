@@ -321,11 +321,70 @@ export class StatusesService {
 
     // ========== Unified Feed ==========
 
+    /**
+     * Calculate a relevance score for feed items.
+     * Higher score = more relevant to the user.
+     */
+    private calculateFeedScore(item: any, userId: string, followedPlayerIds: Set<string>, followedCourtIds: Set<string>, now: Date): number {
+        let score = 0;
+
+        // 1. RECENCY: Decay factor - newer posts score higher (max 100 points, decays over 7 days)
+        const ageMs = now.getTime() - new Date(item.createdAt).getTime();
+        const ageHours = ageMs / (1000 * 60 * 60);
+        const recencyScore = Math.max(0, 100 - (ageHours / 168) * 100); // 168 hours = 7 days
+        score += recencyScore;
+
+        // 2. ENGAGEMENT: Likes, comments, attendees (max ~150 points)
+        const likeScore = Math.min((item.likeCount || 0) * 2, 30);       // 2 pts per like, max 30
+        const commentScore = Math.min((item.commentCount || 0) * 3, 45); // 3 pts per comment, max 45
+        const attendeeScore = Math.min((item.attendeeCount || 0) * 5, 75); // 5 pts per attendee, max 75
+        score += likeScore + commentScore + attendeeScore;
+
+        // 3. RELATIONSHIP: Boost followed content (50 points)
+        const isOwnPost = item.userId === userId;
+        const isFollowedPlayer = followedPlayerIds.has(item.userId);
+        const isFollowedCourt = item.courtId && followedCourtIds.has(item.courtId);
+
+        if (isOwnPost) {
+            score += 60; // Always show own posts prominently
+        } else if (isFollowedPlayer) {
+            score += 50; // Followed players get priority
+        } else if (isFollowedCourt) {
+            score += 40; // Followed courts get good priority
+        }
+
+        // 4. UPCOMING EVENTS: Boost scheduled runs in next 48 hours (40 points)
+        if (item.scheduledAt) {
+            const scheduledTime = new Date(item.scheduledAt);
+            const hoursUntilEvent = (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+            if (hoursUntilEvent > 0 && hoursUntilEvent <= 48) {
+                // Closer events get higher boost
+                const eventBoost = 40 * (1 - hoursUntilEvent / 48);
+                score += eventBoost;
+            } else if (hoursUntilEvent > 48 && hoursUntilEvent <= 168) {
+                // Events within a week still get a small boost
+                score += 15;
+            }
+        }
+
+        // 5. CONTENT TYPE: Matches are inherently interesting (10 points)
+        if (item.type === 'match' || item.type === 'team_match') {
+            score += 10;
+        }
+
+        // 6. DISCOVERY BONUS: Nearby unfollowed courts get a discovery bonus
+        //    (This is applied later in the main function based on proximity)
+        item._isDiscovery = !isOwnPost && !isFollowedPlayer && !isFollowedCourt;
+
+        return score;
+    }
+
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50, lat?: number, lng?: number): Promise<any[]> {
         try {
             console.log('getUnifiedFeed: filter=', filter, 'userId=', userId, 'lat=', lat, 'lng=', lng);
 
-            // Status SELECT clause
+            // Status SELECT clause with additional fields for scoring
             const statusSelectClause = `
                 SELECT 
                     'status' as type,
@@ -342,10 +401,14 @@ export class StatusesService {
                     ps.scheduled_at as "scheduledAt",
                     ps.court_id as "courtId",
                     c.name as "courtName",
+                    c.lat as "courtLat",
+                    c.lng as "courtLng",
                     NULL as "matchStatus",
                     NULL as "matchScore",
                     NULL as "winnerName",
                     NULL as "loserName",
+                    NULL::DOUBLE PRECISION as "winnerRating",
+                    NULL::DOUBLE PRECISION as "loserRating",
                     COALESCE((SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id), 0)::INTEGER as "likeCount",
                     COALESCE((SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id), 0)::INTEGER as "commentCount",
                     EXISTS(SELECT 1 FROM status_likes WHERE status_id = ps.id AND user_id = $1) as "isLikedByMe",
@@ -373,6 +436,8 @@ export class StatusesService {
                     NULL as "scheduledAt",
                     m.court_id as "courtId",
                     COALESCE(mc.name, '') as "courtName",
+                    mc.lat as "courtLat",
+                    mc.lng as "courtLng",
                     CASE WHEN m.status = 'completed' THEN 'ended' ELSE m.status END as "matchStatus",
                     CASE 
                         WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
@@ -396,8 +461,7 @@ export class StatusesService {
                 WHERE m.status = 'completed' AND m.winner_id IS NOT NULL AND (m.team_match IS NULL OR m.team_match = false)
             `;
 
-            // Team Match SELECT clause (for completed team matches)
-            // Join on creator_team_id and opponent_team_id directly, then determine winner/loser
+            // Team Match SELECT clause
             const teamMatchSelectClause = `
                 SELECT 
                     'team_match' as type,
@@ -417,6 +481,8 @@ export class StatusesService {
                     NULL as "scheduledAt",
                     m.court_id as "courtId",
                     COALESCE(mc.name, '') as "courtName",
+                    mc.lat as "courtLat",
+                    mc.lng as "courtLng",
                     'ended' as "matchStatus",
                     CASE 
                         WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
@@ -451,57 +517,188 @@ export class StatusesService {
                 WHERE m.status = 'completed' AND m.team_match = true AND m.winner_id IS NOT NULL
             `;
 
-            let query: string;
-            let params: any[];
+            // Get user's followed players and courts for scoring
+            const [followedPlayersResult, followedCourtsResult] = await Promise.all([
+                this.dataSource.query(`SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $1`, [userId]),
+                this.dataSource.query(`SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $1`, [userId])
+            ]);
 
-            if (filter === 'foryou' && lat !== undefined && lng !== undefined) {
-                // FOR YOU: Expanding radius search with matches
-                const radiusTiers = [80467, 160934, 402336, 804672, 1609344];
-                let results: any[] = [];
+            const followedPlayerIds = new Set<string>(followedPlayersResult.map((r: any) => r.followed_id));
+            const followedCourtIds = new Set<string>(followedCourtsResult.map((r: any) => r.court_id));
+            const now = new Date();
 
-                for (const radius of radiusTiers) {
-                    query = `
+            if (filter === 'foryou') {
+                // FOR YOU: Smart algorithm with scoring
+                console.log('getUnifiedFeed: FOR YOU mode with smart scoring');
+
+                // Fetch more items than needed so we can score and rank them
+                const fetchLimit = Math.min(limit * 3, 150);
+
+                let allItems: any[] = [];
+
+                if (lat !== undefined && lng !== undefined) {
+                    // TIER 1: Own posts + followed content (no geo filter)
+                    const tier1Query = `
                         (${statusSelectClause}
-                        WHERE c.geog IS NOT NULL 
-                          AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
+                        WHERE ps.user_id = $1
+                           OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
+                           OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2))
                         UNION ALL
                         (${matchSelectClause}
-                        AND mc.geog IS NOT NULL
-                        AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
-                        UNION ALL
-                        (${teamMatchSelectClause}
-                        AND mc.geog IS NOT NULL
-                        AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
-                        ORDER BY "createdAt" DESC
-                        LIMIT $5
-                    `;
-                    params = [userId, lng, lat, radius, limit];
-                    results = await this.dataSource.query(query, params);
-
-                    if (results.length > 0) {
-                        console.log(`getUnifiedFeed: found ${results.length} results at ${Math.round(radius / 1609)}mi radius`);
-                        break;
-                    }
-                }
-
-                if (results.length === 0) {
-                    console.log('getUnifiedFeed: no nearby results, falling back to entire network');
-                    query = `
-                        (${statusSelectClause})
-                        UNION ALL
-                        (${matchSelectClause})
+                        AND (m.creator_id = $1 OR m.opponent_id = $1
+                             OR m.creator_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
+                             OR m.opponent_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)))
                         UNION ALL
                         (${teamMatchSelectClause})
                         ORDER BY "createdAt" DESC
-                        LIMIT $2
+                        LIMIT $3
                     `;
-                    params = [userId, limit];
-                    results = await this.dataSource.query(query, params);
+                    const tier1Results = await this.dataSource.query(tier1Query, [userId, userId, fetchLimit]);
+                    allItems.push(...tier1Results);
+                    console.log(`getUnifiedFeed: Tier 1 (followed) = ${tier1Results.length} items`);
+
+                    // TIER 2: Discovery - Nearby courts user doesn't follow (within 50mi / 80km)
+                    const discoveryRadius = 80467; // 50 miles in meters
+                    const discoveryQuery = `
+                        (${statusSelectClause}
+                        WHERE c.geog IS NOT NULL 
+                          AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
+                          AND ps.user_id != $1
+                          AND (ps.court_id IS NULL OR ps.court_id NOT IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $5))
+                          AND ps.user_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
+                        UNION ALL
+                        (${matchSelectClause}
+                        AND mc.geog IS NOT NULL
+                        AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
+                        AND m.creator_id != $1 AND m.opponent_id != $1
+                        AND m.creator_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5)
+                        AND m.opponent_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
+                        ORDER BY "createdAt" DESC
+                        LIMIT $6
+                    `;
+                    const discoveryResults = await this.dataSource.query(discoveryQuery, [userId, lng, lat, discoveryRadius, userId, fetchLimit]);
+                    // Mark these as discovery items
+                    discoveryResults.forEach((item: any) => item._isDiscovery = true);
+                    allItems.push(...discoveryResults);
+                    console.log(`getUnifiedFeed: Tier 2 (discovery) = ${discoveryResults.length} items within 50mi`);
+
+                    // TIER 3: Expanding radius if still not enough content
+                    if (allItems.length < limit) {
+                        const radiusTiers = [160934, 402336, 804672]; // 100mi, 250mi, 500mi
+                        for (const radius of radiusTiers) {
+                            const expandedQuery = `
+                                (${statusSelectClause}
+                                WHERE c.geog IS NOT NULL 
+                                  AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
+                                UNION ALL
+                                (${matchSelectClause}
+                                AND mc.geog IS NOT NULL
+                                AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
+                                ORDER BY "createdAt" DESC
+                                LIMIT $5
+                            `;
+                            const expandedResults = await this.dataSource.query(expandedQuery, [userId, lng, lat, radius, fetchLimit]);
+
+                            // Add only new items
+                            const existingIds = new Set(allItems.map(i => i.id));
+                            const newItems = expandedResults.filter((item: any) => !existingIds.has(item.id));
+                            allItems.push(...newItems);
+
+                            console.log(`getUnifiedFeed: Expanded to ${Math.round(radius / 1609)}mi, added ${newItems.length} items`);
+
+                            if (allItems.length >= limit) break;
+                        }
+                    }
+                } else {
+                    // No location - fall back to followed content + network-wide popular
+                    const fallbackQuery = `
+                        (${statusSelectClause}
+                        WHERE ps.user_id = $1
+                           OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
+                           OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2))
+                        UNION ALL
+                        (${matchSelectClause}
+                        AND (m.creator_id = $1 OR m.opponent_id = $1
+                             OR m.creator_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
+                             OR m.opponent_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)))
+                        UNION ALL
+                        (${teamMatchSelectClause})
+                        ORDER BY "createdAt" DESC
+                        LIMIT $3
+                    `;
+                    allItems = await this.dataSource.query(fallbackQuery, [userId, userId, fetchLimit]);
+
+                    // If not enough, add network-wide content
+                    if (allItems.length < limit) {
+                        const networkQuery = `
+                            (${statusSelectClause})
+                            UNION ALL
+                            (${matchSelectClause})
+                            UNION ALL
+                            (${teamMatchSelectClause})
+                            ORDER BY "createdAt" DESC
+                            LIMIT $2
+                        `;
+                        const networkResults = await this.dataSource.query(networkQuery, [userId, fetchLimit]);
+                        const existingIds = new Set(allItems.map(i => i.id));
+                        const newItems = networkResults.filter((item: any) => !existingIds.has(item.id));
+                        allItems.push(...newItems);
+                    }
                 }
 
-                return results;
+                // De-duplicate by id
+                const seenIds = new Set<string>();
+                allItems = allItems.filter(item => {
+                    if (seenIds.has(item.id)) return false;
+                    seenIds.add(item.id);
+                    return true;
+                });
+
+                // Score all items
+                const scoredItems = allItems.map(item => ({
+                    ...item,
+                    _score: this.calculateFeedScore(item, userId, followedPlayerIds, followedCourtIds, now)
+                }));
+
+                // Sort by score (highest first)
+                scoredItems.sort((a, b) => b._score - a._score);
+
+                // Ensure discovery items are mixed in (at least 20% of feed)
+                const discoveryItems = scoredItems.filter(i => i._isDiscovery);
+                const regularItems = scoredItems.filter(i => !i._isDiscovery);
+
+                const discoverySlots = Math.max(2, Math.floor(limit * 0.2));
+                const regularSlots = limit - discoverySlots;
+
+                const finalFeed: any[] = [];
+                let regularIdx = 0;
+                let discoveryIdx = 0;
+
+                // Interleave: every 4th item is a discovery item (if available)
+                for (let i = 0; i < limit && (regularIdx < regularItems.length || discoveryIdx < discoveryItems.length); i++) {
+                    if (i % 5 === 4 && discoveryIdx < discoveryItems.length) {
+                        // Discovery slot
+                        finalFeed.push(discoveryItems[discoveryIdx++]);
+                    } else if (regularIdx < regularItems.length) {
+                        // Regular slot
+                        finalFeed.push(regularItems[regularIdx++]);
+                    } else if (discoveryIdx < discoveryItems.length) {
+                        // Fill with discovery if no regular left
+                        finalFeed.push(discoveryItems[discoveryIdx++]);
+                    }
+                }
+
+                // Clean up internal scoring fields before returning
+                finalFeed.forEach(item => {
+                    delete item._score;
+                    delete item._isDiscovery;
+                });
+
+                console.log(`getUnifiedFeed: FOR YOU returning ${finalFeed.length} scored items`);
+                return finalFeed.slice(0, limit);
+
             } else if (filter === 'following') {
-                // FOLLOWING: Statuses + matches from followed players
+                // FOLLOWING: Only posts from followed players/courts (unchanged logic)
                 const statusQuery = `
                     ${statusSelectClause}
                     WHERE ps.user_id = $1
@@ -518,26 +715,31 @@ export class StatusesService {
                     ORDER BY "createdAt" DESC
                     LIMIT $3
                 `;
-                // Team matches - include all since they're team-based not user-based
                 const teamMatchQuery = `
                     ${teamMatchSelectClause}
                     ORDER BY "createdAt" DESC
                     LIMIT $1
                 `;
-                params = [userId, userId, userId, limit];
                 const [statusResults, matchResults, teamMatchResults] = await Promise.all([
-                    this.dataSource.query(statusQuery, params),
+                    this.dataSource.query(statusQuery, [userId, userId, userId, limit]),
                     this.dataSource.query(matchQuery, [userId, userId, limit]),
                     this.dataSource.query(teamMatchQuery, [limit])
                 ]);
-                // Merge and sort by createdAt
-                const merged = [...statusResults, ...matchResults, ...teamMatchResults]
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .slice(0, limit);
+
+                // Score and sort
+                let merged = [...statusResults, ...matchResults, ...teamMatchResults];
+                merged = merged.map(item => ({
+                    ...item,
+                    _score: this.calculateFeedScore(item, userId, followedPlayerIds, followedCourtIds, now)
+                }));
+                merged.sort((a, b) => b._score - a._score);
+                merged.forEach(item => delete item._score);
+
                 console.log('getUnifiedFeed: FOLLOWING merged', statusResults.length, 'statuses +', matchResults.length, 'matches +', teamMatchResults.length, 'team matches');
-                return merged;
+                return merged.slice(0, limit);
+
             } else {
-                // ALL: Combined statuses + matches + team matches
+                // ALL: Same as following but with scoring (default view)
                 const statusQuery = `
                     ${statusSelectClause}
                     WHERE ps.user_id = $1
@@ -554,24 +756,28 @@ export class StatusesService {
                     ORDER BY "createdAt" DESC
                     LIMIT $3
                 `;
-                // Team matches - include all since they're team-based not user-based
                 const teamMatchQuery = `
                     ${teamMatchSelectClause}
                     ORDER BY "createdAt" DESC
                     LIMIT $1
                 `;
-                params = [userId, userId, userId, limit];
                 const [statusResults, matchResults, teamMatchResults] = await Promise.all([
-                    this.dataSource.query(statusQuery, params),
+                    this.dataSource.query(statusQuery, [userId, userId, userId, limit]),
                     this.dataSource.query(matchQuery, [userId, userId, limit]),
                     this.dataSource.query(teamMatchQuery, [limit])
                 ]);
-                // Merge and sort by createdAt
-                const merged = [...statusResults, ...matchResults, ...teamMatchResults]
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .slice(0, limit);
+
+                // Score and sort
+                let merged = [...statusResults, ...matchResults, ...teamMatchResults];
+                merged = merged.map(item => ({
+                    ...item,
+                    _score: this.calculateFeedScore(item, userId, followedPlayerIds, followedCourtIds, now)
+                }));
+                merged.sort((a, b) => b._score - a._score);
+                merged.forEach(item => delete item._score);
+
                 console.log('getUnifiedFeed: ALL merged', statusResults.length, 'statuses +', matchResults.length, 'matches +', teamMatchResults.length, 'team matches');
-                return merged;
+                return merged.slice(0, limit);
             }
         } catch (error) {
             console.error('getUnifiedFeed error:', error.message);

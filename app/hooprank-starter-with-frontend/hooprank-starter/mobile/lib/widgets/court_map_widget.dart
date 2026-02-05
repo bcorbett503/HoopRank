@@ -554,172 +554,220 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
               Expanded(
                 flex: 1,
                 child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: _courts.length,
                   itemBuilder: (context, index) {
                     final court = _courts[index];
                     
-                    // Determine which marker image to use for the list
+                    // Determine assets and styling
                     String listMarkerAsset;
-                    double listMarkerSize;
-                    Color borderColor;
+                    Color accentColor;
                     
                     if (court.isSignature) {
                       listMarkerAsset = 'assets/court_marker_signature_crown.jpg';
-                      listMarkerSize = 44;
-                      borderColor = Colors.amber;
+                      accentColor = Colors.amber;
                     } else if (court.hasKings) {
                       listMarkerAsset = 'assets/court_marker_king.jpg';
-                      listMarkerSize = 40;
-                      borderColor = Colors.orange;
+                      accentColor = Colors.orange;
                     } else {
                       listMarkerAsset = 'assets/court_marker.jpg';
-                      listMarkerSize = 36;
-                      borderColor = Colors.grey.shade400;
+                      accentColor = const Color(0xFF00C853); // HoopRank Green default
                     }
                     
-                    return ListTile(
-                      leading: Container(
-                        width: listMarkerSize,
-                        height: listMarkerSize,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: borderColor, width: 2),
-                        ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            listMarkerAsset,
-                            width: listMarkerSize,
-                            height: listMarkerSize,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(court.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ),
-                          if (court.isSignature)
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-                                ),
-                                borderRadius: BorderRadius.circular(6),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.amber.withOpacity(0.4),
-                                    blurRadius: 4,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: const Text('👑 Legendary', 
-                                style: TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.bold)),
+                    return Consumer<CheckInState>(
+                      builder: (context, checkInState, _) {
+                        final isFollowing = checkInState.isFollowing(court.id);
+                        final hasAlert = checkInState.isAlertEnabled(court.id);
+                        final followerCount = checkInState.getFollowerCount(court.id);
+                        final checkInCount = checkInState.getCheckInCount(court.id);
+                        final hasActivity = checkInCount > 0;
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E1E1E),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: hasActivity 
+                                  ? const Color(0xFF00C853).withOpacity(0.3) 
+                                  : Colors.white.withOpacity(0.05)
                             ),
-                        ],
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (court.address != null)
-                            Text(court.address!, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                 style: TextStyle(color: Colors.grey[400], fontSize: 12)),
-                          if (court.hasKings)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
-                              child: Row(
-                                children: [
-                                  const Text('👑 ', style: TextStyle(fontSize: 12)),
-                                  if (court.king1v1 != null)
-                                    _kingBadge('1v1', Colors.deepOrange),
-                                  if (court.king3v3 != null)
-                                    _kingBadge('3v3', Colors.blue),
-                                  if (court.king5v5 != null)
-                                    _kingBadge('5v5', Colors.purple),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      trailing: Consumer<CheckInState>(
-                        builder: (context, checkInState, _) {
-                          final isFollowing = checkInState.isFollowing(court.id);
-                          final hasAlert = checkInState.isAlertEnabled(court.id);
-                          return Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Follower count badge
-                              if (checkInState.getFollowerCount(court.id) > 0)
-                                Container(
-                                  margin: const EdgeInsets.only(right: 4),
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: Colors.red.withOpacity(0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.favorite, size: 12, color: Colors.red.shade300),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        '${checkInState.getFollowerCount(court.id)}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.red.shade300,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              // Bell for alerts (tutorial target for first court)
-                              IconButton(
-                                key: index == 0 ? TutorialKeys.getKey(TutorialKeys.courtAlertBell) : null,
-                                icon: Icon(
-                                  hasAlert ? Icons.notifications_active : Icons.notifications_none,
-                                  size: 20,
-                                ),
-                                color: hasAlert ? Colors.orange : Colors.grey[500],
-                                onPressed: () {
-                                  checkInState.toggleAlert(court.id);
-                                  // Complete tutorial step if active
-                                  final tutorial = context.read<TutorialState>();
-                                  if (tutorial.isActive && tutorial.currentStep?.id == 'enable_notifications') {
-                                    tutorial.completeStep('enable_notifications');
-                                  }
-                                },
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              ),
-                              // Heart for follow (tutorial target for first court)
-                              IconButton(
-                                key: index == 0 ? TutorialKeys.getKey(TutorialKeys.courtFollowButton) : null,
-                                icon: Icon(
-                                  isFollowing ? Icons.favorite : Icons.favorite_border,
-                                  size: 22,
-                                ),
-                                color: isFollowing ? Colors.red : Colors.grey[500],
-                                onPressed: () {
-                                  checkInState.toggleFollow(court.id);
-                                  // Complete tutorial step if active
-                                  final tutorial = context.read<TutorialState>();
-                                  if (tutorial.isActive && tutorial.currentStep?.id == 'follow_court') {
-                                    tutorial.completeStep('follow_court');
-                                  }
-                                },
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
                               ),
                             ],
-                          );
-                        },
-                      ),
-                      onTap: () => _zoomToCourtAndSelect(court),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _zoomToCourtAndSelect(court),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    // Court Image/Icon
+                                    Container(
+                                      width: 56,
+                                      height: 56,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: hasActivity ? const Color(0xFF00C853) : accentColor.withOpacity(0.5), 
+                                          width: 2
+                                        ),
+                                        image: DecorationImage(
+                                          image: AssetImage(listMarkerAsset),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    
+                                    // Main Details
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Court Name & Badges
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  court.name, 
+                                                  maxLines: 1, 
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (hasActivity) ...[
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF00C853),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    'LIVE: $checkInCount',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w900,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          
+                                          // Address line
+                                          if (court.address != null)
+                                            Text(
+                                              court.address!, 
+                                              maxLines: 1, 
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                                            ),
+                                            
+                                          // Bottom Row: Kings & Followers
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              // Kings Badges
+                                              if (court.hasKings) ...[
+                                                Icon(Icons.emoji_events_rounded, size: 14, color: Colors.amber[700]),
+                                                const SizedBox(width: 4),
+                                                if (court.king1v1 != null) _kingBadge('1v1', Colors.deepOrange),
+                                                if (court.king3v3 != null) _kingBadge('3v3', Colors.blue),
+                                                if (court.king5v5 != null) _kingBadge('5v5', Colors.purple),
+                                                if (!court.isSignature) const SizedBox(width: 8), // Spacer if we have more stuff
+                                              ],
+                                              
+                                              // Signature Badge (if space allows or instead of kings if it's simpler)
+                                              if (court.isSignature)
+                                                 Container(
+                                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                   decoration: BoxDecoration(
+                                                     gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA500)]),
+                                                     borderRadius: BorderRadius.circular(4),
+                                                   ),
+                                                   child: const Text('LEGENDARY', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black)),
+                                                 ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    
+                                    // Action Buttons Column
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        // Follow Heart
+                                        GestureDetector(
+                                          key: index == 0 ? TutorialKeys.getKey(TutorialKeys.courtFollowButton) : null,
+                                          onTap: () {
+                                            checkInState.toggleFollow(court.id);
+                                            final tutorial = context.read<TutorialState>();
+                                            if (tutorial.isActive && tutorial.currentStep?.id == 'follow_court') {
+                                              tutorial.completeStep('follow_court');
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: isFollowing ? Colors.red.withOpacity(0.15) : Colors.transparent,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              isFollowing ? Icons.favorite : Icons.favorite_border_rounded,
+                                              size: 20,
+                                              color: isFollowing ? Colors.redAccent : Colors.grey[600],
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        // Alert Bell
+                                        GestureDetector(
+                                          key: index == 0 ? TutorialKeys.getKey(TutorialKeys.courtAlertBell) : null,
+                                          onTap: () {
+                                            checkInState.toggleAlert(court.id);
+                                            final tutorial = context.read<TutorialState>();
+                                            if (tutorial.isActive && tutorial.currentStep?.id == 'enable_notifications') {
+                                              tutorial.completeStep('enable_notifications');
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: hasAlert ? Colors.orange.withOpacity(0.15) : Colors.transparent,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              hasAlert ? Icons.notifications_active : Icons.notifications_none_rounded,
+                                              size: 20,
+                                              color: hasAlert ? Colors.orange : Colors.grey[600],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
