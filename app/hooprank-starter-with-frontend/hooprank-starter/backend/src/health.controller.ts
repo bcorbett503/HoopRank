@@ -980,4 +980,84 @@ export class HealthController {
         const existing = results.filter(r => r.status === 'already_exists').length;
         return { success: true, cities: ['Chicago', 'Houston', 'Phoenix'], summary: { created, existing, total: gymCourts.length }, results };
     }
+
+    /**
+     * Seed Philadelphia, San Antonio, San Diego, Dallas, San Jose courts
+     * Cities #6-10 in the 200 largest US cities
+     */
+    @Post('seed/batch-6-10')
+    async seedBatch6to10() {
+        const gymCourts = [
+            // PHILADELPHIA - YMCAs
+            ['Columbia North YMCA', 'Philadelphia', 40.0031, -75.1419, true],
+            ['Northeast Family YMCA', 'Philadelphia', 40.0641, -75.0459, true],
+            ['West Philadelphia YMCA', 'Philadelphia', 39.9546, -75.2139, true],
+            ['Roxborough YMCA', 'Philadelphia', 40.0349, -75.2283, true],
+            ['Center City YMCA', 'Philadelphia', 39.9532, -75.1667, true],
+
+            // SAN ANTONIO - YMCAs
+            ['D.R. Semmes Family YMCA', 'San Antonio', 29.4680, -98.4803, true],
+            ['Davis-Scott Family YMCA', 'San Antonio', 29.4158, -98.4609, true],
+            ['Harvey E. Najim Family YMCA', 'San Antonio', 29.3829, -98.5093, true],
+            ['Mays Family YMCA at Stone Oak', 'San Antonio', 29.6147, -98.4813, true],
+            ['Mays YMCA at Potranco', 'San Antonio', 29.4239, -98.6751, true],
+            ['Schertz Family YMCA', 'Schertz', 29.5647, -98.2720, true],
+            ['Thousand Oaks YMCA', 'San Antonio', 29.5589, -98.4305, true],
+            ['Walzem Family YMCA', 'San Antonio', 29.4947, -98.3952, true],
+            ['Westside Family YMCA', 'San Antonio', 29.4326, -98.5251, true],
+            ['YMCA at O.P. Schnabel Park', 'San Antonio', 29.5078, -98.6423, true],
+
+            // SAN DIEGO - YMCAs
+            ['Border View Family YMCA', 'San Diego', 32.5452, -116.9712, true],
+            ['Cameron Family YMCA', 'Santee', 32.8446, -116.9740, true],
+            ['Copley-Price Family YMCA', 'San Diego', 32.7612, -117.0961, true],
+            ['Dan McKinney Family YMCA', 'La Jolla', 32.8537, -117.2243, true],
+            ['Escondido YMCA', 'Escondido', 33.1324, -117.0781, true],
+            ['Jackie Robinson Family YMCA', 'San Diego', 32.7123, -117.1205, true],
+            ['Joe and Mary Mottino Family YMCA', 'Oceanside', 33.2140, -117.2822, true],
+            ['John A. Davis Family YMCA', 'La Mesa', 32.7628, -117.0198, true],
+            ['Magdalena Ecke Family YMCA', 'Encinitas', 33.0536, -117.2611, true],
+            ['Mission Valley YMCA', 'San Diego', 32.7639, -117.1628, true],
+            ['Rancho Family YMCA', 'San Diego', 32.9587, -117.1078, true],
+            ['South Bay Family YMCA', 'Chula Vista', 32.6119, -117.0635, true],
+            ['Toby Wells YMCA', 'San Diego', 32.8182, -117.1403, true],
+
+            // DALLAS - YMCAs
+            ['Lake Highlands Family YMCA', 'Dallas', 32.8822, -96.7404, true],
+            ['Moody Family YMCA', 'Dallas', 32.8404, -96.7996, true],
+            ['Moorland Family YMCA', 'Dallas', 32.6810, -96.8436, true],
+            ['Park South Family YMCA', 'Dallas', 32.7405, -96.7618, true],
+            ['Semones Family YMCA', 'Dallas', 32.8729, -96.8466, true],
+            ['White Rock YMCA', 'Dallas', 32.8088, -96.7192, true],
+
+            // SAN JOSE - YMCAs
+            ['Central YMCA San Jose', 'San Jose', 37.3284, -121.9045, true],
+            ['East Valley Family YMCA', 'San Jose', 37.3207, -121.8195, true],
+            ['South Valley Family YMCA', 'San Jose', 37.2315, -121.8487, true],
+            ['Northwest YMCA', 'Cupertino', 37.3197, -122.0325, true],
+        ];
+
+        const results: any[] = [];
+        for (const [name, city, lat, lng, indoor] of gymCourts) {
+            try {
+                const uuidResult = await this.dataSource.query(`SELECT gen_random_uuid() as id`);
+                const courtId = uuidResult[0].id;
+                const existing = await this.dataSource.query(`SELECT id FROM courts WHERE name = $1`, [name]);
+                if (existing.length > 0) {
+                    results.push({ name, status: 'already_exists', id: existing[0].id });
+                    continue;
+                }
+                await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, geog, source)
+                    VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'manual')
+                `, [courtId, name, city, indoor, lng, lat]);
+                results.push({ name, status: 'created', id: courtId });
+            } catch (error) {
+                results.push({ name, status: 'error', error: error.message });
+            }
+        }
+        const created = results.filter(r => r.status === 'created').length;
+        const existing = results.filter(r => r.status === 'already_exists').length;
+        return { success: true, cities: ['Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'San Jose'], summary: { created, existing, total: gymCourts.length }, results };
+    }
 }
