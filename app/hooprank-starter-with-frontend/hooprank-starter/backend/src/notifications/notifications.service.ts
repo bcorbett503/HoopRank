@@ -29,21 +29,23 @@ export class NotificationsService {
         playerName: string,
         activityType: 'check_in' | 'game_started' = 'check_in',
     ): Promise<void> {
-        // Get all users with alerts enabled for this court
+        // Get all users with alerts enabled for this court via user_followed_courts
         const query = this.isPostgres
             ? `SELECT u.fcm_token, u.id, u.name 
                FROM users u
-               JOIN user_court_alerts a ON u.id = a.user_id
-               WHERE a.court_id = $1 AND u.fcm_token IS NOT NULL`
+               JOIN user_followed_courts f ON u.id = f.user_id
+               WHERE f.court_id = $1 AND f.alerts_enabled = true AND u.fcm_token IS NOT NULL`
             : `SELECT u."fcmToken" as fcm_token, u.id, u.name 
                FROM users u
-               JOIN user_court_alerts a ON u.id = a.user_id
-               WHERE a.court_id = ? AND u."fcmToken" IS NOT NULL`;
+               JOIN user_followed_courts f ON u.id = f.user_id
+               WHERE f.court_id = ? AND f.alerts_enabled = 1 AND u."fcmToken" IS NOT NULL`;
 
+        console.log(`[CourtNotification] Querying users with alerts for court ${courtId}`);
         const result = await this.dataSource.query(query, [courtId]);
+        console.log(`[CourtNotification] Found ${result.length} users with alerts enabled`);
 
         if (result.length === 0) {
-            console.log(`No users to notify for court ${courtId}`);
+            console.log(`[CourtNotification] No users to notify for court ${courtId}`);
             return;
         }
 
@@ -134,40 +136,43 @@ export class NotificationsService {
     }
 
     /**
-     * Enable court alert for a user
+     * Enable court alert for a user - updates alerts_enabled in user_followed_courts
      */
     async enableCourtAlert(userId: string, courtId: string): Promise<void> {
+        console.log(`[Alerts] Enabling alert for user=${userId}, court=${courtId}`);
         if (this.isPostgres) {
             await this.dataSource.query(`
-                INSERT INTO user_court_alerts (user_id, court_id)
-                VALUES ($1, $2)
-                ON CONFLICT (user_id, court_id) DO NOTHING
+                UPDATE user_followed_courts 
+                SET alerts_enabled = true
+                WHERE user_id = $1 AND court_id = $2
             `, [userId, courtId]);
         } else {
             await this.dataSource.query(`
-                INSERT OR IGNORE INTO user_court_alerts (user_id, court_id)
-                VALUES (?, ?)
+                UPDATE user_followed_courts 
+                SET alerts_enabled = 1
+                WHERE user_id = ? AND court_id = ?
             `, [userId, courtId]);
         }
     }
 
     /**
-     * Disable court alert for a user
+     * Disable court alert for a user - updates alerts_enabled in user_followed_courts
      */
     async disableCourtAlert(userId: string, courtId: string): Promise<void> {
+        console.log(`[Alerts] Disabling alert for user=${userId}, court=${courtId}`);
         const query = this.isPostgres
-            ? `DELETE FROM user_court_alerts WHERE user_id = $1 AND court_id = $2`
-            : `DELETE FROM user_court_alerts WHERE user_id = ? AND court_id = ?`;
+            ? `UPDATE user_followed_courts SET alerts_enabled = false WHERE user_id = $1 AND court_id = $2`
+            : `UPDATE user_followed_courts SET alerts_enabled = 0 WHERE user_id = ? AND court_id = ?`;
         await this.dataSource.query(query, [userId, courtId]);
     }
 
     /**
-     * Get all court alerts for a user
+     * Get all court alerts for a user - queries user_followed_courts with alerts_enabled
      */
     async getUserCourtAlerts(userId: string): Promise<string[]> {
         const query = this.isPostgres
-            ? `SELECT court_id FROM user_court_alerts WHERE user_id = $1`
-            : `SELECT court_id FROM user_court_alerts WHERE user_id = ?`;
+            ? `SELECT court_id FROM user_followed_courts WHERE user_id = $1 AND alerts_enabled = true`
+            : `SELECT court_id FROM user_followed_courts WHERE user_id = ? AND alerts_enabled = 1`;
         const result = await this.dataSource.query(query, [userId]);
         return result.map((r: any) => r.court_id);
     }
