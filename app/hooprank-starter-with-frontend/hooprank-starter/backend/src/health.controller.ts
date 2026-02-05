@@ -1173,4 +1173,101 @@ export class HealthController {
         const existing = results.filter(r => r.status === 'already_exists').length;
         return { success: true, cities: ['Austin', 'Jacksonville', 'Fort Worth', 'Columbus', 'Indianapolis', 'Charlotte', 'San Francisco', 'Seattle', 'Denver', 'Washington DC'], summary: { created, existing, total: gymCourts.length }, results };
     }
+
+    /**
+     * Seed cities #21-30: Nashville, Boston, El Paso, OKC, Detroit,
+     * Portland, Las Vegas, Memphis, Louisville, Baltimore
+     */
+    @Post('seed/batch-21-30')
+    async seedBatch21to30() {
+        const gymCourts = [
+            // NASHVILLE - YMCAs
+            ['Downtown Nashville YMCA', 'Nashville', 36.1584, -86.7816, true],
+            ['Bellevue YMCA', 'Nashville', 36.0584, -86.9094, true],
+            ['Donelson-Hermitage YMCA', 'Nashville', 36.1589, -86.6455, true],
+            ['Green Hills YMCA', 'Nashville', 36.1026, -86.8157, true],
+            ['Margaret Maddox YMCA', 'Nashville', 36.2072, -86.7447, true],
+            ['Northwest Nashville YMCA', 'Nashville', 36.2245, -86.8624, true],
+
+            // BOSTON - YMCAs
+            ['Huntington Avenue YMCA', 'Boston', 42.3415, -71.0872, true],
+            ['East Boston YMCA', 'Boston', 42.3742, -71.0348, true],
+            ['Oak Square Family YMCA', 'Brighton', 42.3505, -71.1572, true],
+            ['Charlestown YMCA', 'Boston', 42.3793, -71.0605, true],
+            ['Dorchester YMCA', 'Boston', 42.2963, -71.0659, true],
+            ['Roxbury YMCA', 'Boston', 42.3265, -71.0915, true],
+            ['Thomas M. Menino YMCA', 'Hyde Park', 42.2568, -71.1244, true],
+            ['Waltham YMCA', 'Waltham', 42.3795, -71.2471, true],
+
+            // EL PASO - YMCAs
+            ['Bowling Family YMCA', 'El Paso', 31.8637, -106.4439, true],
+            ['Loya Family YMCA', 'El Paso', 31.7718, -106.3373, true],
+            ['Westside Family YMCA El Paso', 'El Paso', 31.8366, -106.5419, true],
+
+            // OKLAHOMA CITY - YMCAs
+            ['Bethany YMCA', 'Bethany', 35.5157, -97.6394, true],
+            ['Earlywine Park YMCA', 'Oklahoma City', 35.3499, -97.5419, true],
+            ['Edward L. Gaylord Downtown YMCA', 'Oklahoma City', 35.4704, -97.5171, true],
+            ['Midwest City YMCA', 'Midwest City', 35.4624, -97.3753, true],
+            ['North Side YMCA OKC', 'Oklahoma City', 35.5664, -97.5217, true],
+            ['Rockwell Plaza YMCA', 'Oklahoma City', 35.5015, -97.6239, true],
+
+            // DETROIT - YMCAs
+            ['Boll Family YMCA', 'Detroit', 42.3361, -83.0483, true],
+            ['Birmingham Family YMCA', 'Birmingham', 42.5467, -83.2144, true],
+            ['Carls Family YMCA', 'Milford', 42.5916, -83.5949, true],
+            ['Downriver Family YMCA', 'Southgate', 42.2048, -83.1993, true],
+            ['South Oakland YMCA', 'Royal Oak', 42.4895, -83.1446, true],
+
+            // PORTLAND (already has courts, but adding any missing)
+
+            // LAS VEGAS - YMCAs
+            ['Bill & Lillie Heinrich YMCA', 'Las Vegas', 36.1509, -115.2007, true],
+            ['Durango Hills YMCA', 'Las Vegas', 36.1989, -115.2794, true],
+            ['Centennial Hills YMCA', 'Las Vegas', 36.2661, -115.2479, true],
+            ['SkyView YMCA', 'North Las Vegas', 36.2655, -115.1371, true],
+
+            // MEMPHIS - YMCAs
+            ['Bartlett YMCA', 'Bartlett', 35.2296, -89.8409, true],
+            ['Cordova Family YMCA', 'Cordova', 35.1544, -89.7694, true],
+            ['Fogelman Downtown YMCA', 'Memphis', 35.1473, -90.0505, true],
+            ['Georgette & Cato Johnson YMCA', 'Memphis', 35.0618, -90.0351, true],
+            ['YMCA at Schilling Farms', 'Collierville', 35.0477, -89.7012, true],
+
+            // LOUISVILLE - YMCAs
+            ['Chestnut Street Family YMCA', 'Louisville', 38.2483, -85.7632, true],
+            ['Downtown Family YMCA Louisville', 'Louisville', 38.2477, -85.7544, true],
+            ['Northeast Family YMCA Louisville', 'Louisville', 38.2842, -85.6161, true],
+            ['Republic Bank Foundation YMCA', 'Louisville', 38.2522, -85.7733, true],
+            ['Southeast Family YMCA Louisville', 'Louisville', 38.2122, -85.6498, true],
+            ['Southwest Family YMCA Louisville', 'Louisville', 38.1902, -85.8005, true],
+
+            // BALTIMORE - YMCAs
+            ['Y in Waverly', 'Baltimore', 39.3255, -76.6093, true],
+            ['Y in Druid Hill', 'Baltimore', 39.3061, -76.6388, true],
+        ];
+
+        const results: any[] = [];
+        for (const [name, city, lat, lng, indoor] of gymCourts) {
+            try {
+                const uuidResult = await this.dataSource.query(`SELECT gen_random_uuid() as id`);
+                const courtId = uuidResult[0].id;
+                const existing = await this.dataSource.query(`SELECT id FROM courts WHERE name = $1`, [name]);
+                if (existing.length > 0) {
+                    results.push({ name, status: 'already_exists', id: existing[0].id });
+                    continue;
+                }
+                await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, geog, source)
+                    VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'manual')
+                `, [courtId, name, city, indoor, lng, lat]);
+                results.push({ name, status: 'created', id: courtId });
+            } catch (error) {
+                results.push({ name, status: 'error', error: error.message });
+            }
+        }
+        const created = results.filter(r => r.status === 'created').length;
+        const existing = results.filter(r => r.status === 'already_exists').length;
+        return { success: true, cities: ['Nashville', 'Boston', 'El Paso', 'Oklahoma City', 'Detroit', 'Las Vegas', 'Memphis', 'Louisville', 'Baltimore'], summary: { created, existing, total: gymCourts.length }, results };
+    }
 }
