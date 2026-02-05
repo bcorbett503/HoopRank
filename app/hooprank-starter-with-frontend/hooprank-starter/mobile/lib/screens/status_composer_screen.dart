@@ -667,37 +667,37 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                       tooltip: 'Tag friends',
                     ),
                   const Spacer(),
-                  // Schedule Run button with text
+                  // Schedule Run button with text - always green to draw attention
                   GestureDetector(
                     onTap: _showScheduleSheet,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: _scheduledTime != null 
-                            ? Colors.deepOrange.withOpacity(0.2) 
-                            : Colors.white.withOpacity(0.08),
+                        color: Colors.green,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _scheduledTime != null 
-                              ? Colors.deepOrange.withOpacity(0.5) 
-                              : Colors.white.withOpacity(0.15),
-                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.calendar_month,
+                            _scheduledTime != null ? Icons.check_circle : Icons.calendar_month,
                             size: 18,
-                            color: _scheduledTime != null ? Colors.deepOrange : Colors.white70,
+                            color: Colors.white,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             _scheduledTime != null ? 'Scheduled ✓' : 'Schedule Run',
-                            style: TextStyle(
-                              color: _scheduledTime != null ? Colors.deepOrange : Colors.white70,
+                            style: const TextStyle(
+                              color: Colors.white,
                               fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
