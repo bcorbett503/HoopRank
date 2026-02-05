@@ -209,9 +209,19 @@ export class NotificationsService {
                 token,
                 notification: { title, body },
                 data,
+                // iOS-specific settings
                 apns: {
                     payload: {
                         aps: { sound: 'default', badge: 1 },
+                    },
+                },
+                // Android-specific settings
+                android: {
+                    priority: 'high',
+                    notification: {
+                        sound: 'default',
+                        channelId: 'hooprank_channel',
+                        priority: 'high',
                     },
                 },
             };
