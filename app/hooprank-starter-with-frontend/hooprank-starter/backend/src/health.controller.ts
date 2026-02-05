@@ -840,4 +840,70 @@ export class HealthController {
         const existing = results.filter(r => r.status === 'already_exists').length;
         return { success: true, city: 'New York', summary: { created, existing, total: gymCourts.length }, results };
     }
+
+    /**
+     * Seed Los Angeles indoor gym basketball courts
+     * City #2 in the 200 largest US cities
+     */
+    @Post('seed/la-courts')
+    async seedLaCourts() {
+        const gymCourts = [
+            // LA Fitness locations
+            ['LA Fitness - Miracle Mile', 'Los Angeles', 34.0625, -118.3467, true],
+            ['LA Fitness - Hollywood Blvd', 'Los Angeles', 34.1017, -118.3388, true],
+            ['LA Fitness - Westwood', 'Los Angeles', 34.0585, -118.4522, true],
+            ['LA Fitness - Montebello', 'Montebello', 34.0168, -118.1251, true],
+            ['LA Fitness - Northridge', 'Northridge', 34.2523, -118.5553, true],
+            ['LA Fitness - La Cienega', 'Los Angeles', 34.0496, -118.3794, true],
+            ['LA Fitness - Hollywood El Centro', 'Los Angeles', 34.0994, -118.3260, true],
+            ['LA Fitness - Downtown Bloc', 'Los Angeles', 34.0490, -118.2579, true],
+            ['LA Fitness - Universal City', 'Los Angeles', 34.1385, -118.3542, true],
+
+            // LA YMCAs
+            ['Anderson Munger Family YMCA', 'Los Angeles', 34.0690, -118.3008, true],
+            ['Collins & Katz Family YMCA', 'Los Angeles', 34.0484, -118.4663, true],
+            ['Crenshaw Family YMCA', 'Los Angeles', 34.0141, -118.3340, true],
+            ['Culver-Palms Family YMCA', 'Culver City', 34.0116, -118.3979, true],
+            ['East Valley Family YMCA', 'North Hollywood', 34.1611, -118.3688, true],
+            ['Gardena-Carson Family YMCA', 'Gardena', 33.8889, -118.3073, true],
+            ['Hollywood YMCA', 'Hollywood', 34.1006, -118.3269, true],
+            ['Ketchum-Downtown YMCA', 'Los Angeles', 34.0510, -118.2553, true],
+            ['Mid Valley Family YMCA', 'Van Nuys', 34.1870, -118.4468, true],
+            ['North Valley Family YMCA', 'Northridge', 34.2553, -118.5363, true],
+            ['San Pedro & Peninsula YMCA', 'San Pedro', 33.7378, -118.2876, true],
+            ['Southeast-Rio Vista YMCA', 'Maywood', 33.9876, -118.1857, true],
+            ['Torrance-South Bay YMCA', 'Torrance', 33.8363, -118.3908, true],
+            ['Weingart Wellness YMCA', 'Los Angeles', 33.9414, -118.2912, true],
+            ['Weingart East Los Angeles YMCA', 'Los Angeles', 34.0231, -118.2140, true],
+            ['Westchester Family YMCA', 'Westchester', 33.9598, -118.3970, true],
+            ['West Valley Family YMCA', 'Reseda', 34.1958, -118.5368, true],
+            ['Wilmington Family YMCA', 'Wilmington', 33.7902, -118.2616, true],
+            ['Crescenta-Canada Family YMCA', 'La Crescenta', 34.2140, -118.2236, true],
+            ['Pasadena-Sierra Madre YMCA', 'Sierra Madre', 34.1627, -118.0515, true],
+            ['Santa Anita Family YMCA', 'Monrovia', 34.1459, -117.9976, true],
+        ];
+
+        const results: any[] = [];
+        for (const [name, city, lat, lng, indoor] of gymCourts) {
+            try {
+                const uuidResult = await this.dataSource.query(`SELECT gen_random_uuid() as id`);
+                const courtId = uuidResult[0].id;
+                const existing = await this.dataSource.query(`SELECT id FROM courts WHERE name = $1`, [name]);
+                if (existing.length > 0) {
+                    results.push({ name, status: 'already_exists', id: existing[0].id });
+                    continue;
+                }
+                await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, geog, source)
+                    VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'manual')
+                `, [courtId, name, city, indoor, lng, lat]);
+                results.push({ name, status: 'created', id: courtId });
+            } catch (error) {
+                results.push({ name, status: 'error', error: error.message });
+            }
+        }
+        const created = results.filter(r => r.status === 'created').length;
+        const existing = results.filter(r => r.status === 'already_exists').length;
+        return { success: true, city: 'Los Angeles', summary: { created, existing, total: gymCourts.length }, results };
+    }
 }
