@@ -696,4 +696,81 @@ export class HealthController {
             results
         };
     }
+
+    /**
+     * Seed known indoor gym basketball courts that are missing from map data
+     * These are verified locations with basketball courts inside gyms
+     */
+    @Post('seed/gym-courts')
+    async seedGymCourts() {
+        // Known gym basketball courts in the Portland/Clackamas area
+        // Format: [name, city, lat, lng, indoor]
+        const gymCourts = [
+            // 24 Hour Fitness locations with basketball courts
+            ['24 Hour Fitness - Clackamas', 'Clackamas', 45.4348, -122.5676, true],
+            ['24 Hour Fitness - Lloyd District', 'Portland', 45.5317, -122.6576, true],
+            ['24 Hour Fitness - Beaverton', 'Beaverton', 45.4874, -122.8033, true],
+            ['24 Hour Fitness - Tigard', 'Tigard', 45.4183, -122.7634, true],
+
+            // LA Fitness locations
+            ['LA Fitness - Clackamas', 'Clackamas', 45.4456, -122.5824, true],
+            ['LA Fitness - Beaverton', 'Beaverton', 45.4728, -122.7892, true],
+
+            // Other gyms with courts
+            ['East Portland Community Center', 'Portland', 45.5117, -122.5127, true],
+            ['Matt Dishman Community Center', 'Portland', 45.5437, -122.6569, true],
+            ['Mt. Scott Community Center', 'Portland', 45.4597, -122.5642, true],
+            ['Southwest Community Center', 'Portland', 45.4672, -122.7156, true],
+            ['North Portland Community Center', 'Portland', 45.5806, -122.6775, true],
+
+            // Recreation centers
+            ['Milwaukie Center', 'Milwaukie', 45.4433, -122.6411, true],
+            ['Lake Oswego Indoor Tennis & Athletic Club', 'Lake Oswego', 45.4206, -122.6706, true],
+            ['Oregon City Recreation Center', 'Oregon City', 45.3577, -122.6067, true],
+        ];
+
+        const results: any[] = [];
+
+        for (const [name, city, lat, lng, indoor] of gymCourts) {
+            try {
+                // Generate deterministic UUID from name
+                const cleanName = (name as string).toLowerCase().replace(/[^a-z0-9]/g, '');
+                const nameHash = cleanName.split('').reduce((a, b) => {
+                    a = ((a << 5) - a) + b.charCodeAt(0);
+                    return a & a;
+                }, 0);
+                const courtId = `gym-${Math.abs(nameHash).toString(16).padStart(8, '0')}-0000-0000-000000000000`;
+
+                // Check if already exists
+                const existing = await this.dataSource.query(
+                    `SELECT id FROM courts WHERE name = $1`, [name]
+                );
+
+                if (existing.length > 0) {
+                    results.push({ name, status: 'already_exists', id: existing[0].id });
+                    continue;
+                }
+
+                // Insert with PostGIS geography
+                await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, geog, source)
+                    VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'manual')
+                `, [courtId, name, city, indoor, lng, lat]);
+
+                results.push({ name, status: 'created', id: courtId });
+            } catch (error) {
+                results.push({ name, status: 'error', error: error.message });
+            }
+        }
+
+        const created = results.filter(r => r.status === 'created').length;
+        const existing = results.filter(r => r.status === 'already_exists').length;
+        const errors = results.filter(r => r.status === 'error').length;
+
+        return {
+            success: true,
+            summary: { created, existing, errors, total: gymCourts.length },
+            results
+        };
+    }
 }
