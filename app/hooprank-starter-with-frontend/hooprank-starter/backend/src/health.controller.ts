@@ -524,4 +524,49 @@ export class HealthController {
             };
         }
     }
+
+    /**
+     * Debug endpoint to check the structure of check_ins table
+     */
+    @Get('debug/check-ins-schema')
+    async debugCheckInsSchema() {
+        try {
+            // Check if check_ins table exists and get its structure
+            const tableInfo = await this.dataSource.query(`
+                SELECT column_name, data_type, udt_name, is_nullable
+                FROM information_schema.columns 
+                WHERE table_name = 'check_ins'
+                ORDER BY ordinal_position
+            `);
+
+            // Check foreign key constraints
+            const fkConstraints = await this.dataSource.query(`
+                SELECT
+                    tc.constraint_name,
+                    kcu.column_name,
+                    ccu.table_name AS foreign_table_name,
+                    ccu.column_name AS foreign_column_name
+                FROM information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                    ON ccu.constraint_name = tc.constraint_name
+                WHERE tc.table_name = 'check_ins' AND tc.constraint_type = 'FOREIGN KEY'
+            `);
+
+            // Get a sample row if exists
+            const sample = await this.dataSource.query(`
+                SELECT * FROM check_ins LIMIT 1
+            `);
+
+            return {
+                tableExists: tableInfo.length > 0,
+                columns: tableInfo,
+                foreignKeys: fkConstraints,
+                sampleRow: sample[0] || null,
+            };
+        } catch (error) {
+            return { error: error.message };
+        }
+    }
 }
