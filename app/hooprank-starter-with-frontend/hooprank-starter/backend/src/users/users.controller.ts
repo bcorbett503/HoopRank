@@ -43,6 +43,12 @@ export class UsersController {
     return this.usersService.cleanupUsers();
   }
 
+  // Delete a specific user and all their data (for testing)
+  @Delete('admin/user/:userId')
+  async deleteUser(@Param('userId') userId: string) {
+    return this.usersService.deleteUser(userId);
+  }
+
   @Get()
   findAll() {
     return this.usersService.getAll();
