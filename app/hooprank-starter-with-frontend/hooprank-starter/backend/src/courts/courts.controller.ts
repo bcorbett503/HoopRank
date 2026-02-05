@@ -42,6 +42,7 @@ export class CourtsController {
         @Query('lng') lng: string,
         @Query('indoor') indoor?: string,
         @Query('rims') rims?: string,
+        @Query('access') access?: string,
     ) {
         return this.courtsService.createCourt({
             id,
@@ -51,6 +52,7 @@ export class CourtsController {
             lng: parseFloat(lng),
             indoor: indoor === 'true',
             rims: rims ? parseInt(rims) : 2,
+            access: access || 'public',
         });
     }
 

@@ -29,7 +29,7 @@ export class CourtsService {
         if (this.dialect.isPostgres) {
             const courts = await this.dataSource.query(`
                 SELECT 
-                    id, name, city, indoor, rims, source, signature,
+                    id, name, city, indoor, rims, source, signature, access,
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng
                 FROM courts
@@ -50,7 +50,7 @@ export class CourtsService {
         if (this.dialect.isPostgres) {
             const results = await this.dataSource.query(`
                 SELECT 
-                    id, name, city, indoor, rims, source, signature,
+                    id, name, city, indoor, rims, source, signature, access,
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng
                 FROM courts
@@ -70,7 +70,7 @@ export class CourtsService {
             // Use PostGIS spatial query for production
             const courts = await this.dataSource.query(`
                 SELECT 
-                    id, name, city, indoor, rims, source, signature,
+                    id, name, city, indoor, rims, source, signature, access,
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng,
                     (SELECT COUNT(*) FROM user_court_alerts WHERE court_id = courts.id) as follower_count
@@ -234,15 +234,16 @@ export class CourtsService {
         lng: number;
         indoor?: boolean;
         rims?: number;
+        access?: string;
     }): Promise<any> {
         try {
             if (this.dialect.isPostgres) {
                 const result = await this.dataSource.query(`
-                    INSERT INTO courts (id, name, city, indoor, rims, source, geog)
-                    VALUES ($1, $2, $3, $4, $5, 'user', ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography)
+                    INSERT INTO courts (id, name, city, indoor, rims, access, source, geog)
+                    VALUES ($1, $2, $3, $4, $5, $6, 'user', ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography)
                     ON CONFLICT (id) DO NOTHING
-                    RETURNING id, name, city
-                `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.lng, data.lat]);
+                    RETURNING id, name, city, access
+                `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.access ?? 'public', data.lng, data.lat]);
 
                 if (result.length === 0) {
                     return { success: false, error: 'Court already exists with this ID' };
