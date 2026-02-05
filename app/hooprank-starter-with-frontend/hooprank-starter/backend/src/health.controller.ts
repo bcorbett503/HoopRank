@@ -769,4 +769,75 @@ export class HealthController {
             results
         };
     }
+
+    /**
+     * Seed NYC indoor gym basketball courts
+     * City #1 in the 200 largest US cities
+     */
+    @Post('seed/nyc-courts')
+    async seedNycCourts() {
+        const gymCourts = [
+            // Commercial Gyms
+            ['24 Hour Fitness - Kew Gardens', 'Queens', 40.7053, -73.8303, true],
+            ['LA Fitness - Staten Island', 'Staten Island', 40.5795, -74.1502, true],
+
+            // Manhattan YMCAs
+            ['Chinatown YMCA', 'Manhattan', 40.7235, -73.9926, true],
+            ['Harlem YMCA', 'Manhattan', 40.8149, -73.9455, true],
+            ['McBurney YMCA', 'Manhattan', 40.7375, -73.9996, true],
+            ['Vanderbilt YMCA', 'Manhattan', 40.7554, -73.9713, true],
+            ['West Side YMCA', 'Manhattan', 40.7706, -73.9799, true],
+            ['92nd Street Y', 'Manhattan', 40.7847, -73.9554, true],
+
+            // Brooklyn YMCAs
+            ['Bedford-Stuyvesant YMCA', 'Brooklyn', 40.6893, -73.9540, true],
+            ['Coney Island YMCA', 'Brooklyn', 40.5762, -73.9849, true],
+            ['Dodge YMCA', 'Brooklyn', 40.6897, -73.9875, true],
+            ['Flatbush YMCA', 'Brooklyn', 40.6320, -73.9576, true],
+            ['Greenpoint YMCA', 'Brooklyn', 40.7272, -73.9529, true],
+            ['North Brooklyn YMCA', 'Brooklyn', 40.6915, -73.8712, true],
+            ['Park Slope Armory YMCA', 'Brooklyn', 40.6624, -73.9827, true],
+            ['Prospect Park YMCA', 'Brooklyn', 40.6703, -73.9758, true],
+
+            // Bronx YMCAs
+            ['Castle Hill YMCA', 'Bronx', 40.8197, -73.8512, true],
+            ['La Central YMCA', 'Bronx', 40.8135, -73.9044, true],
+            ['Northeast Bronx YMCA', 'Bronx', 40.8889, -73.8599, true],
+
+            // Queens YMCAs
+            ['Cross Island YMCA', 'Queens', 40.7431, -73.7275, true],
+            ['Flushing YMCA', 'Queens', 40.7632, -73.8300, true],
+            ['Jamaica YMCA', 'Queens', 40.7054, -73.8024, true],
+            ['Long Island City YMCA', 'Queens', 40.7515, -73.9259, true],
+            ['Ridgewood YMCA', 'Queens', 40.7081, -73.8987, true],
+            ['Rockaway YMCA', 'Queens', 40.5931, -73.7979, true],
+
+            // Staten Island YMCAs
+            ['Broadway YMCA', 'Staten Island', 40.6367, -74.1280, true],
+            ['South Shore YMCA', 'Staten Island', 40.5409, -74.1945, true],
+        ];
+
+        const results: any[] = [];
+        for (const [name, city, lat, lng, indoor] of gymCourts) {
+            try {
+                const uuidResult = await this.dataSource.query(`SELECT gen_random_uuid() as id`);
+                const courtId = uuidResult[0].id;
+                const existing = await this.dataSource.query(`SELECT id FROM courts WHERE name = $1`, [name]);
+                if (existing.length > 0) {
+                    results.push({ name, status: 'already_exists', id: existing[0].id });
+                    continue;
+                }
+                await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, geog, source)
+                    VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'manual')
+                `, [courtId, name, city, indoor, lng, lat]);
+                results.push({ name, status: 'created', id: courtId });
+            } catch (error) {
+                results.push({ name, status: 'error', error: error.message });
+            }
+        }
+        const created = results.filter(r => r.status === 'created').length;
+        const existing = results.filter(r => r.status === 'already_exists').length;
+        return { success: true, city: 'New York', summary: { created, existing, total: gymCourts.length }, results };
+    }
 }
