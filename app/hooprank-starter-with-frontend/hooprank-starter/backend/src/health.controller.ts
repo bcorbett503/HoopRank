@@ -906,4 +906,78 @@ export class HealthController {
         const existing = results.filter(r => r.status === 'already_exists').length;
         return { success: true, city: 'Los Angeles', summary: { created, existing, total: gymCourts.length }, results };
     }
+
+    /**
+     * Seed Chicago, Houston, Phoenix indoor gym basketball courts
+     * Cities #3, #4, #5 in the 200 largest US cities
+     */
+    @Post('seed/batch-3-5')
+    async seedBatch3to5() {
+        const gymCourts = [
+            // CHICAGO - LA Fitness
+            ['LA Fitness - Chicago Clark St', 'Chicago', 41.9338, -87.6437, true],
+            ['LA Fitness - Chicago King Dr', 'Chicago', 41.8319, -87.6174, true],
+            ['LA Fitness - Chicago Pershing', 'Chicago', 41.8235, -87.6861, true],
+            ['LA Fitness - Chicago Kedzie', 'Chicago', 41.7865, -87.7025, true],
+            ['LA Fitness - Chicago Logan Square', 'Chicago', 41.9302, -87.7088, true],
+            ['LA Fitness - Chicago Loop', 'Chicago', 41.8831, -87.6276, true],
+            // CHICAGO - YMCAs
+            ['Irving Park YMCA', 'Chicago', 41.9533, -87.7355, true],
+            ['Kelly Hall YMCA', 'Chicago', 41.8993, -87.7221, true],
+            ['Lake View YMCA', 'Chicago', 41.9403, -87.6652, true],
+            ['Dr. Effie O. Ellis YMCA', 'Chicago', 41.8810, -87.7234, true],
+            ['Garfield YMCA', 'Chicago', 41.8806, -87.7103, true],
+            ['Jeanne Kenney YMCA', 'Chicago', 41.7513, -87.6384, true],
+            ['Marshall YMCA', 'Chicago', 41.8803, -87.7055, true],
+            ['McCormick YMCA', 'Chicago', 41.9203, -87.7155, true],
+            ['North Lawndale YMCA', 'Chicago', 41.8679, -87.7119, true],
+            ['Rauner Family YMCA', 'Chicago', 41.8469, -87.6857, true],
+            ['South Side YMCA', 'Chicago', 41.7811, -87.5865, true],
+            ['West Garfield Park YMCA', 'Chicago', 41.8815, -87.7271, true],
+            // CHICAGO - Other gyms
+            ['FFC Union Station', 'Chicago', 41.8786, -87.6402, true],
+            ['Lakeshore Sport & Fitness', 'Chicago', 41.8924, -87.6145, true],
+            ['Life Time River North', 'Chicago', 41.8958, -87.6353, true],
+
+            // HOUSTON - YMCAs
+            ['Houston Texans YMCA', 'Houston', 29.7180, -95.3571, true],
+            ['M.D. Anderson Family YMCA', 'Houston', 29.7918, -95.3719, true],
+            ['Harriet and Joe Foster Family YMCA', 'Houston', 29.7978, -95.4211, true],
+            ['Perry Family YMCA', 'League City', 29.5077, -95.1071, true],
+            ['Tellepsen Family Downtown YMCA', 'Houston', 29.7528, -95.3655, true],
+            ['D. Bradley McWilliams YMCA', 'Houston', 29.8689, -95.4048, true],
+            ['Weekley Family YMCA', 'Houston', 29.7190, -95.4277, true],
+
+            // PHOENIX - YMCAs
+            ['Ahwatukee Foothills YMCA', 'Phoenix', 33.3279, -111.9749, true],
+            ['Legacy Foundation Chris-Town YMCA', 'Phoenix', 33.5045, -112.0869, true],
+            ['Lincoln Family Downtown YMCA', 'Phoenix', 33.4485, -112.0740, true],
+            ['Watts Family Maryvale YMCA', 'Phoenix', 33.4989, -112.1966, true],
+            ['Southwest Valley YMCA', 'Phoenix', 33.3807, -112.1341, true],
+            ['East Valley YMCA', 'Mesa', 33.4373, -111.7878, true],
+        ];
+
+        const results: any[] = [];
+        for (const [name, city, lat, lng, indoor] of gymCourts) {
+            try {
+                const uuidResult = await this.dataSource.query(`SELECT gen_random_uuid() as id`);
+                const courtId = uuidResult[0].id;
+                const existing = await this.dataSource.query(`SELECT id FROM courts WHERE name = $1`, [name]);
+                if (existing.length > 0) {
+                    results.push({ name, status: 'already_exists', id: existing[0].id });
+                    continue;
+                }
+                await this.dataSource.query(`
+                    INSERT INTO courts (id, name, city, indoor, geog, source)
+                    VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, 'manual')
+                `, [courtId, name, city, indoor, lng, lat]);
+                results.push({ name, status: 'created', id: courtId });
+            } catch (error) {
+                results.push({ name, status: 'error', error: error.message });
+            }
+        }
+        const created = results.filter(r => r.status === 'created').length;
+        const existing = results.filter(r => r.status === 'already_exists').length;
+        return { success: true, cities: ['Chicago', 'Houston', 'Phoenix'], summary: { created, existing, total: gymCourts.length }, results };
+    }
 }
