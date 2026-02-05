@@ -401,8 +401,8 @@ export class StatusesService {
                     ps.scheduled_at as "scheduledAt",
                     ps.court_id as "courtId",
                     c.name as "courtName",
-                    c.lat as "courtLat",
-                    c.lng as "courtLng",
+                    ST_Y(c.geog::geometry) as "courtLat",
+                    ST_X(c.geog::geometry) as "courtLng",
                     NULL as "matchStatus",
                     NULL as "matchScore",
                     NULL as "winnerName",
@@ -436,8 +436,8 @@ export class StatusesService {
                     NULL as "scheduledAt",
                     m.court_id as "courtId",
                     COALESCE(mc.name, '') as "courtName",
-                    mc.lat as "courtLat",
-                    mc.lng as "courtLng",
+                    ST_Y(mc.geog::geometry) as "courtLat",
+                    ST_X(mc.geog::geometry) as "courtLng",
                     CASE WHEN m.status = 'completed' THEN 'ended' ELSE m.status END as "matchStatus",
                     CASE 
                         WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
@@ -481,8 +481,8 @@ export class StatusesService {
                     NULL as "scheduledAt",
                     m.court_id as "courtId",
                     COALESCE(mc.name, '') as "courtName",
-                    mc.lat as "courtLat",
-                    mc.lng as "courtLng",
+                    ST_Y(mc.geog::geometry) as "courtLat",
+                    ST_X(mc.geog::geometry) as "courtLng",
                     'ended' as "matchStatus",
                     CASE 
                         WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
