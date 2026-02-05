@@ -11,6 +11,7 @@ function normalizePrivateKey(key: string | undefined): string | undefined {
 
     // Log the first 100 chars for debugging (obscures most of the key)
     console.log(`[Firebase] Raw private key preview: ${key.substring(0, 100)}...`);
+    console.log(`[Firebase] Raw key length: ${key.length}`);
 
     // Handle JSON stringified format (key wrapped in quotes with escaped chars)
     if (key.startsWith('"') && key.endsWith('"')) {
@@ -22,23 +23,30 @@ function normalizePrivateKey(key: string | undefined): string | undefined {
         }
     }
 
-    // Replace literal \n with actual newlines (most common issue)
-    // This handles both \\n (from JSON) and \n (literal backslash-n in env var)
-    let normalized = key
-        .replace(/\\\\n/g, '\n')  // Double escaped newlines (\\n)
-        .replace(/\\n/g, '\n');   // Single escaped newlines (\n)
+    // Railway stores literal backslash-n as two characters: '\' followed by 'n'
+    // We need to replace these with actual newline characters
+    // Use split/join which is more reliable than regex for this case
+    let normalized = (key as string)
+        .split('\\n').join('\n');  // Replace literal \n with actual newline
+
+    // Also handle double-escaped case (\\n becoming \n then newline)
+    if (normalized.includes('\\n')) {
+        normalized = normalized.split('\\n').join('\n');
+    }
+
+    // Count newlines to verify
+    const newlineCount = (normalized.match(/\n/g) || []).length;
+    console.log(`[Firebase] Normalized key has ${newlineCount} newlines`);
+    console.log(`[Firebase] Normalized key preview: ${normalized.substring(0, 80).replace(/\n/g, '\\n')}...`);
 
     // Ensure proper PEM format with newlines
-    if (!normalized.includes('\n')) {
+    if (newlineCount === 0) {
         // Key might be base64 without newlines, try to reconstruct
         console.log('[Firebase] Key appears to have no newlines, attempting to reconstruct PEM format');
         normalized = normalized
             .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
             .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----\n');
     }
-
-    console.log(`[Firebase] Normalized key preview: ${normalized.substring(0, 60)}...`);
-    console.log(`[Firebase] Key contains newlines: ${normalized.includes('\n')}`);
 
     return normalized;
 }

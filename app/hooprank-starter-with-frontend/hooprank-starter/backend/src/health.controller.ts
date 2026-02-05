@@ -487,10 +487,12 @@ export class HealthController {
                 }
             }
 
-            // Replace escaped newlines with actual newlines
-            privateKey = privateKey
-                .replace(/\\\\n/g, '\n')  // Double escaped
-                .replace(/\\n/g, '\n');   // Single escaped
+            // Replace escaped newlines with actual newlines using split/join
+            // This is more reliable than regex for Railway's escape sequences
+            privateKey = (privateKey as string).split('\\n').join('\n');
+            if (privateKey.includes('\\n')) {
+                privateKey = privateKey.split('\\n').join('\n');
+            }
 
             const firebaseConfig = {
                 projectId,
