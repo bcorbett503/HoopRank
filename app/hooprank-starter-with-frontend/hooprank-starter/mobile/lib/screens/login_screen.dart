@@ -203,7 +203,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 12),
                   
-                  // Facebook Sign In Button
+                  // Facebook Sign In Button - hidden for now
+                  // To re-enable, uncomment this section:
+                  /*
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
@@ -233,6 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
+                  */
                   const SizedBox(height: 24),
                   
                   const Text(
