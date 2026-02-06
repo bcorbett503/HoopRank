@@ -133,7 +133,11 @@ export class RunsService {
             DELETE FROM scheduled_runs WHERE id = $1 AND created_by = $2 RETURNING id
         `, [runId, userId]);
 
-        if (result.length > 0) {
+        // TypeORM raw query for DELETE RETURNING may return [rows, count] or just rows
+        const rows = Array.isArray(result[0]) ? result[0] : result;
+        const deleted = Array.isArray(rows) && rows.length > 0 && rows[0]?.id;
+
+        if (deleted) {
             // Clean up attendees
             await this.dataSource.query(`DELETE FROM run_attendees WHERE run_id = $1`, [runId]);
             return true;
