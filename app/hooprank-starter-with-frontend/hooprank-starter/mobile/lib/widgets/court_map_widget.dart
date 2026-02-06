@@ -7,6 +7,7 @@ import '../models.dart';
 import '../services/court_service.dart';
 import '../services/profile_service.dart';
 import '../services/zipcode_service.dart';
+import '../services/api_service.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
 import '../state/tutorial_state.dart';
@@ -45,6 +46,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   bool _showFollowedOnly = false; // Filter for courts with followers
   bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
   String? _filterAccess; // null=all, 'public', 'members', 'paid'
+  bool _filterRunsToday = false; // Filter for courts with runs happening today
+  Set<String> _courtsWithRunsToday = {}; // Court IDs with runs today
 
   bool _noCourtsFound = false;
 
@@ -292,6 +295,24 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     _onSearchChanged(_searchController.text);
   }
   
+  void _toggleRunsTodayFilter() async {
+    final newValue = !_filterRunsToday;
+    if (newValue) {
+      // Load court IDs with runs today from API
+      final courtsWithRuns = await ApiService.getCourtsWithRuns(today: true);
+      setState(() {
+        _filterRunsToday = true;
+        _courtsWithRunsToday = courtsWithRuns;
+      });
+    } else {
+      setState(() {
+        _filterRunsToday = false;
+        _courtsWithRunsToday = {};
+      });
+    }
+    _onSearchChanged(_searchController.text);
+  }
+  
   List<Court> _applyFilters(List<Court> courts) {
     var filtered = courts;
     
@@ -309,6 +330,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     // Access filter
     if (_filterAccess != null) {
       filtered = filtered.where((court) => court.access == _filterAccess).toList();
+    }
+    
+    // Runs Today filter
+    if (_filterRunsToday && _courtsWithRunsToday.isNotEmpty) {
+      filtered = filtered.where((court) => _courtsWithRunsToday.contains(court.id)).toList();
     }
     
     return filtered;
@@ -679,6 +705,16 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                   isSelected: _filterAccess == 'paid',
                                   color: const Color(0xFF9C27B0), // Purple
                                   onTap: () => _setAccessFilter(_filterAccess == 'paid' ? null : 'paid'),
+                                ),
+                                const SizedBox(width: 6),
+                                // Runs Today filter
+                                _buildFilterChip(
+                                  icon: Icons.calendar_today,
+                                  label: 'Runs Today',
+                                  isSelected: _filterRunsToday,
+                                  count: _courtsWithRunsToday.length,
+                                  color: const Color(0xFFFF5722), // Deep Orange
+                                  onTap: _toggleRunsTodayFilter,
                                 ),
                               ],
                             ),

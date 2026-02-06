@@ -987,10 +987,18 @@ app.get(
 app.get(
   "/runs/courts-with-runs",
   asyncH(async (req, res) => {
+    const today = req.query.today === 'true';
+
+    let whereClause = 'WHERE scheduled_at > NOW()';
+    if (today) {
+      // Filter for runs happening today (between now and end of day)
+      whereClause = `WHERE scheduled_at > NOW() AND scheduled_at < (CURRENT_DATE + INTERVAL '1 day')`;
+    }
+
     const result = await pool.query(`
       SELECT DISTINCT court_id, COUNT(*) as run_count
       FROM scheduled_runs
-      WHERE scheduled_at > NOW()
+      ${whereClause}
       GROUP BY court_id
     `);
 

@@ -1317,9 +1317,13 @@ class ApiService {
   }
 
   /// Get court IDs that have upcoming runs (for filter)
-  static Future<Set<String>> getCourtsWithRuns() async {
+  /// If [today] is true, only returns courts with runs scheduled for today
+  static Future<Set<String>> getCourtsWithRuns({bool today = false}) async {
+    final url = today 
+        ? '$baseUrl/runs/courts-with-runs?today=true'
+        : '$baseUrl/runs/courts-with-runs';
     final response = await http.get(
-      Uri.parse('$baseUrl/runs/courts-with-runs'),
+      Uri.parse(url),
       headers: {'x-user-id': _userId ?? ''},
     );
     if (response.statusCode == 200) {
