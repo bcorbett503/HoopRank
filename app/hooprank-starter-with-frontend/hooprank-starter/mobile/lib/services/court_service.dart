@@ -30,6 +30,7 @@ class CourtService {
         lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
         address: json['city'] as String?,
         isIndoor: json['indoor'] == true,
+        access: json['access'] as String? ?? 'public',
         isSignature: json['signatureCity'] == true,
       )).toList();
       
@@ -70,6 +71,7 @@ class CourtService {
         address: '524 Post Street, San Francisco, CA',
         isSignature: true,
         isIndoor: true,
+        access: 'members',
         king1v1: 'Brett Corbett',
         king1v1Id: brettUserId,
         king1v1Rating: 4.95,

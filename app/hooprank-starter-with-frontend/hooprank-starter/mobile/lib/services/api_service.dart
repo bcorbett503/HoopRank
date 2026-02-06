@@ -1285,5 +1285,111 @@ class ApiService {
     }
     return [];
   }
-}
 
+  // ===================
+  // Scheduled Runs API
+  // ===================
+
+  /// Get upcoming runs at a specific court
+  static Future<List<ScheduledRun>> getCourtRuns(String courtId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/runs'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => ScheduledRun.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  /// Get runs near user's location (for discoverability)
+  static Future<List<ScheduledRun>> getNearbyRuns({int radiusMiles = 25}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/runs/nearby?radiusMiles=$radiusMiles'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => ScheduledRun.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  /// Get court IDs that have upcoming runs (for filter)
+  static Future<Set<String>> getCourtsWithRuns() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/runs/courts-with-runs'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((r) => r['courtId'].toString()).toSet();
+    }
+    return {};
+  }
+
+  /// Create a new scheduled run at a court
+  static Future<String?> createRun({
+    required String courtId,
+    required DateTime scheduledAt,
+    String? title,
+    String gameMode = '5v5',
+    int durationMinutes = 120,
+    int maxPlayers = 10,
+    String? notes,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/runs'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'courtId': courtId,
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+        if (title != null) 'title': title,
+        'gameMode': gameMode,
+        'durationMinutes': durationMinutes,
+        'maxPlayers': maxPlayers,
+        if (notes != null) 'notes': notes,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      return data['id'];
+    }
+    return null;
+  }
+
+  /// Join a scheduled run
+  static Future<bool> joinRun(String runId, {String status = 'going'}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/runs/$runId/join'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'status': status}),
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Leave a scheduled run
+  static Future<bool> leaveRun(String runId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/runs/$runId/leave'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Cancel a run (creator only)
+  static Future<bool> cancelRun(String runId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/runs/$runId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+}

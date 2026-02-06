@@ -273,6 +273,7 @@ class Court {
   final String? address;
   final bool isSignature; // Signature courts are high-traffic/famous venues
   final bool isIndoor; // Indoor venues (gyms, schools, rec centers)
+  final String access; // 'public', 'members', or 'paid'
   final int? followerCount; // Number of users following this court
   // King of the Court for each mode (name, rating, and user ID for challenges)
   final String? king1v1;
@@ -293,6 +294,7 @@ class Court {
     this.address,
     this.isSignature = false,
     this.isIndoor = false,
+    this.access = 'public',
     this.followerCount = 0,
     this.king1v1,
     this.king1v1Id,
@@ -332,6 +334,8 @@ class Court {
       lng: lng,
       address: address,
       isSignature: isSignature,
+      isIndoor: isIndoor,
+      access: access,
       followerCount: followerCount ?? this.followerCount,
       king1v1: king1v1 ?? this.king1v1,
       king1v1Id: king1v1Id ?? this.king1v1Id,
@@ -353,6 +357,8 @@ class Court {
       lng: _parseDouble(json['lng']),
       address: json['address']?.toString(),
       isSignature: json['signature'] == true || json['isSignature'] == true,
+      isIndoor: json['indoor'] == true || json['isIndoor'] == true,
+      access: json['access']?.toString() ?? 'public',
       followerCount: _parseInt(json['follower_count'] ?? json['followerCount']),
       king1v1: json['king1v1']?.toString() ?? json['king']?.toString(),
       king1v1Id: json['king1v1Id']?.toString(),
@@ -363,6 +369,128 @@ class Court {
       king5v5: json['king5v5']?.toString(),
       king5v5Id: json['king5v5Id']?.toString(),
       king5v5Rating: json['king5v5Rating'] != null ? _parseDouble(json['king5v5Rating']) : null,
+    );
+  }
+}
+
+/// Represents a user attending a scheduled run
+class RunAttendee {
+  final String id;
+  final String name;
+  final String? photoUrl;
+
+  RunAttendee({
+    required this.id,
+    required this.name,
+    this.photoUrl,
+  });
+
+  factory RunAttendee.fromJson(Map<String, dynamic> json) {
+    return RunAttendee(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Unknown',
+      photoUrl: json['photoUrl']?.toString(),
+    );
+  }
+}
+
+/// Scheduled pickup run at a court
+class ScheduledRun {
+  final String id;
+  final String courtId;
+  final String? courtName;
+  final String? courtCity;
+  final double? courtLat;
+  final double? courtLng;
+  final String createdBy;
+  final String creatorName;
+  final String? creatorPhotoUrl;
+  final String? title;
+  final String gameMode; // '1v1', '3v3', '5v5'
+  final DateTime scheduledAt;
+  final int durationMinutes;
+  final int maxPlayers;
+  final String? notes;
+  final DateTime createdAt;
+  final int attendeeCount;
+  final bool isAttending;
+  final List<RunAttendee> attendees;
+
+  ScheduledRun({
+    required this.id,
+    required this.courtId,
+    this.courtName,
+    this.courtCity,
+    this.courtLat,
+    this.courtLng,
+    required this.createdBy,
+    required this.creatorName,
+    this.creatorPhotoUrl,
+    this.title,
+    required this.gameMode,
+    required this.scheduledAt,
+    this.durationMinutes = 120,
+    this.maxPlayers = 10,
+    this.notes,
+    required this.createdAt,
+    this.attendeeCount = 0,
+    this.isAttending = false,
+    this.attendees = const [],
+  });
+
+  /// Get relative time string for display
+  String get timeString {
+    final now = DateTime.now();
+    final diff = scheduledAt.difference(now);
+    
+    if (diff.isNegative) return 'Past';
+    
+    if (diff.inDays == 0) {
+      if (diff.inHours < 1) return 'In ${diff.inMinutes}m';
+      return 'Today ${_formatTime(scheduledAt)}';
+    } else if (diff.inDays == 1) {
+      return 'Tomorrow ${_formatTime(scheduledAt)}';
+    } else if (diff.inDays < 7) {
+      final dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][scheduledAt.weekday % 7];
+      return '$dayName ${_formatTime(scheduledAt)}';
+    } else {
+      return '${scheduledAt.month}/${scheduledAt.day} ${_formatTime(scheduledAt)}';
+    }
+  }
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final period = dt.hour >= 12 ? 'pm' : 'am';
+    return '$hour:${dt.minute.toString().padLeft(2, '0')}$period';
+  }
+
+  /// Check if run is almost full
+  bool get isAlmostFull => attendeeCount >= maxPlayers - 2;
+  bool get isFull => attendeeCount >= maxPlayers;
+
+  factory ScheduledRun.fromJson(Map<String, dynamic> json) {
+    return ScheduledRun(
+      id: json['id']?.toString() ?? '',
+      courtId: json['courtId']?.toString() ?? '',
+      courtName: json['courtName']?.toString(),
+      courtCity: json['courtCity']?.toString(),
+      courtLat: json['courtLat'] != null ? _parseDouble(json['courtLat']) : null,
+      courtLng: json['courtLng'] != null ? _parseDouble(json['courtLng']) : null,
+      createdBy: json['createdBy']?.toString() ?? '',
+      creatorName: json['creatorName']?.toString() ?? 'Unknown',
+      creatorPhotoUrl: json['creatorPhotoUrl']?.toString(),
+      title: json['title']?.toString(),
+      gameMode: json['gameMode']?.toString() ?? '5v5',
+      scheduledAt: DateTime.tryParse(json['scheduledAt']?.toString() ?? '') ?? DateTime.now(),
+      durationMinutes: _parseInt(json['durationMinutes'], fallback: 120),
+      maxPlayers: _parseInt(json['maxPlayers'], fallback: 10),
+      notes: json['notes']?.toString(),
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      attendeeCount: _parseInt(json['attendeeCount']),
+      isAttending: json['isAttending'] == true,
+      attendees: (json['attendees'] as List<dynamic>?)
+          ?.map((a) => RunAttendee.fromJson(a as Map<String, dynamic>))
+          .toList() ?? [],
     );
   }
 }

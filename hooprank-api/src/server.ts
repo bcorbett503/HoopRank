@@ -844,6 +844,323 @@ app.delete(
 
 
 /* =========================
+ * Scheduled Runs (Court-based pickup games)
+ * =======================*/
+
+// GET /courts/:courtId/runs - Get upcoming runs at a specific court
+app.get(
+  "/courts/:courtId/runs",
+  asyncH(async (req, res) => {
+    const { courtId } = req.params;
+    const uid = getUserId(req);
+
+    const result = await pool.query(`
+      SELECT 
+        sr.id,
+        sr.court_id,
+        sr.created_by,
+        u.name as creator_name,
+        u.avatar_url as creator_photo_url,
+        sr.title,
+        sr.game_mode,
+        sr.scheduled_at,
+        sr.duration_minutes,
+        sr.max_players,
+        sr.notes,
+        sr.created_at,
+        (SELECT COUNT(*) FROM scheduled_run_attendees WHERE run_id = sr.id AND status = 'going') as attendee_count,
+        EXISTS(SELECT 1 FROM scheduled_run_attendees WHERE run_id = sr.id AND user_id = $2 AND status = 'going') as is_attending
+      FROM scheduled_runs sr
+      JOIN users u ON u.id = sr.created_by
+      WHERE sr.court_id = $1 AND sr.scheduled_at > NOW()
+      ORDER BY sr.scheduled_at ASC
+      LIMIT 20
+    `, [courtId, uid]);
+
+    // Get attendees for each run
+    const runs = await Promise.all(result.rows.map(async (run) => {
+      const attendeesResult = await pool.query(`
+        SELECT u.id, u.name, u.avatar_url
+        FROM scheduled_run_attendees sra
+        JOIN users u ON u.id = sra.user_id
+        WHERE sra.run_id = $1 AND sra.status = 'going'
+        ORDER BY sra.joined_at ASC
+        LIMIT 10
+      `, [run.id]);
+
+      return {
+        id: run.id,
+        courtId: run.court_id,
+        createdBy: run.created_by,
+        creatorName: run.creator_name,
+        creatorPhotoUrl: run.creator_photo_url,
+        title: run.title,
+        gameMode: run.game_mode,
+        scheduledAt: run.scheduled_at,
+        durationMinutes: run.duration_minutes,
+        maxPlayers: run.max_players,
+        notes: run.notes,
+        createdAt: run.created_at,
+        attendeeCount: parseInt(run.attendee_count || '0'),
+        isAttending: run.is_attending,
+        attendees: attendeesResult.rows.map(a => ({
+          id: a.id,
+          name: a.name,
+          photoUrl: a.avatar_url,
+        })),
+      };
+    }));
+
+    res.json(runs);
+  })
+);
+
+// GET /runs/nearby - Get runs near user's location (for discoverability)
+app.get(
+  "/runs/nearby",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const radiusMiles = parseFloat(req.query.radiusMiles as string) || 25;
+    const radiusMeters = radiusMiles * 1609.34;
+
+    // Get current user's location
+    const userResult = await pool.query(
+      `SELECT lat, lng FROM users WHERE id = $1`,
+      [uid]
+    );
+
+    if (userResult.rowCount === 0 || !userResult.rows[0].lat || !userResult.rows[0].lng) {
+      return res.json([]); // No location available
+    }
+
+    const { lat, lng } = userResult.rows[0];
+
+    const result = await pool.query(`
+      SELECT 
+        sr.id,
+        sr.court_id,
+        c.name as court_name,
+        c.city as court_city,
+        ST_X(c.geog::geometry) as court_lng,
+        ST_Y(c.geog::geometry) as court_lat,
+        sr.created_by,
+        u.name as creator_name,
+        u.avatar_url as creator_photo_url,
+        sr.title,
+        sr.game_mode,
+        sr.scheduled_at,
+        sr.duration_minutes,
+        sr.max_players,
+        (SELECT COUNT(*) FROM scheduled_run_attendees WHERE run_id = sr.id AND status = 'going') as attendee_count,
+        EXISTS(SELECT 1 FROM scheduled_run_attendees WHERE run_id = sr.id AND user_id = $1 AND status = 'going') as is_attending
+      FROM scheduled_runs sr
+      JOIN courts c ON c.id = sr.court_id
+      JOIN users u ON u.id = sr.created_by
+      WHERE sr.scheduled_at > NOW()
+        AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($3, $2), 4326)::geography, $4)
+      ORDER BY sr.scheduled_at ASC
+      LIMIT 50
+    `, [uid, lat, lng, radiusMeters]);
+
+    res.json(result.rows.map(run => ({
+      id: run.id,
+      courtId: run.court_id,
+      courtName: run.court_name,
+      courtCity: run.court_city,
+      courtLat: run.court_lat,
+      courtLng: run.court_lng,
+      createdBy: run.created_by,
+      creatorName: run.creator_name,
+      creatorPhotoUrl: run.creator_photo_url,
+      title: run.title,
+      gameMode: run.game_mode,
+      scheduledAt: run.scheduled_at,
+      durationMinutes: run.duration_minutes,
+      maxPlayers: run.max_players,
+      attendeeCount: parseInt(run.attendee_count || '0'),
+      isAttending: run.is_attending,
+    })));
+  })
+);
+
+// GET /runs/courts-with-runs - Get court IDs that have upcoming runs (for filter)
+app.get(
+  "/runs/courts-with-runs",
+  asyncH(async (req, res) => {
+    const result = await pool.query(`
+      SELECT DISTINCT court_id, COUNT(*) as run_count
+      FROM scheduled_runs
+      WHERE scheduled_at > NOW()
+      GROUP BY court_id
+    `);
+
+    res.json(result.rows.map(r => ({
+      courtId: r.court_id,
+      runCount: parseInt(r.run_count),
+    })));
+  })
+);
+
+// POST /runs - Create a new scheduled run
+const CreateRunSchema = z.object({
+  courtId: z.string().uuid(),
+  title: z.string().max(100).optional(),
+  gameMode: z.enum(["1v1", "3v3", "5v5"]).default("5v5"),
+  scheduledAt: z.string().datetime(),
+  durationMinutes: z.number().int().min(30).max(480).default(120),
+  maxPlayers: z.number().int().min(2).max(30).default(10),
+  notes: z.string().max(500).optional(),
+});
+
+app.post(
+  "/runs",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const parsed = CreateRunSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() });
+    }
+    const data = parsed.data;
+
+    // Create the run
+    const result = await pool.query(`
+      INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, scheduled_at, duration_minutes, max_players, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
+    `, [data.courtId, uid, data.title, data.gameMode, data.scheduledAt, data.durationMinutes, data.maxPlayers, data.notes]);
+
+    const runId = result.rows[0].id;
+
+    // Auto-join creator as first attendee
+    await pool.query(`
+      INSERT INTO scheduled_run_attendees (run_id, user_id, status)
+      VALUES ($1, $2, 'going')
+    `, [runId, uid]);
+
+    // Notify followers of this court
+    const followersResult = await pool.query(`
+      SELECT user_id FROM user_followed_courts 
+      WHERE court_id = $1 AND alerts_enabled = true AND user_id != $2
+    `, [data.courtId, uid]);
+
+    const courtResult = await pool.query(`SELECT name FROM courts WHERE id = $1`, [data.courtId]);
+    const courtName = courtResult.rows[0]?.name || 'a court';
+
+    // Send push notifications to followers
+    for (const follower of followersResult.rows) {
+      sendPushNotification(
+        follower.user_id,
+        "New Run Scheduled 🏀",
+        `A ${data.gameMode} run was scheduled at ${courtName}`,
+        { type: "run_created", runId, courtId: data.courtId }
+      );
+    }
+
+    res.json({ id: runId, success: true });
+  })
+);
+
+// POST /runs/:runId/join - Join a scheduled run
+app.post(
+  "/runs/:runId/join",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { runId } = req.params;
+    const status = req.body.status || 'going';
+
+    // Check if run exists and is in the future
+    const runCheck = await pool.query(`
+      SELECT id, max_players, created_by FROM scheduled_runs WHERE id = $1 AND scheduled_at > NOW()
+    `, [runId]);
+
+    if (runCheck.rowCount === 0) {
+      return res.status(404).json({ error: "run_not_found_or_past" });
+    }
+
+    // Check current attendee count
+    const countResult = await pool.query(`
+      SELECT COUNT(*) as count FROM scheduled_run_attendees WHERE run_id = $1 AND status = 'going'
+    `, [runId]);
+
+    const currentCount = parseInt(countResult.rows[0].count);
+    if (status === 'going' && currentCount >= runCheck.rows[0].max_players) {
+      return res.status(400).json({ error: "run_full" });
+    }
+
+    // Upsert attendance
+    await pool.query(`
+      INSERT INTO scheduled_run_attendees (run_id, user_id, status)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (run_id, user_id) DO UPDATE SET status = $3, joined_at = NOW()
+    `, [runId, uid, status]);
+
+    // Notify creator if someone new joins
+    if (status === 'going' && runCheck.rows[0].created_by !== uid) {
+      const userResult = await pool.query(`SELECT name FROM users WHERE id = $1`, [uid]);
+      const userName = userResult.rows[0]?.name || 'Someone';
+
+      sendPushNotification(
+        runCheck.rows[0].created_by,
+        "New Player Joined! 🙌",
+        `${userName} joined your scheduled run`,
+        { type: "run_joined", runId }
+      );
+    }
+
+    res.json({ success: true });
+  })
+);
+
+// DELETE /runs/:runId/leave - Leave a scheduled run
+app.delete(
+  "/runs/:runId/leave",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { runId } = req.params;
+
+    await pool.query(`
+      DELETE FROM scheduled_run_attendees WHERE run_id = $1 AND user_id = $2
+    `, [runId, uid]);
+
+    res.json({ success: true });
+  })
+);
+
+// DELETE /runs/:runId - Cancel a run (creator only)
+app.delete(
+  "/runs/:runId",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { runId } = req.params;
+
+    // Verify ownership
+    const check = await pool.query(`SELECT id FROM scheduled_runs WHERE id = $1 AND created_by = $2`, [runId, uid]);
+    if (check.rowCount === 0) {
+      return res.status(403).json({ error: "not_owner_or_not_found" });
+    }
+
+    // Notify all attendees before deletion
+    const attendeesResult = await pool.query(`
+      SELECT user_id FROM scheduled_run_attendees WHERE run_id = $1 AND user_id != $2
+    `, [runId, uid]);
+
+    for (const attendee of attendeesResult.rows) {
+      sendPushNotification(
+        attendee.user_id,
+        "Run Cancelled",
+        "A scheduled run you were attending has been cancelled",
+        { type: "run_cancelled", runId }
+      );
+    }
+
+    // Delete (cascades to attendees)
+    await pool.query(`DELETE FROM scheduled_runs WHERE id = $1`, [runId]);
+
+    res.json({ success: true });
+  })
+);
+
+/* =========================
  * Rankings (with mode filter)
  * =======================*/
 const RankingsQuery = z.object({

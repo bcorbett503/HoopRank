@@ -75,8 +75,8 @@ class BasketballMarker extends StatelessWidget {
 
   Color _getMarkerColor() {
     if (isLegendary) return const Color(0xFFFFD700); // Gold
-    if (isIndoor) return const Color(0xFF7E57C2); // Deep Purple
-    return const Color(0xFFFF5722); // Deep Orange (HoopRank Brand)
+    if (isIndoor) return const Color(0xFF7E57C2); // Deep Purple for indoor
+    return const Color(0xFF424242); // Asphalt Grey for outdoor
   }
 
   Color _getBorderColor() {

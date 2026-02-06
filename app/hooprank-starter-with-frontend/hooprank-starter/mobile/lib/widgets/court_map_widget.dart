@@ -42,7 +42,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   bool _isLoading = true;
   LatLng _initialCenter = const LatLng(38.0194, -122.5376); // Default to San Rafael
   double _currentZoom = 14.0;
-  bool _showActiveOnly = false; // Filter for courts with same-day activity
+  bool _showFollowedOnly = false; // Filter for courts with followers
+  bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
+  String? _filterAccess; // null=all, 'public', 'members', 'paid'
 
   bool _noCourtsFound = false;
 
@@ -261,38 +263,70 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
 
   void _onSearchChanged(String query) {
     List<Court> filteredCourts = CourtService().searchCourts(query);
-    
-    // Apply active filter if enabled
-    if (_showActiveOnly) {
-      final checkInState = Provider.of<CheckInState>(context, listen: false);
-      filteredCourts = filteredCourts.where((court) {
-        return checkInState.hasCheckIns(court.id);
-      }).toList();
-    }
+    filteredCourts = _applyFilters(filteredCourts);
     
     setState(() {
       _courts = filteredCourts;
     });
   }
   
-  void _toggleActiveFilter() {
+  void _toggleFollowedFilter() {
     setState(() {
-      _showActiveOnly = !_showActiveOnly;
+      _showFollowedOnly = !_showFollowedOnly;
     });
     // Re-run search with current query
     _onSearchChanged(_searchController.text);
+  }
+  
+  void _toggleIndoorFilter(bool? value) {
+    setState(() {
+      _filterIndoor = value;
+    });
+    _onSearchChanged(_searchController.text);
+  }
+  
+  void _setAccessFilter(String? access) {
+    setState(() {
+      _filterAccess = access;
+    });
+    _onSearchChanged(_searchController.text);
+  }
+  
+  List<Court> _applyFilters(List<Court> courts) {
+    var filtered = courts;
+    
+    // Followed filter - courts that have followers
+    if (_showFollowedOnly) {
+      final checkInState = Provider.of<CheckInState>(context, listen: false);
+      filtered = filtered.where((court) => checkInState.getFollowerCount(court.id) > 0).toList();
+    }
+    
+    // Indoor/Outdoor filter
+    if (_filterIndoor != null) {
+      filtered = filtered.where((court) => court.isIndoor == _filterIndoor).toList();
+    }
+    
+    // Access filter
+    if (_filterAccess != null) {
+      filtered = filtered.where((court) => court.access == _filterAccess).toList();
+    }
+    
+    return filtered;
   }
 
   void _updateCourtsForMapCenter() {
     // Use visible bounds to filter courts - only show courts actually visible on map
     final bounds = _mapController.camera.visibleBounds;
     
-    final courtsInView = CourtService().getCourtsInBounds(
+    var courtsInView = CourtService().getCourtsInBounds(
       bounds.south,
       bounds.west,
       bounds.north,
       bounds.east,
     );
+    
+    // Apply filters to map view as well
+    courtsInView = _applyFilters(courtsInView);
     
     if (mounted) {
       setState(() {
@@ -336,6 +370,124 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
         border: Border.all(color: color.withOpacity(0.5)),
       ),
       child: Text(mode, style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold)),
+    );
+  }
+  
+  /// Filter chip widget for search bar
+  Widget _buildFilterChip({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required Color color,
+    required VoidCallback onTap,
+    int? count,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.grey[300],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: isSelected ? Colors.white : Colors.grey[700]),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white : Colors.grey[700],
+              ),
+            ),
+            if (count != null && count > 0) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected ? color.withOpacity(0.7) : Colors.grey[400],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : Colors.grey[700],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// Badge widget for court type (indoor/outdoor, access)
+  Widget _buildCourtTypeBadge(Court court) {
+    // Indoor/Outdoor badge with distinct colors
+    final indoorColor = court.isIndoor 
+        ? const Color(0xFF2196F3) // Blue for indoor
+        : const Color(0xFF424242); // Dark grey/asphalt for outdoor
+    final indoorIcon = court.isIndoor ? Icons.home : Icons.wb_sunny;
+    final indoorLabel = court.isIndoor ? 'Indoor' : 'Outdoor';
+    
+    // Access badge colors
+    Color accessColor;
+    IconData accessIcon;
+    switch (court.access) {
+      case 'members':
+        accessColor = const Color(0xFFFF9800); // Orange
+        accessIcon = Icons.vpn_key;
+        break;
+      case 'paid':
+        accessColor = const Color(0xFF9C27B0); // Purple
+        accessIcon = Icons.attach_money;
+        break;
+      default: // public
+        accessColor = const Color(0xFF4CAF50); // Green
+        accessIcon = Icons.lock_open;
+    }
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Indoor/Outdoor badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: indoorColor.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: indoorColor.withOpacity(0.5)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(indoorIcon, size: 10, color: indoorColor),
+              const SizedBox(width: 3),
+              Text(
+                indoorLabel,
+                style: TextStyle(fontSize: 9, color: indoorColor, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 4),
+        // Access badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: accessColor.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: accessColor.withOpacity(0.5)),
+          ),
+          child: Icon(accessIcon, size: 10, color: accessColor),
+        ),
+      ],
     );
   }
 
@@ -445,79 +597,93 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                       top: 16,
                       left: 16,
                       right: 16,
-                      child: Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Search courts...',
-                                  prefixIcon: Icon(Icons.search),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                ),
-                                onChanged: _onSearchChanged,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Search bar
+                          Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: const InputDecoration(
+                                hintText: 'Search courts...',
+                                prefixIcon: Icon(Icons.search),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               ),
+                              onChanged: _onSearchChanged,
                             ),
-                            // Active filter toggle
-                            Consumer<CheckInState>(
-                              builder: (context, checkInState, _) {
-                                final activeCount = checkInState.activeCourts.length;
-                                return GestureDetector(
-                                  onTap: _toggleActiveFilter,
-                                  child: Container(
-                                    margin: const EdgeInsets.only(right: 8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: _showActiveOnly ? Colors.green : Colors.grey[300],
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.local_fire_department,
-                                          size: 16,
-                                          color: _showActiveOnly ? Colors.white : Colors.grey[700],
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Active',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: _showActiveOnly ? Colors.white : Colors.grey[700],
-                                          ),
-                                        ),
-                                        if (activeCount > 0) ...[
-                                          const SizedBox(width: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                            decoration: BoxDecoration(
-                                              color: _showActiveOnly ? Colors.green[800] : Colors.grey[400],
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              '$activeCount',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                                color: _showActiveOnly ? Colors.white : Colors.grey[700],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
+                          ),
+                          const SizedBox(height: 8),
+                          // Filter chips row
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                // Followed filter - courts with followers
+                                Consumer<CheckInState>(
+                                  builder: (context, checkInState, _) {
+                                    final followedCount = checkInState.followedCourts.length;
+                                    return _buildFilterChip(
+                                      icon: Icons.favorite,
+                                      label: 'Followed',
+                                      count: followedCount,
+                                      isSelected: _showFollowedOnly,
+                                      color: Colors.red,
+                                      onTap: _toggleFollowedFilter,
+                                    );
+                                  },
+                                ),
+                                const SizedBox(width: 6),
+                                // Indoor filter
+                                _buildFilterChip(
+                                  icon: Icons.home,
+                                  label: 'Indoor',
+                                  isSelected: _filterIndoor == true,
+                                  color: const Color(0xFF2196F3), // Blue
+                                  onTap: () => _toggleIndoorFilter(_filterIndoor == true ? null : true),
+                                ),
+                                const SizedBox(width: 6),
+                                // Outdoor filter
+                                _buildFilterChip(
+                                  icon: Icons.wb_sunny,
+                                  label: 'Outdoor',
+                                  isSelected: _filterIndoor == false,
+                                  color: const Color(0xFF424242), // Dark grey/asphalt
+                                  onTap: () => _toggleIndoorFilter(_filterIndoor == false ? null : false),
+                                ),
+                                const SizedBox(width: 6),
+                                // Public filter
+                                _buildFilterChip(
+                                  icon: Icons.lock_open,
+                                  label: 'Public',
+                                  isSelected: _filterAccess == 'public',
+                                  color: const Color(0xFF4CAF50), // Green
+                                  onTap: () => _setAccessFilter(_filterAccess == 'public' ? null : 'public'),
+                                ),
+                                const SizedBox(width: 6),
+                                // Members filter
+                                _buildFilterChip(
+                                  icon: Icons.vpn_key,
+                                  label: 'Members',
+                                  isSelected: _filterAccess == 'members',
+                                  color: const Color(0xFFFF9800), // Orange
+                                  onTap: () => _setAccessFilter(_filterAccess == 'members' ? null : 'members'),
+                                ),
+                                const SizedBox(width: 6),
+                                // Paid filter
+                                _buildFilterChip(
+                                  icon: Icons.attach_money,
+                                  label: 'Paid',
+                                  isSelected: _filterAccess == 'paid',
+                                  color: const Color(0xFF9C27B0), // Purple
+                                  onTap: () => _setAccessFilter(_filterAccess == 'paid' ? null : 'paid'),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     Positioned(
@@ -702,6 +868,12 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                                    ),
                                                    child: const Text('LEGENDARY', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black)),
                                                  ),
+                                              
+                                              // Court type badges (Indoor/Outdoor, Access)
+                                              if (!court.isSignature) ...[
+                                                const Spacer(),
+                                                _buildCourtTypeBadge(court),
+                                              ],
                                             ],
                                           ),
                                         ],
