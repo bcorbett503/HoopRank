@@ -5,8 +5,144 @@ import { DataSource } from 'typeorm';
 export class RunsService {
     constructor(private dataSource: DataSource) { }
 
-    // Get courts that have upcoming scheduled runs
-    // Queries player_status table for statuses with scheduledAt in the future
+    // ========== Create ==========
+
+    async createRun(userId: string, data: {
+        courtId: string;
+        scheduledAt: string;
+        title?: string;
+        gameMode?: string;
+        courtType?: string;
+        ageRange?: string;
+        durationMinutes?: number;
+        maxPlayers?: number;
+        notes?: string;
+    }): Promise<any> {
+        const result = await this.dataSource.query(`
+            INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, duration_minutes, max_players, notes, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+            RETURNING *
+        `, [
+            data.courtId,
+            userId,
+            data.title || null,
+            data.gameMode || '5v5',
+            data.courtType || null,
+            data.ageRange || null,
+            new Date(data.scheduledAt),
+            data.durationMinutes || 120,
+            data.maxPlayers || 10,
+            data.notes || null,
+        ]);
+
+        const run = result[0];
+
+        // Auto-join creator
+        try {
+            await this.joinRun(run.id, userId);
+        } catch (e) {
+            console.error('Failed to auto-join creator to run:', e.message);
+        }
+
+        return run;
+    }
+
+    // ========== Read ==========
+
+    async getCourtRuns(courtId: string, userId?: string): Promise<any[]> {
+        const now = new Date().toISOString();
+
+        const runs = await this.dataSource.query(`
+            SELECT 
+                sr.id,
+                sr.court_id as "courtId",
+                c.name as "courtName",
+                c.city as "courtCity",
+                ST_Y(c.geog::geometry) as "courtLat",
+                ST_X(c.geog::geometry) as "courtLng",
+                sr.created_by as "createdBy",
+                COALESCE(u.name, 'Unknown') as "creatorName",
+                u.avatar_url as "creatorPhotoUrl",
+                sr.title,
+                sr.game_mode as "gameMode",
+                sr.court_type as "courtType",
+                sr.age_range as "ageRange",
+                sr.scheduled_at as "scheduledAt",
+                sr.duration_minutes as "durationMinutes",
+                sr.max_players as "maxPlayers",
+                sr.notes,
+                sr.created_at as "createdAt",
+                COALESCE((SELECT COUNT(*) FROM run_attendees WHERE run_id = sr.id), 0)::INTEGER as "attendeeCount",
+                EXISTS(SELECT 1 FROM run_attendees WHERE run_id = sr.id AND user_id = $2) as "isAttending"
+            FROM scheduled_runs sr
+            LEFT JOIN courts c ON sr.court_id::TEXT = c.id::TEXT
+            LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
+            WHERE sr.court_id = $1
+              AND sr.scheduled_at >= $3
+            ORDER BY sr.scheduled_at ASC
+        `, [courtId, userId || '', now]);
+
+        // Attach attendees to each run
+        for (const run of runs) {
+            run.attendees = await this.getRunAttendees(run.id);
+        }
+
+        return runs;
+    }
+
+    async getRunAttendees(runId: string): Promise<any[]> {
+        return this.dataSource.query(`
+            SELECT 
+                ra.user_id as "id",
+                COALESCE(u.name, 'Unknown') as "name",
+                u.avatar_url as "photoUrl"
+            FROM run_attendees ra
+            LEFT JOIN users u ON ra.user_id::TEXT = u.id::TEXT
+            WHERE ra.run_id = $1
+            ORDER BY ra.created_at ASC
+        `, [runId]);
+    }
+
+    // ========== Join / Leave ==========
+
+    async joinRun(runId: string, userId: string): Promise<void> {
+        try {
+            await this.dataSource.query(`
+                INSERT INTO run_attendees (run_id, user_id, status, created_at)
+                VALUES ($1, $2, 'going', NOW())
+            `, [runId, userId]);
+        } catch (error: any) {
+            // Ignore duplicate key errors
+            if (error.code !== '23505' && !error.message?.includes('UNIQUE')) {
+                throw error;
+            }
+        }
+    }
+
+    async leaveRun(runId: string, userId: string): Promise<void> {
+        await this.dataSource.query(`
+            DELETE FROM run_attendees WHERE run_id = $1 AND user_id = $2
+        `, [runId, userId]);
+    }
+
+    // ========== Cancel ==========
+
+    async cancelRun(runId: string, userId: string): Promise<boolean> {
+        // Only the creator can cancel
+        const result = await this.dataSource.query(`
+            DELETE FROM scheduled_runs WHERE id = $1 AND created_by = $2 RETURNING id
+        `, [runId, userId]);
+
+        if (result.length > 0) {
+            // Clean up attendees
+            await this.dataSource.query(`DELETE FROM run_attendees WHERE run_id = $1`, [runId]);
+            return true;
+        }
+        return false;
+    }
+
+    // ========== Discovery ==========
+
     async getCourtsWithRuns(todayOnly: boolean = false): Promise<{ courtId: string }[]> {
         const now = new Date();
 
@@ -14,37 +150,92 @@ export class RunsService {
         let params: any[];
 
         if (todayOnly) {
-            // Get courts with runs scheduled for today (from now until end of day)
             const endOfDay = new Date(now);
             endOfDay.setHours(23, 59, 59, 999);
 
             query = `
                 SELECT DISTINCT court_id as "courtId"
-                FROM player_statuses
-                WHERE scheduled_at IS NOT NULL
-                  AND court_id IS NOT NULL
-                  AND scheduled_at >= $1
-                  AND scheduled_at <= $2
+                FROM scheduled_runs
+                WHERE scheduled_at >= $1 AND scheduled_at <= $2
             `;
             params = [now.toISOString(), endOfDay.toISOString()];
         } else {
-            // Get all courts with any upcoming scheduled runs
             query = `
                 SELECT DISTINCT court_id as "courtId"
-                FROM player_statuses
-                WHERE scheduled_at IS NOT NULL
-                  AND court_id IS NOT NULL
-                  AND scheduled_at >= $1
+                FROM scheduled_runs
+                WHERE scheduled_at >= $1
             `;
             params = [now.toISOString()];
         }
 
         try {
-            const results = await this.dataSource.query(query, params);
-            return results || [];
+            return await this.dataSource.query(query, params) || [];
         } catch (error) {
             console.error('RunsService.getCourtsWithRuns error:', error.message);
             return [];
+        }
+    }
+
+    // ========== Migration ==========
+
+    async ensureTables(): Promise<string> {
+        try {
+            await this.dataSource.query(`
+                CREATE TABLE IF NOT EXISTS scheduled_runs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    court_id VARCHAR(255) NOT NULL,
+                    created_by VARCHAR(255) NOT NULL,
+                    title VARCHAR(255),
+                    game_mode VARCHAR(20) DEFAULT '5v5',
+                    court_type VARCHAR(20),
+                    age_range VARCHAR(20),
+                    scheduled_at TIMESTAMP NOT NULL,
+                    duration_minutes INTEGER DEFAULT 120,
+                    max_players INTEGER DEFAULT 10,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            await this.dataSource.query(`
+                CREATE TABLE IF NOT EXISTS run_attendees (
+                    id SERIAL PRIMARY KEY,
+                    run_id UUID NOT NULL,
+                    user_id VARCHAR(255) NOT NULL,
+                    status VARCHAR(20) DEFAULT 'going',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(run_id, user_id)
+                )
+            `);
+
+            // Migrate any existing scheduled runs from player_statuses
+            const existing = await this.dataSource.query(`
+                SELECT COUNT(*) as count FROM scheduled_runs
+            `);
+
+            if (parseInt(existing[0].count) === 0) {
+                // Check if there are statuses with scheduled_at to migrate
+                const statusRuns = await this.dataSource.query(`
+                    SELECT ps.id, ps.court_id, ps.user_id, ps.content, ps.scheduled_at, ps.created_at
+                    FROM player_statuses ps
+                    WHERE ps.scheduled_at IS NOT NULL AND ps.court_id IS NOT NULL AND ps.scheduled_at >= NOW()
+                `);
+
+                for (const sr of statusRuns) {
+                    await this.dataSource.query(`
+                        INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, scheduled_at, created_at)
+                        VALUES ($1, $2, $3, '5v5', $4, $5)
+                        ON CONFLICT DO NOTHING
+                    `, [sr.court_id, sr.user_id, sr.content, sr.scheduled_at, sr.created_at]);
+                }
+
+                return `Tables created. Migrated ${statusRuns.length} existing runs from player_statuses.`;
+            }
+
+            return 'Tables already exist.';
+        } catch (error) {
+            console.error('ensureTables error:', error.message);
+            return `Error: ${error.message}`;
         }
     }
 }

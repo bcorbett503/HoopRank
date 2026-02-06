@@ -1,13 +1,37 @@
-import { Controller, Get, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Headers, Query } from '@nestjs/common';
 import { RunsService } from './runs.service';
 
-@Controller('runs')
+@Controller()
 export class RunsController {
     constructor(private readonly runsService: RunsService) { }
 
+    // ========== /runs endpoints ==========
+
+    // Create a new scheduled run
+    @Post('runs')
+    async createRun(
+        @Headers('x-user-id') userId: string,
+        @Body() body: {
+            courtId: string;
+            scheduledAt: string;
+            title?: string;
+            gameMode?: string;
+            courtType?: string;
+            ageRange?: string;
+            durationMinutes?: number;
+            maxPlayers?: number;
+            notes?: string;
+        },
+    ) {
+        if (!userId) {
+            return { success: false, error: 'User ID required' };
+        }
+        const run = await this.runsService.createRun(userId, body);
+        return { success: true, id: run.id, run };
+    }
+
     // Get courts that have upcoming scheduled runs
-    // If today=true, only returns courts with runs scheduled for today
-    @Get('courts-with-runs')
+    @Get('runs/courts-with-runs')
     async getCourtsWithRuns(
         @Query('today') today?: string,
     ) {
@@ -15,13 +39,59 @@ export class RunsController {
         return this.runsService.getCourtsWithRuns(todayOnly);
     }
 
-    // Get nearby runs (placeholder for future implementation)
-    @Get('nearby')
-    async getNearbyRuns(
+    // Join a run
+    @Post('runs/:id/join')
+    async joinRun(
+        @Param('id') runId: string,
         @Headers('x-user-id') userId: string,
-        @Query('radiusMiles') radiusMiles?: string,
     ) {
-        // TODO: Implement location-based run discovery
-        return [];
+        if (!userId) {
+            return { success: false, error: 'User ID required' };
+        }
+        await this.runsService.joinRun(runId, userId);
+        return { success: true };
+    }
+
+    // Leave a run
+    @Delete('runs/:id/leave')
+    async leaveRun(
+        @Param('id') runId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        if (!userId) {
+            return { success: false, error: 'User ID required' };
+        }
+        await this.runsService.leaveRun(runId, userId);
+        return { success: true };
+    }
+
+    // Cancel a run (creator only)
+    @Delete('runs/:id')
+    async cancelRun(
+        @Param('id') runId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        if (!userId) {
+            return { success: false, error: 'User ID required' };
+        }
+        const deleted = await this.runsService.cancelRun(runId, userId);
+        return { success: deleted };
+    }
+
+    // Migration endpoint to create tables
+    @Post('runs/migrate')
+    async migrate() {
+        return this.runsService.ensureTables();
+    }
+
+    // ========== /courts/:id/runs endpoint ==========
+    // The mobile app calls GET /courts/:id/runs
+
+    @Get('courts/:courtId/runs')
+    async getCourtRuns(
+        @Param('courtId') courtId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.runsService.getCourtRuns(courtId, userId);
     }
 }
