@@ -20,6 +20,7 @@ import { Challenge } from './challenges/challenge.entity';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ActivityModule } from './activity/activity.module';
 import { RankingsModule } from './rankings/rankings.module';
+import { RunsModule } from './runs/runs.module';
 import { HealthController } from './health.controller';
 import { SnakeNamingStrategy } from './snake-naming.strategy';
 
@@ -66,6 +67,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     NotificationsModule,
     ActivityModule,
     RankingsModule,
+    RunsModule,
   ],
   controllers: [HealthController],
 })
