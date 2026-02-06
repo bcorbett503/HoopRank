@@ -215,6 +215,16 @@ export class RunsService {
                 }
             }
 
+            // Drop any FK constraints TypeORM may have auto-created
+            const fksToDrop = ['scheduled_runs_created_by_fkey', 'scheduled_runs_court_id_fkey'];
+            for (const fk of fksToDrop) {
+                try {
+                    await this.dataSource.query(`ALTER TABLE scheduled_runs DROP CONSTRAINT IF EXISTS "${fk}"`);
+                } catch (e) {
+                    // Constraint doesn't exist - ignore
+                }
+            }
+
             await this.dataSource.query(`
                 CREATE TABLE IF NOT EXISTS run_attendees (
                     id SERIAL PRIMARY KEY,
