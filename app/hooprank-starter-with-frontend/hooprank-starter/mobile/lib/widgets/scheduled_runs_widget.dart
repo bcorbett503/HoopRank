@@ -199,6 +199,36 @@ class _ScheduledRunsWidgetState extends State<ScheduledRunsWidget> {
                   ),
                 ),
               ),
+              // Court type badge
+              if (run.courtTypeLabel != null) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    run.courtTypeLabel!,
+                    style: const TextStyle(color: Colors.teal, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+              // Age range badge
+              if (run.ageRange != null && run.ageRange!.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    run.ageRange!,
+                    style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -443,6 +473,8 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
   final _titleController = TextEditingController();
   final _notesController = TextEditingController();
   String _gameMode = '5v5';
+  String? _courtType; // null = unset, 'full', 'half'
+  String? _ageRange; // null = unset, '18+', '21+', '30+', '40+', '50+', 'open'
   DateTime _scheduledAt = DateTime.now().add(const Duration(hours: 2));
   int _maxPlayers = 10;
   bool _isSubmitting = false;
@@ -463,6 +495,8 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
         scheduledAt: _scheduledAt,
         title: _titleController.text.isEmpty ? null : _titleController.text,
         gameMode: _gameMode,
+        courtType: _courtType,
+        ageRange: _ageRange,
         maxPlayers: _maxPlayers,
         notes: _notesController.text.isEmpty ? null : _notesController.text,
       );
@@ -533,14 +567,13 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
           const Text('Game Mode', style: TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 8),
           Row(
-            children: ['1v1', '3v3', '5v5'].map((mode) {
+            children: ['3v3', '5v5'].map((mode) {
               final isSelected = _gameMode == mode;
               return Expanded(
                 child: GestureDetector(
                   onTap: () => setState(() {
                     _gameMode = mode;
-                    // Update default max players
-                    _maxPlayers = mode == '1v1' ? 2 : (mode == '3v3' ? 6 : 10);
+                    _maxPlayers = mode == '3v3' ? 6 : 10;
                   }),
                   child: Container(
                     margin: const EdgeInsets.only(right: 8),
@@ -567,6 +600,73 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
                 ),
               );
             }).toList(),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Court type selector
+          const Text('Court Type', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const SizedBox(height: 8),
+          Row(
+            children: [null, 'full', 'half'].map((type) {
+              final isSelected = _courtType == type;
+              final label = type == null ? 'Any' : (type == 'full' ? 'Full Court' : 'Half Court');
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _courtType = type),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.teal.withOpacity(0.3) : Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected ? Colors.teal : Colors.transparent,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: isSelected ? Colors.teal : Colors.grey,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Age range selector
+          const Text('Age Range', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[800],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: _ageRange,
+                isExpanded: true,
+                dropdownColor: Colors.grey[800],
+                style: const TextStyle(color: Colors.white),
+                hint: const Text('Any age (optional)', style: TextStyle(color: Colors.grey)),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('Any age', style: TextStyle(color: Colors.grey))),
+                  ...['18+', '21+', '30+', '40+', '50+', 'Open'].map((age) =>
+                    DropdownMenuItem<String?>(value: age.toLowerCase(), child: Text(age)),
+                  ),
+                ],
+                onChanged: (val) => setState(() => _ageRange = val),
+              ),
+            ),
           ),
 
           const SizedBox(height: 16),

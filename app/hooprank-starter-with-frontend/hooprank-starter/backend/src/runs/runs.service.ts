@@ -197,6 +197,24 @@ export class RunsService {
                 )
             `);
 
+            // Add columns that may not exist on older tables
+            const newColumns = [
+                { name: 'title', type: "VARCHAR(255)" },
+                { name: 'game_mode', type: "VARCHAR(20) DEFAULT '5v5'" },
+                { name: 'court_type', type: "VARCHAR(20)" },
+                { name: 'age_range', type: "VARCHAR(20)" },
+                { name: 'duration_minutes', type: "INTEGER DEFAULT 120" },
+                { name: 'max_players', type: "INTEGER DEFAULT 10" },
+                { name: 'notes', type: "TEXT" },
+            ];
+            for (const col of newColumns) {
+                try {
+                    await this.dataSource.query(`ALTER TABLE scheduled_runs ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+                } catch (e) {
+                    // Column already exists - ignore
+                }
+            }
+
             await this.dataSource.query(`
                 CREATE TABLE IF NOT EXISTS run_attendees (
                     id SERIAL PRIMARY KEY,

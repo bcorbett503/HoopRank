@@ -46,8 +46,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   bool _showFollowedOnly = false; // Filter for courts with followers
   bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
   String? _filterAccess; // null=all, 'public', 'members', 'paid'
-  bool _filterRunsToday = false; // Filter for courts with runs happening today
-  Set<String> _courtsWithRunsToday = {}; // Court IDs with runs today
+  String? _runsFilter; // null=off, 'today'=runs today, 'all'=all upcoming runs
+  Set<String> _courtsWithRuns = {}; // Court IDs with runs (based on filter)
 
   bool _noCourtsFound = false;
 
@@ -295,19 +295,19 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     _onSearchChanged(_searchController.text);
   }
   
-  void _toggleRunsTodayFilter() async {
-    final newValue = !_filterRunsToday;
-    if (newValue) {
-      // Load court IDs with runs today from API
-      final courtsWithRuns = await ApiService.getCourtsWithRuns(today: true);
+  void _setRunsFilter(String? filter) async {
+    if (filter == null) {
+      // Clear runs filter
       setState(() {
-        _filterRunsToday = true;
-        _courtsWithRunsToday = courtsWithRuns;
+        _runsFilter = null;
+        _courtsWithRuns = {};
       });
     } else {
+      // Load court IDs with runs from API
+      final courtsWithRuns = await ApiService.getCourtsWithRuns(today: filter == 'today');
       setState(() {
-        _filterRunsToday = false;
-        _courtsWithRunsToday = {};
+        _runsFilter = filter;
+        _courtsWithRuns = courtsWithRuns;
       });
     }
     _onSearchChanged(_searchController.text);
@@ -332,9 +332,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
       filtered = filtered.where((court) => court.access == _filterAccess).toList();
     }
     
-    // Runs Today filter
-    if (_filterRunsToday && _courtsWithRunsToday.isNotEmpty) {
-      filtered = filtered.where((court) => _courtsWithRunsToday.contains(court.id)).toList();
+    // Runs filter (today or all upcoming)
+    if (_runsFilter != null && _courtsWithRuns.isNotEmpty) {
+      filtered = filtered.where((court) => _courtsWithRuns.contains(court.id)).toList();
     }
     
     return filtered;
@@ -642,82 +642,310 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          // Filter chips row
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                // Followed filter - courts with followers
-                                Consumer<CheckInState>(
+                          // Simplified filter row
+                          Row(
+                            children: [
+                              // Scheduled Runs dropdown (primary)
+                              Expanded(
+                                child: PopupMenuButton<String>(
+                                  onSelected: (value) {
+                                    if (value == 'off') {
+                                      _setRunsFilter(null);
+                                    } else {
+                                      _setRunsFilter(value);
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      value: 'today',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.today, size: 18, color: _runsFilter == 'today' ? Colors.deepOrange : null),
+                                          const SizedBox(width: 8),
+                                          Text('Today', style: TextStyle(color: _runsFilter == 'today' ? Colors.deepOrange : null)),
+                                          if (_runsFilter == 'today') const Spacer(),
+                                          if (_runsFilter == 'today') const Icon(Icons.check, size: 16, color: Colors.deepOrange),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'all',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.calendar_month, size: 18, color: _runsFilter == 'all' ? Colors.deepOrange : null),
+                                          const SizedBox(width: 8),
+                                          Text('All Upcoming', style: TextStyle(color: _runsFilter == 'all' ? Colors.deepOrange : null)),
+                                          if (_runsFilter == 'all') const Spacer(),
+                                          if (_runsFilter == 'all') const Icon(Icons.check, size: 16, color: Colors.deepOrange),
+                                        ],
+                                      ),
+                                    ),
+                                    if (_runsFilter != null) ...[
+                                      const PopupMenuDivider(),
+                                      const PopupMenuItem(
+                                        value: 'off',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.close, size: 18, color: Colors.grey),
+                                            SizedBox(width: 8),
+                                            Text('Clear Filter', style: TextStyle(color: Colors.grey)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _runsFilter != null 
+                                          ? const Color(0xFFFF5722) 
+                                          : Colors.grey[800],
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          size: 16,
+                                          color: _runsFilter != null ? Colors.white : Colors.grey[400],
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _runsFilter == 'today' ? 'Today' : (_runsFilter == 'all' ? 'All Runs' : 'Runs'),
+                                          style: TextStyle(
+                                            color: _runsFilter != null ? Colors.white : Colors.grey[400],
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Icon(
+                                          Icons.arrow_drop_down,
+                                          size: 16,
+                                          color: _runsFilter != null ? Colors.white : Colors.grey[400],
+                                        ),
+                                        if (_courtsWithRuns.isNotEmpty) ...[
+                                          const SizedBox(width: 2),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              '${_courtsWithRuns.length}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Followed chip (primary)
+                              Expanded(
+                                child: Consumer<CheckInState>(
                                   builder: (context, checkInState, _) {
                                     final followedCount = checkInState.followedCourts.length;
-                                    return _buildFilterChip(
-                                      icon: Icons.favorite,
-                                      label: 'Followed',
-                                      count: followedCount,
-                                      isSelected: _showFollowedOnly,
-                                      color: Colors.red,
+                                    return GestureDetector(
                                       onTap: _toggleFollowedFilter,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: _showFollowedOnly 
+                                              ? Colors.red 
+                                              : Colors.grey[800],
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              _showFollowedOnly ? Icons.favorite : Icons.favorite_border,
+                                              size: 16,
+                                              color: _showFollowedOnly ? Colors.white : Colors.grey[400],
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Followed',
+                                              style: TextStyle(
+                                                color: _showFollowedOnly ? Colors.white : Colors.grey[400],
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            if (followedCount > 0) ...[
+                                              const SizedBox(width: 4),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.2),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  '$followedCount',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
                                     );
                                   },
                                 ),
-                                const SizedBox(width: 6),
-                                // Indoor filter
-                                _buildFilterChip(
-                                  icon: Icons.home,
-                                  label: 'Indoor',
-                                  isSelected: _filterIndoor == true,
-                                  color: const Color(0xFF2196F3), // Blue
-                                  onTap: () => _toggleIndoorFilter(_filterIndoor == true ? null : true),
+                              ),
+                              const SizedBox(width: 8),
+                              // All + More filters dropdown
+                              PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case 'all':
+                                      setState(() {
+                                        _filterIndoor = null;
+                                        _filterAccess = null;
+                                        _runsFilter = null;
+                                        _showFollowedOnly = false;
+                                        _courtsWithRuns = {};
+                                      });
+                                      _onSearchChanged(_searchController.text);
+                                      break;
+                                    case 'indoor':
+                                      _toggleIndoorFilter(_filterIndoor == true ? null : true);
+                                      break;
+                                    case 'outdoor':
+                                      _toggleIndoorFilter(_filterIndoor == false ? null : false);
+                                      break;
+                                    case 'public':
+                                      _setAccessFilter(_filterAccess == 'public' ? null : 'public');
+                                      break;
+                                    case 'members':
+                                      _setAccessFilter(_filterAccess == 'members' ? null : 'members');
+                                      break;
+                                    case 'paid':
+                                      _setAccessFilter(_filterAccess == 'paid' ? null : 'paid');
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'all',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.clear_all, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Show All'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuDivider(),
+                                  PopupMenuItem(
+                                    value: 'indoor',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.home, size: 18, color: _filterIndoor == true ? Colors.blue : null),
+                                        const SizedBox(width: 8),
+                                        Text('Indoor', style: TextStyle(color: _filterIndoor == true ? Colors.blue : null)),
+                                        if (_filterIndoor == true) const Spacer(),
+                                        if (_filterIndoor == true) const Icon(Icons.check, size: 16, color: Colors.blue),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'outdoor',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.wb_sunny, size: 18, color: _filterIndoor == false ? Colors.grey[700] : null),
+                                        const SizedBox(width: 8),
+                                        Text('Outdoor', style: TextStyle(color: _filterIndoor == false ? Colors.grey[700] : null)),
+                                        if (_filterIndoor == false) const Spacer(),
+                                        if (_filterIndoor == false) Icon(Icons.check, size: 16, color: Colors.grey[700]),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuDivider(),
+                                  PopupMenuItem(
+                                    value: 'public',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.lock_open, size: 18, color: _filterAccess == 'public' ? Colors.green : null),
+                                        const SizedBox(width: 8),
+                                        Text('Public', style: TextStyle(color: _filterAccess == 'public' ? Colors.green : null)),
+                                        if (_filterAccess == 'public') const Spacer(),
+                                        if (_filterAccess == 'public') const Icon(Icons.check, size: 16, color: Colors.green),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'members',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.vpn_key, size: 18, color: _filterAccess == 'members' ? Colors.orange : null),
+                                        const SizedBox(width: 8),
+                                        Text('Members Only', style: TextStyle(color: _filterAccess == 'members' ? Colors.orange : null)),
+                                        if (_filterAccess == 'members') const Spacer(),
+                                        if (_filterAccess == 'members') const Icon(Icons.check, size: 16, color: Colors.orange),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'paid',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.attach_money, size: 18, color: _filterAccess == 'paid' ? Colors.purple : null),
+                                        const SizedBox(width: 8),
+                                        Text('Paid', style: TextStyle(color: _filterAccess == 'paid' ? Colors.purple : null)),
+                                        if (_filterAccess == 'paid') const Spacer(),
+                                        if (_filterAccess == 'paid') const Icon(Icons.check, size: 16, color: Colors.purple),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: (_filterIndoor != null || _filterAccess != null) 
+                                        ? const Color(0xFF00C853) 
+                                        : Colors.grey[800],
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'All',
+                                        style: TextStyle(
+                                          color: (_filterIndoor != null || _filterAccess != null) 
+                                              ? Colors.white 
+                                              : Colors.grey[400],
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.arrow_drop_down,
+                                        size: 18,
+                                        color: (_filterIndoor != null || _filterAccess != null) 
+                                            ? Colors.white 
+                                            : Colors.grey[400],
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: 6),
-                                // Outdoor filter
-                                _buildFilterChip(
-                                  icon: Icons.wb_sunny,
-                                  label: 'Outdoor',
-                                  isSelected: _filterIndoor == false,
-                                  color: const Color(0xFF424242), // Dark grey/asphalt
-                                  onTap: () => _toggleIndoorFilter(_filterIndoor == false ? null : false),
-                                ),
-                                const SizedBox(width: 6),
-                                // Public filter
-                                _buildFilterChip(
-                                  icon: Icons.lock_open,
-                                  label: 'Public',
-                                  isSelected: _filterAccess == 'public',
-                                  color: const Color(0xFF4CAF50), // Green
-                                  onTap: () => _setAccessFilter(_filterAccess == 'public' ? null : 'public'),
-                                ),
-                                const SizedBox(width: 6),
-                                // Members filter
-                                _buildFilterChip(
-                                  icon: Icons.vpn_key,
-                                  label: 'Members',
-                                  isSelected: _filterAccess == 'members',
-                                  color: const Color(0xFFFF9800), // Orange
-                                  onTap: () => _setAccessFilter(_filterAccess == 'members' ? null : 'members'),
-                                ),
-                                const SizedBox(width: 6),
-                                // Paid filter
-                                _buildFilterChip(
-                                  icon: Icons.attach_money,
-                                  label: 'Paid',
-                                  isSelected: _filterAccess == 'paid',
-                                  color: const Color(0xFF9C27B0), // Purple
-                                  onTap: () => _setAccessFilter(_filterAccess == 'paid' ? null : 'paid'),
-                                ),
-                                const SizedBox(width: 6),
-                                // Runs Today filter
-                                _buildFilterChip(
-                                  icon: Icons.calendar_today,
-                                  label: 'Runs Today',
-                                  isSelected: _filterRunsToday,
-                                  count: _courtsWithRunsToday.length,
-                                  color: const Color(0xFFFF5722), // Deep Orange
-                                  onTap: _toggleRunsTodayFilter,
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

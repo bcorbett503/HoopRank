@@ -406,7 +406,9 @@ class ScheduledRun {
   final String creatorName;
   final String? creatorPhotoUrl;
   final String? title;
-  final String gameMode; // '1v1', '3v3', '5v5'
+  final String gameMode; // '3v3', '5v5'
+  final String? courtType; // 'full' or 'half'
+  final String? ageRange; // '18+', '21+', '30+', '40+', '50+', 'open'
   final DateTime scheduledAt;
   final int durationMinutes;
   final int maxPlayers;
@@ -428,6 +430,8 @@ class ScheduledRun {
     this.creatorPhotoUrl,
     this.title,
     required this.gameMode,
+    this.courtType,
+    this.ageRange,
     required this.scheduledAt,
     this.durationMinutes = 120,
     this.maxPlayers = 10,
@@ -468,6 +472,13 @@ class ScheduledRun {
   bool get isAlmostFull => attendeeCount >= maxPlayers - 2;
   bool get isFull => attendeeCount >= maxPlayers;
 
+  /// Display label for court type
+  String? get courtTypeLabel {
+    if (courtType == 'full') return 'Full Court';
+    if (courtType == 'half') return 'Half Court';
+    return null;
+  }
+
   factory ScheduledRun.fromJson(Map<String, dynamic> json) {
     return ScheduledRun(
       id: json['id']?.toString() ?? '',
@@ -481,6 +492,8 @@ class ScheduledRun {
       creatorPhotoUrl: json['creatorPhotoUrl']?.toString(),
       title: json['title']?.toString(),
       gameMode: json['gameMode']?.toString() ?? '5v5',
+      courtType: json['courtType']?.toString(),
+      ageRange: json['ageRange']?.toString(),
       scheduledAt: DateTime.tryParse(json['scheduledAt']?.toString() ?? '') ?? DateTime.now(),
       durationMinutes: _parseInt(json['durationMinutes'], fallback: 120),
       maxPlayers: _parseInt(json['maxPlayers'], fallback: 10),
@@ -494,3 +507,4 @@ class ScheduledRun {
     );
   }
 }
+
