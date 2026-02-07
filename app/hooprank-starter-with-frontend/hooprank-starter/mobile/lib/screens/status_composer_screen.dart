@@ -47,6 +47,13 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   bool _showCourtSuggestions = false;
   Court? _taggedCourt;
   
+  // Friend tagging
+  String _tagMode = 'all'; // 'all', 'local', 'individual'
+  final Set<String> _selectedPlayerIds = {};
+  List<FollowedPlayerInfo>? _followedPlayers;
+  bool _isLoadingPlayers = false;
+  bool _showPlayerTagging = false;
+  
   // Quick prompts to encourage posts
   final List<String> _quickPrompts = [
     "🏀 Looking for a game?",
@@ -76,6 +83,9 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     
     // Listen for @ mentions
     _textController.addListener(_onTextChanged);
+    
+    // Pre-load followed players
+    _loadFollowedPlayers();
   }
 
   @override
@@ -104,6 +114,25 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     }
     
     return courts;
+  }
+
+  /// Load followed players for tagging
+  Future<void> _loadFollowedPlayers() async {
+    if (_isLoadingPlayers || _followedPlayers != null) return;
+    setState(() => _isLoadingPlayers = true);
+    try {
+      final checkInState = Provider.of<CheckInState>(context, listen: false);
+      final players = await checkInState.getFollowedPlayersInfo();
+      if (mounted) {
+        setState(() {
+          _followedPlayers = players;
+          _isLoadingPlayers = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading followed players: $e');
+      if (mounted) setState(() => _isLoadingPlayers = false);
+    }
   }
 
   void _onTextChanged() {
@@ -332,6 +361,178 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     );
   }
   
+  /// Build the friend tagging section matching the "Your Courts" chip style
+  Widget _buildFriendTaggingSection() {
+    if (!_showPlayerTagging) return const SizedBox.shrink();
+    
+    final players = _followedPlayers ?? [];
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.people, size: 14, color: Colors.deepOrange.withOpacity(0.7)),
+            const SizedBox(width: 6),
+            const Text(
+              'Invite Players:',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        
+        // Mode selection: All / Local / Individual
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            _buildModeChip('all', 'All', Icons.group, Colors.deepOrange,
+                subtitle: 'Everyone you follow'),
+            _buildModeChip('local', 'Local', Icons.near_me, Colors.green,
+                subtitle: 'Within 25 mi'),
+            _buildModeChip('individual', 'Individual', Icons.person_search, Colors.blue,
+                subtitle: 'Pick players'),
+          ],
+        ),
+        
+        // Player list (only for Individual mode)
+        if (_tagMode == 'individual') ...[
+          const SizedBox(height: 12),
+          if (_isLoadingPlayers)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.deepOrange),
+                ),
+              ),
+            )
+          else if (players.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Follow some players first to tag them here!',
+                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: players.map((player) {
+                final isSelected = _selectedPlayerIds.contains(player.playerId);
+                return ActionChip(
+                  avatar: player.photoUrl != null
+                      ? CircleAvatar(
+                          backgroundImage: NetworkImage(player.photoUrl!),
+                          radius: 12,
+                        )
+                      : CircleAvatar(
+                          radius: 12,
+                          backgroundColor: isSelected ? Colors.blue : Colors.grey[700],
+                          child: Text(
+                            player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                  label: Text(
+                    player.name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isSelected ? Colors.blue : Colors.white70,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  backgroundColor: isSelected
+                      ? Colors.blue.withOpacity(0.2)
+                      : Colors.grey[800],
+                  side: BorderSide(
+                    color: isSelected
+                        ? Colors.blue.withOpacity(0.5)
+                        : Colors.transparent,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selectedPlayerIds.remove(player.playerId);
+                      } else {
+                        _selectedPlayerIds.add(player.playerId);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+        ],
+        
+        // Summary of selection
+        if (_tagMode == 'all' && players.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '${players.length} player${players.length == 1 ? '' : 's'} will be notified',
+              style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11),
+            ),
+          ),
+        if (_tagMode == 'individual' && _selectedPlayerIds.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '${_selectedPlayerIds.length} player${_selectedPlayerIds.length == 1 ? '' : 's'} selected',
+              style: TextStyle(color: Colors.blue.withOpacity(0.7), fontSize: 11),
+            ),
+          ),
+        
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+  
+  /// Build a mode selection chip matching the app design
+  Widget _buildModeChip(String mode, String label, IconData icon, Color color, {String? subtitle}) {
+    final isSelected = _tagMode == mode;
+    return ActionChip(
+      avatar: Icon(
+        isSelected ? Icons.check_circle : icon,
+        size: 16,
+        color: isSelected ? color : Colors.grey,
+      ),
+      label: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? color : Colors.white70,
+            ),
+          ),
+          if (subtitle != null)
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 9,
+                color: isSelected ? color.withOpacity(0.7) : Colors.white38,
+              ),
+            ),
+        ],
+      ),
+      backgroundColor: isSelected
+          ? color.withOpacity(0.2)
+          : Colors.grey[800],
+      side: BorderSide(
+        color: isSelected
+            ? color.withOpacity(0.5)
+            : Colors.transparent,
+      ),
+      onPressed: () => setState(() => _tagMode = mode),
+    );
+  }
+  
   String _formatDateOnly(DateTime date) {
     final now = DateTime.now();
     final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
@@ -534,6 +735,10 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                       );
                     },
                   ),
+                  
+                  // ── Friend Tagging Section ──
+                  _buildFriendTaggingSection(),
+
                   
                   // Scheduled time badge
                   if (_scheduledTime != null)
@@ -837,18 +1042,17 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                     },
                     tooltip: 'Tag court',
                   ),
-                  // Tag friend - only for regular posts
-                  if (_scheduledTime == null)
-                    IconButton(
-                      icon: const Icon(Icons.person_add, color: Colors.white70),
-                      onPressed: () {
-                        // TODO: Implement friend tagging
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Friend tagging coming soon!')),
-                        );
-                      },
-                      tooltip: 'Tag friends',
-                    ),
+                  // Tag friend toggle
+                  IconButton(
+                    icon: Icon(Icons.person_add, color: _showPlayerTagging ? Colors.deepOrange : Colors.white70),
+                    onPressed: () {
+                      setState(() => _showPlayerTagging = !_showPlayerTagging);
+                      if (_showPlayerTagging && _followedPlayers == null) {
+                        _loadFollowedPlayers();
+                      }
+                    },
+                    tooltip: 'Tag friends',
+                  ),
                   const Spacer(),
                   // Schedule Run button with text - always green to draw attention
                   GestureDetector(
