@@ -23,6 +23,7 @@ import { RankingsModule } from './rankings/rankings.module';
 import { RunsModule } from './runs/runs.module';
 import { ScheduledRun, RunAttendee } from './runs/scheduled-run.entity';
 import { HealthController } from './health.controller';
+import { UploadController } from './upload.controller';
 import { SnakeNamingStrategy } from './snake-naming.strategy';
 
 @Module({
@@ -70,7 +71,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     RankingsModule,
     RunsModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, UploadController],
 })
 export class AppModule { }
 
