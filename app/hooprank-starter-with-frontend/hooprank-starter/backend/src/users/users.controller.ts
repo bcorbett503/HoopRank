@@ -347,6 +347,11 @@ export class UsersController {
     return this.usersService.getMatches(id);
   }
 
+  @Get(':id/recent-games')
+  getRecentGames(@Param('id') id: string) {
+    return this.usersService.getMatches(id);
+  }
+
 
 }
 
