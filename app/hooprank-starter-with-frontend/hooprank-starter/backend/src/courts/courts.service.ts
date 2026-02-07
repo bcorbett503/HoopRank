@@ -73,7 +73,7 @@ export class CourtsService {
                     id, name, city, indoor, rims, source, signature, access,
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng,
-                    (SELECT COUNT(*) FROM user_court_alerts WHERE court_id = courts.id) as follower_count
+                    (SELECT COUNT(*) FROM user_court_alerts WHERE court_id = courts.id::text) as follower_count
                 FROM courts
                 WHERE geog && ST_MakeEnvelope($1, $2, $3, $4, 4326)
                 ORDER BY name ASC

@@ -26,8 +26,12 @@ export class MatchesController {
   }
 
   @Post(':id/accept')
-  async accept(@Param('id') id: string, @Body() body: { guestId?: string; opponentId?: string }): Promise<Match> {
-    const opponentId = body.guestId || body.opponentId;
+  async accept(
+    @Param('id') id: string,
+    @Body() body: { guestId?: string; opponentId?: string },
+    @Headers('x-user-id') userId?: string,
+  ): Promise<Match> {
+    const opponentId = body.guestId || body.opponentId || userId;
     if (!opponentId) throw new Error('opponentId required');
     return await this.matches.accept(id, opponentId);
   }
