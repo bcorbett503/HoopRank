@@ -1350,6 +1350,8 @@ class ApiService {
     int durationMinutes = 120,
     int maxPlayers = 10,
     String? notes,
+    List<String>? taggedPlayerIds,
+    String? tagMode,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/runs'),
@@ -1367,6 +1369,8 @@ class ApiService {
         'durationMinutes': durationMinutes,
         'maxPlayers': maxPlayers,
         if (notes != null) 'notes': notes,
+        if (taggedPlayerIds != null && taggedPlayerIds.isNotEmpty) 'taggedPlayerIds': taggedPlayerIds,
+        if (tagMode != null) 'tagMode': tagMode,
       }),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {

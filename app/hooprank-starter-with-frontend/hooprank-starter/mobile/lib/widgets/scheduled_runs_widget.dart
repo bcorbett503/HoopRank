@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/api_service.dart';
+import '../state/check_in_state.dart';
 
 /// Widget to display and manage scheduled runs at a court
 class ScheduledRunsWidget extends StatefulWidget {
@@ -479,6 +481,10 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
   int _maxPlayers = 10;
   bool _isSubmitting = false;
 
+  // Player tagging state
+  String _tagMode = 'all'; // 'all', 'local', 'individual'
+  final Set<String> _selectedPlayerIds = {};
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -499,6 +505,8 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
         ageRange: _ageRange,
         maxPlayers: _maxPlayers,
         notes: _notesController.text.isEmpty ? null : _notesController.text,
+        tagMode: _tagMode,
+        taggedPlayerIds: _tagMode == 'individual' ? _selectedPlayerIds.toList() : null,
       );
 
       if (runId != null) {
@@ -740,12 +748,76 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
               ),
               IconButton(
                 icon: const Icon(Icons.add_circle_outline, color: Colors.orange),
-                onPressed: _maxPlayers < 30
+                onPressed: _maxPlayers < 15
                     ? () => setState(() => _maxPlayers++)
                     : null,
               ),
             ],
           ),
+
+          const SizedBox(height: 16),
+
+          // Tag Players Section
+          const Text('Tag Players', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const SizedBox(height: 8),
+          Row(
+            children: ['all', 'local', 'individual'].map((mode) {
+              final isSelected = _tagMode == mode;
+              final label = mode == 'all' ? 'All' : (mode == 'local' ? 'Local' : 'Individual');
+              final icon = mode == 'all' ? Icons.public : (mode == 'local' ? Icons.near_me : Icons.person_add);
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _tagMode = mode),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.orange.withOpacity(0.3) : Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected ? Colors.orange : Colors.transparent,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, size: 18, color: isSelected ? Colors.orange : Colors.grey),
+                        const SizedBox(height: 4),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: isSelected ? Colors.orange : Colors.grey,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          if (_tagMode == 'all')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'All your followed players will be notified',
+                style: TextStyle(color: Colors.grey[500], fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ),
+          if (_tagMode == 'local')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Players near this court will be notified',
+                style: TextStyle(color: Colors.grey[500], fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ),
+          if (_tagMode == 'individual') ...[
+            const SizedBox(height: 8),
+            _buildPlayerSelector(),
+          ],
 
           const SizedBox(height: 16),
 
@@ -818,6 +890,91 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
       ),
     );
   }
+
+  Widget _buildPlayerSelector() {
+    final checkInState = context.read<CheckInState>();
+    final followedIds = checkInState.followedPlayers.toList();
+
+    if (followedIds.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[800]!.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.grey[500], size: 18),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Follow players to tag them in your runs',
+                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 160),
+      decoration: BoxDecoration(
+        color: Colors.grey[850],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[700]!),
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        itemCount: followedIds.length,
+        itemBuilder: (context, index) {
+          final playerId = followedIds[index];
+          final playerName = checkInState.getPlayerName(playerId);
+          final isSelected = _selectedPlayerIds.contains(playerId);
+          return ListTile(
+            dense: true,
+            leading: CircleAvatar(
+              radius: 14,
+              backgroundColor: isSelected
+                  ? Colors.orange.withOpacity(0.3)
+                  : Colors.grey[700],
+              child: Text(
+                playerName.isNotEmpty ? playerName[0].toUpperCase() : '?',
+                style: TextStyle(
+                  color: isSelected ? Colors.orange : Colors.white54,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            title: Text(
+              playerName,
+              style: TextStyle(
+                fontSize: 14,
+                color: isSelected ? Colors.white : Colors.white70,
+              ),
+            ),
+            trailing: Icon(
+              isSelected ? Icons.check_circle : Icons.circle_outlined,
+              color: isSelected ? Colors.orange : Colors.grey[600],
+              size: 20,
+            ),
+            onTap: () {
+              setState(() {
+                if (isSelected) {
+                  _selectedPlayerIds.remove(playerId);
+                } else {
+                  _selectedPlayerIds.add(playerId);
+                }
+              });
+            },
+          );
+        },
+      ),
+    );
+  }
+
 
   Color _getModeColor(String mode) {
     switch (mode) {

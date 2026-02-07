@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:share_plus/share_plus.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
 import '../services/api_service.dart';
@@ -36,6 +37,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   final Map<int, List<Map<String, dynamic>>> _comments = {}; // statusId -> comments
   final Map<int, bool> _attendingStates = {}; // statusId -> isAttending
   final Map<int, int> _attendeeCounts = {}; // statusId -> count
+  final Map<int, bool> _expandedAttendees = {}; // statusId -> show attendee list
+  final Map<int, List<Map<String, dynamic>>> _attendeeDetails = {}; // statusId -> attendee list
 
   @override
   void initState() {
@@ -1840,7 +1843,183 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         _attendingStates[statusId] = currentlyAttending;
         _attendeeCounts[statusId] = currentCount;
       });
+    } else if (success && !currentlyAttending && mounted) {
+      // User just clicked IN — auto-expand and fetch attendee list
+      _loadAttendees(statusId, autoExpand: true);
     }
+  }
+
+  void _loadAttendees(int statusId, {bool autoExpand = false}) async {
+    try {
+      final attendees = await ApiService.getAttendees(statusId);
+      if (mounted) {
+        setState(() {
+          _attendeeDetails[statusId] = attendees;
+          if (autoExpand) _expandedAttendees[statusId] = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load attendees: $e');
+    }
+  }
+
+  void _sharePost(Map<String, dynamic> post) {
+    final userName = post['userName']?.toString() ?? 'Someone';
+    final content = post['content']?.toString() ?? '';
+    final courtName = post['courtName']?.toString() ??
+        (content.trim().startsWith('@') ? content.trim().substring(1).trim() : null);
+    final scheduledAt = post['scheduledAt'];
+    final isScheduledEvent = scheduledAt != null;
+
+    final buffer = StringBuffer();
+
+    if (isScheduledEvent) {
+      // Scheduled Run share
+      buffer.write('🏀 $userName is hosting a pickup run on HoopRank!');
+      try {
+        final dt = DateTime.parse(scheduledAt.toString()).toLocal();
+        final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+        final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+        final timeStr = dt.minute == 0
+            ? '$hour$amPm'
+            : '$hour:${dt.minute.toString().padLeft(2, '0')}$amPm';
+        const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        buffer.write('\n📅 ${weekdays[dt.weekday - 1]} ${dt.month}/${dt.day} at $timeStr');
+      } catch (_) {}
+      if (courtName != null && courtName.isNotEmpty) {
+        buffer.write('\n📍 $courtName');
+      }
+      // Run attributes
+      final gameMode = post['gameMode']?.toString();
+      if (gameMode != null) buffer.write('\n🎮 $gameMode');
+    } else {
+      // Regular post share
+      if (content.isNotEmpty) {
+        buffer.write('$userName on HoopRank: "$content"');
+      } else {
+        buffer.write('Check out this post by $userName on HoopRank!');
+      }
+      if (courtName != null && courtName.isNotEmpty) {
+        buffer.write('\n📍 $courtName');
+      }
+    }
+
+    buffer.write('\n\nDownload HoopRank: https://apps.apple.com/app/hooprank/id6741466657');
+
+    SharePlus.instance.share(ShareParams(text: buffer.toString()));
+  }
+  Widget _buildAttendeeRow(int statusId, int attendeeCount) {
+    final isExpanded = _expandedAttendees[statusId] ?? false;
+    final attendees = _attendeeDetails[statusId] ?? [];
+
+    return GestureDetector(
+      onTap: () {
+        if (attendees.isEmpty) {
+          _loadAttendees(statusId, autoExpand: true);
+        } else {
+          setState(() {
+            _expandedAttendees[statusId] = !isExpanded;
+          });
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF00C853).withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF00C853).withOpacity(0.15)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Stacked avatars
+                if (attendees.isNotEmpty)
+                  SizedBox(
+                    width: (attendees.length.clamp(0, 5) * 22.0) + 8,
+                    height: 28,
+                    child: Stack(
+                      children: [
+                        for (var i = 0; i < attendees.length.clamp(0, 5); i++)
+                          Positioned(
+                            left: i * 22.0,
+                            child: CircleAvatar(
+                              radius: 14,
+                              backgroundColor: Colors.grey[700],
+                              backgroundImage: attendees[i]['photoUrl'] != null
+                                  ? NetworkImage(attendees[i]['photoUrl'].toString())
+                                  : null,
+                              child: attendees[i]['photoUrl'] == null
+                                  ? Text(
+                                      (attendees[i]['name']?.toString() ?? '?')[0].toUpperCase(),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                      ],
+                    ),
+                  )
+                else
+                  const Icon(Icons.people_outline, size: 18, color: Color(0xFF00C853)),
+                const SizedBox(width: 8),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '$attendeeCount ',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00C853), fontSize: 13),
+                      ),
+                      TextSpan(
+                        text: attendeeCount == 1 ? 'player going' : 'players going',
+                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: Colors.white.withOpacity(0.4),
+                  size: 20,
+                ),
+              ],
+            ),
+            if (isExpanded && attendees.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Divider(height: 1, color: Colors.white.withOpacity(0.08)),
+              const SizedBox(height: 8),
+              ...attendees.map((a) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 12,
+                      backgroundColor: Colors.grey[700],
+                      backgroundImage: a['photoUrl'] != null
+                          ? NetworkImage(a['photoUrl'].toString())
+                          : null,
+                      child: a['photoUrl'] == null
+                          ? Text(
+                              (a['name']?.toString() ?? '?')[0].toUpperCase(),
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      a['name']?.toString() ?? 'Unknown',
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ],
+                ),
+              )),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildAttributeBadge(String label, IconData icon, Color color) {
@@ -2315,6 +2494,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   ],
                 ),
               ),
+
+            // Attendee Visibility Row (for scheduled runs)
+            if (isScheduledEvent && isAttending) ...[
+              const SizedBox(height: 8),
+              _buildAttendeeRow(statusId, attendeeCount),
+            ],
             
             // Regular Content (for non-scheduled events)
             if (content.isNotEmpty && !isScheduledEvent)
@@ -2477,7 +2662,17 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   
                   const Spacer(),
                   // Share Button
-                  Icon(Icons.share_outlined, color: Colors.grey[600], size: 20),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => _sharePost(post),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Icon(Icons.share_outlined, color: Colors.grey[600], size: 20),
+                      ),
+                    ),
+                  ),
                   
                   // Delete Button
                   if (isOwnPost) ...[

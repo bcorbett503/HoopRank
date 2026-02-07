@@ -35,6 +35,12 @@ export class ScheduledRun {
     @Column({ type: 'text', nullable: true })
     notes?: string;
 
+    @Column({ name: 'tagged_player_ids', type: 'text', nullable: true })
+    taggedPlayerIds?: string; // JSON array of player IDs
+
+    @Column({ name: 'tag_mode', type: 'varchar', length: 20, nullable: true })
+    tagMode?: string; // 'all', 'local', or 'individual'
+
     @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }

@@ -17,10 +17,16 @@ export class RunsService {
         durationMinutes?: number;
         maxPlayers?: number;
         notes?: string;
+        taggedPlayerIds?: string[];
+        tagMode?: string;
     }): Promise<any> {
+        const taggedJson = data.taggedPlayerIds && data.taggedPlayerIds.length > 0
+            ? JSON.stringify(data.taggedPlayerIds)
+            : null;
+
         const result = await this.dataSource.query(`
-            INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, duration_minutes, max_players, notes, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+            INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, duration_minutes, max_players, notes, tagged_player_ids, tag_mode, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
             RETURNING *
         `, [
             data.courtId,
@@ -33,6 +39,8 @@ export class RunsService {
             data.durationMinutes || 120,
             data.maxPlayers || 10,
             data.notes || null,
+            taggedJson,
+            data.tagMode || null,
         ]);
 
         const run = result[0];
@@ -71,6 +79,8 @@ export class RunsService {
                 sr.duration_minutes as "durationMinutes",
                 sr.max_players as "maxPlayers",
                 sr.notes,
+                sr.tagged_player_ids as "taggedPlayerIds",
+                sr.tag_mode as "tagMode",
                 sr.created_at as "createdAt",
                 COALESCE((SELECT COUNT(*) FROM run_attendees WHERE run_id = sr.id), 0)::INTEGER as "attendeeCount",
                 EXISTS(SELECT 1 FROM run_attendees WHERE run_id = sr.id AND user_id = $2) as "isAttending"
@@ -101,6 +111,26 @@ export class RunsService {
             WHERE ra.run_id = $1
             ORDER BY ra.created_at ASC
         `, [runId]);
+    }
+
+    // ========== Capacity Check ==========
+
+    async checkCapacity(runId: string): Promise<{ isFull: boolean; attendeeCount: number; maxPlayers: number } | null> {
+        try {
+            const result = await this.dataSource.query(`
+                SELECT 
+                    sr.max_players as "maxPlayers",
+                    COALESCE((SELECT COUNT(*) FROM run_attendees WHERE run_id = sr.id), 0)::INTEGER as "attendeeCount"
+                FROM scheduled_runs sr
+                WHERE sr.id = $1
+            `, [runId]);
+            if (result.length === 0) return null;
+            const { maxPlayers, attendeeCount } = result[0];
+            return { isFull: attendeeCount >= maxPlayers, attendeeCount, maxPlayers };
+        } catch (e) {
+            console.error('checkCapacity error:', e.message);
+            return null;
+        }
     }
 
     // ========== Join / Leave ==========
@@ -210,6 +240,8 @@ export class RunsService {
                 { name: 'duration_minutes', type: "INTEGER DEFAULT 120" },
                 { name: 'max_players', type: "INTEGER DEFAULT 10" },
                 { name: 'notes', type: "TEXT" },
+                { name: 'tagged_player_ids', type: "TEXT" },
+                { name: 'tag_mode', type: "VARCHAR(20)" },
             ];
             for (const col of newColumns) {
                 try {

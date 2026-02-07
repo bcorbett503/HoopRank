@@ -21,6 +21,8 @@ export class RunsController {
             durationMinutes?: number;
             maxPlayers?: number;
             notes?: string;
+            taggedPlayerIds?: string[];
+            tagMode?: string;
         },
     ) {
         if (!userId) {
@@ -96,6 +98,11 @@ export class RunsController {
     ) {
         if (!userId) {
             return { success: false, error: 'User ID required' };
+        }
+        // Enforce RSVP cap
+        const capacityCheck = await this.runsService.checkCapacity(runId);
+        if (capacityCheck && capacityCheck.isFull) {
+            return { success: false, error: 'Run is full', isFull: true };
         }
         await this.runsService.joinRun(runId, userId);
         return { success: true };
