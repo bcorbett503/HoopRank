@@ -1947,12 +1947,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                             child: CircleAvatar(
                               radius: 14,
                               backgroundColor: Colors.grey[700],
-                              backgroundImage: attendees[i]['photoUrl'] != null
-                                  ? NetworkImage(attendees[i]['photoUrl'].toString())
+                              backgroundImage: (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']) != null
+                                  ? NetworkImage((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString())
                                   : null,
-                              child: attendees[i]['photoUrl'] == null
+                              child: (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']) == null
                                   ? Text(
-                                      (attendees[i]['name']?.toString() ?? '?')[0].toUpperCase(),
+                                      ((attendees[i]['userName'] ?? attendees[i]['name'])?.toString() ?? '?')[0].toUpperCase(),
                                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
                                     )
                                   : null,
@@ -1990,31 +1990,35 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               const SizedBox(height: 10),
               Divider(height: 1, color: Colors.white.withOpacity(0.08)),
               const SizedBox(height: 8),
-              ...attendees.map((a) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundColor: Colors.grey[700],
-                      backgroundImage: a['photoUrl'] != null
-                          ? NetworkImage(a['photoUrl'].toString())
-                          : null,
-                      child: a['photoUrl'] == null
-                          ? Text(
-                              (a['name']?.toString() ?? '?')[0].toUpperCase(),
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      a['name']?.toString() ?? 'Unknown',
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
-                    ),
-                  ],
-                ),
-              )),
+              ...attendees.map((a) {
+                final name = a['userName']?.toString() ?? a['name']?.toString() ?? 'Unknown';
+                final photo = a['userPhotoUrl']?.toString() ?? a['photoUrl']?.toString();
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundColor: Colors.grey[700],
+                        backgroundImage: photo != null
+                            ? NetworkImage(photo)
+                            : null,
+                        child: photo == null
+                            ? Text(
+                                name[0].toUpperCase(),
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        name,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                );
+              }),
             ],
           ],
         ),
