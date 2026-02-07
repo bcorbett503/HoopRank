@@ -193,6 +193,15 @@ export class MatchesService {
       ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_submitter_id VARCHAR
     `).catch(() => { /* column may already exist */ });
 
+    // Ensure status check constraint includes new statuses (idempotent)
+    await this.dataSource.query(`
+      ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_status_check
+    `).catch(() => { });
+    await this.dataSource.query(`
+      ALTER TABLE matches ADD CONSTRAINT matches_status_check
+      CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested'))
+    `).catch(() => { /* constraint may already exist */ });
+
     const match = await this.get(id);
     if (!match) throw new Error('Match not found');
 
