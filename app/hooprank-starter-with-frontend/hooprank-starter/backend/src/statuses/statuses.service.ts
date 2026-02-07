@@ -38,6 +38,8 @@ export class StatusesService {
         gameMode?: string,
         courtType?: string,
         ageRange?: string,
+        taggedPlayerIds?: string[],
+        tagMode?: string,
     ): Promise<PlayerStatus> {
         try {
             console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, courtId, videoUrl, videoDurationMs, gameMode, courtType, ageRange });
@@ -66,6 +68,13 @@ export class StatusesService {
             if (scheduledAt && courtId) {
                 this.sendScheduledRunNotification(userId, courtId, scheduledAt, content).catch(err => {
                     console.error('Failed to send scheduled run notification:', err.message);
+                });
+            }
+
+            // Send push notifications to tagged players
+            if (scheduledAt && tagMode && (tagMode === 'all' || tagMode === 'local' || (tagMode === 'individual' && taggedPlayerIds && taggedPlayerIds.length > 0))) {
+                this.sendTaggedPlayerNotifications(userId, tagMode, taggedPlayerIds || [], scheduledAt, courtId, content).catch(err => {
+                    console.error('Failed to send tagged player notifications:', err.message);
                 });
             }
 
@@ -129,6 +138,69 @@ export class StatusesService {
             }
         } catch (error) {
             console.error('sendScheduledRunNotification error:', error.message);
+        }
+    }
+
+    // Send push notifications to tagged/invited players
+    private async sendTaggedPlayerNotifications(
+        userId: string,
+        tagMode: string,
+        taggedPlayerIds: string[],
+        scheduledAt: string,
+        courtId?: string,
+        content?: string,
+    ): Promise<void> {
+        try {
+            // Get creator name and court name
+            const [userResult, courtResult] = await Promise.all([
+                this.dataSource.query(`SELECT name FROM users WHERE id = $1`, [userId]),
+                courtId ? this.dataSource.query(`SELECT name FROM courts WHERE id = $1`, [courtId]) : Promise.resolve([]),
+            ]);
+
+            const userName = userResult[0]?.name || 'Someone';
+            const courtName = courtResult[0]?.name || '';
+
+            // Format scheduled time
+            const scheduledDate = new Date(scheduledAt);
+            const timeStr = scheduledDate.toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+            });
+
+            let playerIdsToNotify: string[] = [];
+
+            if (tagMode === 'all' || tagMode === 'local') {
+                // Notify all players that follow this user (or that this user follows)
+                const followers = await this.dataSource.query(
+                    `SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $1`,
+                    [userId],
+                );
+                playerIdsToNotify = followers.map((r: any) => r.followed_id).filter((id: string) => id !== userId);
+            } else if (tagMode === 'individual') {
+                playerIdsToNotify = taggedPlayerIds.filter(id => id !== userId);
+            }
+
+            if (playerIdsToNotify.length === 0) {
+                console.log('No tagged players to notify');
+                return;
+            }
+
+            const locationStr = courtName ? ` at ${courtName}` : '';
+            console.log(`Sending run invite notification to ${playerIdsToNotify.length} tagged players`);
+
+            for (const playerId of playerIdsToNotify) {
+                this.notificationsService.sendToUser(
+                    playerId,
+                    `🏀 ${userName} invited you to a run!`,
+                    `${timeStr}${locationStr}`,
+                    { type: 'run_invite', scheduledAt, ...(courtId ? { courtId } : {}) },
+                ).catch(() => { });
+            }
+        } catch (error) {
+            console.error('sendTaggedPlayerNotifications error:', error.message);
         }
     }
 

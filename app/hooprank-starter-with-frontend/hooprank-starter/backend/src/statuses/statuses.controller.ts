@@ -20,6 +20,8 @@ export class StatusesController {
             gameMode?: string;
             courtType?: string;
             ageRange?: string;
+            taggedPlayerIds?: string[];
+            tagMode?: string;
         },
     ) {
         if (!userId) {
@@ -37,6 +39,8 @@ export class StatusesController {
             body.gameMode,
             body.courtType,
             body.ageRange,
+            body.taggedPlayerIds,
+            body.tagMode,
         );
         return { success: true, status };
     }

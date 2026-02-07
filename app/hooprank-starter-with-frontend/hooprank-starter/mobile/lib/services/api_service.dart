@@ -1092,6 +1092,8 @@ class ApiService {
     String? gameMode,
     String? courtType,
     String? ageRange,
+    String? tagMode,
+    List<String>? taggedPlayerIds,
   }) async {
     debugPrint('API createStatus: content length=${content.length}, imageUrl=${imageUrl != null ? "${imageUrl.length} chars" : "null"}, videoUrl=${videoUrl != null ? "present" : "null"}, scheduledAt=$scheduledAt, courtId=$courtId');
     final body = {
@@ -1105,6 +1107,8 @@ class ApiService {
       if (gameMode != null) 'gameMode': gameMode,
       if (courtType != null) 'courtType': courtType,
       if (ageRange != null) 'ageRange': ageRange,
+      if (tagMode != null) 'tagMode': tagMode,
+      if (taggedPlayerIds != null && taggedPlayerIds.isNotEmpty) 'taggedPlayerIds': taggedPlayerIds,
     };
     debugPrint('API createStatus: body keys=${body.keys.toList()}');
     final response = await http.post(

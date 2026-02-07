@@ -52,7 +52,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   final Set<String> _selectedPlayerIds = {};
   List<FollowedPlayerInfo>? _followedPlayers;
   bool _isLoadingPlayers = false;
-  bool _showPlayerTagging = false;
+  bool _showPlayerTagging = true;
   
   // Quick prompts to encourage posts
   final List<String> _quickPrompts = [
@@ -596,6 +596,8 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
         gameMode: _scheduledTime != null ? _gameMode : null,
         courtType: _scheduledTime != null ? _courtType : null,
         ageRange: _scheduledTime != null ? _ageRange : null,
+        tagMode: _showPlayerTagging ? _tagMode : null,
+        taggedPlayerIds: _showPlayerTagging && _tagMode == 'individual' ? _selectedPlayerIds.toList() : null,
       );
       
       if (mounted) {

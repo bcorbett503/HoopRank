@@ -1993,29 +1993,37 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               ...attendees.map((a) {
                 final name = a['userName']?.toString() ?? a['name']?.toString() ?? 'Unknown';
                 final photo = a['userPhotoUrl']?.toString() ?? a['photoUrl']?.toString();
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 12,
-                        backgroundColor: Colors.grey[700],
-                        backgroundImage: photo != null
-                            ? NetworkImage(photo)
-                            : null,
-                        child: photo == null
-                            ? Text(
-                                name[0].toUpperCase(),
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        name,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
-                    ],
+                final odId = a['userId']?.toString();
+                return GestureDetector(
+                  onTap: odId != null ? () => context.go('/player/$odId') : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Colors.grey[700],
+                          backgroundImage: photo != null
+                              ? NetworkImage(photo)
+                              : null,
+                          child: photo == null
+                              ? Text(
+                                  name[0].toUpperCase(),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                        ),
+                        if (odId != null)
+                          Icon(Icons.chevron_right, size: 16, color: Colors.white.withOpacity(0.3)),
+                      ],
+                    ),
                   ),
                 );
               }),
