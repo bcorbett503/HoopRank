@@ -631,7 +631,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           ),
                           onTap: () {
                             Navigator.pop(context);
-                            context.go('/player/${player.playerId}');
+                            context.go('/players/${player.playerId}');
                           },
                         );
                       },
@@ -863,7 +863,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 ),
                 // Opponent avatar - smaller
                 GestureDetector(
-                  onTap: () => context.go('/player/${opponent.id}'),
+                  onTap: () => context.go('/players/${opponent.id}'),
                   child: CircleAvatar(
                     radius: 18, // Reduced from 22
                     backgroundColor: Colors.orange.withOpacity(0.3),
@@ -1995,7 +1995,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 final photo = a['userPhotoUrl']?.toString() ?? a['photoUrl']?.toString();
                 final odId = a['userId']?.toString();
                 return GestureDetector(
-                  onTap: odId != null ? () => context.go('/player/$odId') : null,
+                  onTap: odId != null ? () => context.go('/players/$odId') : null,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
