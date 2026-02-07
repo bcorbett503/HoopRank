@@ -14,13 +14,15 @@ export class MessagesController {
     @Post()
     async sendMessage(
         @Headers('x-user-id') userId: string,
-        @Body() body: { senderId: string; receiverId: string; content: string; matchId?: string; isChallenge?: boolean }
+        @Body() body: { senderId?: string; receiverId?: string; toUserId?: string; content: string; matchId?: string; isChallenge?: boolean }
     ) {
-        // Validate that the authenticated user matches the sender
-        if (!userId || userId !== body.senderId) {
-            throw new Error('Unauthorized: sender must match authenticated user');
+        // Support both formats: {senderId, receiverId} and {toUserId} (mobile)
+        const senderId = body.senderId || userId;
+        const receiverId = body.receiverId || body.toUserId;
+        if (!senderId || !receiverId) {
+            throw new Error('Receiver ID required (receiverId or toUserId)');
         }
-        return this.messagesService.sendMessage(body.senderId, body.receiverId, body.content, body.matchId, body.isChallenge);
+        return this.messagesService.sendMessage(senderId, receiverId, body.content, body.matchId, body.isChallenge);
     }
 
     @Get('challenges')
@@ -39,9 +41,24 @@ export class MessagesController {
         return { unreadCount: count };
     }
 
+    // GET /messages/conversations — uses x-user-id header (mobile path)
+    @Get('conversations')
+    async getConversationsFromHeader(@Headers('x-user-id') userId: string) {
+        return this.messagesService.getConversations(userId);
+    }
+
     @Get('conversations/:userId')
     async getConversations(@Param('userId') userId: string) {
         return this.messagesService.getConversations(userId);
+    }
+
+    // GET /messages/:otherUserId — uses x-user-id header (mobile path)
+    @Get(':otherUserId')
+    async getMessagesWithHeader(
+        @Headers('x-user-id') userId: string,
+        @Param('otherUserId') otherUserId: string,
+    ) {
+        return this.messagesService.getMessages(userId, otherUserId);
     }
 
     @Get(':userId/:otherUserId')

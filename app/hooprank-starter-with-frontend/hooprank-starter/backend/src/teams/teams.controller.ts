@@ -51,6 +51,17 @@ export class TeamsController {
     }
 
     /**
+     * Get teams for a specific user (mobile path: GET /teams/user/:userId)
+     */
+    @Get('user/:userId')
+    async getUserTeams(
+        @Param('userId') targetUserId: string,
+    ) {
+        const teams = await this.teamsService.getUserTeams(targetUserId);
+        return { teams };
+    }
+
+    /**
      * Get team details
      */
     @Get(':id')
