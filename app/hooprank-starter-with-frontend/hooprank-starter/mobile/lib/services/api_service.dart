@@ -272,7 +272,7 @@ class ApiService {
     if (_authToken == null && _userId == null) throw Exception('Not authenticated');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/matches'),
+      Uri.parse('$baseUrl/api/v1/matches'),
       headers: {
         'Authorization': 'Bearer $_authToken',
         'x-user-id': _userId ?? '',
@@ -496,7 +496,7 @@ class ApiService {
   /// Get a specific match by ID
   static Future<Map<String, dynamic>?> getMatch(String matchId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/matches/$matchId'),
+      Uri.parse('$baseUrl/api/v1/matches/$matchId'),
       headers: {
         'x-user-id': _userId ?? '',
       },
@@ -547,7 +547,7 @@ class ApiService {
     if (_userId == null) throw Exception('Not authenticated');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/matches/$matchId/confirm'),
+      Uri.parse('$baseUrl/api/v1/matches/$matchId/confirm'),
       headers: {
         'x-user-id': _userId!,
         'Content-Type': 'application/json',
@@ -567,7 +567,7 @@ class ApiService {
     if (_userId == null) throw Exception('Not authenticated');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/matches/$matchId/contest'),
+      Uri.parse('$baseUrl/api/v1/matches/$matchId/contest'),
       headers: {
         'x-user-id': _userId!,
         'Content-Type': 'application/json',
@@ -616,7 +616,7 @@ class ApiService {
   /// Get matches awaiting score confirmation from current user
   static Future<List<Map<String, dynamic>>> getPendingConfirmations() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/matches/pending-confirmation'),
+      Uri.parse('$baseUrl/api/v1/matches/pending-confirmation'),
       headers: {
         'x-user-id': _userId ?? '',
       },
