@@ -174,29 +174,199 @@ export class MatchesService {
     return await this.matchesRepository.save(m);
   }
 
-  async getPendingConfirmations(userId: string): Promise<any[]> {
+  /**
+   * Phase 1: Store scores without updating ratings — sets status to 'score_submitted'.
+   * Ensures the score_submitter_id column exists, then writes the scores.
+   */
+  async submitScoreOnly(
+    id: string,
+    submitterId: string,
+    scoreCreator: number,
+    scoreOpponent: number,
+    courtId?: string,
+  ): Promise<Match> {
     const isPostgres = !!process.env.DATABASE_URL;
+    if (!isPostgres) throw new Error('Only supported on PostgreSQL');
 
-    if (isPostgres) {
-      const results = await this.dataSource.query(`
-        SELECT m.*,
-          c.name as court_name, c.city as court_city,
-          creator.name as creator_name,
-          opponent.name as opponent_name
-        FROM matches m
-        LEFT JOIN courts c ON m.court_id = c.id
-        LEFT JOIN users creator ON m.creator_id = creator.id
-        LEFT JOIN users opponent ON m.opponent_id = opponent.id
-        WHERE (m.creator_id = $1 OR m.opponent_id = $1)
-          AND m.status = 'completed'
-          AND (m.score_creator IS NOT NULL OR m.score_opponent IS NOT NULL)
-        ORDER BY m.updated_at DESC
-      `, [userId]);
+    // Ensure score_submitter_id column exists (idempotent)
+    await this.dataSource.query(`
+      ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_submitter_id VARCHAR
+    `).catch(() => { /* column may already exist */ });
 
-      return results;
+    const match = await this.get(id);
+    if (!match) throw new Error('Match not found');
+
+    const creatorId = (match as any).creator_id || match.creatorId;
+    const opponentId = (match as any).opponent_id || match.opponentId;
+
+    if (submitterId !== creatorId && submitterId !== opponentId) {
+      throw new Error('You are not a participant in this match');
     }
 
-    return [];
+    // Optionally update court if valid UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isValidUUID = courtId && uuidRegex.test(courtId);
+
+    if (isValidUUID) {
+      await this.dataSource.query(`
+        UPDATE matches SET status = 'score_submitted', score_creator = $2, score_opponent = $3,
+          score_submitter_id = $4, court_id = $5, updated_at = NOW()
+        WHERE id = $1
+      `, [id, scoreCreator, scoreOpponent, submitterId, courtId]);
+    } else {
+      await this.dataSource.query(`
+        UPDATE matches SET status = 'score_submitted', score_creator = $2, score_opponent = $3,
+          score_submitter_id = $4, updated_at = NOW()
+        WHERE id = $1
+      `, [id, scoreCreator, scoreOpponent, submitterId]);
+    }
+
+    console.log(`[submitScoreOnly] Match ${id} → score_submitted by ${submitterId}`);
+
+    // Send push notification to the OTHER player asking them to confirm
+    const otherUserId = submitterId === creatorId ? opponentId : creatorId;
+    const submitterResult = await this.dataSource.query(`SELECT name FROM users WHERE id = $1`, [submitterId]);
+    const submitterName = submitterResult[0]?.name || 'Your opponent';
+
+    this.notificationsService.sendScoreSubmittedNotification(
+      otherUserId, submitterName, scoreCreator, scoreOpponent, id
+    ).catch(() => { });
+
+    const result = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [id]);
+    return result[0];
+  }
+
+  /**
+   * Phase 2a: Opponent confirms the score — triggers rating update + match completion.
+   */
+  async confirmScore(matchId: string, confirmerId: string): Promise<Match> {
+    const isPostgres = !!process.env.DATABASE_URL;
+    if (!isPostgres) throw new Error('Only supported on PostgreSQL');
+
+    const match = await this.get(matchId);
+    if (!match) throw new Error('Match not found');
+
+    const status = (match as any).status;
+    if (status !== 'score_submitted') {
+      throw new Error(`Cannot confirm — match status is '${status}', expected 'score_submitted'`);
+    }
+
+    const creatorId = (match as any).creator_id || match.creatorId;
+    const opponentId = (match as any).opponent_id || match.opponentId;
+    const submitterId = (match as any).score_submitter_id;
+
+    // Only the NON-submitter can confirm
+    if (confirmerId === submitterId) {
+      throw new Error('You submitted the score — only the other player can confirm');
+    }
+    if (confirmerId !== creatorId && confirmerId !== opponentId) {
+      throw new Error('You are not a participant in this match');
+    }
+
+    const scoreCreator = parseInt((match as any).score_creator);
+    const scoreOpponent = parseInt((match as any).score_opponent);
+    const winnerId = scoreCreator > scoreOpponent ? creatorId : opponentId;
+
+    console.log(`[confirmScore] Match ${matchId} confirmed by ${confirmerId}, winner=${winnerId}`);
+
+    // Now run the full rating-update + completion flow
+    return this.completeWithScores(matchId, winnerId, scoreCreator, scoreOpponent);
+  }
+
+  /**
+   * Phase 2b: Opponent contests the score — match is voided, no rating change.
+   */
+  async contestScore(matchId: string, contesterId: string): Promise<Match> {
+    const isPostgres = !!process.env.DATABASE_URL;
+    if (!isPostgres) throw new Error('Only supported on PostgreSQL');
+
+    const match = await this.get(matchId);
+    if (!match) throw new Error('Match not found');
+
+    const status = (match as any).status;
+    if (status !== 'score_submitted') {
+      throw new Error(`Cannot contest — match status is '${status}', expected 'score_submitted'`);
+    }
+
+    const creatorId = (match as any).creator_id || match.creatorId;
+    const opponentId = (match as any).opponent_id || match.opponentId;
+    const submitterId = (match as any).score_submitter_id;
+
+    // Only the NON-submitter can contest
+    if (contesterId === submitterId) {
+      throw new Error('You submitted the score — you cannot contest your own submission');
+    }
+    if (contesterId !== creatorId && contesterId !== opponentId) {
+      throw new Error('You are not a participant in this match');
+    }
+
+    // Set status to contested, clear scores
+    await this.dataSource.query(`
+      UPDATE matches SET status = 'contested', score_creator = NULL, score_opponent = NULL,
+        winner_id = NULL, updated_at = NOW()
+      WHERE id = $1
+    `, [matchId]);
+
+    // Increment games_contested for both players
+    await this.dataSource.query(`
+      UPDATE users SET games_contested = COALESCE(games_contested, 0) + 1, updated_at = NOW()
+      WHERE id = $1 OR id = $2
+    `, [creatorId, opponentId]);
+
+    console.log(`[contestScore] Match ${matchId} contested by ${contesterId}`);
+
+    // Notify the submitter that the score was contested
+    const contesterResult = await this.dataSource.query(`SELECT name FROM users WHERE id = $1`, [contesterId]);
+    const contesterName = contesterResult[0]?.name || 'Your opponent';
+
+    this.notificationsService.sendScoreContestedNotification(
+      submitterId, contesterName, matchId
+    ).catch(() => { });
+
+    const result = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [matchId]);
+    return result[0];
+  }
+
+  /**
+   * Get matches awaiting score confirmation from this user.
+   * Returns matches with status 'score_submitted' where this user is NOT the submitter.
+   * Response shape matches mobile expectation: {matchId, opponentName, score: {me, opponent}}
+   */
+  async getPendingConfirmations(userId: string): Promise<any[]> {
+    const isPostgres = !!process.env.DATABASE_URL;
+    if (!isPostgres) return [];
+
+    const results = await this.dataSource.query(`
+      SELECT m.*,
+        c.name as court_name, c.city as court_city,
+        creator.name as creator_name,
+        opponent.name as opponent_name
+      FROM matches m
+      LEFT JOIN courts c ON m.court_id = c.id
+      LEFT JOIN users creator ON m.creator_id = creator.id
+      LEFT JOIN users opponent ON m.opponent_id = opponent.id
+      WHERE (m.creator_id = $1 OR m.opponent_id = $1)
+        AND m.status = 'score_submitted'
+        AND m.score_submitter_id IS NOT NULL
+        AND m.score_submitter_id != $1
+      ORDER BY m.updated_at DESC
+    `, [userId]);
+
+    // Transform to shape expected by mobile app
+    return results.map((m: any) => {
+      const isUserCreator = m.creator_id === userId;
+      const opponentName = isUserCreator ? m.opponent_name : m.creator_name;
+      const myScore = isUserCreator ? m.score_creator : m.score_opponent;
+      const theirScore = isUserCreator ? m.score_opponent : m.score_creator;
+
+      return {
+        matchId: m.id,
+        opponentName: opponentName || 'Opponent',
+        score: { me: parseInt(myScore), opponent: parseInt(theirScore) },
+        courtName: m.court_name,
+        createdAt: m.updated_at,
+      };
+    });
   }
 
   async get(id: string): Promise<Match | undefined> {

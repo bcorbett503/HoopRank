@@ -318,4 +318,40 @@ export class NotificationsService {
             type: 'follow',
         });
     }
+
+    /**
+     * Send notification asking opponent to confirm a submitted score
+     */
+    async sendScoreSubmittedNotification(
+        opponentUserId: string,
+        submitterName: string,
+        scoreCreator: number,
+        scoreOpponent: number,
+        matchId: string,
+    ): Promise<void> {
+        const title = '📊 Confirm Score';
+        const body = `${submitterName} submitted a score (${scoreCreator}-${scoreOpponent}). Tap to confirm or contest.`;
+
+        await this.sendToUser(opponentUserId, title, body, {
+            type: 'score_submitted',
+            matchId,
+        });
+    }
+
+    /**
+     * Send notification telling the submitter their score was contested
+     */
+    async sendScoreContestedNotification(
+        submitterUserId: string,
+        contesterName: string,
+        matchId: string,
+    ): Promise<void> {
+        const title = '⚠️ Score Contested';
+        const body = `${contesterName} contested your submitted score. The match is voided.`;
+
+        await this.sendToUser(submitterUserId, title, body, {
+            type: 'score_contested',
+            matchId,
+        });
+    }
 }

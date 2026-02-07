@@ -46,7 +46,7 @@ export class MatchesController {
     @Param('id') id: string,
     @Body() body: { me: number; opponent: number; courtId?: string },
     @Headers('x-user-id') userId: string
-  ): Promise<{ match: Match; ratingChange?: { myChange: number; opponentChange: number } }> {
+  ): Promise<{ match: Match }> {
     try {
       console.log(`[submitScore] Starting for match ${id}, user ${userId}, scores: me=${body.me}, opponent=${body.opponent}, courtId=${body.courtId || 'none'}`);
 
@@ -54,32 +54,19 @@ export class MatchesController {
       const match = await this.matches.get(id);
       if (!match) throw new Error('Match not found');
 
-      // Get the submitter ID from the header
-      const submitterId = userId;
-
-      // Handle both camelCase (entity) and snake_case (raw SQL) property names
       const creatorId = (match as any).creator_id || match.creatorId;
       const opponentId = (match as any).opponent_id || match.opponentId;
 
-      console.log(`[submitScore] Match found: creator=${creatorId}, opponent=${opponentId}`);
-
       // Determine scores based on who is submitting
-      // If submitter is creator, their score is score_creator
-      const isSubmitterCreator = submitterId === creatorId;
+      const isSubmitterCreator = userId === creatorId;
       const scoreCreator = isSubmitterCreator ? body.me : body.opponent;
       const scoreOpponent = isSubmitterCreator ? body.opponent : body.me;
 
-      // Determine winner based on scores: if me > opponent, submitter wins
-      const submitterOpponentId = submitterId === creatorId ? opponentId : creatorId;
-      const winnerId = body.me > body.opponent ? submitterId : submitterOpponentId;
+      // Phase 1: Store scores without updating ratings — opponent must confirm
+      const updatedMatch = await this.matches.submitScoreOnly(id, userId, scoreCreator, scoreOpponent, body.courtId);
 
-      console.log(`[submitScore] Calculated: scoreCreator=${scoreCreator}, scoreOpponent=${scoreOpponent}, winnerId=${winnerId}`);
-
-      // Complete the match with scores (this updates ratings and challenge status)
-      const completedMatch = await this.matches.completeWithScores(id, winnerId, scoreCreator, scoreOpponent, body.courtId);
-
-      console.log(`[submitScore] Match completed successfully`);
-      return { match: completedMatch };
+      console.log(`[submitScore] Score submitted — awaiting opponent confirmation`);
+      return { match: updatedMatch };
     } catch (error) {
       console.error(`[submitScore] Error for match ${id}:`, error);
       throw error;
@@ -90,6 +77,26 @@ export class MatchesController {
   async getPendingConfirmations(@Headers('x-user-id') userId: string) {
     if (!userId) return [];
     return this.matches.getPendingConfirmations(userId);
+  }
+
+  @Post(':id/confirm')
+  async confirmScore(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId: string
+  ): Promise<{ match: Match }> {
+    if (!userId) throw new Error('Authentication required');
+    const match = await this.matches.confirmScore(id, userId);
+    return { match };
+  }
+
+  @Post(':id/contest')
+  async contestScore(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId: string
+  ): Promise<{ match: Match }> {
+    if (!userId) throw new Error('Authentication required');
+    const match = await this.matches.contestScore(id, userId);
+    return { match };
   }
 
   @Get(':id')
