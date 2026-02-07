@@ -14,6 +14,14 @@ export class TeamsController {
     }
 
     /**
+     * Get user's teams (explicit /mine route to avoid :id conflict)
+     */
+    @Get('mine')
+    async getMyTeamsExplicit(@Headers('x-user-id') userId: string) {
+        return this.teamsService.getUserTeams(userId);
+    }
+
+    /**
      * Get pending team invites
      */
     @Get('invites')

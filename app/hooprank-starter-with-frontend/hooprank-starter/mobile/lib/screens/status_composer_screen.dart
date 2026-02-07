@@ -175,15 +175,17 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   }
 
   void _showScheduleSheet() async {
-    // Go directly to date picker
-    final date = await showDatePicker(
+    // Show inline calendar in a bottom sheet — tapping a date auto-advances to time
+    final date = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-      builder: (context, child) {
+      backgroundColor: const Color(0xFF1E2128),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
         return Theme(
-          data: Theme.of(context).copyWith(
+          data: Theme.of(ctx).copyWith(
             colorScheme: const ColorScheme.dark(
               primary: Colors.deepOrange,
               onPrimary: Colors.white,
@@ -191,7 +193,38 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
               onSurface: Colors.white,
             ),
           ),
-          child: child!,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[600],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const Text(
+                  'Pick a date',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 8),
+                CalendarDatePicker(
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 30)),
+                  onDateChanged: (selectedDate) {
+                    Navigator.pop(ctx, selectedDate);
+                  },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -411,7 +444,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
               ),
               child: _isSubmitting
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(_scheduledTime != null ? 'Schedule' : 'Post'),
+                  : const Text('Post'),
             ),
           ),
         ],

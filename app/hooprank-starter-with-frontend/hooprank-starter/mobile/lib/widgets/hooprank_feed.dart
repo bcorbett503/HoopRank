@@ -2223,6 +2223,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
                         child: Wrap(
+                          alignment: WrapAlignment.start,
                           spacing: 6,
                           runSpacing: 6,
                           children: [

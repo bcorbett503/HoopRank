@@ -472,22 +472,24 @@ export class TeamsService {
 
         const teamIds = memberships.map(m => m.teamId);
 
-        // Build a dynamic IN clause for the team IDs
-        const placeholders = teamIds.map((_, i) => `$${i + 1}`).join(', ');
+        // Build dynamic IN clauses with separate placeholder indices for each
+        const placeholders1 = teamIds.map((_, i) => `$${i + 1}`).join(', ');
+        const offset = teamIds.length;
+        const placeholders2 = teamIds.map((_, i) => `$${i + 1 + offset}`).join(', ');
         const challenges = await this.dataSource.query(`
-            SELECT 
-                tc.*,
-                ft.name as from_team_name,
-                ft.team_type as from_team_type,
-                tt.name as to_team_name,
-                tt.team_type as to_team_type
-            FROM team_challenges tc
-            JOIN teams ft ON tc.from_team_id = ft.id
-            JOIN teams tt ON tc.to_team_id = tt.id
-            WHERE (tc.from_team_id IN (${placeholders}) OR tc.to_team_id IN (${placeholders}))
-              AND tc.status = 'pending'
-            ORDER BY tc.created_at DESC
-        `, [...teamIds, ...teamIds]);
+        SELECT 
+            tc.*,
+            ft.name as from_team_name,
+            ft.team_type as from_team_type,
+            tt.name as to_team_name,
+            tt.team_type as to_team_type
+        FROM team_challenges tc
+        JOIN teams ft ON tc.from_team_id = ft.id
+        JOIN teams tt ON tc.to_team_id = tt.id
+        WHERE (tc.from_team_id IN (${placeholders1}) OR tc.to_team_id IN (${placeholders2}))
+          AND tc.status = 'pending'
+        ORDER BY tc.created_at DESC
+    `, [...teamIds, ...teamIds]);
 
         return challenges.map((c: any) => {
             // Determine which of the user's teams is involved

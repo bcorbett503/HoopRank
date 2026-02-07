@@ -402,56 +402,42 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            // Kings section
-            if (court.hasKings) ...[
-              const Text(
-                '👑 Kings of the Court',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.amber,
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Mode Kings row
-              Row(
-                children: [
-                  if (court.king1v1 != null)
-                    Expanded(child: _buildKingCard('1v1', court.king1v1!, court.king1v1Id, court.king1v1Rating, Colors.deepOrange)),
-                  if (court.king1v1 != null && (court.king3v3 != null || court.king5v5 != null))
-                    const SizedBox(width: 8),
-                  if (court.king3v3 != null)
-                    Expanded(child: _buildKingCard('3v3', court.king3v3!, court.king3v3Id, court.king3v3Rating, Colors.blue)),
-                  if (court.king3v3 != null && court.king5v5 != null)
-                    const SizedBox(width: 8),
-                  if (court.king5v5 != null)
-                    Expanded(child: _buildKingCard('5v5', court.king5v5!, court.king5v5Id, court.king5v5Rating, Colors.purple)),
-                ],
-              ),
-            ] else ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[800]?.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[700]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.emoji_events_outlined, color: Colors.grey[500], size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'No Kings yet! Play here to claim the throne.',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 14),
+            const SizedBox(height: 16),
+            // Schedule Run button - large green CTA (TOP PRIORITY)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StatusComposerScreen(
+                        initialCourt: court,
                       ),
                     ),
-                  ],
+                  );
+                },
+                icon: const Icon(Icons.calendar_month, size: 24),
+                label: const Text(
+                  'Schedule Run',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
                 ),
               ),
-            ],
-            const SizedBox(height: 20),
+            ),
+            const SizedBox(height: 16),
             // ── Upcoming Runs at this Court ──
             FutureBuilder<List<ScheduledRun>>(
               future: ApiService.getCourtRuns(court.id),
@@ -574,41 +560,58 @@ class _MapScreenState extends State<MapScreen> {
                 );
               },
             ),
-            // Schedule Run button - large green CTA
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => StatusComposerScreen(
-                        initialCourt: court,
+            // ── Kings of the Court (compact) ──
+            if (court.hasKings)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.amber.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Text('👑', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          if (court.king1v1 != null)
+                            _buildCompactKingBadge('1v1', court.king1v1!, Colors.deepOrange),
+                          if (court.king3v3 != null)
+                            _buildCompactKingBadge('3v3', court.king3v3!, Colors.blue),
+                          if (court.king5v5 != null)
+                            _buildCompactKingBadge('5v5', court.king5v5!, Colors.purple),
+                        ],
                       ),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.calendar_month, size: 24),
-                label: const Text(
-                  'Schedule Run',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  ],
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
+              )
+            else
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800]?.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey[700]!.withOpacity(0.5)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.emoji_events_outlined, color: Colors.grey[600], size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'No Kings yet — play here to claim the throne!',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+
             
             // Get Directions section
             Row(
@@ -1241,6 +1244,39 @@ class _MapScreenState extends State<MapScreen> {
         );
       }
     }
+  }
+
+  Widget _buildCompactKingBadge(String mode, String name, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(
+              mode,
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: color),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            name,
+            style: TextStyle(fontSize: 11, color: Colors.grey[300], fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildKingCard(String mode, String name, String? kingId, double? rating, Color color) {

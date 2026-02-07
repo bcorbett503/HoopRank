@@ -30,6 +30,55 @@ export class RunsController {
         return { success: true, id: run.id, run };
     }
 
+    // Get nearby scheduled runs (for mobile app calling /runs/nearby)
+    @Get('runs/nearby')
+    async getNearbyRuns(
+        @Headers('x-user-id') userId: string,
+        @Query('lat') lat?: string,
+        @Query('lng') lng?: string,
+        @Query('radius') radius?: string,
+    ) {
+        // Return all upcoming runs — location filtering can be refined later
+        try {
+            const now = new Date().toISOString();
+            const runs = await this.runsService['dataSource'].query(`
+                SELECT 
+                    sr.id,
+                    sr.court_id as "courtId",
+                    c.name as "courtName",
+                    c.city as "courtCity",
+                    sr.created_by as "createdBy",
+                    COALESCE(u.name, 'Unknown') as "creatorName",
+                    sr.title,
+                    sr.game_mode as "gameMode",
+                    sr.scheduled_at as "scheduledAt",
+                    sr.duration_minutes as "durationMinutes",
+                    sr.max_players as "maxPlayers",
+                    sr.notes,
+                    COALESCE((SELECT COUNT(*) FROM run_attendees WHERE run_id = sr.id), 0)::INTEGER as "attendeeCount"
+                FROM scheduled_runs sr
+                LEFT JOIN courts c ON sr.court_id::TEXT = c.id::TEXT
+                LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
+                WHERE sr.scheduled_at >= $1
+                ORDER BY sr.scheduled_at ASC
+                LIMIT 50
+            `, [now]);
+            return runs;
+        } catch (error) {
+            console.error('getNearbyRuns error:', error.message);
+            return [];
+        }
+    }
+
+    // Get courts with runs (alias for mobile path /runs/courts)
+    @Get('runs/courts')
+    async getCourtsWithRunsAlias(
+        @Query('today') today?: string,
+    ) {
+        const todayOnly = today === 'true';
+        return this.runsService.getCourtsWithRuns(todayOnly);
+    }
+
     // Get courts that have upcoming scheduled runs
     @Get('runs/courts-with-runs')
     async getCourtsWithRuns(

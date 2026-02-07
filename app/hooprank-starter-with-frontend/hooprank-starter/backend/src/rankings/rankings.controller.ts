@@ -77,6 +77,30 @@ export class RankingsController {
         }
     }
 
+    @Get('teams')
+    async getTeamRankings() {
+        try {
+            const teams = await this.dataSource.query(`
+                SELECT 
+                    t.id,
+                    t.name,
+                    t.team_type as "teamType",
+                    t.logo_url as "logoUrl",
+                    COALESCE(t.rating, 3.0) as "rating",
+                    COALESCE(t.wins, 0) as "wins",
+                    COALESCE(t.losses, 0) as "losses",
+                    (SELECT COUNT(*) FROM team_members tm WHERE tm.team_id = t.id AND tm.status = 'active') as "memberCount"
+                FROM teams t
+                ORDER BY COALESCE(t.rating, 3.0) DESC
+                LIMIT 100
+            `);
+            return teams;
+        } catch (error) {
+            console.error('getTeamRankings error:', error.message);
+            return [];
+        }
+    }
+
     /**
      * Admin endpoint to run team challenges migration
      * POST /rankings/migrate-team-challenges

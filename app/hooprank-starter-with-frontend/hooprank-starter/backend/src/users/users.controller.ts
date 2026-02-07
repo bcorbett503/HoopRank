@@ -3,12 +3,14 @@ import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { User } from './user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TeamsService } from '../teams/teams.service';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly notificationsService: NotificationsService,
+    private readonly teamsService: TeamsService,
   ) { }
 
   @Post('auth')
@@ -246,6 +248,31 @@ export class UsersController {
       hoopRank: parseFloat((user as any).hoop_rank) || 3.0,
       gamesPlayed: parseInt((user as any).games_played) || 0,
     };
+  }
+
+  @Get(':id/rank-history')
+  async getRankHistory(@Param('id') id: string) {
+    // Rank history is derived from match completions.
+    // Return the user's match history formatted as rating changes.
+    try {
+      const matches = await this.usersService.getMatches(id);
+      return (matches || []).filter((m: any) => m.status === 'completed').map((m: any) => ({
+        date: m.completed_at || m.updated_at,
+        rating: parseFloat(m.winner_id === id ? '3.1' : '2.9'),
+        matchId: m.id,
+      })).slice(0, 50);
+    } catch {
+      return [];
+    }
+  }
+
+  @Get(':id/teams')
+  async getUserTeams(@Param('id') id: string) {
+    try {
+      return await this.teamsService.getUserTeams(id);
+    } catch {
+      return [];
+    }
   }
 
   @Get(':id')

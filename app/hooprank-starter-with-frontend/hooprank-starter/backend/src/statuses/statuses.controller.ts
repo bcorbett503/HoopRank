@@ -41,6 +41,15 @@ export class StatusesController {
         return { success: true, status };
     }
 
+    // Get all statuses (bare GET /statuses — used by mobile)
+    @Get()
+    async getAllStatuses(@Headers('x-user-id') userId: string) {
+        if (!userId) {
+            return [];
+        }
+        return this.statusesService.getFeed(userId);
+    }
+
     // Get feed of statuses from followed users
     @Get('feed')
     async getFeed(@Headers('x-user-id') userId: string) {
