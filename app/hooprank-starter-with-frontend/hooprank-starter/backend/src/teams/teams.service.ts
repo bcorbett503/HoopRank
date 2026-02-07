@@ -459,6 +459,55 @@ export class TeamsService {
     // ====================
 
     /**
+     * Get all pending team challenges across all of the user's teams.
+     * Used by the mobile app which calls GET /teams/challenges without a team ID.
+     */
+    async getAllUserTeamChallenges(userId: string): Promise<any[]> {
+        // Get all team IDs where the user is an active member
+        const memberships = await this.membersRepository.find({
+            where: { userId, status: 'active' },
+        });
+
+        if (memberships.length === 0) return [];
+
+        const teamIds = memberships.map(m => m.teamId);
+
+        // Build a dynamic IN clause for the team IDs
+        const placeholders = teamIds.map((_, i) => `$${i + 1}`).join(', ');
+        const challenges = await this.dataSource.query(`
+            SELECT 
+                tc.*,
+                ft.name as from_team_name,
+                ft.team_type as from_team_type,
+                tt.name as to_team_name,
+                tt.team_type as to_team_type
+            FROM team_challenges tc
+            JOIN teams ft ON tc.from_team_id = ft.id
+            JOIN teams tt ON tc.to_team_id = tt.id
+            WHERE (tc.from_team_id IN (${placeholders}) OR tc.to_team_id IN (${placeholders}))
+              AND tc.status = 'pending'
+            ORDER BY tc.created_at DESC
+        `, [...teamIds, ...teamIds]);
+
+        return challenges.map((c: any) => {
+            // Determine which of the user's teams is involved
+            const userTeamId = teamIds.find(id => id === c.from_team_id || id === c.to_team_id);
+            return {
+                id: c.id,
+                fromTeamId: c.from_team_id,
+                fromTeamName: c.from_team_name,
+                toTeamId: c.to_team_id,
+                toTeamName: c.to_team_name,
+                teamType: c.from_team_type,
+                message: c.message,
+                status: c.status,
+                createdAt: c.created_at,
+                direction: teamIds.includes(c.to_team_id) ? 'incoming' : 'outgoing',
+            };
+        });
+    }
+
+    /**
      * Create a challenge from one team to another
      */
     async createTeamChallenge(fromTeamId: string, toTeamId: string, userId: string, message?: string): Promise<any> {

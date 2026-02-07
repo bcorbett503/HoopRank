@@ -174,6 +174,31 @@ export class MatchesService {
     return await this.matchesRepository.save(m);
   }
 
+  async getPendingConfirmations(userId: string): Promise<any[]> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      const results = await this.dataSource.query(`
+        SELECT m.*,
+          c.name as court_name, c.city as court_city,
+          creator.name as creator_name,
+          opponent.name as opponent_name
+        FROM matches m
+        LEFT JOIN courts c ON m.court_id = c.id
+        LEFT JOIN users creator ON m.creator_id = creator.id
+        LEFT JOIN users opponent ON m.opponent_id = opponent.id
+        WHERE (m.creator_id = $1 OR m.opponent_id = $1)
+          AND m.status = 'completed'
+          AND (m.score_creator IS NOT NULL OR m.score_opponent IS NOT NULL)
+        ORDER BY m.updated_at DESC
+      `, [userId]);
+
+      return results;
+    }
+
+    return [];
+  }
+
   async get(id: string): Promise<Match | undefined> {
     const isPostgres = !!process.env.DATABASE_URL;
 

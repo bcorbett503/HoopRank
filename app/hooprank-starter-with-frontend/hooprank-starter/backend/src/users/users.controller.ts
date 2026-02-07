@@ -229,6 +229,11 @@ export class UsersController {
     return this.usersService.getNearbyUsers(userId, radius);
   }
 
+  @Get(':id/stats')
+  async getUserStats(@Param('id') id: string) {
+    return this.usersService.getUserStats(id);
+  }
+
   @Get(':id/rating')
   async getUserRating(@Param('id') id: string) {
     const user = await this.usersService.findOne(id);

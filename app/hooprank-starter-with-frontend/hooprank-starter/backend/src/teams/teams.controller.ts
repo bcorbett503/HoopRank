@@ -33,6 +33,16 @@ export class TeamsController {
     }
 
     /**
+     * Get all team challenges for the current user (across all their teams)
+     * Must be before :id route to avoid NestJS parsing 'challenges' as a team ID
+     */
+    @Get('challenges')
+    async getAllUserTeamChallenges(@Headers('x-user-id') userId: string) {
+        if (!userId) return [];
+        return this.teamsService.getAllUserTeamChallenges(userId);
+    }
+
+    /**
      * Get team details
      */
     @Get(':id')

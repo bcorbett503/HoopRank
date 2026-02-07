@@ -12,4 +12,14 @@ export class ActivityController {
     ) {
         return this.activityService.getGlobalActivity(parseInt(limit) || 10);
     }
+
+    @Get('local')
+    async getLocalActivity(
+        @Query('limit') limit: string = '20',
+        @Query('radiusMiles') radiusMiles: string = '25',
+        @Headers('x-user-id') userId: string,
+    ) {
+        if (!userId) return [];
+        return this.activityService.getLocalActivity(userId, parseInt(limit) || 20, parseInt(radiusMiles) || 25);
+    }
 }

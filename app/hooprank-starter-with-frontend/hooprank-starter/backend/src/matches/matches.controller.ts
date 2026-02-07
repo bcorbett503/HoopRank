@@ -86,6 +86,12 @@ export class MatchesController {
     }
   }
 
+  @Get('pending-confirmation')
+  async getPendingConfirmations(@Headers('x-user-id') userId: string) {
+    if (!userId) return [];
+    return this.matches.getPendingConfirmations(userId);
+  }
+
   @Get(':id')
   async get(@Param('id') id: string): Promise<Match | { error: string }> {
     const match = await this.matches.get(id);

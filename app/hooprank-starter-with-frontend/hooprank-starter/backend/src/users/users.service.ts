@@ -223,6 +223,41 @@ export class UsersService {
     return [...(user.createdMatches || []), ...(user.opponentMatches || [])];
   }
 
+  async getUserStats(userId: string): Promise<any> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      // Count wins and losses from completed matches
+      const result = await this.dataSource.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE winner_id = $1) as wins,
+          COUNT(*) FILTER (WHERE winner_id IS NOT NULL AND winner_id != $1) as losses,
+          COUNT(*) as matches_played
+        FROM matches
+        WHERE (creator_id = $1 OR opponent_id = $1)
+          AND status = 'completed'
+      `, [userId]);
+
+      const user = await this.dataSource.query(`SELECT hoop_rank FROM users WHERE id = $1`, [userId]);
+      const hoopRank = user.length > 0 ? parseFloat(user[0].hoop_rank) || 3.0 : 3.0;
+
+      const wins = parseInt(result[0]?.wins) || 0;
+      const losses = parseInt(result[0]?.losses) || 0;
+      const matchesPlayed = parseInt(result[0]?.matches_played) || 0;
+
+      return {
+        wins,
+        losses,
+        matchesPlayed,
+        winRate: matchesPlayed > 0 ? Math.round((wins / matchesPlayed) * 100) : 0,
+        hoopRank,
+      };
+    }
+
+    // SQLite fallback
+    return { wins: 0, losses: 0, matchesPlayed: 0, winRate: 0, hoopRank: 3.0 };
+  }
+
   // ==================== FOLLOW METHODS ====================
 
   async followCourt(userId: string, courtId: string): Promise<void> {
