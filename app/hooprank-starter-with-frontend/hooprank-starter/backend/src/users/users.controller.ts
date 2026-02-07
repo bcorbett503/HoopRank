@@ -3,14 +3,14 @@ import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { User } from './user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TeamsService } from '../teams/teams.service';
+import { DataSource } from 'typeorm';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly notificationsService: NotificationsService,
-    private readonly teamsService: TeamsService,
+    private readonly dataSource: DataSource,
   ) { }
 
   @Post('auth')
@@ -269,7 +269,19 @@ export class UsersController {
   @Get(':id/teams')
   async getUserTeams(@Param('id') id: string) {
     try {
-      return await this.teamsService.getUserTeams(id);
+      const teams = await this.dataSource.query(`
+        SELECT t.id, t.name, t.team_type as "teamType",
+               COALESCE(t.rating, 3.0) as "rating",
+               COALESCE(t.wins, 0) as "wins",
+               COALESCE(t.losses, 0) as "losses",
+               t.logo_url as "logoUrl",
+               (t.owner_id = $1) as "isOwner"
+        FROM teams t
+        JOIN team_members tm ON tm.team_id = t.id
+        WHERE tm.user_id = $1 AND tm.status = 'active'
+        ORDER BY t.name
+      `, [id]);
+      return teams;
     } catch {
       return [];
     }
