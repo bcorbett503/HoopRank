@@ -17,6 +17,9 @@ export class StatusesController {
             videoUrl?: string;
             videoThumbnailUrl?: string;
             videoDurationMs?: number;
+            gameMode?: string;
+            courtType?: string;
+            ageRange?: string;
         },
     ) {
         if (!userId) {
@@ -30,7 +33,10 @@ export class StatusesController {
             body.courtId,
             body.videoUrl,
             body.videoThumbnailUrl,
-            body.videoDurationMs
+            body.videoDurationMs,
+            body.gameMode,
+            body.courtType,
+            body.ageRange,
         );
         return { success: true, status };
     }
@@ -60,6 +66,12 @@ export class StatusesController {
     @Post('migrate-video-columns')
     async migrateVideoColumns() {
         return this.statusesService.migrateVideoColumns();
+    }
+
+    // Migration endpoint to add run attribute columns
+    @Post('migrate-run-attributes')
+    async migrateRunAttributes() {
+        return this.statusesService.migrateRunAttributeColumns();
     }
 
     // Get unified feed (statuses + check-ins + matches)

@@ -34,17 +34,20 @@ export class StatusesService {
         courtId?: string,
         videoUrl?: string,
         videoThumbnailUrl?: string,
-        videoDurationMs?: number
+        videoDurationMs?: number,
+        gameMode?: string,
+        courtType?: string,
+        ageRange?: string,
     ): Promise<PlayerStatus> {
         try {
-            console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, courtId, videoUrl, videoDurationMs });
+            console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, courtId, videoUrl, videoDurationMs, gameMode, courtType, ageRange });
 
             // Use raw SQL to insert status (bypasses TypeORM entity schema issues)
             const result = await this.dataSource.query(`
-                INSERT INTO player_statuses (user_id, content, image_url, scheduled_at, court_id, video_url, video_thumbnail_url, video_duration_ms, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                INSERT INTO player_statuses (user_id, content, image_url, scheduled_at, court_id, video_url, video_thumbnail_url, video_duration_ms, game_mode, court_type, age_range, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
                 RETURNING *
-            `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null, videoUrl || null, videoThumbnailUrl || null, videoDurationMs || null]);
+            `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null, videoUrl || null, videoThumbnailUrl || null, videoDurationMs || null, gameMode || null, courtType || null, ageRange || null]);
 
             const createdStatus = result[0];
             console.log('createStatus success:', createdStatus);
@@ -403,6 +406,9 @@ export class StatusesService {
                     c.name as "courtName",
                     ST_Y(c.geog::geometry) as "courtLat",
                     ST_X(c.geog::geometry) as "courtLng",
+                    ps.game_mode as "gameMode",
+                    ps.court_type as "courtType",
+                    ps.age_range as "ageRange",
                     NULL as "matchStatus",
                     NULL as "matchScore",
                     NULL as "winnerName",
@@ -438,6 +444,9 @@ export class StatusesService {
                     COALESCE(mc.name, '') as "courtName",
                     ST_Y(mc.geog::geometry) as "courtLat",
                     ST_X(mc.geog::geometry) as "courtLng",
+                    NULL as "gameMode",
+                    NULL as "courtType",
+                    NULL as "ageRange",
                     CASE WHEN m.status = 'completed' THEN 'ended' ELSE m.status END as "matchStatus",
                     CASE 
                         WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
@@ -483,6 +492,9 @@ export class StatusesService {
                     COALESCE(mc.name, '') as "courtName",
                     ST_Y(mc.geog::geometry) as "courtLat",
                     ST_X(mc.geog::geometry) as "courtLng",
+                    NULL as "gameMode",
+                    NULL as "courtType",
+                    NULL as "ageRange",
                     'ended' as "matchStatus",
                     CASE 
                         WHEN m.score_creator IS NOT NULL AND m.score_opponent IS NOT NULL 
@@ -907,6 +919,36 @@ export class StatusesService {
             return {
                 success: true,
                 message: 'Video columns added successfully',
+                columns: verify.map((r: any) => r.column_name)
+            };
+        } catch (error) {
+            console.error('Migration error:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async migrateRunAttributeColumns(): Promise<any> {
+        try {
+            const alterQuery = `
+                ALTER TABLE player_statuses 
+                ADD COLUMN IF NOT EXISTS game_mode VARCHAR(10),
+                ADD COLUMN IF NOT EXISTS court_type VARCHAR(20),
+                ADD COLUMN IF NOT EXISTS age_range VARCHAR(10);
+            `;
+            await this.dataSource.query(alterQuery);
+
+            // Verify columns were added
+            const checkQuery = `
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'player_statuses' 
+                AND column_name IN ('game_mode', 'court_type', 'age_range');
+            `;
+            const verify = await this.dataSource.query(checkQuery);
+
+            return {
+                success: true,
+                message: 'Run attribute columns added successfully',
                 columns: verify.map((r: any) => r.column_name)
             };
         } catch (error) {

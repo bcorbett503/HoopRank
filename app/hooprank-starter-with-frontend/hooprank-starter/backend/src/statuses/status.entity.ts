@@ -32,6 +32,15 @@ export class PlayerStatus {
     @Column({ name: 'video_duration_ms', type: 'integer', nullable: true })
     videoDurationMs?: number;
 
+    @Column({ name: 'game_mode', type: 'varchar', length: 10, nullable: true })
+    gameMode?: string;
+
+    @Column({ name: 'court_type', type: 'varchar', length: 20, nullable: true })
+    courtType?: string;
+
+    @Column({ name: 'age_range', type: 'varchar', length: 10, nullable: true })
+    ageRange?: string;
+
     @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }

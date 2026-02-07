@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
+import '../services/api_service.dart';
 import '../widgets/court_map_widget.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../services/messages_service.dart';
@@ -296,15 +297,20 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      builder: (context) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Handle bar
             Center(
@@ -446,6 +452,128 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ],
             const SizedBox(height: 20),
+            // ── Upcoming Runs at this Court ──
+            FutureBuilder<List<ScheduledRun>>(
+              future: ApiService.getCourtRuns(court.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 24, height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey[600]),
+                      ),
+                    ),
+                  );
+                }
+                final runs = snapshot.data ?? [];
+                if (runs.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.directions_run, color: Colors.deepOrange, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Upcoming Runs (${runs.length})',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ...runs.take(5).map((run) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Top row: time + attendee count
+                            Row(
+                              children: [
+                                Icon(Icons.access_time, size: 14, color: Colors.deepOrange),
+                                const SizedBox(width: 6),
+                                Text(
+                                  run.timeString,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: Colors.deepOrange,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Icon(Icons.people, size: 14, color: Colors.grey[500]),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${run.attendeeCount}/${run.maxPlayers}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: run.isFull ? Colors.red : Colors.grey[400],
+                                    fontWeight: run.isAlmostFull ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (run.title != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                run.title!,
+                                style: TextStyle(color: Colors.grey[300], fontSize: 13),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            // Attribute badges
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                _buildRunBadge(
+                                  run.gameMode,
+                                  Icons.sports_basketball,
+                                  run.gameMode == '3v3' ? Colors.blue : Colors.purple,
+                                ),
+                                if (run.courtTypeLabel != null)
+                                  _buildRunBadge(
+                                    run.courtTypeLabel!,
+                                    Icons.grid_view,
+                                    Colors.teal,
+                                  ),
+                                if (run.ageRange != null)
+                                  _buildRunBadge(
+                                    run.ageRange!,
+                                    Icons.people_outline,
+                                    Colors.amber,
+                                  ),
+                              ],
+                            ),
+                            // Creator
+                            const SizedBox(height: 6),
+                            Text(
+                              'by ${run.creatorName}',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    const SizedBox(height: 8),
+                  ],
+                );
+              },
+            ),
             // Schedule Run button - large green CTA
             SizedBox(
               width: double.infinity,
@@ -569,6 +697,34 @@ class _MapScreenState extends State<MapScreen> {
             const SizedBox(height: 8),
           ],
         ),
+      ),
+      ),
+      ),
+    );
+  }
+
+  Widget _buildRunBadge(String label, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

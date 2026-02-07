@@ -53,7 +53,6 @@
 		<string>HoopRank needs your location to find nearby courts and players, even when the app is in the background.</string>
 		<key>UIStatusBarHidden</key>
 		<false/>
-		
 		<!-- URL Schemes for Social Login -->
 		<key>CFBundleURLTypes</key>
 		<array>
@@ -82,7 +81,6 @@
 				</array>
 			</dict>
 		</array>
-		
 		<!-- Facebook SDK Configuration -->
 		<key>FacebookAppID</key>
 		<string>3166274956866749</string>
@@ -90,19 +88,17 @@
 		<string>168dd1d311a34d0b17a15c48e616f9f7</string>
 		<key>FacebookDisplayName</key>
 		<string>HoopRank</string>
-		
 		<!-- Allow Facebook Login in browser -->
 		<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>fbapi</string>
-		<string>fb-messenger-share-api</string>
-		<string>fbauth2</string>
-		<string>fbshareextension</string>
-		<string>maps</string>
-		<string>comgooglemaps</string>
-		<string>googlemaps</string>
-	</array>
-		
+		<array>
+			<string>fbapi</string>
+			<string>fb-messenger-share-api</string>
+			<string>fbauth2</string>
+			<string>fbshareextension</string>
+			<string>maps</string>
+			<string>comgooglemaps</string>
+			<string>googlemaps</string>
+		</array>
 		<!-- Camera and Photo Library Permissions (for image_picker) -->
 		<key>NSCameraUsageDescription</key>
 		<string>HoopRank needs camera access to take profile photos and capture court images.</string>
@@ -110,7 +106,6 @@
 		<string>HoopRank needs photo library access to select profile photos and court images.</string>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>HoopRank needs microphone access for video recording.</string>
-		
 		<!-- Background Modes for Push Notifications -->
 		<key>UIBackgroundModes</key>
 		<array>

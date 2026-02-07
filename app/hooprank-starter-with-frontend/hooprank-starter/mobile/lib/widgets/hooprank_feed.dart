@@ -1843,6 +1843,32 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     }
   }
 
+  Widget _buildAttributeBadge(String label, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ========== Post Card with Interactive Engagement ==========
 
   Widget _buildPostCard(Map<String, dynamic> post) {
@@ -2191,6 +2217,38 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       ),
                     ),
                     
+                    // Run Attribute Badges
+                    if (post['gameMode'] != null || post['courtType'] != null || post['ageRange'] != null) ...[
+                      Divider(height: 1, color: Colors.white.withOpacity(0.08)),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            if (post['gameMode'] != null)
+                              _buildAttributeBadge(
+                                post['gameMode'].toString(),
+                                post['gameMode'] == '3v3' ? Icons.people : Icons.groups,
+                                post['gameMode'] == '3v3' ? Colors.blue : Colors.purple,
+                              ),
+                            if (post['courtType'] != null)
+                              _buildAttributeBadge(
+                                post['courtType'] == 'full' ? 'Full Court' : 'Half Court',
+                                post['courtType'] == 'full' ? Icons.rectangle_outlined : Icons.crop_square,
+                                Colors.teal,
+                              ),
+                            if (post['ageRange'] != null)
+                              _buildAttributeBadge(
+                                post['ageRange'].toString(),
+                                Icons.people_outline,
+                                Colors.amber,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     if (courtName != null) ...[
                       // Divider
                       Divider(height: 1, color: Colors.white.withOpacity(0.08)),

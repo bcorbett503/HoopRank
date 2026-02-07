@@ -1089,6 +1089,9 @@ class ApiService {
     String? videoUrl,
     String? videoThumbnailUrl,
     int? videoDurationMs,
+    String? gameMode,
+    String? courtType,
+    String? ageRange,
   }) async {
     debugPrint('API createStatus: content length=${content.length}, imageUrl=${imageUrl != null ? "${imageUrl.length} chars" : "null"}, videoUrl=${videoUrl != null ? "present" : "null"}, scheduledAt=$scheduledAt, courtId=$courtId');
     final body = {
@@ -1099,6 +1102,9 @@ class ApiService {
       if (videoUrl != null) 'videoUrl': videoUrl,
       if (videoThumbnailUrl != null) 'videoThumbnailUrl': videoThumbnailUrl,
       if (videoDurationMs != null) 'videoDurationMs': videoDurationMs,
+      if (gameMode != null) 'gameMode': gameMode,
+      if (courtType != null) 'courtType': courtType,
+      if (ageRange != null) 'ageRange': ageRange,
     };
     debugPrint('API createStatus: body keys=${body.keys.toList()}');
     final response = await http.post(

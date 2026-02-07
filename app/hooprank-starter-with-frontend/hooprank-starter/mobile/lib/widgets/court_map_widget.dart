@@ -45,7 +45,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   double _currentZoom = 14.0;
   bool _showFollowedOnly = false; // Filter for courts with followers
   bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
-  String? _filterAccess; // null=all, 'public', 'members', 'paid'
+  String? _filterAccess; // null=all, 'public', 'private'
   String? _runsFilter; // null=off, 'today'=runs today, 'all'=all upcoming runs
   Set<String> _courtsWithRuns = {}; // Court IDs with runs (based on filter)
 
@@ -329,7 +329,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     
     // Access filter
     if (_filterAccess != null) {
-      filtered = filtered.where((court) => court.access == _filterAccess).toList();
+      if (_filterAccess == 'private') {
+        filtered = filtered.where((court) => court.access == 'members' || court.access == 'paid').toList();
+      } else {
+        filtered = filtered.where((court) => court.access == _filterAccess).toList();
+      }
     }
     
     // Runs filter (today or all upcoming)
@@ -462,21 +466,16 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     final indoorIcon = court.isIndoor ? Icons.home : Icons.wb_sunny;
     final indoorLabel = court.isIndoor ? 'Indoor' : 'Outdoor';
     
-    // Access badge colors
+    // Access badge colors — 'members' and 'paid' both show as "Private"
     Color accessColor;
     IconData accessIcon;
-    switch (court.access) {
-      case 'members':
-        accessColor = const Color(0xFFFF9800); // Orange
-        accessIcon = Icons.vpn_key;
-        break;
-      case 'paid':
-        accessColor = const Color(0xFF9C27B0); // Purple
-        accessIcon = Icons.attach_money;
-        break;
-      default: // public
-        accessColor = const Color(0xFF4CAF50); // Green
-        accessIcon = Icons.lock_open;
+    final bool isPrivate = court.access == 'members' || court.access == 'paid';
+    if (isPrivate) {
+      accessColor = const Color(0xFFFF9800); // Orange for private
+      accessIcon = Icons.lock;
+    } else {
+      accessColor = const Color(0xFF4CAF50); // Green for public
+      accessIcon = Icons.lock_open;
     }
     
     return Row(
@@ -830,11 +829,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                     case 'public':
                                       _setAccessFilter(_filterAccess == 'public' ? null : 'public');
                                       break;
-                                    case 'members':
-                                      _setAccessFilter(_filterAccess == 'members' ? null : 'members');
-                                      break;
-                                    case 'paid':
-                                      _setAccessFilter(_filterAccess == 'paid' ? null : 'paid');
+                                    case 'private':
+                                      _setAccessFilter(_filterAccess == 'private' ? null : 'private');
                                       break;
                                   }
                                 },
@@ -888,26 +884,14 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                     ),
                                   ),
                                   PopupMenuItem(
-                                    value: 'members',
+                                    value: 'private',
                                     child: Row(
                                       children: [
-                                        Icon(Icons.vpn_key, size: 18, color: _filterAccess == 'members' ? Colors.orange : null),
+                                        Icon(Icons.lock, size: 18, color: _filterAccess == 'private' ? Colors.orange : null),
                                         const SizedBox(width: 8),
-                                        Text('Members Only', style: TextStyle(color: _filterAccess == 'members' ? Colors.orange : null)),
-                                        if (_filterAccess == 'members') const Spacer(),
-                                        if (_filterAccess == 'members') const Icon(Icons.check, size: 16, color: Colors.orange),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'paid',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.attach_money, size: 18, color: _filterAccess == 'paid' ? Colors.purple : null),
-                                        const SizedBox(width: 8),
-                                        Text('Paid', style: TextStyle(color: _filterAccess == 'paid' ? Colors.purple : null)),
-                                        if (_filterAccess == 'paid') const Spacer(),
-                                        if (_filterAccess == 'paid') const Icon(Icons.check, size: 16, color: Colors.purple),
+                                        Text('Private', style: TextStyle(color: _filterAccess == 'private' ? Colors.orange : null)),
+                                        if (_filterAccess == 'private') const Spacer(),
+                                        if (_filterAccess == 'private') const Icon(Icons.check, size: 16, color: Colors.orange),
                                       ],
                                     ),
                                   ),
