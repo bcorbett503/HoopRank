@@ -77,7 +77,7 @@ export class RunsService {
             FROM scheduled_runs sr
             LEFT JOIN courts c ON sr.court_id::TEXT = c.id::TEXT
             LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
-            WHERE sr.court_id = $1
+            WHERE sr.court_id::TEXT = $1::TEXT
               AND sr.scheduled_at >= $3
             ORDER BY sr.scheduled_at ASC
         `, [courtId, userId || '', now]);
