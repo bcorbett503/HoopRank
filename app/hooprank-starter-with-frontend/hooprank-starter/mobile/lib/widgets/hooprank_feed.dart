@@ -1948,7 +1948,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               radius: 14,
                               backgroundColor: Colors.grey[700],
                               backgroundImage: (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']) != null
-                                  ? NetworkImage((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString())
+                                  ? ((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString().startsWith('data:')
+                                      ? MemoryImage(Uri.parse((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()).data!.contentAsBytes())
+                                      : NetworkImage((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()))
                                   : null,
                               child: (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']) == null
                                   ? Text(
@@ -2004,7 +2006,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           radius: 12,
                           backgroundColor: Colors.grey[700],
                           backgroundImage: photo != null
-                              ? NetworkImage(photo)
+                              ? (photo.startsWith('data:')
+                                  ? MemoryImage(Uri.parse(photo).data!.contentAsBytes())
+                                  : NetworkImage(photo))
                               : null,
                           child: photo == null
                               ? Text(
