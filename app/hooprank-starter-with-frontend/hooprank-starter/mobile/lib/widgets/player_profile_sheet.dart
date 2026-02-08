@@ -733,29 +733,48 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   }
 
   Widget _buildMatchCard(Map<String, dynamic> match) {
-    // Parse match result - check if user won
     final playerId = widget.player.id;
-    final score = match['score'] as Map<String, dynamic>?;
-    final creatorId = match['creator_id'] as String?;
-    final opponentId = match['opponent_id'] as String?;
-    final opponentName = match['opponent_name'] as String?;
+    final creatorId = match['creator_id']?.toString();
+    final opponentId = match['opponent_id']?.toString();
+    final creatorName = match['creator_name']?.toString();
+    final opponentName = match['opponent_name']?.toString();
+    final winnerId = match['winner_id']?.toString();
+    final status = match['status']?.toString() ?? '';
     
-    // Determine if this player won
+    // Determine who is the opponent relative to this player
+    final isCreator = creatorId == playerId;
+    final oppName = isCreator ? opponentName : creatorName;
+    final oppId = isCreator ? opponentId : creatorId;
+    final opponentDisplay = oppName ?? (oppId != null && oppId.length > 8 ? '${oppId.substring(0, 8)}...' : oppId ?? 'Unknown');
+    
+    // Parse scores from flat fields
+    final scoreCreator = match['score_creator'];
+    final scoreOpponent = match['score_opponent'];
+    final hasScores = scoreCreator != null && scoreOpponent != null;
+    
+    String scoreStr;
     bool? isWin;
-    String scoreStr = 'N/A';
-    String opponentDisplay = opponentName ?? 'Unknown';
     
-    if (score != null) {
-      final myScore = score[playerId] as int? ?? 0;
-      final otherIdForScore = creatorId == playerId ? opponentId : creatorId;
-      final oppScore = score[otherIdForScore] as int? ?? 0;
-      isWin = myScore > oppScore;
-      scoreStr = '$myScore - $oppScore';
+    if (hasScores) {
+      final myScore = isCreator ? scoreCreator : scoreOpponent;
+      final theirScore = isCreator ? scoreOpponent : scoreCreator;
+      scoreStr = '$myScore - $theirScore';
+      
+      if (winnerId != null) {
+        isWin = winnerId == playerId;
+      } else {
+        final ms = (myScore is num ? myScore : int.tryParse(myScore.toString()) ?? 0);
+        final ts = (theirScore is num ? theirScore : int.tryParse(theirScore.toString()) ?? 0);
+        if (ms != ts) isWin = ms > ts;
+      }
+    } else {
+      scoreStr = status == 'completed' ? 'N/A' : '';
     }
-    
-    // Use opponent name if available
-    if (opponentName == null && opponentId != null) {
-      opponentDisplay = opponentId.length > 8 ? '${opponentId.substring(0, 8)}...' : opponentId;
+
+    // Status display
+    String statusDisplay = status;
+    if (status == 'completed' && isWin != null) {
+      statusDisplay = isWin ? 'Victory' : 'Defeat';
     }
 
     return Card(
@@ -769,18 +788,19 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
           ),
         ),
         title: Text('vs $opponentDisplay'),
-        subtitle: Text(match['status'] ?? ''),
+        subtitle: Text(statusDisplay),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              scoreStr,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+            if (hasScores)
+              Text(
+                scoreStr,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
-            ),
             if (isWin != null)
               Text(
                 isWin ? 'WIN' : 'LOSS',

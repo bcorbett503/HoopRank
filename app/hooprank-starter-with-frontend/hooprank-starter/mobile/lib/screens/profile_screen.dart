@@ -230,28 +230,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildMatchCard(Map<String, dynamic> match, String myId) {
-    final score = match['score'] as Map<String, dynamic>?;
-    final result = match['result'] as Map<String, dynamic>?;
-    final creatorId = match['creator_id'] as String?;
-    final opponentId = match['opponent_id'] as String?;
-    final status = match['status'] as String?;
-    final updatedAt = match['updated_at'] as String?;
+    final creatorId = match['creator_id']?.toString();
+    final opponentId = match['opponent_id']?.toString();
+    final creatorName = match['creator_name']?.toString();
+    final opponentName = match['opponent_name']?.toString();
+    final winnerId = match['winner_id']?.toString();
+    final status = match['status']?.toString();
+    final updatedAt = match['updated_at']?.toString();
 
     // Determine if I'm the creator or opponent
     final isCreator = creatorId == myId;
     final otherId = isCreator ? opponentId : creatorId;
+    final otherName = isCreator ? opponentName : creatorName;
 
-    // Get scores
+    // Get scores from flat fields
+    final scoreCreator = match['score_creator'];
+    final scoreOpponent = match['score_opponent'];
+    
     int? myScore;
     int? oppScore;
-    if (score != null) {
-      myScore = score[myId] as int?;
-      oppScore = score[otherId] as int?;
+    if (scoreCreator != null && scoreOpponent != null) {
+      myScore = isCreator
+          ? (scoreCreator is num ? scoreCreator.toInt() : int.tryParse(scoreCreator.toString()) ?? 0)
+          : (scoreOpponent is num ? scoreOpponent.toInt() : int.tryParse(scoreOpponent.toString()) ?? 0);
+      oppScore = isCreator
+          ? (scoreOpponent is num ? scoreOpponent.toInt() : int.tryParse(scoreOpponent.toString()) ?? 0)
+          : (scoreCreator is num ? scoreCreator.toInt() : int.tryParse(scoreCreator.toString()) ?? 0);
     }
 
     // Determine win/loss
     bool? didWin;
-    if (myScore != null && oppScore != null) {
+    if (winnerId != null) {
+      didWin = winnerId == myId;
+    } else if (myScore != null && oppScore != null && myScore != oppScore) {
       didWin = myScore > oppScore;
     }
 
@@ -264,10 +275,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } catch (_) {}
     }
 
+    final result = match['result'] as Map<String, dynamic>?;
     final isFinalized = result?['finalized'] == true;
-
-    // Get opponent name from the API response, fallback to ID if not available
-    final opponentName = match['opponent_name'] as String?;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -297,7 +306,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? () => PlayerProfileSheet.showById(context, otherId)
                         : null,
                     child: Text(
-                      'vs ${opponentName ?? otherId?.substring(0, 8) ?? 'Unknown'}${opponentName == null && otherId != null ? '...' : ''}',
+                      'vs ${otherName ?? (otherId != null ? '${otherId.substring(0, 8)}...' : 'Unknown')}',
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
                         color: otherId != null ? Colors.blue : null,

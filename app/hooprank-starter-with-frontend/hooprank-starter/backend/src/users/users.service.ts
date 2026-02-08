@@ -266,11 +266,17 @@ export class UsersService {
 
     if (isPostgres) {
       return await this.dataSource.query(`
-        SELECT m.*, c.name as court_name, c.city as court_city
+        SELECT m.*,
+          c.name as court_name, c.city as court_city,
+          u_creator.name as creator_name, u_creator.avatar_url as creator_photo,
+          u_opponent.name as opponent_name, u_opponent.avatar_url as opponent_photo
         FROM matches m
         LEFT JOIN courts c ON m.court_id = c.id
+        LEFT JOIN users u_creator ON m.creator_id = u_creator.id
+        LEFT JOIN users u_opponent ON m.opponent_id = u_opponent.id
         WHERE m.creator_id = $1 OR m.opponent_id = $1
         ORDER BY m.created_at DESC
+        LIMIT 20
       `, [userId]);
     }
 
