@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import '../services/messages_service.dart';
 import '../models.dart';
 import 'feed_video_player.dart';
+import 'player_profile_sheet.dart';
 import 'dart:math' as math;
 
 /// Unified HoopRank Feed with For You/Following tabs
@@ -631,7 +632,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           ),
                           onTap: () {
                             Navigator.pop(context);
-                            context.go('/players/${player.playerId}');
+                            PlayerProfileSheet.showById(context, player.playerId);
                           },
                         );
                       },
@@ -863,7 +864,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 ),
                 // Opponent avatar - smaller
                 GestureDetector(
-                  onTap: () => context.go('/players/${opponent.id}'),
+                  onTap: () => PlayerProfileSheet.showById(context, opponent.id),
                   child: CircleAvatar(
                     radius: 18, // Reduced from 22
                     backgroundColor: Colors.orange.withOpacity(0.3),
@@ -1997,7 +1998,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 final photo = a['userPhotoUrl']?.toString() ?? a['photoUrl']?.toString();
                 final odId = a['userId']?.toString();
                 return GestureDetector(
-                  onTap: odId != null ? () => context.go('/players/$odId') : null,
+                  onTap: odId != null ? () => PlayerProfileSheet.showById(context, odId) : null,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
