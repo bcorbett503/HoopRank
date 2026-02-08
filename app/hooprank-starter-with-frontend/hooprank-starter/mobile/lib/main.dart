@@ -139,15 +139,14 @@ class _HoopRankAppState extends State<HoopRankApp> {
           return '/profile/setup';
         }
         
-        // Profile complete - start tutorial if not done, then go to courts
-        if (loggedIn && user.isProfileComplete && !tutorialState.tutorialComplete && !tutorialState.isActive && !isProfileSetup) {
-          debugPrint('ROUTER: Starting interactive tutorial');
-          // Start tutorial and navigate to courts
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            tutorialState.startTutorial();
-          });
-          return '/courts';
-        }
+        // Tutorial auto-start disabled — user can trigger via (?) button instead
+        // if (loggedIn && user.isProfileComplete && !tutorialState.tutorialComplete && !tutorialState.isActive && !isProfileSetup) {
+        //   debugPrint('ROUTER: Starting interactive tutorial');
+        //   WidgetsBinding.instance.addPostFrameCallback((_) {
+        //     tutorialState.startTutorial();
+        //   });
+        //   return '/courts';
+        // }
         
         // Profile complete and on login screen - go to home
         if (loggedIn && user.isProfileComplete && isLoggingIn) {
