@@ -78,23 +78,82 @@ export class UsersService {
     return this.usersRepository.find();
   }
 
+  /**
+   * Reverse geocode lat/lng to a "City, ST" string using OpenStreetMap Nominatim.
+   * Returns null if lookup fails (non-blocking).
+   */
+  private async reverseGeocode(lat: number, lng: number): Promise<string | null> {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`;
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'HoopRank/1.0' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) return null;
+      const json = await response.json();
+      const addr = json.address;
+      if (!addr) return null;
+      const city = addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
+      const state = addr.state || '';
+      // Convert state to abbreviation if US
+      const stateAbbr = this.getStateAbbreviation(state) || state;
+      if (city && stateAbbr) return `${city}, ${stateAbbr}`;
+      if (city) return city;
+      return null;
+    } catch (e) {
+      console.log('reverseGeocode failed (non-critical):', e.message);
+      return null;
+    }
+  }
+
+  private getStateAbbreviation(state: string): string | null {
+    const stateMap: Record<string, string> = {
+      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+      'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+      'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+      'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+      'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+      'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+      'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+      'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+      'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+      'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+      'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+      'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+      'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC',
+    };
+    return stateMap[state] || null;
+  }
+
   async updateProfile(id: string, data: Partial<any>): Promise<User> {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
+      // If lat/lng provided without city, reverse geocode to infer city
+      if (data.lat && data.lng && !data.city) {
+        const lat = parseFloat(data.lat);
+        const lng = parseFloat(data.lng);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const city = await this.reverseGeocode(lat, lng);
+          if (city) {
+            data.city = city;
+            console.log(`updateProfile: inferred city="${city}" from coords (${lat}, ${lng})`);
+          }
+        }
+      }
+
       // Build dynamic update query
       const updates: string[] = [];
       const values: any[] = [];
       let paramIndex = 1;
 
       // Map camelCase to snake_case for production columns
-      // Production table has: id, email, name, avatar_url, hoop_rank, created_at, updated_at, fcm_token
       const columnMap: Record<string, string> = {
-        name: 'name',                // app sends 'name', production uses 'name'
+        name: 'name',
         displayName: 'name',
         email: 'email',
         avatarUrl: 'avatar_url',
-        hoopRank: 'hoop_rank',       // app sends 'hoopRank', production uses 'hoop_rank'
+        hoopRank: 'hoop_rank',
         rating: 'hoop_rank',
         position: 'position',
         height: 'height',
