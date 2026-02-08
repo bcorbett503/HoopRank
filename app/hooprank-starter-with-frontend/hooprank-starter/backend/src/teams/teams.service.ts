@@ -441,7 +441,6 @@ export class TeamsService {
                     payload: {
                         aps: {
                             sound: 'default',
-                            badge: 1,
                         },
                     },
                 },

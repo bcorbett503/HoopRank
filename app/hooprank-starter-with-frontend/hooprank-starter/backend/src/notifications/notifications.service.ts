@@ -75,10 +75,7 @@ export class NotificationsService {
                 },
                 apns: {
                     payload: {
-                        aps: {
-                            sound: 'default',
-                            badge: 1,
-                        },
+                        aps: { sound: 'default' },
                     },
                 },
             };
@@ -212,7 +209,7 @@ export class NotificationsService {
                 // iOS-specific settings
                 apns: {
                     payload: {
-                        aps: { sound: 'default', badge: 1 },
+                        aps: { sound: 'default' },
                     },
                 },
                 // Android-specific settings

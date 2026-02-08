@@ -360,7 +360,7 @@ export class HealthController {
                 data: { type: 'test' },
                 apns: {
                     payload: {
-                        aps: { sound: 'default', badge: 1 },
+                        aps: { sound: 'default' },
                     },
                 },
             };

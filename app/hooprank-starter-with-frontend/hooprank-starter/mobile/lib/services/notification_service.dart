@@ -1,10 +1,11 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'api_service.dart';
 
 /// Handles push notifications via Firebase Cloud Messaging
-class NotificationService {
+class NotificationService with WidgetsBindingObserver {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
@@ -68,6 +69,13 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
+    // Don't auto-show badge for foreground notifications
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: false,
+      sound: true,
+    );
+
     // Get FCM token
     _fcmToken = await _messaging.getToken();
     debugPrint('FCM Token: $_fcmToken');
@@ -88,6 +96,33 @@ class NotificationService {
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
       _handleMessageTap(initialMessage);
+    }
+
+    // Clear badge on app launch
+    clearBadge();
+
+    // Listen for app lifecycle changes to clear badge when app comes to foreground
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Clear the iOS app icon badge count
+  static Future<void> clearBadge() async {
+    try {
+      // Cancel all local notifications and clear badge
+      await FlutterLocalNotificationsPlugin().cancelAll();
+      debugPrint('Badge cleared');
+    } catch (e) {
+      debugPrint('Failed to clear badge: $e');
+    }
+  }
+
+  /// Called when app lifecycle state changes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App came back to foreground — clear badge
+      clearBadge();
+      debugPrint('App resumed — badge cleared');
     }
   }
 
@@ -114,7 +149,7 @@ class NotificationService {
     // Notify listeners to refresh (e.g., home screen)
     _notifyListeners();
     
-    // Show local notification
+    // Show local notification without badge increment
     if (message.notification != null) {
       _localNotifications.show(
         message.hashCode,
@@ -128,6 +163,9 @@ class NotificationService {
             importance: Importance.high,
             priority: Priority.high,
           ),
+          iOS: DarwinNotificationDetails(
+            presentBadge: false,
+          ),
         ),
         payload: message.data.toString(),
       );
@@ -136,13 +174,14 @@ class NotificationService {
 
   void _handleMessageTap(RemoteMessage message) {
     debugPrint('Message tap: ${message.data}');
-    // Navigation would be handled here based on message.data['type']
-    // For now, just log it - the app's routing should handle deep links
+    // Clear badge when user taps a notification
+    clearBadge();
   }
 
   void _onNotificationTap(NotificationResponse response) {
     debugPrint('Local notification tap: ${response.payload}');
-    // Handle navigation based on payload
+    // Clear badge when user taps a local notification
+    clearBadge();
   }
 }
 
