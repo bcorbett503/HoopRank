@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Headers, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Headers, Query, BadRequestException } from '@nestjs/common';
 import { CourtsService } from './courts.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Court } from './court.entity';
@@ -54,6 +54,19 @@ export class CourtsController {
             rims: rims ? parseInt(rims) : 2,
             access: access || 'public',
         });
+    }
+
+    @Delete('admin/delete')
+    async deleteCourt(
+        @Headers('x-user-id') userId: string,
+        @Query('name') name: string,
+        @Query('city') city: string,
+    ) {
+        const result = await this.dataSource.query(
+            `DELETE FROM courts WHERE name = $1 AND city = $2 RETURNING id, name`,
+            [name, city]
+        );
+        return { success: true, deleted: result.length, courts: result };
     }
 
     @Get('follower-counts')
