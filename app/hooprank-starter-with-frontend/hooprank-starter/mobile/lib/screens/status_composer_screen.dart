@@ -53,6 +53,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   List<FollowedPlayerInfo>? _followedPlayers;
   bool _isLoadingPlayers = false;
   bool _showPlayerTagging = true;
+  bool _individualExpanded = false;
   
   // Quick prompts to encourage posts
   final List<String> _quickPrompts = [
@@ -367,169 +368,214 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     
     final players = _followedPlayers ?? [];
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.people, size: 14, color: Colors.deepOrange.withOpacity(0.7)),
-            const SizedBox(width: 6),
-            const Text(
-              'Invite Players:',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        
-        // Mode selection: All / Local / Individual
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: [
-            _buildModeChip('all', 'All', Icons.group, Colors.deepOrange,
-                subtitle: 'Everyone you follow'),
-            _buildModeChip('local', 'Local', Icons.near_me, Colors.green,
-                subtitle: 'Within 25 mi'),
-            _buildModeChip('individual', 'Individual', Icons.person_search, Colors.blue,
-                subtitle: 'Pick players'),
-          ],
-        ),
-        
-        // Player list (only for Individual mode)
-        if (_tagMode == 'individual') ...[
-          const SizedBox(height: 12),
-          if (_isLoadingPlayers)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.deepOrange),
-                ),
-              ),
-            )
-          else if (players.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                'Follow some players first to tag them here!',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
-              ),
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: players.map((player) {
-                final isSelected = _selectedPlayerIds.contains(player.playerId);
-                return ActionChip(
-                  avatar: player.photoUrl != null
-                      ? CircleAvatar(
-                          backgroundImage: NetworkImage(player.photoUrl!),
-                          radius: 12,
-                        )
-                      : CircleAvatar(
-                          radius: 12,
-                          backgroundColor: isSelected ? Colors.blue : Colors.grey[700],
-                          child: Text(
-                            player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ),
-                  label: Text(
-                    player.name,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isSelected ? Colors.blue : Colors.white70,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  backgroundColor: isSelected
-                      ? Colors.blue.withOpacity(0.2)
-                      : Colors.grey[800],
-                  side: BorderSide(
-                    color: isSelected
-                        ? Colors.blue.withOpacity(0.5)
-                        : Colors.transparent,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedPlayerIds.remove(player.playerId);
-                      } else {
-                        _selectedPlayerIds.add(player.playerId);
-                      }
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-        ],
-        
-        // Summary of selection
-        if (_tagMode == 'all' && players.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '${players.length} player${players.length == 1 ? '' : 's'} will be notified',
-              style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11),
-            ),
-          ),
-        if (_tagMode == 'individual' && _selectedPlayerIds.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '${_selectedPlayerIds.length} player${_selectedPlayerIds.length == 1 ? '' : 's'} selected',
-              style: TextStyle(color: Colors.blue.withOpacity(0.7), fontSize: 11),
-            ),
-          ),
-        
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-  
-  /// Build a mode selection chip matching the app design
-  Widget _buildModeChip(String mode, String label, IconData icon, Color color, {String? subtitle}) {
-    final isSelected = _tagMode == mode;
-    return ActionChip(
-      avatar: Icon(
-        isSelected ? Icons.check_circle : icon,
-        size: 16,
-        color: isSelected ? color : Colors.grey,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: Colors.white.withOpacity(0.03),
       ),
-      label: Column(
+      padding: const EdgeInsets.all(10),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: isSelected ? color : Colors.white70,
-            ),
+          Row(
+            children: [
+              Icon(Icons.people, size: 14, color: Colors.deepOrange.withOpacity(0.7)),
+              const SizedBox(width: 6),
+              const Text(
+                'Invite Players:',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
           ),
-          if (subtitle != null)
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 9,
-                color: isSelected ? color.withOpacity(0.7) : Colors.white38,
+          const SizedBox(height: 8),
+          
+          // Mode selection: All / Local / Individual – single row
+          Row(
+            children: [
+              Expanded(child: _buildModeChip('all', 'All', Icons.group, Colors.deepOrange,
+                  subtitle: 'Everyone you follow')),
+              const SizedBox(width: 6),
+              Expanded(child: _buildModeChip('local', 'Local', Icons.near_me, Colors.green,
+                  subtitle: 'Within 25 mi')),
+              const SizedBox(width: 6),
+              Expanded(child: _buildModeChip('individual', 'Individual', Icons.person_search, Colors.blue,
+                  subtitle: 'Pick players')),
+            ],
+          ),
+          
+          // Player list (only for Individual mode, shown directly)
+          if (_tagMode == 'individual') ...[
+            const SizedBox(height: 8),
+            if (_isLoadingPlayers)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.deepOrange),
+                  ),
+                ),
+              )
+            else if (players.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  'Follow some players first to tag them here!',
+                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+                ),
+              )
+            else
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.blue.withOpacity(0.1)),
+                  color: Colors.blue.withOpacity(0.03),
+                ),
+                child: ScrollbarTheme(
+                  data: ScrollbarThemeData(
+                    thumbColor: WidgetStateProperty.all(Colors.white.withOpacity(0.2)),
+                    radius: const Radius.circular(4),
+                    thickness: WidgetStateProperty.all(3.0),
+                  ),
+                  child: Scrollbar(
+                    thumbVisibility: players.length >= 4,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: players.map((player) {
+                          final isSelected = _selectedPlayerIds.contains(player.playerId);
+                          return ActionChip(
+                            avatar: player.photoUrl != null
+                                ? CircleAvatar(
+                                    backgroundImage: NetworkImage(player.photoUrl!),
+                                    radius: 12,
+                                  )
+                                : CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: isSelected ? Colors.blue : Colors.grey[700],
+                                    child: Text(
+                                      player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                  ),
+                            label: Text(
+                              player.name,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isSelected ? Colors.blue : Colors.white70,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            backgroundColor: isSelected
+                                ? Colors.blue.withOpacity(0.2)
+                                : Colors.grey[800],
+                            side: BorderSide(
+                              color: isSelected
+                                  ? Colors.blue.withOpacity(0.5)
+                                  : Colors.transparent,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                if (isSelected) {
+                                  _selectedPlayerIds.remove(player.playerId);
+                                } else {
+                                  _selectedPlayerIds.add(player.playerId);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+          
+          // Summary of selection
+          if (_tagMode == 'all' && players.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '${players.length} player${players.length == 1 ? '' : 's'} will be notified',
+                style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11),
+              ),
+            ),
+          if (_tagMode == 'individual' && _selectedPlayerIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '${_selectedPlayerIds.length} player${_selectedPlayerIds.length == 1 ? '' : 's'} selected',
+                style: TextStyle(color: Colors.blue.withOpacity(0.7), fontSize: 11),
               ),
             ),
         ],
       ),
-      backgroundColor: isSelected
-          ? color.withOpacity(0.2)
-          : Colors.grey[800],
-      side: BorderSide(
-        color: isSelected
-            ? color.withOpacity(0.5)
-            : Colors.transparent,
+    );
+  }
+  
+  /// Build a compact mode selection chip matching the app design
+  Widget _buildModeChip(String mode, String label, IconData icon, Color color, {String? subtitle}) {
+    final isSelected = _tagMode == mode;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _tagMode = mode;
+          if (mode != 'individual') _individualExpanded = false;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.2) : Colors.grey[800],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? color.withOpacity(0.5) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? Icons.check_circle : icon,
+              size: 14,
+              color: isSelected ? color : Colors.grey,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? color : Colors.white70,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: isSelected ? color.withOpacity(0.7) : Colors.white38,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-      onPressed: () => setState(() => _tagMode = mode),
     );
   }
   
@@ -673,6 +719,9 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                       
                       final courts = snapshot.data!;
                       
+                      final courtsToShow = courts.take(5).toList();
+                      final hasOverflow = courtsToShow.length >= 3;
+                      
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -684,53 +733,78 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                                 'Your courts:',
                                 style: TextStyle(color: Colors.white54, fontSize: 12),
                               ),
+                              if (hasOverflow) ...[
+                                const Spacer(),
+                                Text(
+                                  'scroll ↕',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.25), fontSize: 10, fontStyle: FontStyle.italic),
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: courts.take(5).map((court) => ActionChip(
-                              avatar: Icon(
-                                _taggedCourt?.id == court.id ? Icons.check_circle : Icons.location_on,
-                                size: 16,
-                                color: _taggedCourt?.id == court.id ? Colors.green : Colors.blue,
+                          Container(
+                            constraints: const BoxConstraints(maxHeight: 120),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              color: Colors.white.withOpacity(0.03),
+                            ),
+                            child: ScrollbarTheme(
+                              data: ScrollbarThemeData(
+                                thumbColor: WidgetStateProperty.all(Colors.white.withOpacity(0.2)),
+                                radius: const Radius.circular(4),
+                                thickness: WidgetStateProperty.all(3.0),
                               ),
-                              label: Text(
-                                court.name,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: _taggedCourt?.id == court.id ? Colors.green : Colors.white70,
+                              child: Scrollbar(
+                                thumbVisibility: hasOverflow,
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: courtsToShow.map((court) => ActionChip(
+                                      avatar: Icon(
+                                        _taggedCourt?.id == court.id ? Icons.check_circle : Icons.location_on,
+                                        size: 16,
+                                        color: _taggedCourt?.id == court.id ? Colors.green : Colors.blue,
+                                      ),
+                                      label: Text(
+                                        court.name,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: _taggedCourt?.id == court.id ? Colors.green : Colors.white70,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      backgroundColor: _taggedCourt?.id == court.id
+                                          ? Colors.green.withOpacity(0.2)
+                                          : Colors.blue.withOpacity(0.15),
+                                      side: BorderSide(
+                                        color: _taggedCourt?.id == court.id
+                                            ? Colors.green.withOpacity(0.5)
+                                            : Colors.blue.withOpacity(0.3),
+                                      ),
+                                      onPressed: () {
+                                        if (_taggedCourt?.id == court.id) {
+                                          setState(() => _taggedCourt = null);
+                                        } else {
+                                          setState(() => _taggedCourt = court);
+                                          if (!_textController.text.contains('@${court.name}')) {
+                                            final current = _textController.text;
+                                            if (current.isNotEmpty && !current.endsWith(' ')) {
+                                              _textController.text = '$current @${court.name}';
+                                            } else {
+                                              _textController.text = '${current}@${court.name}';
+                                            }
+                                          }
+                                        }
+                                      },
+                                    )).toList(),
+                                  ),
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              backgroundColor: _taggedCourt?.id == court.id
-                                  ? Colors.green.withOpacity(0.2)
-                                  : Colors.blue.withOpacity(0.15),
-                              side: BorderSide(
-                                color: _taggedCourt?.id == court.id
-                                    ? Colors.green.withOpacity(0.5)
-                                    : Colors.blue.withOpacity(0.3),
-                              ),
-                              onPressed: () {
-                                if (_taggedCourt?.id == court.id) {
-                                  // Deselect
-                                  setState(() => _taggedCourt = null);
-                                } else {
-                                  // Select this court
-                                  setState(() => _taggedCourt = court);
-                                  // Optionally add @courtname to text
-                                  if (!_textController.text.contains('@${court.name}')) {
-                                    final current = _textController.text;
-                                    if (current.isNotEmpty && !current.endsWith(' ')) {
-                                      _textController.text = '$current @${court.name}';
-                                    } else {
-                                      _textController.text = '${current}@${court.name}';
-                                    }
-                                  }
-                                }
-                              },
-                            )).toList(),
+                            ),
                           ),
                           const SizedBox(height: 16),
                         ],
