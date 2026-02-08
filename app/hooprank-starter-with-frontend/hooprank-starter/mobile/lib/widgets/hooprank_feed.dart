@@ -1949,7 +1949,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               backgroundColor: Colors.grey[700],
                               backgroundImage: (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']) != null
                                   ? ((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString().startsWith('data:')
-                                      ? MemoryImage(Uri.parse((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()).data!.contentAsBytes())
+                                      ? MemoryImage(Uri.parse((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()).data!.contentAsBytes()) as ImageProvider
                                       : NetworkImage((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()))
                                   : null,
                               child: (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']) == null
@@ -2007,7 +2007,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           backgroundColor: Colors.grey[700],
                           backgroundImage: photo != null
                               ? (photo.startsWith('data:')
-                                  ? MemoryImage(Uri.parse(photo).data!.contentAsBytes())
+                                  ? MemoryImage(Uri.parse(photo).data!.contentAsBytes()) as ImageProvider
                                   : NetworkImage(photo))
                               : null,
                           child: photo == null
