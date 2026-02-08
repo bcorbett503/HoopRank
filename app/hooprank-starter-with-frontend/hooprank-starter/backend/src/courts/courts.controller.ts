@@ -56,7 +56,7 @@ export class CourtsController {
         });
     }
 
-    @Delete('admin/delete')
+    @Post('admin/delete')
     async deleteCourt(
         @Headers('x-user-id') userId: string,
         @Query('name') name: string,
