@@ -293,9 +293,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    final zipValid = RegExp(r'^[0-9]{5}$').hasMatch(_zipCtrl.text);
+    // Trim and strip any invisible chars iPad keyboard may insert
+    final zipText = _zipCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final zipValid = zipText.isEmpty || RegExp(r'^[0-9]{5}$').hasMatch(zipText);
     final nameValid = _firstNameCtrl.text.trim().isNotEmpty && _lastNameCtrl.text.trim().isNotEmpty;
-    final canSave = zipValid && nameValid;
+    // Only name is required — ZIP is optional (GPS provides location)
+    final canSave = nameValid && zipValid;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Setup Profile')),
@@ -454,18 +457,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
             const SizedBox(height: 16),
 
-            // ZIP - Fixed for iPad compatibility (App Store Guideline 2.1)
-            _buildFieldLabel('ZIP Code', zipValid, _zipTouched, required: true),
+            // ZIP - Optional, GPS handles location (App Store Guidelines 5.1.1 & 2.1)
+            _buildFieldLabel('ZIP Code', zipText.length == 5, _zipTouched, required: false, optional: true),
             TextField(
               controller: _zipCtrl,
               decoration: InputDecoration(
                 hintText: 'e.g. 94103',
-                errorText: _zipTouched && _zipCtrl.text.isNotEmpty && !zipValid ? 'Enter a valid 5-digit ZIP' : null,
+                helperText: 'Optional — we can use your GPS location instead',
+                helperStyle: const TextStyle(color: Colors.grey, fontSize: 11),
+                errorText: _zipTouched && zipText.isNotEmpty && zipText.length != 5 ? 'ZIP code must be 5 digits' : null,
                 border: const OutlineInputBorder(),
               ),
-              // Use phone keyboard which works consistently on iPad
-              keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: false),
-              // Force digits only - fixes iPad keyboard inserting spaces/special chars
+              keyboardType: TextInputType.number,
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(5),
