@@ -307,15 +307,25 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    if (team['ageGroup'] != null || team['gender'] != null) ...[
+                    if (team['ageGroup'] != null || team['gender'] != null || team['skillLevel'] != null) ...[
                       const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
+                          if (team['skillLevel'] != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.deepPurple.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(team['skillLevel'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
                           if (team['ageGroup'] != null)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              margin: const EdgeInsets.only(right: 6),
                               decoration: BoxDecoration(
                                 color: Colors.teal.withOpacity(0.3),
                                 borderRadius: BorderRadius.circular(12),
@@ -343,6 +353,28 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    if (team['city'] != null && team['city'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.location_on, size: 14, color: Colors.white.withOpacity(0.7)),
+                          const SizedBox(width: 4),
+                          Text(
+                            team['city'],
+                            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (team['description'] != null && team['description'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        team['description'],
+                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13, fontStyle: FontStyle.italic),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,

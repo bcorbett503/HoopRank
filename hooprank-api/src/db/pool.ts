@@ -45,13 +45,17 @@ export async function runAutoMigrations() {
         `);
         console.log("Auto-migration: fcm_token column checked/added");
 
-        // Add age_group and gender columns to teams table
+        // Add team attribute columns to teams table
         await pool.query(`
             ALTER TABLE teams 
             ADD COLUMN IF NOT EXISTS age_group VARCHAR(20),
-            ADD COLUMN IF NOT EXISTS gender VARCHAR(20)
+            ADD COLUMN IF NOT EXISTS gender VARCHAR(20),
+            ADD COLUMN IF NOT EXISTS skill_level VARCHAR(20),
+            ADD COLUMN IF NOT EXISTS home_court_id TEXT,
+            ADD COLUMN IF NOT EXISTS city TEXT,
+            ADD COLUMN IF NOT EXISTS description TEXT
         `);
-        console.log("Auto-migration: age_group/gender columns checked/added");
+        console.log("Auto-migration: team attribute columns checked/added");
 
         // Backfill lat/lng for users with ZIP but no coordinates (runs once per restart)
         const usersToUpdate = await pool.query(`

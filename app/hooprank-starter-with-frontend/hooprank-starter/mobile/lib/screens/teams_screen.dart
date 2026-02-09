@@ -114,13 +114,26 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     }
 
     final nameController = TextEditingController();
+    final cityController = TextEditingController();
+    final descriptionController = TextEditingController();
     String teamType = '3v3';
     String? ageGroup;
     String? gender;
+    String? skillLevel;
+    Court? selectedCourt;
     File? selectedImage;
+    List<Court> courtSearchResults = [];
+    final courtSearchController = TextEditingController();
+    bool showCourtResults = false;
 
     final ageGroups = ['U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'];
     final genders = ['Mens', 'Womens', 'Coed'];
+    final skillLevels = ['Recreational', 'Competitive', 'Elite'];
+    final skillIcons = {
+      'Recreational': Icons.directions_walk,
+      'Competitive': Icons.fitness_center,
+      'Elite': Icons.emoji_events,
+    };
 
     showDialog(
       context: context,
@@ -132,6 +145,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // --- Team Name ---
                 TextField(
                   controller: nameController,
                   decoration: const InputDecoration(
@@ -140,7 +154,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   ),
                   autofocus: true,
                 ),
+
                 const SizedBox(height: 16),
+
+                // --- Team Type ---
                 const Text('Team Type', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Row(
@@ -166,7 +183,29 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 16),
+
+                // --- Skill Level ---
+                const Text('Skill Level', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: skillLevels.map((sl) => ChoiceChip(
+                    avatar: skillLevel == sl ? null : Icon(skillIcons[sl], size: 16),
+                    label: Text(sl, style: const TextStyle(fontSize: 12)),
+                    selected: skillLevel == sl,
+                    onSelected: (_) => setDialogState(() => skillLevel = skillLevel == sl ? null : sl),
+                    selectedColor: Colors.deepPurple,
+                    labelStyle: TextStyle(color: skillLevel == sl ? Colors.white : null),
+                    visualDensity: VisualDensity.compact,
+                  )).toList(),
+                ),
+
+                const SizedBox(height: 16),
+
+                // --- Age Group ---
                 const Text('Age Group', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Wrap(
@@ -181,7 +220,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     visualDensity: VisualDensity.compact,
                   )).toList(),
                 ),
+
                 const SizedBox(height: 16),
+
+                // --- Gender ---
                 const Text('Gender', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Wrap(
@@ -195,6 +237,142 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     visualDensity: VisualDensity.compact,
                   )).toList(),
                 ),
+
+                const SizedBox(height: 16),
+
+                // --- Home Court ---
+                const Text('Home Court', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                if (selectedCourt != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.sports_basketball, color: Colors.green, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(selectedCourt!.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              if (selectedCourt!.address != null)
+                                Text(selectedCourt!.address!, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () => setDialogState(() {
+                            selectedCourt = null;
+                            cityController.clear();
+                          }),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...
+                  [
+                    TextField(
+                      controller: courtSearchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search courts...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onChanged: (query) {
+                        final courtService = context.read<CourtService>();
+                        setDialogState(() {
+                          if (query.length >= 2) {
+                            courtSearchResults = courtService.searchCourts(query).take(5).toList();
+                            showCourtResults = true;
+                          } else {
+                            courtSearchResults = [];
+                            showCourtResults = false;
+                          }
+                        });
+                      },
+                    ),
+                    if (showCourtResults && courtSearchResults.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        constraints: const BoxConstraints(maxHeight: 150),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: courtSearchResults.length,
+                          itemBuilder: (ctx, i) {
+                            final court = courtSearchResults[i];
+                            return ListTile(
+                              dense: true,
+                              leading: Icon(
+                                court.isIndoor ? Icons.home : Icons.wb_sunny,
+                                size: 18,
+                                color: court.isIndoor ? Colors.blue : Colors.amber,
+                              ),
+                              title: Text(court.name, style: const TextStyle(fontSize: 13)),
+                              subtitle: court.address != null
+                                  ? Text(court.address!, style: const TextStyle(fontSize: 11))
+                                  : null,
+                              onTap: () {
+                                setDialogState(() {
+                                  selectedCourt = court;
+                                  showCourtResults = false;
+                                  courtSearchController.clear();
+                                  // Auto-fill city from court address
+                                  if (court.address != null) {
+                                    final parts = court.address!.split(',');
+                                    if (parts.length >= 2) {
+                                      cityController.text = parts[parts.length - 2].trim();
+                                    }
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+
+                const SizedBox(height: 16),
+
+                // --- City ---
+                TextField(
+                  controller: cityController,
+                  decoration: const InputDecoration(
+                    labelText: 'City',
+                    hintText: 'e.g. Portland, OR',
+                    isDense: true,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // --- Description ---
+                TextField(
+                  controller: descriptionController,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Short team bio...',
+                    isDense: true,
+                    counterText: '${descriptionController.text.length}/200',
+                  ),
+                  maxLines: 2,
+                  maxLength: 200,
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+
                 const SizedBox(height: 8),
                 Text(
                   teamType == '3v3' ? 'Max 5 members' : 'Max 10 members',
@@ -212,7 +390,17 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               onPressed: () async {
                 if (nameController.text.trim().isEmpty) return;
                 Navigator.pop(context);
-                await _createTeam(nameController.text.trim(), teamType, selectedImage, ageGroup: ageGroup, gender: gender);
+                await _createTeam(
+                  nameController.text.trim(),
+                  teamType,
+                  selectedImage,
+                  ageGroup: ageGroup,
+                  gender: gender,
+                  skillLevel: skillLevel,
+                  homeCourtId: selectedCourt?.id,
+                  city: cityController.text.trim().isNotEmpty ? cityController.text.trim() : null,
+                  description: descriptionController.text.trim().isNotEmpty ? descriptionController.text.trim() : null,
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepOrange,
@@ -226,9 +414,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     );
   }
 
-  Future<void> _createTeam(String name, String teamType, File? logoImage, {String? ageGroup, String? gender}) async {
+  Future<void> _createTeam(String name, String teamType, File? logoImage, {String? ageGroup, String? gender, String? skillLevel, String? homeCourtId, String? city, String? description}) async {
     try {
-      final team = await ApiService.createTeam(name: name, teamType: teamType, ageGroup: ageGroup, gender: gender);
+      final team = await ApiService.createTeam(name: name, teamType: teamType, ageGroup: ageGroup, gender: gender, skillLevel: skillLevel, homeCourtId: homeCourtId, city: city, description: description);
       if (team != null && mounted) {
         if (logoImage != null) {
           await ApiService.uploadImage(type: 'team', targetId: team['id'], imageFile: logoImage);
@@ -1376,6 +1564,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     final teamType = team['teamType'] ?? '3v3';
     final ageGroup = team['ageGroup'];
     final gender = team['gender'];
+    final skillLevel = team['skillLevel'];
+    final cityVal = team['city'];
+    final descriptionVal = team['description'];
     final ratingValue = team['rating'];
     final rating = ratingValue is num ? ratingValue.toDouble() : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0);
     final winsValue = team['wins'];
@@ -1427,6 +1618,18 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         ),
                       ),
                     ),
+                    if (skillLevel != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.deepPurple.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.deepPurple.withOpacity(0.3)),
+                        ),
+                        child: Text(skillLevel, style: TextStyle(color: Colors.deepPurple[200], fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
                     if (ageGroup != null) ...[
                       const SizedBox(width: 6),
                       Container(
@@ -1476,8 +1679,21 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     _buildStatChip(Icons.star, rating.toStringAsFixed(1)),
                     const SizedBox(width: 12),
                     _buildStatChip(Icons.emoji_events, '$wins W - $losses L'),
+                    if (cityVal != null && cityVal.toString().isNotEmpty) ...[
+                      const SizedBox(width: 12),
+                      _buildStatChip(Icons.location_on, cityVal.toString()),
+                    ],
                   ],
                 ),
+                if (descriptionVal != null && descriptionVal.toString().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    descriptionVal.toString(),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),

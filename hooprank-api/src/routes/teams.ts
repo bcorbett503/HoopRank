@@ -20,13 +20,17 @@ const CreateTeamSchema = z.object({
     teamType: z.enum(["3v3", "5v5"]),
     ageGroup: z.enum(["U10", "U12", "U14", "U18", "HS", "College", "Open"]).optional(),
     gender: z.enum(["Mens", "Womens", "Coed"]).optional(),
+    skillLevel: z.enum(["Recreational", "Competitive", "Elite"]).optional(),
+    homeCourtId: z.string().optional(),
+    city: z.string().max(100).optional(),
+    description: z.string().max(200).optional(),
 });
 
 router.post(
     "/teams",
     asyncH(async (req, res) => {
         const uid = getUserId(req);
-        const { name, teamType, ageGroup, gender } = CreateTeamSchema.parse(req.body);
+        const { name, teamType, ageGroup, gender, skillLevel, homeCourtId, city, description } = CreateTeamSchema.parse(req.body);
 
         // Ensure user exists in database (auto-create if not)
         // This handles Firebase users who haven't synced yet
@@ -70,10 +74,10 @@ router.post(
         const threadId = threadResult.rows[0].id;
 
         const result = await pool.query(
-            `INSERT INTO teams (owner_id, name, team_type, age_group, gender, thread_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, name, team_type, age_group, gender, rating, mmr, matches_played, wins, losses, thread_id, created_at`,
-            [uid, name, teamType, ageGroup || null, gender || null, threadId]
+            `INSERT INTO teams (owner_id, name, team_type, age_group, gender, skill_level, home_court_id, city, description, thread_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, name, team_type, age_group, gender, skill_level, home_court_id, city, description, rating, mmr, matches_played, wins, losses, thread_id, created_at`,
+            [uid, name, teamType, ageGroup || null, gender || null, skillLevel || null, homeCourtId || null, city || null, description || null, threadId]
         );
 
         const team = result.rows[0];
@@ -104,6 +108,10 @@ router.post(
             teamType: team.team_type,
             ageGroup: team.age_group || null,
             gender: team.gender || null,
+            skillLevel: team.skill_level || null,
+            homeCourtId: team.home_court_id || null,
+            city: team.city || null,
+            description: team.description || null,
             rating: Number(team.rating),
             matchesPlayed: team.matches_played,
             wins: team.wins,
@@ -140,6 +148,10 @@ router.get(
                 teamType: t.team_type,
                 ageGroup: t.age_group || null,
                 gender: t.gender || null,
+                skillLevel: t.skill_level || null,
+                homeCourtId: t.home_court_id || null,
+                city: t.city || null,
+                description: t.description || null,
                 rating: Number(t.rating),
                 matchesPlayed: t.matches_played,
                 wins: t.wins,
@@ -557,6 +569,10 @@ router.get(
             teamType: team.team_type,
             ageGroup: team.age_group || null,
             gender: team.gender || null,
+            skillLevel: team.skill_level || null,
+            homeCourtId: team.home_court_id || null,
+            city: team.city || null,
+            description: team.description || null,
             rating: Number(team.rating),
             matchesPlayed: team.matches_played,
             wins: team.wins,

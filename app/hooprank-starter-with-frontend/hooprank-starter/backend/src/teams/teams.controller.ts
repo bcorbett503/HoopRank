@@ -35,9 +35,9 @@ export class TeamsController {
     @Post()
     async createTeam(
         @Headers('x-user-id') userId: string,
-        @Body() body: { name: string; teamType: string; ageGroup?: string; gender?: string },
+        @Body() body: { name: string; teamType: string; ageGroup?: string; gender?: string; skillLevel?: string; homeCourtId?: string; city?: string; description?: string },
     ) {
-        return this.teamsService.createTeam(userId, body.name, body.teamType, body.ageGroup, body.gender);
+        return this.teamsService.createTeam(userId, body.name, body.teamType, body.ageGroup, body.gender, body.skillLevel, body.homeCourtId, body.city, body.description);
     }
 
     /**

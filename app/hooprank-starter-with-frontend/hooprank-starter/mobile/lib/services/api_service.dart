@@ -711,8 +711,12 @@ class ApiService {
     required String teamType,
     String? ageGroup,
     String? gender,
+    String? skillLevel,
+    String? homeCourtId,
+    String? city,
+    String? description,
   }) async {
-    debugPrint('>>> createTeam: name=$name, teamType=$teamType, ageGroup=$ageGroup, gender=$gender');
+    debugPrint('>>> createTeam: name=$name, teamType=$teamType, ageGroup=$ageGroup, gender=$gender, skillLevel=$skillLevel');
     debugPrint('>>> createTeam: _userId=$_userId, baseUrl=$baseUrl');
     
     if (_userId == null || _userId!.isEmpty) {
@@ -726,6 +730,10 @@ class ApiService {
     };
     if (ageGroup != null) body['ageGroup'] = ageGroup;
     if (gender != null) body['gender'] = gender;
+    if (skillLevel != null) body['skillLevel'] = skillLevel;
+    if (homeCourtId != null) body['homeCourtId'] = homeCourtId;
+    if (city != null) body['city'] = city;
+    if (description != null) body['description'] = description;
 
     final response = await http.post(
       Uri.parse('$baseUrl/teams'),

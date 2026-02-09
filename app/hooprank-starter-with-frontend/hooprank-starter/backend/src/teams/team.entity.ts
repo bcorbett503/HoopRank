@@ -21,6 +21,18 @@ export class Team {
     @Column({ type: 'text', nullable: true })
     gender: string; // 'Mens', 'Womens', 'Coed'
 
+    @Column({ name: 'skill_level', type: 'text', nullable: true })
+    skillLevel: string; // 'Recreational', 'Competitive', 'Elite'
+
+    @Column({ name: 'home_court_id', type: 'text', nullable: true })
+    homeCourtId: string;
+
+    @Column({ type: 'text', nullable: true })
+    city: string;
+
+    @Column({ type: 'text', nullable: true })
+    description: string;
+
     @Column({ name: 'owner_id', type: 'text' })
     ownerId: string;
 

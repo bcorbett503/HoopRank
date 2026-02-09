@@ -42,6 +42,10 @@ export class TeamsService {
                 teamType: m.team.teamType,
                 ageGroup: m.team.ageGroup,
                 gender: m.team.gender,
+                skillLevel: m.team.skillLevel,
+                homeCourtId: m.team.homeCourtId,
+                city: m.team.city,
+                description: m.team.description,
                 rating: m.team.rating,
                 wins: m.team.wins,
                 losses: m.team.losses,
@@ -74,8 +78,8 @@ export class TeamsService {
     /**
      * Create a new team
      */
-    async createTeam(userId: string, name: string, teamType: string, ageGroup?: string, gender?: string): Promise<Team> {
-        console.log(`[TeamsService.createTeam] userId=${userId}, name=${name}, teamType=${teamType}, ageGroup=${ageGroup}, gender=${gender}`);
+    async createTeam(userId: string, name: string, teamType: string, ageGroup?: string, gender?: string, skillLevel?: string, homeCourtId?: string, city?: string, description?: string): Promise<Team> {
+        console.log(`[TeamsService.createTeam] userId=${userId}, name=${name}, teamType=${teamType}, ageGroup=${ageGroup}, gender=${gender}, skillLevel=${skillLevel}`);
 
         // Validate userId
         if (!userId || userId.trim() === '') {
@@ -100,6 +104,17 @@ export class TeamsService {
             throw new BadRequestException(`Gender must be one of: ${validGenders.join(', ')}`);
         }
 
+        // Validate skill level if provided
+        const validSkillLevels = ['Recreational', 'Competitive', 'Elite'];
+        if (skillLevel && !validSkillLevels.includes(skillLevel)) {
+            throw new BadRequestException(`Skill level must be one of: ${validSkillLevels.join(', ')}`);
+        }
+
+        // Validate description length
+        if (description && description.length > 200) {
+            throw new BadRequestException('Description must be 200 characters or less');
+        }
+
         // Check if team name already exists for this type
         const existing = await this.teamsRepository.findOne({
             where: { name, teamType },
@@ -115,6 +130,10 @@ export class TeamsService {
             ownerId: userId,
             ageGroup: ageGroup || null,
             gender: gender || null,
+            skillLevel: skillLevel || null,
+            homeCourtId: homeCourtId || null,
+            city: city || null,
+            description: description || null,
             rating: 3.0,
             wins: 0,
             losses: 0,
@@ -201,6 +220,10 @@ export class TeamsService {
             teamType: team.teamType,
             ageGroup: team.ageGroup,
             gender: team.gender,
+            skillLevel: team.skillLevel,
+            homeCourtId: team.homeCourtId,
+            city: team.city,
+            description: team.description,
             rating: team.rating,
             wins: team.wins,
             losses: team.losses,

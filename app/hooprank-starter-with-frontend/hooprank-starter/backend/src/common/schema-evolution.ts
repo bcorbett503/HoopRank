@@ -44,6 +44,10 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS rating DECIMAL(3,2) DEFAULT 3.00`);
         await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS age_group TEXT`);
         await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS gender TEXT`);
+        await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS skill_level TEXT`);
+        await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS home_court_id TEXT`);
+        await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS city TEXT`);
+        await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS description TEXT`);
 
         // ============================================
         // USERS TABLE MIGRATIONS
