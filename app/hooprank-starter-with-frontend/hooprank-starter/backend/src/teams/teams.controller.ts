@@ -278,5 +278,71 @@ export class TeamsController {
     ) {
         return this.teamsService.submitTeamMatchScore(matchId, teamId, userId, body.me, body.opponent);
     }
-}
 
+    // ====================
+    // TEAM EVENTS (Practices & Games)
+    // ====================
+
+    /**
+     * Create a team event (practice or game)
+     */
+    @Post(':id/events')
+    @HttpCode(201)
+    async createTeamEvent(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: {
+            type: string;
+            title: string;
+            eventDate: string;
+            endDate?: string;
+            locationName?: string;
+            courtId?: string;
+            opponentTeamId?: string;
+            opponentTeamName?: string;
+            recurrenceRule?: string;
+            notes?: string;
+        },
+    ) {
+        return this.teamsService.createTeamEvent(teamId, userId, body);
+    }
+
+    /**
+     * Get upcoming events for a team
+     */
+    @Get(':id/events')
+    async getTeamEvents(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.teamsService.getTeamEvents(teamId, userId);
+    }
+
+    /**
+     * Toggle attendance for a team event (IN / OUT)
+     */
+    @Post(':id/events/:eventId/attendance')
+    @HttpCode(200)
+    async toggleAttendance(
+        @Param('id') teamId: string,
+        @Param('eventId') eventId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: { status: string },
+    ) {
+        return this.teamsService.toggleAttendance(teamId, eventId, userId, body.status);
+    }
+
+    /**
+     * Delete a team event
+     */
+    @Delete(':id/events/:eventId')
+    @HttpCode(200)
+    async deleteTeamEvent(
+        @Param('id') teamId: string,
+        @Param('eventId') eventId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        await this.teamsService.deleteTeamEvent(teamId, eventId, userId);
+        return { success: true };
+    }
+}

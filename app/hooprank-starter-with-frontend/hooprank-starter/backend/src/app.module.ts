@@ -12,6 +12,7 @@ import { Court } from './courts/court.entity';
 import { Match } from './matches/match.entity';
 import { Message } from './messages/message.entity';
 import { Team, TeamMember, TeamMessage } from './teams/team.entity';
+import { TeamEvent, TeamEventAttendance } from './teams/team-event.entity';
 import { PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn } from './statuses/status.entity';
 import { FirebaseModule } from './auth/firebase.module';
 import { MessagesModule } from './messages/messages.module';
@@ -42,7 +43,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
           return {
             type: 'postgres',
             url: databaseUrl,
-            entities: [User, Court, Match, Message, Challenge, Team, TeamMember, TeamMessage, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn, ScheduledRun, RunAttendee],
+            entities: [User, Court, Match, Message, Challenge, Team, TeamMember, TeamMessage, TeamEvent, TeamEventAttendance, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn, ScheduledRun, RunAttendee],
             synchronize: false, // Disabled for production - use migrations instead
             ssl: false, // Railway internal connection doesn't need SSL
             namingStrategy: new SnakeNamingStrategy(),
@@ -52,7 +53,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
           return {
             type: 'better-sqlite3',
             database: 'hooprank.db',
-            entities: [User, Court, Match, Message, Challenge, Team, TeamMember, TeamMessage, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn, ScheduledRun, RunAttendee],
+            entities: [User, Court, Match, Message, Challenge, Team, TeamMember, TeamMessage, TeamEvent, TeamEventAttendance, PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn, ScheduledRun, RunAttendee],
             synchronize: true,
           } as any;
         }

@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, MoreThanOrEqual } from 'typeorm';
 import { Team, TeamMember, TeamMessage } from './team.entity';
+import { TeamEvent, TeamEventAttendance } from './team-event.entity';
 import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -14,6 +15,10 @@ export class TeamsService {
         private membersRepository: Repository<TeamMember>,
         @InjectRepository(TeamMessage)
         private messagesRepository: Repository<TeamMessage>,
+        @InjectRepository(TeamEvent)
+        private eventsRepository: Repository<TeamEvent>,
+        @InjectRepository(TeamEventAttendance)
+        private attendanceRepository: Repository<TeamEventAttendance>,
         @InjectRepository(User)
         private usersRepository: Repository<User>,
         private notificationsService: NotificationsService,
@@ -806,5 +811,194 @@ export class TeamsService {
             throw error;
         }
     }
-}
 
+    // ====================
+    // TEAM EVENTS (Practices & Games)
+    // ====================
+
+    /**
+     * Create a team event (practice or game)
+     */
+    async createTeamEvent(teamId: string, userId: string, dto: {
+        type: string;
+        title: string;
+        eventDate: string;
+        endDate?: string;
+        locationName?: string;
+        courtId?: string;
+        opponentTeamId?: string;
+        opponentTeamName?: string;
+        recurrenceRule?: string;
+        notes?: string;
+    }): Promise<TeamEvent> {
+        // Verify user is a member
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        // Validate type
+        if (!['practice', 'game'].includes(dto.type)) {
+            throw new BadRequestException('Event type must be practice or game');
+        }
+
+        const event = new TeamEvent();
+        event.teamId = teamId;
+        event.type = dto.type;
+        event.title = dto.title;
+        event.eventDate = new Date(dto.eventDate);
+        event.endDate = dto.endDate ? new Date(dto.endDate) : null;
+        event.locationName = dto.locationName || null;
+        event.courtId = dto.courtId || null;
+        event.opponentTeamId = dto.opponentTeamId || null;
+        event.opponentTeamName = dto.opponentTeamName || null;
+        event.recurrenceRule = dto.recurrenceRule || null;
+        event.notes = dto.notes || null;
+        event.createdBy = userId;
+
+        const saved = await this.eventsRepository.save(event);
+
+        // Auto-mark creator as IN
+        const attendance = new TeamEventAttendance();
+        attendance.eventId = saved.id;
+        attendance.userId = userId;
+        attendance.status = 'in';
+        await this.attendanceRepository.save(attendance);
+
+        console.log(`[TeamsService] Created ${dto.type} event: ${saved.id} for team ${teamId}`);
+        return saved;
+    }
+
+    /**
+     * Get upcoming events for a team with attendance info
+     */
+    async getTeamEvents(teamId: string, userId: string): Promise<any[]> {
+        // Verify user is a member
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        const events = await this.eventsRepository.find({
+            where: {
+                teamId,
+                eventDate: MoreThanOrEqual(new Date()),
+            },
+            order: { eventDate: 'ASC' },
+        });
+
+        // Hydrate each event with attendance data
+        const result: any[] = [];
+        for (const event of events) {
+            const allAttendance = await this.attendanceRepository.find({
+                where: { eventId: event.id },
+            });
+
+            const inCount = allAttendance.filter(a => a.status === 'in').length;
+            const outCount = allAttendance.filter(a => a.status === 'out').length;
+            const myAttendance = allAttendance.find(a => a.userId === userId);
+
+            // Get display names for attendees
+            const inUserIds = allAttendance.filter(a => a.status === 'in').map(a => a.userId);
+            const outUserIds = allAttendance.filter(a => a.status === 'out').map(a => a.userId);
+
+            result.push({
+                id: event.id,
+                teamId: event.teamId,
+                type: event.type,
+                title: event.title,
+                eventDate: event.eventDate,
+                endDate: event.endDate,
+                locationName: event.locationName,
+                courtId: event.courtId,
+                opponentTeamId: event.opponentTeamId,
+                opponentTeamName: event.opponentTeamName,
+                recurrenceRule: event.recurrenceRule,
+                notes: event.notes,
+                createdBy: event.createdBy,
+                createdAt: event.createdAt,
+                inCount,
+                outCount,
+                myStatus: myAttendance?.status || null,
+                inUsers: inUserIds,
+                outUsers: outUserIds,
+            });
+        }
+
+        return result;
+    }
+
+    /**
+     * Toggle attendance for a team event (IN / OUT)
+     */
+    async toggleAttendance(teamId: string, eventId: string, userId: string, status: string): Promise<any> {
+        // Verify user is a member
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        // Verify event exists and belongs to team
+        const event = await this.eventsRepository.findOne({
+            where: { id: eventId, teamId },
+        });
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+
+        if (!['in', 'out'].includes(status)) {
+            throw new BadRequestException('Status must be in or out');
+        }
+
+        // Upsert attendance
+        let attendance = await this.attendanceRepository.findOne({
+            where: { eventId, userId },
+        });
+
+        if (attendance) {
+            attendance.status = status;
+            await this.attendanceRepository.save(attendance);
+        } else {
+            attendance = this.attendanceRepository.create({
+                eventId,
+                userId,
+                status,
+            });
+            await this.attendanceRepository.save(attendance);
+        }
+
+        console.log(`[TeamsService] User ${userId} marked ${status} for event ${eventId}`);
+        return { eventId, userId, status };
+    }
+
+    /**
+     * Delete a team event (creator or team owner only)
+     */
+    async deleteTeamEvent(teamId: string, eventId: string, userId: string): Promise<void> {
+        const event = await this.eventsRepository.findOne({
+            where: { id: eventId, teamId },
+        });
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+
+        // Only creator or team owner can delete
+        const team = await this.teamsRepository.findOne({ where: { id: teamId } });
+        if (event.createdBy !== userId && team?.ownerId !== userId) {
+            throw new ForbiddenException('Only the event creator or team owner can delete events');
+        }
+
+        // Delete attendance records first
+        await this.attendanceRepository.delete({ eventId });
+        // Delete event
+        await this.eventsRepository.delete({ id: eventId });
+
+        console.log(`[TeamsService] Deleted event ${eventId} from team ${teamId}`);
+    }
+}

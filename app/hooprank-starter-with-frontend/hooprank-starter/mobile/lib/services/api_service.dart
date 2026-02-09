@@ -938,6 +938,114 @@ class ApiService {
   }
 
   // ===================
+  // Team Events (Practices & Games)
+  // ===================
+
+  /// Create a team event (practice or game)
+  static Future<Map<String, dynamic>?> createTeamEvent({
+    required String teamId,
+    required String type,
+    required String title,
+    required String eventDate,
+    String? endDate,
+    String? locationName,
+    String? courtId,
+    String? opponentTeamId,
+    String? opponentTeamName,
+    String? recurrenceRule,
+    String? notes,
+  }) async {
+    final body = <String, dynamic>{
+      'type': type,
+      'title': title,
+      'eventDate': eventDate,
+      if (endDate != null) 'endDate': endDate,
+      if (locationName != null) 'locationName': locationName,
+      if (courtId != null) 'courtId': courtId,
+      if (opponentTeamId != null) 'opponentTeamId': opponentTeamId,
+      if (opponentTeamName != null) 'opponentTeamName': opponentTeamName,
+      if (recurrenceRule != null) 'recurrenceRule': recurrenceRule,
+      if (notes != null) 'notes': notes,
+    };
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/events'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to create event: ${response.body}');
+  }
+
+  /// Get upcoming events for a team
+  static Future<List<Map<String, dynamic>>> getTeamEvents(String teamId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/teams/$teamId/events'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data is List) {
+        return data.cast<Map<String, dynamic>>();
+      }
+    }
+    return [];
+  }
+
+  /// Toggle attendance for a team event (IN / OUT)
+  static Future<bool> toggleEventAttendance(String teamId, String eventId, String status) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/events/$eventId/attendance'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'status': status}),
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Delete a team event
+  static Future<bool> deleteTeamEvent(String teamId, String eventId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/teams/$teamId/events/$eventId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Get ALL events across all of user's teams (for unified schedule view)
+  static Future<List<Map<String, dynamic>>> getAllTeamEvents() async {
+    // First get user's teams, then fetch events for each
+    final teams = await getMyTeams();
+    final allEvents = <Map<String, dynamic>>[];
+    for (final team in teams) {
+      final teamId = team['id']?.toString() ?? '';
+      if (teamId.isNotEmpty) {
+        final events = await getTeamEvents(teamId);
+        // Inject team name for display
+        for (final event in events) {
+          event['teamName'] = team['name'] ?? 'Team';
+        }
+        allEvents.addAll(events);
+      }
+    }
+    // Sort by eventDate ascending
+    allEvents.sort((a, b) {
+      final aDate = DateTime.tryParse(a['eventDate']?.toString() ?? '') ?? DateTime.now();
+      final bDate = DateTime.tryParse(b['eventDate']?.toString() ?? '') ?? DateTime.now();
+      return aDate.compareTo(bDate);
+    });
+    return allEvents;
+  }
+
+  // ===================
   // Follow API (Courts & Players)
   // ===================
 
