@@ -118,7 +118,7 @@ export class TeamsService {
             rating: 3.0,
             wins: 0,
             losses: 0,
-        });
+        } as Partial<Team>);
         await this.teamsRepository.save(team);
 
         // Add owner as active member
