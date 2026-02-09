@@ -1001,4 +1001,33 @@ export class TeamsService {
 
         console.log(`[TeamsService] Deleted event ${eventId} from team ${teamId}`);
     }
+
+    /**
+     * Get all upcoming events from all teams the user belongs to.
+     * Used for the unified "Schedule" tab.
+     */
+    async getAllTeamEvents(userId: string): Promise<any[]> {
+        // Get all teams user is member of
+        const teams = await this.getUserTeams(userId);
+        const result: any[] = [];
+
+        for (const team of teams) {
+            const teamId = team.id?.toString() ?? '';
+            if (!teamId) continue;
+            const events = await this.getTeamEvents(teamId, userId);
+            for (const event of events) {
+                event.teamName = team.name ?? 'Team';
+            }
+            result.push(...events);
+        }
+
+        // Sort by event date ascending
+        result.sort((a: any, b: any) => {
+            const aDate = new Date(a.eventDate || 0).getTime();
+            const bDate = new Date(b.eventDate || 0).getTime();
+            return aDate - bDate;
+        });
+
+        return result;
+    }
 }

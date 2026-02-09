@@ -51,6 +51,16 @@ export class TeamsController {
     }
 
     /**
+     * Get all upcoming events across all of the user's teams (unified schedule)
+     * Must be before :id route to avoid NestJS parsing 'all-events' as a team ID
+     */
+    @Get('all-events')
+    async getAllTeamEvents(@Headers('x-user-id') userId: string) {
+        if (!userId) return [];
+        return this.teamsService.getAllTeamEvents(userId);
+    }
+
+    /**
      * Get teams for a specific user (mobile path: GET /teams/user/:userId)
      */
     @Get('user/:userId')
