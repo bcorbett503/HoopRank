@@ -3440,6 +3440,42 @@ async function ensureFollowTables() {
       CREATE INDEX IF NOT EXISTS idx_followed_courts_user ON user_followed_courts(user_id);
       CREATE INDEX IF NOT EXISTS idx_followed_players_user ON user_followed_players(user_id);
     `);
+
+    // Team events tables (practices & games)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS team_events (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        team_id UUID NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        event_date TIMESTAMPTZ NOT NULL,
+        end_date TIMESTAMPTZ,
+        location_name TEXT,
+        court_id VARCHAR(255),
+        opponent_team_id UUID,
+        opponent_team_name TEXT,
+        recurrence_rule TEXT,
+        notes TEXT,
+        created_by TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS team_event_attendance (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        event_id UUID NOT NULL,
+        user_id TEXT NOT NULL,
+        status TEXT DEFAULT 'in',
+        responded_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_team_events_team_id ON team_events(team_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_team_events_event_date ON team_events(event_date)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_team_event_attendance_event_id ON team_event_attendance(event_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_team_event_attendance_user_id ON team_event_attendance(user_id)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_team_event_attendance_unique ON team_event_attendance(event_id, user_id)`);
+
     console.log("✓ Follow tables ensured");
   } catch (e) {
     console.error("Error ensuring follow tables:", e);

@@ -243,6 +243,241 @@ router.get(
         })));
     })
 );
+// =============================================================================
+// Team Events (Practices & Games) - MUST be before /teams/:id routes!
+// =============================================================================
+
+const TeamEventSchema = z.object({
+    type: z.string(),
+    title: z.string().min(1).max(200),
+    eventDate: z.string(),
+    endDate: z.string().optional(),
+    locationName: z.string().optional(),
+    courtId: z.string().optional(),
+    opponentTeamId: z.string().optional(),
+    opponentTeamName: z.string().optional(),
+    recurrenceRule: z.string().optional(),
+    notes: z.string().optional(),
+});
+
+// GET /teams/all-events - Get all events across user's teams (unified schedule)
+router.get(
+    "/teams/all-events",
+    asyncH(async (req, res) => {
+        const uid = getUserId(req);
+
+        // Get all teams user is member of
+        const teamsResult = await pool.query(
+            `SELECT t.id, t.name FROM teams t
+             JOIN team_members tm ON tm.team_id = t.id
+             WHERE tm.user_id = $1 AND tm.status = 'accepted'`,
+            [uid]
+        );
+
+        const allEvents: any[] = [];
+        for (const team of teamsResult.rows) {
+            const eventsResult = await pool.query(
+                `SELECT e.*, 
+                    (SELECT COUNT(*) FROM team_event_attendance WHERE event_id = e.id AND status = 'in') as in_count,
+                    (SELECT COUNT(*) FROM team_event_attendance WHERE event_id = e.id AND status = 'out') as out_count,
+                    (SELECT status FROM team_event_attendance WHERE event_id = e.id AND user_id = $2 LIMIT 1) as my_status
+                 FROM team_events e
+                 WHERE e.team_id = $1 AND e.event_date >= NOW()
+                 ORDER BY e.event_date ASC`,
+                [team.id, uid]
+            );
+            for (const e of eventsResult.rows) {
+                allEvents.push({
+                    id: e.id,
+                    teamId: e.team_id,
+                    teamName: team.name,
+                    type: e.type,
+                    title: e.title,
+                    eventDate: e.event_date,
+                    endDate: e.end_date,
+                    locationName: e.location_name,
+                    courtId: e.court_id,
+                    opponentTeamId: e.opponent_team_id,
+                    opponentTeamName: e.opponent_team_name,
+                    recurrenceRule: e.recurrence_rule,
+                    notes: e.notes,
+                    createdBy: e.created_by,
+                    createdAt: e.created_at,
+                    inCount: Number(e.in_count),
+                    outCount: Number(e.out_count),
+                    myStatus: e.my_status || null,
+                });
+            }
+        }
+
+        // Sort by event date
+        allEvents.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+        res.json(allEvents);
+    })
+);
+
+// POST /teams/:id/events - Create a team event
+router.post(
+    "/teams/:id/events",
+    asyncH(async (req, res) => {
+        const { id } = req.params;
+        const uid = getUserId(req);
+        const body = TeamEventSchema.parse(req.body);
+
+        // Verify user is a team member
+        const memberCheck = await pool.query(
+            `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 AND status = 'accepted'`,
+            [id, uid]
+        );
+        if (memberCheck.rowCount === 0) {
+            return res.status(403).json({ error: "not_team_member" });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO team_events (team_id, type, title, event_date, end_date, location_name, court_id, opponent_team_id, opponent_team_name, recurrence_rule, notes, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             RETURNING *`,
+            [id, body.type, body.title, body.eventDate, body.endDate || null, body.locationName || null, body.courtId || null, body.opponentTeamId || null, body.opponentTeamName || null, body.recurrenceRule || null, body.notes || null, uid]
+        );
+
+        const e = result.rows[0];
+        res.status(201).json({
+            id: e.id,
+            teamId: e.team_id,
+            type: e.type,
+            title: e.title,
+            eventDate: e.event_date,
+            endDate: e.end_date,
+            locationName: e.location_name,
+            courtId: e.court_id,
+            opponentTeamId: e.opponent_team_id,
+            opponentTeamName: e.opponent_team_name,
+            recurrenceRule: e.recurrence_rule,
+            notes: e.notes,
+            createdBy: e.created_by,
+            createdAt: e.created_at,
+            inCount: 0,
+            outCount: 0,
+            myStatus: null,
+        });
+    })
+);
+
+// GET /teams/:id/events - Get upcoming events for a team
+router.get(
+    "/teams/:id/events",
+    asyncH(async (req, res) => {
+        const { id } = req.params;
+        const uid = getUserId(req);
+
+        const result = await pool.query(
+            `SELECT e.*, 
+                (SELECT COUNT(*) FROM team_event_attendance WHERE event_id = e.id AND status = 'in') as in_count,
+                (SELECT COUNT(*) FROM team_event_attendance WHERE event_id = e.id AND status = 'out') as out_count,
+                (SELECT status FROM team_event_attendance WHERE event_id = e.id AND user_id = $2 LIMIT 1) as my_status
+             FROM team_events e
+             WHERE e.team_id = $1 AND e.event_date >= NOW()
+             ORDER BY e.event_date ASC`,
+            [id, uid]
+        );
+
+        res.json(result.rows.map(e => ({
+            id: e.id,
+            teamId: e.team_id,
+            type: e.type,
+            title: e.title,
+            eventDate: e.event_date,
+            endDate: e.end_date,
+            locationName: e.location_name,
+            courtId: e.court_id,
+            opponentTeamId: e.opponent_team_id,
+            opponentTeamName: e.opponent_team_name,
+            recurrenceRule: e.recurrence_rule,
+            notes: e.notes,
+            createdBy: e.created_by,
+            createdAt: e.created_at,
+            inCount: Number(e.in_count),
+            outCount: Number(e.out_count),
+            myStatus: e.my_status || null,
+        })));
+    })
+);
+
+// POST /teams/:id/events/:eventId/attendance - Toggle attendance
+router.post(
+    "/teams/:id/events/:eventId/attendance",
+    asyncH(async (req, res) => {
+        const { id, eventId } = req.params;
+        const uid = getUserId(req);
+        const status = req.body.status || 'in';
+
+        // Verify membership
+        const memberCheck = await pool.query(
+            `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 AND status = 'accepted'`,
+            [id, uid]
+        );
+        if (memberCheck.rowCount === 0) {
+            return res.status(403).json({ error: "not_team_member" });
+        }
+
+        // Upsert attendance
+        await pool.query(
+            `INSERT INTO team_event_attendance (event_id, user_id, status, responded_at)
+             VALUES ($1, $2, $3, NOW())
+             ON CONFLICT (event_id, user_id) DO UPDATE SET status = $3, responded_at = NOW()`,
+            [eventId, uid, status]
+        );
+
+        // Return updated counts
+        const counts = await pool.query(
+            `SELECT 
+                (SELECT COUNT(*) FROM team_event_attendance WHERE event_id = $1 AND status = 'in') as in_count,
+                (SELECT COUNT(*) FROM team_event_attendance WHERE event_id = $1 AND status = 'out') as out_count`,
+            [eventId]
+        );
+
+        res.json({
+            success: true,
+            status,
+            inCount: Number(counts.rows[0]?.in_count || 0),
+            outCount: Number(counts.rows[0]?.out_count || 0),
+        });
+    })
+);
+
+// DELETE /teams/:id/events/:eventId - Delete a team event
+router.delete(
+    "/teams/:id/events/:eventId",
+    asyncH(async (req, res) => {
+        const { id, eventId } = req.params;
+        const uid = getUserId(req);
+
+        // Verify event exists and user is creator or team owner
+        const eventResult = await pool.query(
+            `SELECT e.created_by, t.owner_id 
+             FROM team_events e 
+             JOIN teams t ON t.id = e.team_id 
+             WHERE e.id = $1 AND e.team_id = $2`,
+            [eventId, id]
+        );
+
+        if (eventResult.rowCount === 0) {
+            return res.status(404).json({ error: "event_not_found" });
+        }
+
+        const ev = eventResult.rows[0];
+        if (ev.created_by !== uid && ev.owner_id !== uid) {
+            return res.status(403).json({ error: "not_authorized" });
+        }
+
+        // Delete attendance records first
+        await pool.query(`DELETE FROM team_event_attendance WHERE event_id = $1`, [eventId]);
+        // Delete event
+        await pool.query(`DELETE FROM team_events WHERE id = $1`, [eventId]);
+
+        res.json({ success: true });
+    })
+);
 
 // GET /teams/:id - Get team details
 router.get(
