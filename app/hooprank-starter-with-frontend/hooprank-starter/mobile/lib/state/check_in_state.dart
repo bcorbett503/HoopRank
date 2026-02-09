@@ -147,6 +147,12 @@ class CheckInState extends ChangeNotifier {
   // Set of player IDs the current user follows
   final Set<String> _followedPlayers = {};
   
+  // Set of team IDs the current user follows
+  final Set<String> _followedTeams = {};
+  
+  // Cached team names for followed teams (teamId -> teamName)
+  final Map<String, String> _followedTeamNames = {};
+  
   // Map of player ID -> their current status (what they're up to)
   final Map<String, PlayerStatus> _playerStatuses = {};
   
@@ -168,6 +174,7 @@ class CheckInState extends ChangeNotifier {
     await _loadFollowedCourts();
     await _loadAlertCourts();
     await _loadFollowedPlayers();
+    await _loadFollowedTeams();
     
     // Then sync with backend API (will overwrite local data if successful)
     await _syncFollowsFromApi();
@@ -230,12 +237,26 @@ class CheckInState extends ChangeNotifier {
         }
       }
       
+      // Update teams
+      final teams = data['teams'] as List? ?? [];
+      _followedTeams.clear();
+      _followedTeamNames.clear();
+      for (final t in teams) {
+        final teamId = t['teamId'] as String?;
+        final teamName = t['teamName'] as String?;
+        if (teamId != null) {
+          _followedTeams.add(teamId);
+          if (teamName != null) _followedTeamNames[teamId] = teamName;
+        }
+      }
+      
       // Save to local cache
       await _saveFollowedCourts();
       await _saveAlertCourts();
       await _saveFollowedPlayers();
+      await _saveFollowedTeams();
       
-      debugPrint('Synced follows from API: ${_followedCourts.length} courts, ${_followedPlayers.length} players');
+      debugPrint('Synced follows from API: ${_followedCourts.length} courts, ${_followedPlayers.length} players, ${_followedTeams.length} teams');
     } catch (e) {
       debugPrint('Error syncing follows from API (using local cache): $e');
     }
@@ -709,6 +730,99 @@ class CheckInState extends ChangeNotifier {
   
   /// Get number of followed players
   int get followedPlayerCount => _followedPlayers.length;
+  
+  // ==================== FOLLOW TEAM METHODS ====================
+  
+  /// Load followed teams from SharedPreferences
+  Future<void> _loadFollowedTeams() async {
+    if (_currentUserId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'user_${_currentUserId}_followed_teams';
+      final followed = prefs.getStringList(key) ?? [];
+      _followedTeams.addAll(followed);
+      
+      // Load cached team names
+      final namesKey = 'user_${_currentUserId}_followed_team_names';
+      final namesJson = prefs.getString(namesKey);
+      if (namesJson != null) {
+        final Map<String, dynamic> names = Map<String, dynamic>.from(
+          (namesJson.isNotEmpty) ? Map.castFrom(jsonDecode(namesJson)) : {},
+        );
+        names.forEach((k, v) => _followedTeamNames[k] = v.toString());
+      }
+    } catch (e) {
+      debugPrint('Error loading followed teams: $e');
+    }
+  }
+  
+  /// Save followed teams to SharedPreferences
+  Future<void> _saveFollowedTeams() async {
+    if (_currentUserId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'user_${_currentUserId}_followed_teams';
+      await prefs.setStringList(key, _followedTeams.toList());
+      
+      // Save team names cache
+      final namesKey = 'user_${_currentUserId}_followed_team_names';
+      await prefs.setString(namesKey, jsonEncode(_followedTeamNames));
+    } catch (e) {
+      debugPrint('Error saving followed teams: $e');
+    }
+  }
+  
+  /// Check if current user follows a team
+  bool isFollowingTeam(String teamId) {
+    return _followedTeams.contains(teamId);
+  }
+  
+  /// Follow a team
+  Future<void> followTeam(String teamId, {String? teamName}) async {
+    if (_followedTeams.contains(teamId)) return;
+    
+    _followedTeams.add(teamId);
+    if (teamName != null) _followedTeamNames[teamId] = teamName;
+    await _saveFollowedTeams();
+    notifyListeners();
+    
+    // Sync to backend
+    ApiService.followTeam(teamId);
+  }
+  
+  /// Unfollow a team
+  Future<void> unfollowTeam(String teamId) async {
+    if (!_followedTeams.contains(teamId)) return;
+    
+    _followedTeams.remove(teamId);
+    _followedTeamNames.remove(teamId);
+    await _saveFollowedTeams();
+    notifyListeners();
+    
+    // Sync to backend
+    ApiService.unfollowTeam(teamId);
+  }
+  
+  /// Toggle follow status for a team
+  Future<void> toggleFollowTeam(String teamId, {String? teamName}) async {
+    if (isFollowingTeam(teamId)) {
+      await unfollowTeam(teamId);
+    } else {
+      await followTeam(teamId, teamName: teamName);
+    }
+  }
+  
+  /// Get all followed teams
+  Set<String> get followedTeams => Set.unmodifiable(_followedTeams);
+  
+  /// Get number of followed teams
+  int get followedTeamCount => _followedTeams.length;
+  
+  /// Get cached team name for a followed team
+  String? getFollowedTeamName(String teamId) => _followedTeamNames[teamId];
+  
+  /// Get all followed team names as a map
+  Map<String, String> get followedTeamNames => Map.unmodifiable(_followedTeamNames);
   
   /// Get a player's name by ID (from any available source)
   String getPlayerName(String playerId) {

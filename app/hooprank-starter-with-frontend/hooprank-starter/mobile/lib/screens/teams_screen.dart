@@ -1,7 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import '../services/court_service.dart';
+import '../models.dart';
+import '../state/check_in_state.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
 import 'team_detail_screen.dart';
 
@@ -110,7 +115,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
     final nameController = TextEditingController();
     String teamType = '3v3';
+    String? ageGroup;
+    String? gender;
     File? selectedImage;
+
+    final ageGroups = ['U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'];
+    final genders = ['Mens', 'Womens', 'Coed'];
 
     showDialog(
       context: context,
@@ -156,6 +166,35 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                const Text('Age Group', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: ageGroups.map((ag) => ChoiceChip(
+                    label: Text(ag, style: const TextStyle(fontSize: 12)),
+                    selected: ageGroup == ag,
+                    onSelected: (_) => setDialogState(() => ageGroup = ageGroup == ag ? null : ag),
+                    selectedColor: Colors.teal,
+                    labelStyle: TextStyle(color: ageGroup == ag ? Colors.white : null),
+                    visualDensity: VisualDensity.compact,
+                  )).toList(),
+                ),
+                const SizedBox(height: 16),
+                const Text('Gender', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  children: genders.map((g) => ChoiceChip(
+                    label: Text(g, style: const TextStyle(fontSize: 12)),
+                    selected: gender == g,
+                    onSelected: (_) => setDialogState(() => gender = gender == g ? null : g),
+                    selectedColor: Colors.indigo,
+                    labelStyle: TextStyle(color: gender == g ? Colors.white : null),
+                    visualDensity: VisualDensity.compact,
+                  )).toList(),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   teamType == '3v3' ? 'Max 5 members' : 'Max 10 members',
@@ -173,7 +212,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               onPressed: () async {
                 if (nameController.text.trim().isEmpty) return;
                 Navigator.pop(context);
-                await _createTeam(nameController.text.trim(), teamType, selectedImage);
+                await _createTeam(nameController.text.trim(), teamType, selectedImage, ageGroup: ageGroup, gender: gender);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepOrange,
@@ -187,9 +226,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     );
   }
 
-  Future<void> _createTeam(String name, String teamType, File? logoImage) async {
+  Future<void> _createTeam(String name, String teamType, File? logoImage, {String? ageGroup, String? gender}) async {
     try {
-      final team = await ApiService.createTeam(name: name, teamType: teamType);
+      final team = await ApiService.createTeam(name: name, teamType: teamType, ageGroup: ageGroup, gender: gender);
       if (team != null && mounted) {
         if (logoImage != null) {
           await ApiService.uploadImage(type: 'team', targetId: team['id'], imageFile: logoImage);
@@ -274,7 +313,288 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   }
 
   // ==============================
-  // Add Practice / Add Game dialogs
+  // Court search helper
+  // ==============================
+  List<Court> _getFollowedCourts() {
+    try {
+      final checkInState = Provider.of<CheckInState>(context, listen: false);
+      final courtService = Provider.of<CourtService>(context, listen: false);
+      final followedIds = checkInState.followedCourts;
+      final courts = <Court>[];
+      for (final id in followedIds) {
+        final c = courtService.getCourtById(id);
+        if (c != null) courts.add(c);
+      }
+      return courts;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  List<Court> _searchCourts(String query) {
+    try {
+      final courtService = Provider.of<CourtService>(context, listen: false);
+      return courtService.searchCourts(query).take(5).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ==============================
+  // Shared: Court picker widget builder (status-composer style)
+  // ==============================
+  Widget _buildCourtPicker({
+    required Court? selectedCourt,
+    required String searchQuery,
+    required List<Court> searchResults,
+    required TextEditingController searchController,
+    required void Function(Court?) onCourtSelected,
+    required void Function(String) onSearchChanged,
+    required void Function(void Function()) setState,
+  }) {
+    final followedCourts = _getFollowedCourts();
+    final hasOverflow = followedCourts.length >= 3;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Section header
+        Row(
+          children: [
+            Icon(Icons.favorite, size: 14, color: Colors.redAccent.withOpacity(0.7)),
+            const SizedBox(width: 6),
+            const Text('Your courts:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+            if (hasOverflow) ...[
+              const Spacer(),
+              Text('scroll ↕', style: TextStyle(color: Colors.white.withOpacity(0.25), fontSize: 10, fontStyle: FontStyle.italic)),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Selected court badge
+        if (selectedCourt != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.green.withOpacity(0.4)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle, size: 16, color: Colors.green),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    selectedCourt.name,
+                    style: const TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => setState(() => onCourtSelected(null)),
+                  child: const Icon(Icons.close, size: 16, color: Colors.green),
+                ),
+              ],
+            ),
+          ),
+
+        // Bounded scrollable box with followed courts
+        if (selectedCourt == null && followedCourts.isNotEmpty)
+          Container(
+            constraints: const BoxConstraints(maxHeight: 120),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              color: Colors.white.withOpacity(0.03),
+            ),
+            child: ScrollbarTheme(
+              data: ScrollbarThemeData(
+                thumbColor: WidgetStateProperty.all(Colors.white.withOpacity(0.2)),
+                radius: const Radius.circular(4),
+                thickness: WidgetStateProperty.all(3.0),
+              ),
+              child: Scrollbar(
+                thumbVisibility: hasOverflow,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: followedCourts.take(5).map((court) => ActionChip(
+                      avatar: const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                      label: Text(
+                        court.name,
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      backgroundColor: Colors.blue.withOpacity(0.15),
+                      side: BorderSide(color: Colors.blue.withOpacity(0.3)),
+                      onPressed: () => setState(() {
+                        onCourtSelected(court);
+                        searchController.clear();
+                        onSearchChanged('');
+                      }),
+                    )).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // Search field
+        if (selectedCourt == null) ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Search other courts...',
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+              prefixIcon: Icon(Icons.search, size: 18, color: Colors.white.withOpacity(0.3)),
+              suffixIcon: searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () => setState(() {
+                        searchController.clear();
+                        onSearchChanged('');
+                      }),
+                    )
+                  : null,
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.04),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white.withOpacity(0.06))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.blue.withOpacity(0.4))),
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+            style: const TextStyle(fontSize: 13),
+            onChanged: onSearchChanged,
+          ),
+
+          // Search results
+          if (searchResults.isNotEmpty)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 120),
+              margin: const EdgeInsets.only(top: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blue.withOpacity(0.15)),
+                color: Colors.white.withOpacity(0.03),
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: searchResults.length,
+                itemBuilder: (context, i) {
+                  final court = searchResults[i];
+                  return ListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    leading: Icon(court.isIndoor ? Icons.roofing : Icons.park, size: 18, color: Colors.blue),
+                    title: Text(court.name, style: const TextStyle(fontSize: 13)),
+                    subtitle: court.address != null
+                        ? Text(court.address!, style: TextStyle(fontSize: 11, color: Colors.grey[500]))
+                        : null,
+                    onTap: () => setState(() {
+                      onCourtSelected(court);
+                      searchController.clear();
+                      onSearchChanged('');
+                    }),
+                  );
+                },
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  // ==============================
+  // Shared: Inline date & time pickers
+  // ==============================
+  Widget _buildInlineDatePicker(DateTime selectedDate, void Function(DateTime) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
+            const SizedBox(width: 6),
+            Text(
+              DateFormat('EEEE, MMM d').format(selectedDate),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.blue),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 120,
+          child: CupertinoTheme(
+            data: const CupertinoThemeData(
+              brightness: Brightness.dark,
+              textTheme: CupertinoTextThemeData(
+                dateTimePickerTextStyle: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ),
+            child: CupertinoDatePicker(
+              mode: CupertinoDatePickerMode.date,
+              initialDateTime: selectedDate,
+              minimumDate: DateTime.now().subtract(const Duration(hours: 1)),
+              maximumDate: DateTime.now().add(const Duration(days: 365)),
+              onDateTimeChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInlineTimePicker(TimeOfDay selectedTime, void Function(DateTime) onChanged) {
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, selectedTime.hour, selectedTime.minute);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.access_time, size: 16, color: Colors.orange),
+            const SizedBox(width: 6),
+            Text(
+              DateFormat('h:mm a').format(dt),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.orange),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 120,
+          child: CupertinoTheme(
+            data: const CupertinoThemeData(
+              brightness: Brightness.dark,
+              textTheme: CupertinoTextThemeData(
+                dateTimePickerTextStyle: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ),
+            child: CupertinoDatePicker(
+              mode: CupertinoDatePickerMode.time,
+              initialDateTime: dt,
+              use24hFormat: false,
+              minuteInterval: 5,
+              onDateTimeChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==============================
+  // Add Practice (full-screen sheet)
   // ==============================
   void _showAddPracticeDialog() {
     if (_myTeams.isEmpty) {
@@ -285,143 +605,218 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     }
 
     final titleController = TextEditingController(text: 'Practice');
-    final locationController = TextEditingController();
+    final courtSearchController = TextEditingController();
     final notesController = TextEditingController();
     DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
     TimeOfDay selectedTime = const TimeOfDay(hour: 18, minute: 0);
     String? recurrence;
     String selectedTeamId = _myTeams.first['id']?.toString() ?? '';
+    Court? selectedCourt;
+    List<Court> courtSearchResults = [];
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.fitness_center, color: Colors.green, size: 24),
-              SizedBox(width: 8),
-              Text('Add Practice'),
-            ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Container(
+          height: MediaQuery.of(context).size.height * 0.92,
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Team selector (if multiple teams)
-                if (_myTeams.length > 1) ...[
-                  DropdownButtonFormField<String>(
-                    value: selectedTeamId,
-                    decoration: const InputDecoration(labelText: 'Team'),
-                    items: _myTeams.map((t) => DropdownMenuItem(
-                      value: t['id']?.toString(),
-                      child: Text(t['name'] ?? 'Team'),
-                    )).toList(),
-                    onChanged: (v) => setDialogState(() => selectedTeamId = v ?? selectedTeamId),
-                  ),
-                  const SizedBox(height: 12),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(sheetContext),
+              ),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.fitness_center, color: Colors.green, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('Add Practice', style: TextStyle(color: Colors.white, fontSize: 16)),
                 ],
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                ),
-                const SizedBox(height: 12),
-                // Date picker
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today, size: 20),
-                  title: Text(DateFormat('EEE, MMM d').format(selectedDate)),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) setDialogState(() => selectedDate = picked);
-                  },
-                ),
-                // Time picker
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.access_time, size: 20),
-                  title: Text(selectedTime.format(context)),
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: selectedTime,
-                    );
-                    if (picked != null) setDialogState(() => selectedTime = picked);
-                  },
-                ),
-                TextField(
-                  controller: locationController,
-                  decoration: const InputDecoration(labelText: 'Location (optional)', hintText: 'e.g. City Gym'),
-                ),
-                const SizedBox(height: 12),
-                // Recurrence
-                DropdownButtonFormField<String?>(
-                  value: recurrence,
-                  decoration: const InputDecoration(labelText: 'Repeat'),
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('None')),
-                    DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                    DropdownMenuItem(value: 'biweekly', child: Text('Every 2 Weeks')),
-                    DropdownMenuItem(value: 'daily', child: Text('Daily')),
-                  ],
-                  onChanged: (v) => setDialogState(() => recurrence = v),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(labelText: 'Notes (optional)'),
-                  maxLines: 2,
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(sheetContext);
+                      final eventDate = DateTime(
+                        selectedDate.year, selectedDate.month, selectedDate.day,
+                        selectedTime.hour, selectedTime.minute,
+                      );
+                      try {
+                        await ApiService.createTeamEvent(
+                          teamId: selectedTeamId,
+                          type: 'practice',
+                          title: titleController.text.trim().isEmpty ? 'Practice' : titleController.text.trim(),
+                          eventDate: eventDate.toUtc().toIso8601String(),
+                          locationName: selectedCourt?.name ?? null,
+                          courtId: selectedCourt?.id,
+                          recurrenceRule: recurrence,
+                          notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                        );
+                        _loadData();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Practice added!')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to create practice: $e')),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    child: const Text('Create'),
+                  ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                final eventDate = DateTime(
-                  selectedDate.year, selectedDate.month, selectedDate.day,
-                  selectedTime.hour, selectedTime.minute,
-                );
-                try {
-                  await ApiService.createTeamEvent(
-                    teamId: selectedTeamId,
-                    type: 'practice',
-                    title: titleController.text.trim().isEmpty ? 'Practice' : titleController.text.trim(),
-                    eventDate: eventDate.toUtc().toIso8601String(),
-                    locationName: locationController.text.trim().isEmpty ? null : locationController.text.trim(),
-                    recurrenceRule: recurrence,
-                    notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                  );
-                  _loadData();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Practice added!')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to create practice: $e')),
-                    );
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-              child: const Text('Create'),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Court picker (status-composer style)
+                  _buildCourtPicker(
+                    selectedCourt: selectedCourt,
+                    searchQuery: courtSearchController.text,
+                    searchResults: courtSearchResults,
+                    searchController: courtSearchController,
+                    onCourtSelected: (court) { selectedCourt = court; },
+                    onSearchChanged: (query) {
+                      courtSearchResults = query.isEmpty ? [] : _searchCourts(query);
+                    },
+                    setState: setSheetState,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Date picker
+                  _buildInlineDatePicker(selectedDate, (dt) {
+                    setSheetState(() => selectedDate = dt);
+                  }),
+                  const SizedBox(height: 12),
+
+                  // Time picker
+                  _buildInlineTimePicker(selectedTime, (dt) {
+                    setSheetState(() => selectedTime = TimeOfDay(hour: dt.hour, minute: dt.minute));
+                  }),
+                  const SizedBox(height: 20),
+
+                  // Team selector
+                  if (_myTeams.length > 1) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.groups, size: 14, color: Colors.green.withOpacity(0.7)),
+                        const SizedBox(width: 6),
+                        const Text('Team:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      value: selectedTeamId,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.04),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      items: _myTeams.map((t) => DropdownMenuItem(
+                        value: t['id']?.toString(),
+                        child: Text(t['name'] ?? 'Team', style: const TextStyle(fontSize: 13)),
+                      )).toList(),
+                      onChanged: (v) => setSheetState(() => selectedTeamId = v ?? selectedTeamId),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Recurrence
+                  Row(
+                    children: [
+                      Icon(Icons.repeat, size: 14, color: Colors.orange.withOpacity(0.7)),
+                      const SizedBox(width: 6),
+                      const Text('Repeat:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String?>(
+                    value: recurrence,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('None', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(value: 'weekly', child: Text('Weekly', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(value: 'biweekly', child: Text('Every 2 Weeks', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(value: 'daily', child: Text('Daily', style: TextStyle(fontSize: 13))),
+                    ],
+                    onChanged: (v) => setSheetState(() => recurrence = v),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Title
+                  TextField(
+                    controller: titleController,
+                    decoration: InputDecoration(
+                      hintText: 'Title',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Notes
+                  TextField(
+                    controller: notesController,
+                    decoration: InputDecoration(
+                      hintText: 'Notes (optional)',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  // ==============================
+  // Add Game (full-screen sheet)
+  // ==============================
   void _showAddGameDialog() {
     if (_myTeams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -431,130 +826,338 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     }
 
     final titleController = TextEditingController();
-    final locationController = TextEditingController();
+    final courtSearchController = TextEditingController();
     final opponentController = TextEditingController();
     final notesController = TextEditingController();
     DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
     TimeOfDay selectedTime = const TimeOfDay(hour: 18, minute: 0);
     String selectedTeamId = _myTeams.first['id']?.toString() ?? '';
+    Court? selectedCourt;
+    List<Court> courtSearchResults = [];
+    String? selectedOpponentId;
+    String? selectedOpponentName;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.sports_basketball, color: Colors.purple, size: 24),
-              SizedBox(width: 8),
-              Text('Add Game'),
-            ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Container(
+          height: MediaQuery.of(context).size.height * 0.92,
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_myTeams.length > 1) ...[
-                  DropdownButtonFormField<String>(
-                    value: selectedTeamId,
-                    decoration: const InputDecoration(labelText: 'Your Team'),
-                    items: _myTeams.map((t) => DropdownMenuItem(
-                      value: t['id']?.toString(),
-                      child: Text(t['name'] ?? 'Team'),
-                    )).toList(),
-                    onChanged: (v) => setDialogState(() => selectedTeamId = v ?? selectedTeamId),
-                  ),
-                  const SizedBox(height: 12),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(sheetContext),
+              ),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sports_basketball, color: Colors.purple, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('Add Game', style: TextStyle(color: Colors.white, fontSize: 16)),
                 ],
-                TextField(
-                  controller: opponentController,
-                  decoration: const InputDecoration(labelText: 'Opponent Team Name', hintText: 'e.g. Lakers'),
-                ),
-                const SizedBox(height: 12),
-                // Date picker
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today, size: 20),
-                  title: Text(DateFormat('EEE, MMM d').format(selectedDate)),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) setDialogState(() => selectedDate = picked);
-                  },
-                ),
-                // Time picker
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.access_time, size: 20),
-                  title: Text(selectedTime.format(context)),
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: selectedTime,
-                    );
-                    if (picked != null) setDialogState(() => selectedTime = picked);
-                  },
-                ),
-                TextField(
-                  controller: locationController,
-                  decoration: const InputDecoration(labelText: 'Location (optional)', hintText: 'e.g. Downtown Court'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Title (optional)', hintText: 'e.g. Semifinal'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(labelText: 'Notes (optional)'),
-                  maxLines: 2,
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(sheetContext);
+                      final opponent = selectedOpponentName ?? opponentController.text.trim();
+                      final eventDate = DateTime(
+                        selectedDate.year, selectedDate.month, selectedDate.day,
+                        selectedTime.hour, selectedTime.minute,
+                      );
+                      try {
+                        await ApiService.createTeamEvent(
+                          teamId: selectedTeamId,
+                          type: 'game',
+                          title: titleController.text.trim().isEmpty ? 'vs ${opponent.isEmpty ? "TBD" : opponent}' : titleController.text.trim(),
+                          eventDate: eventDate.toUtc().toIso8601String(),
+                          locationName: selectedCourt?.name ?? null,
+                          courtId: selectedCourt?.id,
+                          opponentTeamId: selectedOpponentId,
+                          opponentTeamName: opponent.isEmpty ? null : opponent,
+                          notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                        );
+                        _loadData();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Game added!')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to create game: $e')),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    child: const Text('Create'),
+                  ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                final opponent = opponentController.text.trim();
-                final eventDate = DateTime(
-                  selectedDate.year, selectedDate.month, selectedDate.day,
-                  selectedTime.hour, selectedTime.minute,
-                );
-                try {
-                  await ApiService.createTeamEvent(
-                    teamId: selectedTeamId,
-                    type: 'game',
-                    title: titleController.text.trim().isEmpty ? 'vs ${opponent.isEmpty ? "TBD" : opponent}' : titleController.text.trim(),
-                    eventDate: eventDate.toUtc().toIso8601String(),
-                    locationName: locationController.text.trim().isEmpty ? null : locationController.text.trim(),
-                    opponentTeamName: opponent.isEmpty ? null : opponent,
-                    notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                  );
-                  _loadData();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Game added!')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to create game: $e')),
-                    );
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white),
-              child: const Text('Create'),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Court picker (status-composer style)
+                  _buildCourtPicker(
+                    selectedCourt: selectedCourt,
+                    searchQuery: courtSearchController.text,
+                    searchResults: courtSearchResults,
+                    searchController: courtSearchController,
+                    onCourtSelected: (court) { selectedCourt = court; },
+                    onSearchChanged: (query) {
+                      courtSearchResults = query.isEmpty ? [] : _searchCourts(query);
+                    },
+                    setState: setSheetState,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Opponent section — bounded box with followed teams
+                  Row(
+                    children: [
+                      Icon(Icons.sports_basketball, size: 14, color: Colors.purple.withOpacity(0.7)),
+                      const SizedBox(width: 6),
+                      const Text('Opponent:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Selected opponent badge
+                  if (selectedOpponentName != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.purple.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check_circle, size: 16, color: Colors.purple),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'vs $selectedOpponentName',
+                              style: const TextStyle(color: Colors.purple, fontSize: 13, fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => setSheetState(() {
+                              selectedOpponentName = null;
+                              selectedOpponentId = null;
+                              opponentController.clear();
+                            }),
+                            child: const Icon(Icons.close, size: 16, color: Colors.purple),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Followed teams bounded box
+                  if (selectedOpponentName == null)
+                    Builder(builder: (_) {
+                      final checkInState = Provider.of<CheckInState>(context, listen: false);
+                      final teamNames = checkInState.followedTeamNames;
+                      if (teamNames.isEmpty) return const SizedBox.shrink();
+                      final hasOverflow = teamNames.length >= 3;
+                      return Container(
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          color: Colors.white.withOpacity(0.03),
+                        ),
+                        child: ScrollbarTheme(
+                          data: ScrollbarThemeData(
+                            thumbColor: WidgetStateProperty.all(Colors.white.withOpacity(0.2)),
+                            radius: const Radius.circular(4),
+                            thickness: WidgetStateProperty.all(3.0),
+                          ),
+                          child: Scrollbar(
+                            thumbVisibility: hasOverflow,
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: teamNames.entries.map((entry) => ActionChip(
+                                  avatar: const Icon(Icons.groups, size: 16, color: Colors.purple),
+                                  label: Text(
+                                    entry.value,
+                                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  backgroundColor: Colors.purple.withOpacity(0.15),
+                                  side: BorderSide(color: Colors.purple.withOpacity(0.3)),
+                                  onPressed: () => setSheetState(() {
+                                    selectedOpponentId = entry.key;
+                                    selectedOpponentName = entry.value;
+                                    opponentController.clear();
+                                  }),
+                                )).toList(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+
+                  // Search/custom opponent input
+                  if (selectedOpponentName == null) ...[
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: opponentController,
+                      decoration: InputDecoration(
+                        hintText: 'Search or type team name...',
+                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                        prefixIcon: Icon(Icons.search, size: 18, color: Colors.white.withOpacity(0.3)),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.04),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white.withOpacity(0.06))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.purple.withOpacity(0.4))),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                      onSubmitted: (value) {
+                        if (value.trim().isNotEmpty) {
+                          setSheetState(() {
+                            selectedOpponentName = value.trim();
+                            selectedOpponentId = null;
+                          });
+                        }
+                      },
+                    ),
+                    if (opponentController.text.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: InkWell(
+                          onTap: () => setSheetState(() {
+                            selectedOpponentName = opponentController.text.trim();
+                            selectedOpponentId = null;
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                              color: Colors.purple.withOpacity(0.06),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.add, size: 16, color: Colors.purple),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Use "${opponentController.text.trim()}"',
+                                  style: const TextStyle(fontSize: 13, color: Colors.purple),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                  const SizedBox(height: 20),
+
+                  // Date picker
+                  _buildInlineDatePicker(selectedDate, (dt) {
+                    setSheetState(() => selectedDate = dt);
+                  }),
+                  const SizedBox(height: 12),
+
+                  // Time picker
+                  _buildInlineTimePicker(selectedTime, (dt) {
+                    setSheetState(() => selectedTime = TimeOfDay(hour: dt.hour, minute: dt.minute));
+                  }),
+                  const SizedBox(height: 20),
+
+                  // Team selector
+                  if (_myTeams.length > 1) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.groups, size: 14, color: Colors.purple.withOpacity(0.7)),
+                        const SizedBox(width: 6),
+                        const Text('Your team:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      value: selectedTeamId,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.04),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      items: _myTeams.map((t) => DropdownMenuItem(
+                        value: t['id']?.toString(),
+                        child: Text(t['name'] ?? 'Team', style: const TextStyle(fontSize: 13)),
+                      )).toList(),
+                      onChanged: (v) => setSheetState(() => selectedTeamId = v ?? selectedTeamId),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Title
+                  TextField(
+                    controller: titleController,
+                    decoration: InputDecoration(
+                      hintText: 'Title (optional) e.g. Semifinal',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Notes
+                  TextField(
+                    controller: notesController,
+                    decoration: InputDecoration(
+                      hintText: 'Notes (optional)',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -771,6 +1374,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   Widget _buildTeamCard(Map<String, dynamic> team) {
     final isOwner = team['isOwner'] == true;
     final teamType = team['teamType'] ?? '3v3';
+    final ageGroup = team['ageGroup'];
+    final gender = team['gender'];
     final ratingValue = team['rating'];
     final rating = ratingValue is num ? ratingValue.toDouble() : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0);
     final winsValue = team['wins'];
@@ -822,6 +1427,30 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         ),
                       ),
                     ),
+                    if (ageGroup != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                        ),
+                        child: Text(ageGroup, style: TextStyle(color: Colors.teal[300], fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                    if (gender != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.indigo.withOpacity(0.3)),
+                        ),
+                        child: Text(gender, style: TextStyle(color: Colors.indigo[300], fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -1084,11 +1713,30 @@ class _TeamRankingsWithFilter extends StatefulWidget {
 class _TeamRankingsWithFilterState extends State<_TeamRankingsWithFilter> {
   List<Map<String, dynamic>> _teams = [];
   bool _isLoading = true;
+  String? _selectedAgeGroup;
+  String? _selectedGender;
+  String? _myTeamId; // User's team id for challenges
+
+  final _ageGroups = ['U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'];
+  final _genders = ['Mens', 'Womens', 'Coed'];
 
   @override
   void initState() {
     super.initState();
+    _loadMyTeam();
     _loadTeams();
+  }
+
+  Future<void> _loadMyTeam() async {
+    try {
+      final teams = await ApiService.getMyTeams();
+      final matching = teams.where((t) => t['teamType'] == widget.teamType).toList();
+      if (matching.isNotEmpty && mounted) {
+        setState(() => _myTeamId = matching.first['id']);
+      }
+    } catch (e) {
+      debugPrint('Error loading my team: $e');
+    }
   }
 
   Future<void> _loadTeams() async {
@@ -1097,6 +1745,8 @@ class _TeamRankingsWithFilterState extends State<_TeamRankingsWithFilter> {
       final teams = await ApiService.getTeamRankings(
         teamType: widget.teamType,
         scope: 'local',
+        ageGroup: _selectedAgeGroup,
+        gender: _selectedGender,
       );
       if (mounted) {
         setState(() {
@@ -1110,122 +1760,215 @@ class _TeamRankingsWithFilterState extends State<_TeamRankingsWithFilter> {
     }
   }
 
+  Future<void> _challengeTeam(Map<String, dynamic> opponent) async {
+    if (_myTeamId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Create a team first to send challenges!')),
+      );
+      return;
+    }
+    if (_myTeamId == opponent['id']) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You can't challenge your own team")),
+      );
+      return;
+    }
+    try {
+      await ApiService.challengeTeam(
+        teamId: _myTeamId!,
+        opponentTeamId: opponent['id'],
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Challenge sent to ${opponent['name']}!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Challenge failed: ${e.toString().replaceAll('Exception: ', '')}')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.teamType} Teams - Local'),
+        title: Text('${widget.teamType} Teams'),
         backgroundColor: widget.teamType == '3v3' ? Colors.blue : Colors.purple,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _teams.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.groups, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text('No ${widget.teamType} teams nearby', style: TextStyle(fontSize: 18, color: Colors.grey[600])),
-                      const SizedBox(height: 8),
-                      Text('Be the first to challenge!', style: TextStyle(color: Colors.grey[500])),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadTeams,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _teams.length,
-                    itemBuilder: (context, index) {
-                      final team = _teams[index];
-                      final rv = team['rating'];
-                      final rating = rv is num ? rv.toDouble() : (double.tryParse(rv?.toString() ?? '') ?? 3.0);
-                      final wv = team['wins'];
-                      final wins = wv is int ? wv : (int.tryParse(wv?.toString() ?? '') ?? 0);
-                      final lv = team['losses'];
-                      final losses = lv is int ? lv : (int.tryParse(lv?.toString() ?? '') ?? 0);
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[900],
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withOpacity(0.05)),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
+      body: Column(
+        children: [
+          // Filter chips row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: Colors.grey[900],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ..._ageGroups.map((ag) => Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: FilterChip(
+                      label: Text(ag, style: const TextStyle(fontSize: 11)),
+                      selected: _selectedAgeGroup == ag,
+                      onSelected: (_) {
+                        setState(() => _selectedAgeGroup = _selectedAgeGroup == ag ? null : ag);
+                        _loadTeams();
+                      },
+                      selectedColor: Colors.teal,
+                      labelStyle: TextStyle(color: _selectedAgeGroup == ag ? Colors.white : null),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )),
+                  const SizedBox(width: 8),
+                  ..._genders.map((g) => Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: FilterChip(
+                      label: Text(g, style: const TextStyle(fontSize: 11)),
+                      selected: _selectedGender == g,
+                      onSelected: (_) {
+                        setState(() => _selectedGender = _selectedGender == g ? null : g);
+                        _loadTeams();
+                      },
+                      selectedColor: Colors.indigo,
+                      labelStyle: TextStyle(color: _selectedGender == g ? Colors.white : null),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )),
+                ],
+              ),
+            ),
+          ),
+          // Team list
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _teams.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.groups, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text('No ${widget.teamType} teams found', style: TextStyle(fontSize: 18, color: Colors.grey[600])),
+                            const SizedBox(height: 8),
+                            Text('Be the first to challenge!', style: TextStyle(color: Colors.grey[500])),
                           ],
                         ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () {},
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: widget.teamType == '3v3'
-                                          ? Colors.blue.withOpacity(0.2)
-                                          : Colors.purple.withOpacity(0.2),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '${index + 1}',
-                                        style: TextStyle(
-                                          color: widget.teamType == '3v3' ? Colors.blue : Colors.purple,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadTeams,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _teams.length,
+                          itemBuilder: (context, index) {
+                            final team = _teams[index];
+                            final rv = team['rating'];
+                            final rating = rv is num ? rv.toDouble() : (double.tryParse(rv?.toString() ?? '') ?? 3.0);
+                            final wv = team['wins'];
+                            final wins = wv is int ? wv : (int.tryParse(wv?.toString() ?? '') ?? 0);
+                            final lv = team['losses'];
+                            final losses = lv is int ? lv : (int.tryParse(lv?.toString() ?? '') ?? 0);
+                            final ageGroup = team['ageGroup'];
+                            final gender = team['gender'];
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[900],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () {
+                                    Navigator.push(context, MaterialPageRoute(
+                                      builder: (_) => TeamDetailScreen(teamId: team['id']),
+                                    ));
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Row(
                                       children: [
-                                        Text(
-                                          team['name'] ?? 'Team',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: widget.teamType == '3v3'
+                                                ? Colors.blue.withOpacity(0.2)
+                                                : Colors.purple.withOpacity(0.2),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '${index + 1}',
+                                              style: TextStyle(
+                                                color: widget.teamType == '3v3' ? Colors.blue : Colors.purple,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '⭐ ${rating.toStringAsFixed(2)} • $wins W - $losses L',
-                                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                team['name'] ?? 'Team',
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  Text(
+                                                    '⭐ ${rating.toStringAsFixed(2)} • $wins W - $losses L',
+                                                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                                  ),
+                                                  if (ageGroup != null) ...[
+                                                    const SizedBox(width: 6),
+                                                    Text(ageGroup, style: TextStyle(color: Colors.teal[300], fontSize: 10, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                  if (gender != null) ...[
+                                                    const SizedBox(width: 4),
+                                                    Text(gender, style: TextStyle(color: Colors.indigo[300], fontSize: 10, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => _challengeTeam(team),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.deepOrange,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            elevation: 0,
+                                          ),
+                                          child: const Text('Challenge'),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Challenge sent to ${team['name']}!')),
-                                      );
-                                      Navigator.pop(context);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.deepOrange,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      elevation: 0,
-                                    ),
-                                    child: const Text('Challenge'),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                ),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }

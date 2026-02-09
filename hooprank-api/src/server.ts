@@ -730,6 +730,16 @@ app.get(
       [uid]
     );
 
+    // Get followed teams
+    const teamsResult = await pool.query(
+      `SELECT ft.team_id, t.name as team_name, t.team_type, t.logo_url, ft.created_at 
+       FROM user_followed_teams ft
+       LEFT JOIN teams t ON t.id = ft.team_id
+       WHERE ft.user_id = $1 
+       ORDER BY ft.created_at DESC`,
+      [uid]
+    );
+
     res.json({
       courts: courtsResult.rows.map(r => ({
         courtId: r.court_id,
@@ -738,6 +748,13 @@ app.get(
       })),
       players: playersResult.rows.map(r => ({
         playerId: r.player_id,
+        createdAt: r.created_at,
+      })),
+      teams: teamsResult.rows.map(r => ({
+        teamId: r.team_id,
+        teamName: r.team_name,
+        teamType: r.team_type,
+        logoUrl: r.logo_url,
         createdAt: r.created_at,
       })),
     });
@@ -836,6 +853,44 @@ app.delete(
     await pool.query(
       `DELETE FROM user_followed_players WHERE user_id = $1 AND player_id = $2`,
       [uid, playerId]
+    );
+
+    res.json({ success: true });
+  })
+);
+
+// POST /users/me/follows/teams - Follow a team
+app.post(
+  "/users/me/follows/teams",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { teamId } = req.body;
+
+    if (!teamId) {
+      return res.status(400).json({ error: "teamId required" });
+    }
+
+    await pool.query(
+      `INSERT INTO user_followed_teams (user_id, team_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, team_id) DO NOTHING`,
+      [uid, teamId]
+    );
+
+    res.json({ success: true });
+  })
+);
+
+// DELETE /users/me/follows/teams/:teamId - Unfollow a team
+app.delete(
+  "/users/me/follows/teams/:teamId",
+  asyncH(async (req, res) => {
+    const uid = getUserId(req);
+    const { teamId } = req.params;
+
+    await pool.query(
+      `DELETE FROM user_followed_teams WHERE user_id = $1 AND team_id = $2`,
+      [uid, teamId]
     );
 
     res.json({ success: true });
@@ -3437,8 +3492,17 @@ async function ensureFollowTables() {
       )
     `);
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_followed_teams (
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        team_id UUID NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (user_id, team_id)
+      )
+    `);
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_followed_courts_user ON user_followed_courts(user_id);
       CREATE INDEX IF NOT EXISTS idx_followed_players_user ON user_followed_players(user_id);
+      CREATE INDEX IF NOT EXISTS idx_followed_teams_user ON user_followed_teams(user_id);
     `);
 
     // Team events tables (practices & games)

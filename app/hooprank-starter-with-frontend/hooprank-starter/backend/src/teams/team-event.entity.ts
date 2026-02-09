@@ -42,6 +42,9 @@ export class TeamEvent {
     @Column({ type: 'text', nullable: true })
     notes: string | null;
 
+    @Column({ name: 'match_id', type: 'uuid', nullable: true })
+    matchId: string | null;
+
     @Column({ name: 'created_by', type: 'text' })
     createdBy: string;
 

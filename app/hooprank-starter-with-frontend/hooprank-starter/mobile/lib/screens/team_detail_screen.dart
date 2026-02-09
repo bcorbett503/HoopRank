@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import '../state/check_in_state.dart';
 import '../widgets/player_profile_sheet.dart';
 
 /// Team detail screen showing roster and team info
@@ -196,10 +198,27 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     final acceptedMembers = members.where((m) => m['status'] == 'accepted').toList();
     final pendingMembers = members.where((m) => m['status'] == 'pending').toList();
 
+    final checkInState = Provider.of<CheckInState>(context);
+    final isFollowing = checkInState.isFollowingTeam(widget.teamId);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(team['name'] ?? 'Team'),
         actions: [
+          // Follow/unfollow button
+          IconButton(
+            icon: Icon(
+              isFollowing ? Icons.favorite : Icons.favorite_border,
+              color: isFollowing ? Colors.redAccent : null,
+            ),
+            tooltip: isFollowing ? 'Unfollow team' : 'Follow team',
+            onPressed: () {
+              checkInState.toggleFollowTeam(
+                widget.teamId,
+                teamName: team['name'],
+              );
+            },
+          ),
           if (isOwner)
             IconButton(
               icon: const Icon(Icons.delete),
@@ -288,6 +307,33 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
+                    if (team['ageGroup'] != null || team['gender'] != null) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (team['ageGroup'] != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              margin: const EdgeInsets.only(right: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(team['ageGroup'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          if (team['gender'] != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(team['gender'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Text(
                       team['name'] ?? 'Team',
@@ -383,6 +429,74 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                   itemCount: pendingMembers.length,
                   itemBuilder: (context, index) => _buildMemberTile(pendingMembers[index], isPending: true),
                 ),
+              ],
+
+              // Recent Matches section
+              if (team['recentMatches'] != null && (team['recentMatches'] as List).isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'Recent Matches',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...((team['recentMatches'] as List).map<Widget>((match) {
+                  final won = match['won'] == true;
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: won ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: won ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          won ? Icons.emoji_events : Icons.close,
+                          color: won ? Colors.green : Colors.red,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'vs ${match['creatorTeamName'] == team['name'] ? match['opponentTeamName'] : match['creatorTeamName']}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${match['scoreCreator']} - ${match['scoreOpponent']}',
+                                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: won ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            won ? 'WIN' : 'LOSS',
+                            style: TextStyle(
+                              color: won ? Colors.green : Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList()),
               ],
 
               const SizedBox(height: 80), // Space for FAB

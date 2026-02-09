@@ -1213,6 +1213,37 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                     ],
                   ),
                 ),
+                // Follow heart button
+                Consumer<CheckInState>(
+                  builder: (context, checkInState, _) {
+                    final teamId = team['id']?.toString() ?? '';
+                    final isOwnTeam = _myTeams.any((t) => t['id'] == team['id']);
+                    final isFollowing = checkInState.isFollowingTeam(teamId);
+                    // Auto-follow own team
+                    if (isOwnTeam && !isFollowing) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        checkInState.followTeam(teamId, teamName: team['name']?.toString());
+                      });
+                    }
+                    return IconButton(
+                      icon: Icon(
+                        (isFollowing || isOwnTeam) ? Icons.favorite : Icons.favorite_border,
+                        size: 20,
+                      ),
+                      color: (isFollowing || isOwnTeam) ? Colors.red : Colors.white30,
+                      tooltip: isOwnTeam ? 'Your team' : (isFollowing ? 'Unfollow' : 'Follow'),
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                      onPressed: isOwnTeam ? null : () {
+                        if (isFollowing) {
+                          checkInState.unfollowTeam(teamId);
+                        } else {
+                          checkInState.followTeam(teamId, teamName: team['name']?.toString());
+                        }
+                      },
+                    );
+                  },
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [

@@ -15,6 +15,12 @@ export class Team {
     @Column({ name: 'team_type', type: 'text' })
     teamType: string; // '3v3' or '5v5'
 
+    @Column({ name: 'age_group', type: 'text', nullable: true })
+    ageGroup: string; // 'U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'
+
+    @Column({ type: 'text', nullable: true })
+    gender: string; // 'Mens', 'Womens', 'Coed'
+
     @Column({ name: 'owner_id', type: 'text' })
     ownerId: string;
 

@@ -13,17 +13,21 @@ export class RankingsController {
     async getRankings(
         @Query('mode') mode: string = '1v1',
         @Query('scope') scope: string = 'global',
+        @Query('ageGroup') ageGroup?: string,
+        @Query('gender') gender?: string,
     ) {
-        console.log('getRankings: mode=', mode, 'scope=', scope);
+        console.log('getRankings: mode=', mode, 'scope=', scope, 'ageGroup=', ageGroup, 'gender=', gender);
 
         try {
             // For 3v3 or 5v5, return teams
             if (mode === '3v3' || mode === '5v5') {
-                const teams = await this.dataSource.query(`
+                let query = `
                     SELECT 
                         t.id,
                         t.name,
                         t.team_type as "teamType",
+                        t.age_group as "ageGroup",
+                        t.gender,
                         t.logo_url as "logoUrl",
                         COALESCE(t.rating, 3.0) as "rating",
                         COALESCE(t.wins, 0) as "wins",
@@ -31,10 +35,24 @@ export class RankingsController {
                         (SELECT COUNT(*) FROM team_members tm WHERE tm.team_id = t.id AND tm.status = 'active') as "memberCount"
                     FROM teams t
                     WHERE t.team_type = $1
-                    ORDER BY COALESCE(t.rating, 3.0) DESC
-                    LIMIT 100
-                `, [mode]);
+                `;
+                const params: any[] = [mode];
+                let paramIndex = 2;
 
+                if (ageGroup) {
+                    query += ` AND t.age_group = $${paramIndex}`;
+                    params.push(ageGroup);
+                    paramIndex++;
+                }
+                if (gender) {
+                    query += ` AND t.gender = $${paramIndex}`;
+                    params.push(gender);
+                    paramIndex++;
+                }
+
+                query += ` ORDER BY COALESCE(t.rating, 3.0) DESC LIMIT 100`;
+
+                const teams = await this.dataSource.query(query, params);
                 console.log('getRankings: found', teams.length, 'teams for mode', mode);
                 return teams;
             }

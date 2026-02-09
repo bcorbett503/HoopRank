@@ -42,6 +42,8 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0`);
         await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0`);
         await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS rating DECIMAL(3,2) DEFAULT 3.00`);
+        await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS age_group TEXT`);
+        await dataSource.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS gender TEXT`);
 
         // ============================================
         // USERS TABLE MIGRATIONS
@@ -123,6 +125,15 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_events_event_date ON team_events(event_date)`);
         await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_event_attendance_event_id ON team_event_attendance(event_id)`);
         await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_event_attendance_user_id ON team_event_attendance(user_id)`);
+
+        // Link team_events to matches for game→match pipeline
+        await dataSource.query(`ALTER TABLE team_events ADD COLUMN IF NOT EXISTS match_id UUID`);
+
+        // Store rating changes on matches for feed display (e.g. "3.0 → 3.2")
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS winner_old_rating DECIMAL(4,2)`);
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS winner_new_rating DECIMAL(4,2)`);
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS loser_old_rating DECIMAL(4,2)`);
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS loser_new_rating DECIMAL(4,2)`);
 
         console.log('[SchemaEvolution] All migrations completed successfully');
     } catch (error) {

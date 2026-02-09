@@ -487,6 +487,8 @@ export class StatusesService {
                     NULL as "loserName",
                     NULL::DOUBLE PRECISION as "winnerRating",
                     NULL::DOUBLE PRECISION as "loserRating",
+                    NULL::DOUBLE PRECISION as "winnerOldRating",
+                    NULL::DOUBLE PRECISION as "loserOldRating",
                     COALESCE((SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id), 0)::INTEGER as "likeCount",
                     COALESCE((SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id), 0)::INTEGER as "commentCount",
                     EXISTS(SELECT 1 FROM status_likes WHERE status_id = ps.id AND user_id = $1) as "isLikedByMe",
@@ -529,6 +531,8 @@ export class StatusesService {
                     loser.name as "loserName",
                     winner.hoop_rank as "winnerRating",
                     loser.hoop_rank as "loserRating",
+                    NULL::DOUBLE PRECISION as "winnerOldRating",
+                    NULL::DOUBLE PRECISION as "loserOldRating",
                     0 as "likeCount",
                     0 as "commentCount",
                     false as "isLikedByMe",
@@ -581,14 +585,16 @@ export class StatusesService {
                         WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ot.name
                         ELSE ct.name
                     END as "loserName",
-                    CASE 
+                    COALESCE(m.winner_new_rating, CASE 
                         WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ct.rating
                         ELSE ot.rating
-                    END as "winnerRating",
-                    CASE 
+                    END) as "winnerRating",
+                    COALESCE(m.loser_new_rating, CASE 
                         WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ot.rating
                         ELSE ct.rating
-                    END as "loserRating",
+                    END) as "loserRating",
+                    m.winner_old_rating as "winnerOldRating",
+                    m.loser_old_rating as "loserOldRating",
                     0 as "likeCount",
                     0 as "commentCount",
                     false as "isLikedByMe",

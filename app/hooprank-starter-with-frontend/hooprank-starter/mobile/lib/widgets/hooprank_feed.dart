@@ -325,7 +325,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final checkInState = context.watch<CheckInState>();
     final courtCount = checkInState.followedCourtCount;
     final playerCount = checkInState.followedPlayerCount;
-    final totalFollowing = courtCount + playerCount;
+    final teamCount = checkInState.followedTeamCount;
+    final totalFollowing = courtCount + playerCount + teamCount;
 
     // No following anyone yet - show challenges first, then empty state with follow buttons
     if (totalFollowing == 0) {
@@ -432,6 +433,23 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 fontWeight: FontWeight.w600,
                 decoration: TextDecoration.underline,
                 decorationColor: courtCount > 0 ? Colors.blue : Colors.white38,
+              ),
+            ),
+          ),
+          const Text(' • ', style: TextStyle(color: Colors.white38, fontSize: 13)),
+          // Teams count - always show as CTA, deep link to Teams tab
+          GestureDetector(
+            onTap: () {
+              context.go('/teams');
+            },
+            child: Text(
+              '$teamCount team${teamCount == 1 ? '' : 's'}',
+              style: TextStyle(
+                color: teamCount > 0 ? Colors.orange : Colors.white38,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+                decorationColor: teamCount > 0 ? Colors.orange : Colors.white38,
               ),
             ),
           ),
@@ -1437,6 +1455,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final loserRating = item['loserRating'] != null 
         ? double.tryParse(item['loserRating'].toString()) 
         : null;
+    final winnerOldRating = item['winnerOldRating'] != null 
+        ? double.tryParse(item['winnerOldRating'].toString()) 
+        : null;
+    final loserOldRating = item['loserOldRating'] != null 
+        ? double.tryParse(item['loserOldRating'].toString()) 
+        : null;
     
     // Display text: "Winner vs Loser" if both available, else just winner
     final displayName = loserName != null && loserName.isNotEmpty 
@@ -1545,22 +1569,30 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Winner rating
+                  // Winner rating (with before → after if available)
                   Row(
                     children: [
-                      Icon(Icons.star, size: 14, color: statusColor),
+                      Icon(Icons.trending_up, size: 14, color: Colors.green),
                       const SizedBox(width: 4),
                       Text('${winnerName ?? 'Winner'}: ', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-                      Text(winnerRating.toStringAsFixed(2), style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                      if (winnerOldRating != null) ...[
+                        Text(winnerOldRating.toStringAsFixed(2), style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                        Text(' → ', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                      ],
+                      Text(winnerRating.toStringAsFixed(2), style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   ),
-                  // Loser rating
+                  // Loser rating (with before → after if available)
                   Row(
                     children: [
-                      Icon(Icons.star_border, size: 14, color: Colors.grey[500]),
+                      Icon(Icons.trending_down, size: 14, color: Colors.red.shade300),
                       const SizedBox(width: 4),
                       Text('${loserName ?? 'Loser'}: ', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-                      Text(loserRating.toStringAsFixed(2), style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.bold, fontSize: 12)),
+                      if (loserOldRating != null) ...[
+                        Text(loserOldRating.toStringAsFixed(2), style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                        Text(' → ', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                      ],
+                      Text(loserRating.toStringAsFixed(2), style: TextStyle(color: Colors.red.shade300, fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   ),
                 ],

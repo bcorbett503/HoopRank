@@ -709,8 +709,10 @@ class ApiService {
   static Future<Map<String, dynamic>?> createTeam({
     required String name,
     required String teamType,
+    String? ageGroup,
+    String? gender,
   }) async {
-    debugPrint('>>> createTeam: name=$name, teamType=$teamType');
+    debugPrint('>>> createTeam: name=$name, teamType=$teamType, ageGroup=$ageGroup, gender=$gender');
     debugPrint('>>> createTeam: _userId=$_userId, baseUrl=$baseUrl');
     
     if (_userId == null || _userId!.isEmpty) {
@@ -718,16 +720,20 @@ class ApiService {
       throw Exception('Not authenticated - userId is missing');
     }
     
+    final body = <String, dynamic>{
+      'name': name,
+      'teamType': teamType,
+    };
+    if (ageGroup != null) body['ageGroup'] = ageGroup;
+    if (gender != null) body['gender'] = gender;
+
     final response = await http.post(
       Uri.parse('$baseUrl/teams'),
       headers: {
         'x-user-id': _userId!,
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({
-        'name': name,
-        'teamType': teamType,
-      }),
+      body: jsonEncode(body),
     );
 
     debugPrint('>>> createTeam: status=${response.statusCode}, body=${response.body}');
@@ -818,13 +824,18 @@ class ApiService {
     return response.statusCode == 200;
   }
 
-  /// Get team rankings by type and scope
+  /// Get team rankings by type, scope, and attribute filters
   static Future<List<Map<String, dynamic>>> getTeamRankings({
     required String teamType,
     String scope = 'global',
+    String? ageGroup,
+    String? gender,
   }) async {
+    var url = '$baseUrl/rankings?mode=$teamType&scope=$scope';
+    if (ageGroup != null) url += '&ageGroup=$ageGroup';
+    if (gender != null) url += '&gender=$gender';
     final response = await http.get(
-      Uri.parse('$baseUrl/rankings?mode=$teamType&scope=$scope'),
+      Uri.parse(url),
       headers: {'x-user-id': _userId ?? ''},
     );
     if (response.statusCode == 200) {
@@ -1116,6 +1127,28 @@ class ApiService {
   static Future<bool> unfollowPlayer(String playerId) async {
     final response = await http.delete(
       Uri.parse('$baseUrl/users/me/follows/players/$playerId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Follow a team
+  static Future<bool> followTeam(String teamId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users/me/follows/teams'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'teamId': teamId}),
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Unfollow a team
+  static Future<bool> unfollowTeam(String teamId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/users/me/follows/teams/$teamId'),
       headers: {'x-user-id': _userId ?? ''},
     );
     return response.statusCode == 200;

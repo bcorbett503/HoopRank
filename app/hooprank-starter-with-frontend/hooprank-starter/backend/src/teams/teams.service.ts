@@ -40,6 +40,8 @@ export class TeamsService {
                 id: m.team.id,
                 name: m.team.name,
                 teamType: m.team.teamType,
+                ageGroup: m.team.ageGroup,
+                gender: m.team.gender,
                 rating: m.team.rating,
                 wins: m.team.wins,
                 losses: m.team.losses,
@@ -72,8 +74,8 @@ export class TeamsService {
     /**
      * Create a new team
      */
-    async createTeam(userId: string, name: string, teamType: string): Promise<Team> {
-        console.log(`[TeamsService.createTeam] userId=${userId}, name=${name}, teamType=${teamType}`);
+    async createTeam(userId: string, name: string, teamType: string, ageGroup?: string, gender?: string): Promise<Team> {
+        console.log(`[TeamsService.createTeam] userId=${userId}, name=${name}, teamType=${teamType}, ageGroup=${ageGroup}, gender=${gender}`);
 
         // Validate userId
         if (!userId || userId.trim() === '') {
@@ -84,6 +86,18 @@ export class TeamsService {
         // Validate team type
         if (!['3v3', '5v5'].includes(teamType)) {
             throw new BadRequestException('Team type must be 3v3 or 5v5');
+        }
+
+        // Validate age group if provided
+        const validAgeGroups = ['U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'];
+        if (ageGroup && !validAgeGroups.includes(ageGroup)) {
+            throw new BadRequestException(`Age group must be one of: ${validAgeGroups.join(', ')}`);
+        }
+
+        // Validate gender if provided
+        const validGenders = ['Mens', 'Womens', 'Coed'];
+        if (gender && !validGenders.includes(gender)) {
+            throw new BadRequestException(`Gender must be one of: ${validGenders.join(', ')}`);
         }
 
         // Check if team name already exists for this type
@@ -99,6 +113,8 @@ export class TeamsService {
             name,
             teamType,
             ownerId: userId,
+            ageGroup: ageGroup || null,
+            gender: gender || null,
             rating: 3.0,
             wins: 0,
             losses: 0,
@@ -138,36 +154,81 @@ export class TeamsService {
             where: { teamId, status: 'pending' },
         });
 
-        // Get member IDs for listing
-        const members = await this.membersRepository.find({
-            where: { teamId, status: 'active' },
-        });
+        // Get members with real names from users table
+        const activeMembers = await this.dataSource.query(`
+            SELECT tm.user_id as "userId", tm.role, COALESCE(u.name, 'Player') as name,
+                   u.avatar_url as "photoUrl"
+            FROM team_members tm
+            LEFT JOIN users u ON u.id = tm.user_id
+            WHERE tm.team_id = $1 AND tm.status = 'active'
+        `, [teamId]);
 
-        const pendingMembers = await this.membersRepository.find({
-            where: { teamId, status: 'pending' },
-        });
+        const pendingMembers = await this.dataSource.query(`
+            SELECT tm.user_id as "userId", COALESCE(u.name, 'Player') as name,
+                   u.avatar_url as "photoUrl"
+            FROM team_members tm
+            LEFT JOIN users u ON u.id = tm.user_id
+            WHERE tm.team_id = $1 AND tm.status = 'pending'
+        `, [teamId]);
+
+        // Get owner name
+        const ownerResult = await this.dataSource.query(`
+            SELECT name FROM users WHERE id = $1
+        `, [team.ownerId]);
+        const ownerName = ownerResult[0]?.name || 'Team Owner';
+
+        // Get recent matches (last 10)
+        const recentMatches = await this.dataSource.query(`
+            SELECT m.id, m.status, m.score_creator, m.score_opponent,
+                   m.creator_team_id, m.opponent_team_id,
+                   m.winner_id as winner_team_id,
+                   m.completed_at,
+                   t1.name as "creatorTeamName",
+                   t2.name as "opponentTeamName"
+            FROM matches m
+            LEFT JOIN teams t1 ON t1.id = m.creator_team_id::uuid
+            LEFT JOIN teams t2 ON t2.id = m.opponent_team_id::uuid
+            WHERE m.team_match = true
+              AND (m.creator_team_id = $1 OR m.opponent_team_id = $1)
+              AND m.status = 'completed'
+            ORDER BY m.completed_at DESC
+            LIMIT 10
+        `, [teamId]);
 
         return {
             id: team.id,
             name: team.name,
             teamType: team.teamType,
+            ageGroup: team.ageGroup,
+            gender: team.gender,
             rating: team.rating,
             wins: team.wins,
             losses: team.losses,
             logoUrl: team.logoUrl,
             ownerId: team.ownerId,
-            ownerName: 'Team Owner',  // Simplified
+            ownerName,
             isOwner: team.ownerId === userId,
             memberCount,
             pendingCount,
-            members: members.map(m => ({
+            members: activeMembers.map(m => ({
                 id: m.userId,
-                name: 'Member',  // Simplified - avoid user relation issues
+                name: m.name,
+                photoUrl: m.photoUrl,
                 role: m.role,
             })),
             pending: pendingMembers.map(m => ({
                 id: m.userId,
-                name: 'Pending',
+                name: m.name,
+                photoUrl: m.photoUrl,
+            })),
+            recentMatches: recentMatches.map(m => ({
+                id: m.id,
+                creatorTeamName: m.creatorTeamName,
+                opponentTeamName: m.opponentTeamName,
+                scoreCreator: m.score_creator,
+                scoreOpponent: m.score_opponent,
+                won: m.winner_team_id === teamId,
+                completedAt: m.completed_at,
             })),
         };
     }
@@ -770,16 +831,28 @@ export class TeamsService {
             const newCreatorRating = Math.max(1, Math.min(5, creatorRating + K * (creatorWon - expectedCreator)));
             const newOpponentRating = Math.max(1, Math.min(5, opponentRating + K * ((1 - creatorWon) - (1 - expectedCreator))));
 
-            // Update match
+            // Determine winner/loser old/new ratings for feed display
+            const winnerOldRating = match.creator_team_id === winnerTeamId ? creatorRating : opponentRating;
+            const winnerNewRating = match.creator_team_id === winnerTeamId ? newCreatorRating : newOpponentRating;
+            const loserOldRating = match.creator_team_id === winnerTeamId ? opponentRating : creatorRating;
+            const loserNewRating = match.creator_team_id === winnerTeamId ? newOpponentRating : newCreatorRating;
+
+            // Update match with scores and rating changes
             await this.dataSource.query(`
                 UPDATE matches SET 
                     status = 'completed',
                     winner_id = $1,
                     score_creator = $2,
                     score_opponent = $3,
-                    completed_at = NOW()
+                    completed_at = NOW(),
+                    winner_old_rating = $5,
+                    winner_new_rating = $6,
+                    loser_old_rating = $7,
+                    loser_new_rating = $8
                 WHERE id = $4
-            `, [winnerTeamId, creatorScore, opponentTeamScore, matchId]);
+            `, [winnerTeamId, creatorScore, opponentTeamScore, matchId,
+                winnerOldRating.toFixed(2), winnerNewRating.toFixed(2),
+                loserOldRating.toFixed(2), loserNewRating.toFixed(2)]);
 
             // Update team ratings and W/L records - separate queries for clarity
             if (match.creator_team_id === winnerTeamId) {
@@ -868,6 +941,45 @@ export class TeamsService {
         await this.attendanceRepository.save(attendance);
 
         console.log(`[TeamsService] Created ${dto.type} event: ${saved.id} for team ${teamId}`);
+
+        // If this is a game with an opponent, auto-create challenge + match
+        // Per design: scheduled games are valid challenges (no acceptance needed)
+        if (dto.type === 'game' && dto.opponentTeamId) {
+            try {
+                // Get team type for match_type
+                const team = await this.teamsRepository.findOne({ where: { id: teamId } });
+                const matchType = team?.teamType || '3v3';
+
+                // Ensure required columns exist
+                await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false`);
+                await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS creator_team_id UUID`);
+                await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_team_id UUID`);
+
+                // Create match
+                const matchResult = await this.dataSource.query(`
+                    INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
+                    VALUES ($1, 'accepted', true, $2, $3, $4)
+                    RETURNING *
+                `, [matchType, teamId, dto.opponentTeamId, userId]);
+                const match = matchResult[0];
+
+                // Create auto-accepted challenge
+                await this.dataSource.query(`
+                    INSERT INTO team_challenges (from_team_id, to_team_id, message, status, match_id, created_by)
+                    VALUES ($1, $2, $3, 'accepted', $4, $5)
+                `, [teamId, dto.opponentTeamId, `Scheduled game: ${saved.title}`, match.id, userId]);
+
+                // Link event to match
+                await this.dataSource.query(`UPDATE team_events SET match_id = $1 WHERE id = $2`, [match.id, saved.id]);
+                saved.matchId = match.id;
+
+                console.log(`[TeamsService] Auto-created challenge + match ${match.id} for game event ${saved.id}`);
+            } catch (err) {
+                console.error(`[TeamsService] Failed to auto-create match for game event: ${err.message}`);
+                // Don't fail the event creation if match creation fails
+            }
+        }
+
         return saved;
     }
 
