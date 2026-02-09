@@ -45,6 +45,14 @@ export async function runAutoMigrations() {
         `);
         console.log("Auto-migration: fcm_token column checked/added");
 
+        // Add age_group and gender columns to teams table
+        await pool.query(`
+            ALTER TABLE teams 
+            ADD COLUMN IF NOT EXISTS age_group VARCHAR(20),
+            ADD COLUMN IF NOT EXISTS gender VARCHAR(20)
+        `);
+        console.log("Auto-migration: age_group/gender columns checked/added");
+
         // Backfill lat/lng for users with ZIP but no coordinates (runs once per restart)
         const usersToUpdate = await pool.query(`
             SELECT id, zip FROM users 

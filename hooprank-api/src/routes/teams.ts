@@ -18,13 +18,15 @@ const router = Router();
 const CreateTeamSchema = z.object({
     name: z.string().min(2).max(50),
     teamType: z.enum(["3v3", "5v5"]),
+    ageGroup: z.enum(["U10", "U12", "U14", "U18", "HS", "College", "Open"]).optional(),
+    gender: z.enum(["Mens", "Womens", "Coed"]).optional(),
 });
 
 router.post(
     "/teams",
     asyncH(async (req, res) => {
         const uid = getUserId(req);
-        const { name, teamType } = CreateTeamSchema.parse(req.body);
+        const { name, teamType, ageGroup, gender } = CreateTeamSchema.parse(req.body);
 
         // Ensure user exists in database (auto-create if not)
         // This handles Firebase users who haven't synced yet
@@ -68,10 +70,10 @@ router.post(
         const threadId = threadResult.rows[0].id;
 
         const result = await pool.query(
-            `INSERT INTO teams (owner_id, name, team_type, thread_id)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, team_type, rating, mmr, matches_played, wins, losses, thread_id, created_at`,
-            [uid, name, teamType, threadId]
+            `INSERT INTO teams (owner_id, name, team_type, age_group, gender, thread_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, team_type, age_group, gender, rating, mmr, matches_played, wins, losses, thread_id, created_at`,
+            [uid, name, teamType, ageGroup || null, gender || null, threadId]
         );
 
         const team = result.rows[0];
@@ -100,6 +102,8 @@ router.post(
             id: team.id,
             name: team.name,
             teamType: team.team_type,
+            ageGroup: team.age_group || null,
+            gender: team.gender || null,
             rating: Number(team.rating),
             matchesPlayed: team.matches_played,
             wins: team.wins,
@@ -134,6 +138,8 @@ router.get(
                 id: t.id,
                 name: t.name,
                 teamType: t.team_type,
+                ageGroup: t.age_group || null,
+                gender: t.gender || null,
                 rating: Number(t.rating),
                 matchesPlayed: t.matches_played,
                 wins: t.wins,
@@ -509,10 +515,48 @@ router.get(
             [id]
         );
 
+        // Get owner name
+        const ownerResult = await pool.query(
+            `SELECT name FROM users WHERE id = $1`,
+            [team.owner_id]
+        );
+        const ownerName = ownerResult.rows[0]?.name || 'Team Owner';
+
+        // Get recent matches
+        const matchesResult = await pool.query(
+            `SELECT m.id, m.status, m.score_creator, m.score_opponent, m.winner_id,
+                    t1.name as creator_team_name, t2.name as opponent_team_name,
+                    t1.id as creator_team_id, t2.id as opponent_team_id,
+                    m.created_at
+             FROM matches m
+             LEFT JOIN teams t1 ON t1.id = m.creator_team_id
+             LEFT JOIN teams t2 ON t2.id = m.opponent_team_id
+             WHERE (m.creator_team_id = $1 OR m.opponent_team_id = $1)
+               AND m.status = 'completed'
+             ORDER BY m.created_at DESC
+             LIMIT 10`,
+            [id]
+        );
+
+        const recentMatches = matchesResult.rows.map(m => {
+            const isCreator = m.creator_team_id === id;
+            return {
+                id: m.id,
+                creatorTeamName: m.creator_team_name,
+                opponentTeamName: m.opponent_team_name,
+                scoreCreator: m.score_creator,
+                scoreOpponent: m.score_opponent,
+                won: isCreator ? m.winner_id === id : m.winner_id === id,
+                createdAt: m.created_at,
+            };
+        });
+
         res.json({
             id: team.id,
             name: team.name,
             teamType: team.team_type,
+            ageGroup: team.age_group || null,
+            gender: team.gender || null,
             rating: Number(team.rating),
             matchesPlayed: team.matches_played,
             wins: team.wins,
@@ -521,6 +565,7 @@ router.get(
             threadId: team.thread_id,
             isOwner: team.my_role === "owner",
             isMember: !!team.my_role,
+            ownerName,
             members: membersResult.rows.map((m) => ({
                 id: m.user_id,
                 name: m.name,
@@ -530,6 +575,7 @@ router.get(
                 status: m.status,
                 joinedAt: m.joined_at,
             })),
+            recentMatches,
         });
     })
 );

@@ -1,5 +1,5 @@
 /**
- * E2E Test: Teams Critical Fixes Verification
+ * E2E Test: Teams Critical Fixes Verification (Production API)
  * 
  * Tests all the critical fixes from the Teams audit:
  * 1. Create team with ageGroup + gender
@@ -7,7 +7,7 @@
  * 3. Rankings filter by ageGroup / gender
  * 4. Team detail includes recentMatches
  * 5. Challenge flow works from rankings
- * 6. Score submission and rating changes
+ * 6. Validation of invalid ageGroup/gender
  * 
  * Run: node verify_teams_fixes.js
  */
@@ -33,7 +33,7 @@ async function test(name, fn) {
 }
 
 async function main() {
-    console.log('=== TEAMS CRITICAL FIXES E2E TEST ===\n');
+    console.log('=== TEAMS CRITICAL FIXES E2E TEST (Production) ===\n');
 
     // ────────────────────────────────────────────────────────
     // TEST 1: Create team WITH ageGroup + gender
@@ -59,10 +59,10 @@ async function main() {
 
         testTeamId = body.id;
 
-        if (body.ageGroup === 'HS' || body.age_group === 'HS') {
+        if (body.ageGroup === 'HS' && body.gender === 'Mens') {
             pass('Create team with ageGroup + gender');
         } else {
-            fail('Create team with ageGroup + gender', `ageGroup not returned: ${JSON.stringify(body)}`);
+            fail('Create team with ageGroup + gender', `ageGroup=${body.ageGroup}, gender=${body.gender}, full: ${JSON.stringify(body)}`);
         }
     });
 
@@ -94,7 +94,6 @@ async function main() {
         const detail = await res.json();
 
         const hasRealNames = detail.members?.some(m => m.name !== 'Member' && m.name !== 'Pending');
-        const ownerNameReal = detail.ownerName !== 'Team Owner';
 
         if (hasRealNames) {
             pass('Team detail returns real member names');
@@ -143,14 +142,16 @@ async function main() {
 
     // ────────────────────────────────────────────────────────
     // TEST 4: Rankings include ageGroup + gender in response
+    // (Production API wraps in { mode, rankings: [...] })
     // ────────────────────────────────────────────────────────
     await test('Rankings return ageGroup + gender fields', async () => {
         const res = await fetch(`${API}/rankings?mode=3v3`, {
             headers: headers(USER_ID),
         });
-        const teams = await res.json();
+        const body = await res.json();
+        const teams = body.rankings || body; // Handle both formats
 
-        if (teams.length > 0) {
+        if (Array.isArray(teams) && teams.length > 0) {
             const hasAgeField = 'ageGroup' in teams[0];
             const hasGenderField = 'gender' in teams[0];
 
@@ -169,7 +170,8 @@ async function main() {
         const res = await fetch(`${API}/rankings?mode=3v3&ageGroup=HS`, {
             headers: headers(USER_ID),
         });
-        const teams = await res.json();
+        const body = await res.json();
+        const teams = body.rankings || body;
 
         // All returned teams should have ageGroup=HS (or be empty if none match)
         const allMatch = teams.every(t => t.ageGroup === 'HS');
@@ -186,7 +188,8 @@ async function main() {
         const res = await fetch(`${API}/rankings?mode=3v3&gender=Mens`, {
             headers: headers(USER_ID),
         });
-        const teams = await res.json();
+        const body = await res.json();
+        const teams = body.rankings || body;
 
         const allMatch = teams.every(t => t.gender === 'Mens');
         if (allMatch) {
@@ -236,7 +239,8 @@ async function main() {
 
         // Get rankings to find an opponent
         const rankRes = await fetch(`${API}/rankings?mode=3v3`, { headers: headers(USER_ID) });
-        const rankTeams = await rankRes.json();
+        const rankBody = await rankRes.json();
+        const rankTeams = rankBody.rankings || rankBody;
 
         const myTeam = myTeamList.find(t => t.teamType === '3v3');
         const opponent = rankTeams.find(t => t.id !== myTeam?.id);
@@ -256,7 +260,6 @@ async function main() {
             pass('Challenge flow works');
             const chalBody = await chalRes.json();
             console.log(`    Challenge created: ${myTeam.name} vs ${opponent.name}`);
-            console.log(`    Challenge ID: ${chalBody.id || chalBody.challengeId || 'N/A'}`);
         } else {
             const body = await chalRes.text();
             fail('Challenge flow works', `HTTP ${chalRes.status}: ${body}`);
@@ -264,7 +267,7 @@ async function main() {
     });
 
     // ────────────────────────────────────────────────────────
-    // TEST 7: ageGroup validation
+    // TEST 7: ageGroup / gender validation (Zod rejects unknown values)
     // ────────────────────────────────────────────────────────
     await test('Invalid ageGroup is rejected', async () => {
         const res = await fetch(`${API}/teams`, {
@@ -277,10 +280,11 @@ async function main() {
             }),
         });
 
-        if (res.status === 400) {
+        if (res.status === 400 || res.status === 422) {
             pass('Invalid ageGroup is rejected');
         } else {
-            fail('Invalid ageGroup is rejected', `Expected 400, got ${res.status}`);
+            const body = await res.text();
+            fail('Invalid ageGroup is rejected', `Expected 400/422, got ${res.status}: ${body.substring(0, 200)}`);
         }
     });
 
@@ -295,10 +299,11 @@ async function main() {
             }),
         });
 
-        if (res.status === 400) {
+        if (res.status === 400 || res.status === 422) {
             pass('Invalid gender is rejected');
         } else {
-            fail('Invalid gender is rejected', `Expected 400, got ${res.status}`);
+            const body = await res.text();
+            fail('Invalid gender is rejected', `Expected 400/422, got ${res.status}: ${body.substring(0, 200)}`);
         }
     });
 

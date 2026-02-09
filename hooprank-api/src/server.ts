@@ -1230,12 +1230,14 @@ const RankingsQuery = z.object({
   mode: z.enum(["1v1", "3v3", "5v5"]).default("1v1"),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+  ageGroup: z.string().optional(),
+  gender: z.string().optional(),
 });
 
 app.get(
   "/rankings",
   asyncH(async (req, res) => {
-    const { mode, limit, offset } = RankingsQuery.parse(req.query);
+    const { mode, limit, offset, ageGroup, gender } = RankingsQuery.parse(req.query);
 
     if (mode === "1v1") {
       // Individual rankings with team info (includes both member and owner teams)
@@ -1302,9 +1304,9 @@ app.get(
       // Get user ID to exclude user's own teams (for challenge flow)
       const uid = req.headers["x-user-id"] as string | undefined;
 
-      // Exclude teams where user is owner or accepted member
-      const result = await pool.query(
-        `SELECT t.id, t.name, t.rating, t.matches_played, t.wins, t.losses,
+      // Build dynamic query with optional ageGroup/gender filters
+      let query = `SELECT t.id, t.name, t.rating, t.matches_played, t.wins, t.losses,
+           t.age_group, t.gender, t.logo_url,
            (SELECT COUNT(*) FROM team_members WHERE team_id = t.id AND status = 'accepted') as member_count,
            u.name as owner_name
          FROM teams t
@@ -1313,11 +1315,25 @@ app.get(
            AND ($4::text IS NULL OR t.owner_id != $4)
            AND ($4::text IS NULL OR t.id NOT IN (
              SELECT team_id FROM team_members WHERE user_id = $4 AND status = 'accepted'
-           ))
-         ORDER BY t.rating DESC, t.name ASC
-         LIMIT $2 OFFSET $3`,
-        [mode, limit, offset, uid || null]
-      );
+           ))`;
+
+      const params: any[] = [mode, limit, offset, uid || null];
+      let paramIndex = 5;
+
+      if (ageGroup) {
+        query += ` AND t.age_group = $${paramIndex}`;
+        params.push(ageGroup);
+        paramIndex++;
+      }
+      if (gender) {
+        query += ` AND t.gender = $${paramIndex}`;
+        params.push(gender);
+        paramIndex++;
+      }
+
+      query += ` ORDER BY t.rating DESC, t.name ASC LIMIT $2 OFFSET $3`;
+
+      const result = await pool.query(query, params);
 
       res.json({
         mode,
@@ -1329,6 +1345,9 @@ app.get(
           matchesPlayed: t.matches_played,
           wins: t.wins,
           losses: t.losses,
+          ageGroup: t.age_group || null,
+          gender: t.gender || null,
+          logoUrl: t.logo_url || null,
           memberCount: Number(t.member_count),
           ownerName: t.owner_name,
         })),
