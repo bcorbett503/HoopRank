@@ -203,7 +203,7 @@ export class TeamsService {
                    m.winner_id as winner_team_id,
                    m.completed_at,
                    t1.name as "creatorTeamName",
-                   t2.name as "opponentTeamName"
+                   COALESCE(t2.name, m.opponent_name, 'Unknown') as "opponentTeamName"
             FROM matches m
             LEFT JOIN teams t1 ON t1.id = m.creator_team_id::uuid
             LEFT JOIN teams t2 ON t2.id = m.opponent_team_id::uuid
@@ -1043,10 +1043,10 @@ export class TeamsService {
 
                 // Create match
                 const matchResult = await this.dataSource.query(`
-                    INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
-                    VALUES ($1, 'accepted', true, $2, $3, $4)
+                    INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id, opponent_name)
+                    VALUES ($1, 'accepted', true, $2, $3, $4, $5)
                     RETURNING *
-                `, [matchType, teamId, dto.opponentTeamId, userId]);
+                `, [matchType, teamId, dto.opponentTeamId, userId, dto.opponentTeamName || null]);
                 const match = matchResult[0];
 
                 // Create auto-accepted challenge
@@ -1274,13 +1274,14 @@ export class TeamsService {
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false`);
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS creator_team_id UUID`);
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_team_id UUID`);
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_name TEXT`);
 
         // Create match
         const matchResult = await this.dataSource.query(`
-            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
-            VALUES ($1, 'accepted', true, $2, $3, $4)
+            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id, opponent_name)
+            VALUES ($1, 'accepted', true, $2, $3, $4, $5)
             RETURNING *
-        `, [matchType, teamId, event.opponentTeamId || null, userId]);
+        `, [matchType, teamId, event.opponentTeamId || null, userId, event.opponentTeamName || null]);
         const match = matchResult[0];
 
         // Link event to match

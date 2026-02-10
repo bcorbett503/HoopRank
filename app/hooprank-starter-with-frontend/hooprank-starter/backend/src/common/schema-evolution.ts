@@ -139,6 +139,9 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS loser_old_rating DECIMAL(4,2)`);
         await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS loser_new_rating DECIMAL(4,2)`);
 
+        // Store custom opponent name for unregistered teams
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_name TEXT`);
+
         console.log('[SchemaEvolution] All migrations completed successfully');
     } catch (error) {
         console.error('[SchemaEvolution] Migration error:', error.message);

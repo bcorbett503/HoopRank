@@ -1621,12 +1621,37 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             )).then((_) => _loadData());
           },
           borderRadius: BorderRadius.circular(16),
-          child: Padding(
+            child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Row 1: Team name + Owner badge
                 Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        team['name'] ?? 'Team',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                    if (isOwner)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                        ),
+                        child: const Text('Owner', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Row 2: Attribute badges (wrapped)
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1646,8 +1671,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         ),
                       ),
                     ),
-                    if (skillLevel != null) ...[
-                      const SizedBox(width: 6),
+                    if (skillLevel != null)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
@@ -1657,9 +1681,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         ),
                         child: Text(skillLevel, style: TextStyle(color: Colors.deepPurple[200], fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
-                    ],
-                    if (ageGroup != null) ...[
-                      const SizedBox(width: 6),
+                    if (ageGroup != null)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
@@ -1669,9 +1691,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         ),
                         child: Text(ageGroup, style: TextStyle(color: Colors.teal[300], fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
-                    ],
-                    if (gender != null) ...[
-                      const SizedBox(width: 6),
+                    if (gender != null)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
@@ -1680,24 +1700,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                           border: Border.all(color: Colors.indigo.withOpacity(0.3)),
                         ),
                         child: Text(gender, style: TextStyle(color: Colors.indigo[300], fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        team['name'] ?? 'Team',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                    ),
-                    if (isOwner)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.amber.withOpacity(0.3)),
-                        ),
-                        child: const Text('Owner', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
