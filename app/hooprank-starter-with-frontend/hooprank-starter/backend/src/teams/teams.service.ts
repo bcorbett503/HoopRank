@@ -40,7 +40,7 @@ export class TeamsService {
 
             // Get pending members for this team
             const pendingMembers = await this.dataSource.query(`
-                SELECT tm.user_id, u.name, u.photo_url
+                SELECT tm.user_id, u.name, u.avatar_url
                 FROM team_members tm
                 LEFT JOIN users u ON u.id = tm.user_id
                 WHERE tm.team_id = $1 AND tm.status = 'pending'
@@ -71,7 +71,7 @@ export class TeamsService {
                 pendingMembers: pendingMembers.map(p => ({
                     id: p.user_id,
                     name: p.name || 'Unknown',
-                    photoUrl: p.photo_url,
+                    photoUrl: p.avatar_url,
                 })),
             });
         }
