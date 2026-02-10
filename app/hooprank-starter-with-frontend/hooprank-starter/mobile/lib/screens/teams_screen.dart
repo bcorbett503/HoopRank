@@ -119,7 +119,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     final nameController = TextEditingController();
     final cityController = TextEditingController();
     final descriptionController = TextEditingController();
-    String teamType = '3v3';
+    String teamType = '5v5';
     String? ageGroup;
     String? gender;
     String? skillLevel;

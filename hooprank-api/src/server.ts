@@ -1308,17 +1308,14 @@ app.get(
       let query = `SELECT t.id, t.name, t.rating, t.matches_played, t.wins, t.losses,
            t.age_group, t.gender, t.skill_level, t.logo_url,
            (SELECT COUNT(*) FROM team_members WHERE team_id = t.id AND status = 'accepted') as member_count,
-           u.name as owner_name
+           u.name as owner_name,
+           t.owner_id
          FROM teams t
          JOIN users u ON u.id = t.owner_id
-         WHERE t.team_type = $1
-           AND ($4::text IS NULL OR t.owner_id != $4)
-           AND ($4::text IS NULL OR t.id NOT IN (
-             SELECT team_id FROM team_members WHERE user_id = $4 AND status = 'accepted'
-           ))`;
+         WHERE t.team_type = $1`;
 
-      const params: any[] = [mode, limit, offset, uid || null];
-      let paramIndex = 5;
+      const params: any[] = [mode, limit, offset];
+      let paramIndex = 4;
 
       if (ageGroup) {
         query += ` AND t.age_group = $${paramIndex}`;
