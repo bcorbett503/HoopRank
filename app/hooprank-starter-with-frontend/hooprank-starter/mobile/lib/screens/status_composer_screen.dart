@@ -250,6 +250,20 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     }
   }
 
+  Widget _toolbarIcon(IconData icon, String tooltip, VoidCallback onPressed, {Color color = Colors.white70}) {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        icon: Icon(icon, color: color, size: 22),
+        onPressed: onPressed,
+        tooltip: tooltip,
+      ),
+    );
+  }
+
   void _showScheduleSheet() async {
     // Show inline calendar in a bottom sheet — tapping a date auto-advances to time
     final date = await showModalBottomSheet<DateTime>(
@@ -1233,51 +1247,36 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                   // Media buttons only shown for regular posts (not scheduled runs)
                   if (_scheduledTime == null) ...[
                     // Photo from camera
-                    IconButton(
-                      icon: const Icon(Icons.camera_alt, color: Colors.white70),
-                      onPressed: _takePhoto,
-                      tooltip: 'Take photo',
-                    ),
+                    _toolbarIcon(Icons.camera_alt, 'Take photo', _takePhoto),
                     // Photo from gallery
-                    IconButton(
-                      icon: const Icon(Icons.photo_library, color: Colors.white70),
-                      onPressed: _pickImage,
-                      tooltip: 'Add photo',
-                    ),
+                    _toolbarIcon(Icons.photo_library, 'Add photo', _pickImage),
                     // Video from gallery
-                    IconButton(
-                      icon: const Icon(Icons.videocam, color: Colors.white70),
-                      onPressed: _pickVideo,
-                      tooltip: 'Add video',
-                    ),
+                    _toolbarIcon(Icons.videocam, 'Add video', _pickVideo),
                   ],
                   // Tag court - always available
-                  IconButton(
-                    icon: const Icon(Icons.location_on, color: Colors.white70),
-                    onPressed: () {
-                      _textController.text += '@';
-                      _textController.selection = TextSelection.collapsed(offset: _textController.text.length);
-                      _focusNode.requestFocus();
-                    },
-                    tooltip: 'Tag court',
-                  ),
+                  _toolbarIcon(Icons.location_on, 'Tag court', () {
+                    _textController.text += '@';
+                    _textController.selection = TextSelection.collapsed(offset: _textController.text.length);
+                    _focusNode.requestFocus();
+                  }),
                   // Tag friend toggle
-                  IconButton(
-                    icon: Icon(Icons.person_add, color: _showPlayerTagging ? Colors.deepOrange : Colors.white70),
-                    onPressed: () {
+                  _toolbarIcon(
+                    Icons.person_add,
+                    'Tag friends',
+                    () {
                       setState(() => _showPlayerTagging = !_showPlayerTagging);
                       if (_showPlayerTagging && _followedPlayers == null) {
                         _loadFollowedPlayers();
                       }
                     },
-                    tooltip: 'Tag friends',
+                    color: _showPlayerTagging ? Colors.deepOrange : Colors.white70,
                   ),
                   const Spacer(),
-                  // Schedule Run button with text - always green to draw attention
+                  // Schedule Run button
                   GestureDetector(
                     onTap: _showScheduleSheet,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.green,
                         borderRadius: BorderRadius.circular(20),
@@ -1294,15 +1293,15 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                         children: [
                           Icon(
                             _scheduledTime != null ? Icons.check_circle : Icons.calendar_month,
-                            size: 18,
+                            size: 16,
                             color: Colors.white,
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           Text(
-                            _scheduledTime != null ? 'Scheduled ✓' : 'Schedule Run',
+                            _scheduledTime != null ? 'Set ✓' : 'Run',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

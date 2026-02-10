@@ -16,5 +16,8 @@
         "destination": "/support.html"
       }
     ]
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }
