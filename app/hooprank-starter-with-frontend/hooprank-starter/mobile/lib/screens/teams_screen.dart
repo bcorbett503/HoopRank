@@ -56,6 +56,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         ApiService.getTeamInvites(),
         ApiService.getAllTeamEvents(),
       ]);
+      // Ensure courts are loaded for court picker (same pattern as status composer)
+      await CourtService().loadCourts();
       if (mounted) {
         setState(() {
           _myTeams = results[0] as List<Map<String, dynamic>>;
@@ -427,7 +429,14 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
   List<Court> _searchCourts(String query) {
     try {
-      final courtService = Provider.of<CourtService>(context, listen: false);
+      final courtService = CourtService();
+      if (!courtService.isLoaded) {
+        // Trigger load asynchronously - results will appear on next rebuild
+        courtService.loadCourts().then((_) {
+          if (mounted) setState(() {});
+        });
+        return [];
+      }
       final results = courtService.searchCourts(query).take(5).toList();
       debugPrint('COURT_SEARCH: query="$query" totalCourts=${courtService.courts.length} results=${results.length}');
       return results;
