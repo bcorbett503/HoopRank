@@ -203,7 +203,16 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final rawTeams = (data as List?)?.cast<Map<String, dynamic>>() ?? [];
+        // Backend returns { mode, rankings: [...] } — extract the rankings array
+        List<dynamic> rawList;
+        if (data is Map && data.containsKey('rankings')) {
+          rawList = (data['rankings'] as List?) ?? [];
+        } else if (data is List) {
+          rawList = data;
+        } else {
+          rawList = [];
+        }
+        final rawTeams = rawList.cast<Map<String, dynamic>>();
         debugPrint('_fetchTeams: got ${rawTeams.length} teams from /rankings?mode=$_teamFilter');
         setState(() {
           _teams = rawTeams;
