@@ -175,6 +175,8 @@ class _HoopRankAppState extends State<HoopRankApp> {
                     final teamType = state.uri.queryParameters['teamType'];
                     final region = state.uri.queryParameters['region'];
                     return RankingsScreen(
+                      // Key forces widget recreation when query params change
+                      key: ValueKey(state.uri.toString()),
                       initialTab: tab == 'teams' ? 1 : 0,
                       initialTeamType: teamType,
                       initialRegion: region,
