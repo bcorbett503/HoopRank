@@ -437,10 +437,10 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             ),
           ),
           const Text(' • ', style: TextStyle(color: Colors.white38, fontSize: 13)),
-          // Teams count - always show as CTA, deep link to Teams tab
+          // Teams count - deep link to Rankings > Teams > 5v5 Local to discover teams
           GestureDetector(
             onTap: () {
-              context.go('/teams');
+              context.go('/rankings?tab=teams&teamType=5v5&region=local');
             },
             child: Text(
               '$teamCount team${teamCount == 1 ? '' : 's'}',

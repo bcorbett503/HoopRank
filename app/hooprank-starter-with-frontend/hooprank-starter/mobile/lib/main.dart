@@ -173,9 +173,11 @@ class _HoopRankAppState extends State<HoopRankApp> {
                     // Support query params for deep linking to Teams tab with specific filter
                     final tab = state.uri.queryParameters['tab'];
                     final teamType = state.uri.queryParameters['teamType'];
+                    final region = state.uri.queryParameters['region'];
                     return RankingsScreen(
                       initialTab: tab == 'teams' ? 1 : 0,
                       initialTeamType: teamType,
+                      initialRegion: region,
                     );
                   },
                 ),

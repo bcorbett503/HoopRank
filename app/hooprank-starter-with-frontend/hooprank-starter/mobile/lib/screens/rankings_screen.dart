@@ -16,11 +16,13 @@ import 'team_detail_screen.dart';
 class RankingsScreen extends StatefulWidget {
   final int initialTab;
   final String? initialTeamType;
+  final String? initialRegion;
   
   const RankingsScreen({
     super.key,
     this.initialTab = 0,
     this.initialTeamType,
+    this.initialRegion,
   });
 
   @override
@@ -72,6 +74,10 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     // Apply initial team type if provided (for deep linking)
     if (widget.initialTeamType != null) {
       _teamFilter = widget.initialTeamType!;
+    }
+    // Apply initial region if provided (for deep linking)
+    if (widget.initialRegion == 'local') {
+      _isTeamLocal = true;
     }
     
     _fetchPlayers();
