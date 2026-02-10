@@ -428,8 +428,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   List<Court> _searchCourts(String query) {
     try {
       final courtService = Provider.of<CourtService>(context, listen: false);
-      return courtService.searchCourts(query).take(5).toList();
+      final results = courtService.searchCourts(query).take(5).toList();
+      debugPrint('COURT_SEARCH: query="$query" totalCourts=${courtService.courts.length} results=${results.length}');
+      return results;
     } catch (e) {
+      debugPrint('COURT_SEARCH ERROR: $e');
       return [];
     }
   }
@@ -439,15 +442,15 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   // ==============================
   Widget _buildCourtPicker({
     required Court? selectedCourt,
-    required String searchQuery,
-    required List<Court> searchResults,
     required TextEditingController searchController,
     required void Function(Court?) onCourtSelected,
-    required void Function(String) onSearchChanged,
     required void Function(void Function()) setState,
   }) {
     final followedCourts = _getFollowedCourts();
     final hasOverflow = followedCourts.length >= 3;
+    // Compute search results directly from the controller text
+    final query = searchController.text.trim();
+    final searchResults = query.isEmpty ? <Court>[] : _searchCourts(query);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -531,7 +534,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                       onPressed: () => setState(() {
                         onCourtSelected(court);
                         searchController.clear();
-                        onSearchChanged('');
                       }),
                     )).toList(),
                   ),
@@ -554,7 +556,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                       icon: const Icon(Icons.clear, size: 18),
                       onPressed: () => setState(() {
                         searchController.clear();
-                        onSearchChanged('');
                       }),
                     )
                   : null,
@@ -567,7 +568,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
             style: const TextStyle(fontSize: 13),
-            onChanged: (query) => setState(() => onSearchChanged(query)),
+            onChanged: (_) => setState(() {}),
           ),
 
           // Search results
@@ -597,7 +598,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     onTap: () => setState(() {
                       onCourtSelected(court);
                       searchController.clear();
-                      onSearchChanged('');
                     }),
                   );
                 },
@@ -706,7 +706,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     String? recurrence;
     String selectedTeamId = _myTeams.first['id']?.toString() ?? '';
     Court? selectedCourt;
-    List<Court> courtSearchResults = [];
 
     showModalBottomSheet(
       context: context,
@@ -789,13 +788,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   // Court picker (status-composer style)
                   _buildCourtPicker(
                     selectedCourt: selectedCourt,
-                    searchQuery: courtSearchController.text,
-                    searchResults: courtSearchResults,
                     searchController: courtSearchController,
                     onCourtSelected: (court) { selectedCourt = court; },
-                    onSearchChanged: (query) {
-                      courtSearchResults = query.isEmpty ? [] : _searchCourts(query);
-                    },
                     setState: setSheetState,
                   ),
                   const SizedBox(height: 20),
@@ -927,7 +921,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     TimeOfDay selectedTime = const TimeOfDay(hour: 18, minute: 0);
     String selectedTeamId = _myTeams.first['id']?.toString() ?? '';
     Court? selectedCourt;
-    List<Court> courtSearchResults = [];
     String? selectedOpponentId;
     String? selectedOpponentName;
 
@@ -1014,13 +1007,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   // Court picker (status-composer style)
                   _buildCourtPicker(
                     selectedCourt: selectedCourt,
-                    searchQuery: courtSearchController.text,
-                    searchResults: courtSearchResults,
                     searchController: courtSearchController,
                     onCourtSelected: (court) { selectedCourt = court; },
-                    onSearchChanged: (query) {
-                      courtSearchResults = query.isEmpty ? [] : _searchCourts(query);
-                    },
                     setState: setSheetState,
                   ),
                   const SizedBox(height: 20),
