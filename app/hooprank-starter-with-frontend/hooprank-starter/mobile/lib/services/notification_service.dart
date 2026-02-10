@@ -108,8 +108,23 @@ class NotificationService with WidgetsBindingObserver {
   /// Clear the iOS app icon badge count
   static Future<void> clearBadge() async {
     try {
-      // Cancel all local notifications and clear badge
-      await FlutterLocalNotificationsPlugin().cancelAll();
+      // Cancel all local notifications
+      final plugin = FlutterLocalNotificationsPlugin();
+      await plugin.cancelAll();
+      
+      // Explicitly reset iOS badge count to 0
+      final iosPlugin = plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+      if (iosPlugin != null) {
+        await iosPlugin.requestPermissions(badge: true);
+      }
+      
+      // Also tell Firebase to not show badge
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: false,
+        sound: true,
+      );
+      
       debugPrint('Badge cleared');
     } catch (e) {
       debugPrint('Failed to clear badge: $e');
