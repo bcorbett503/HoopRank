@@ -353,7 +353,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () => context.go('/rankings'),
+                            onPressed: () => context.go('/rankings?region=local'),
                             icon: const Icon(Icons.person, size: 16),
                             label: const Text('Players', style: TextStyle(fontSize: 12)),
                             style: ElevatedButton.styleFrom(

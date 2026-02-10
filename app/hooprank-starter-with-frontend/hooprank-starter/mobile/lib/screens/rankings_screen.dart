@@ -77,6 +77,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     }
     // Apply initial region if provided (for deep linking)
     if (widget.initialRegion == 'local') {
+      _isLocal = true;
       _isTeamLocal = true;
     }
     
