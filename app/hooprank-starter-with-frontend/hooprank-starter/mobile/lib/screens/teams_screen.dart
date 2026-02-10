@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
@@ -555,7 +556,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
             style: const TextStyle(fontSize: 13),
-            onChanged: onSearchChanged,
+            onChanged: (query) => setState(() => onSearchChanged(query)),
           ),
 
           // Search results
