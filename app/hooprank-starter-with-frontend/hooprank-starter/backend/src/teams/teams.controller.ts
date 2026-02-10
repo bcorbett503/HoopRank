@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, Headers, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Headers, HttpCode } from '@nestjs/common';
 import { TeamsService } from './teams.service';
 
 @Controller('teams')
@@ -151,6 +151,26 @@ export class TeamsController {
     ) {
         await this.teamsService.deleteTeam(teamId, userId);
         return { success: true };
+    }
+
+    /**
+     * Update team details (owner only)
+     */
+    @Patch(':id')
+    async updateTeam(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: {
+            name?: string;
+            description?: string;
+            city?: string;
+            ageGroup?: string;
+            gender?: string;
+            skillLevel?: string;
+            homeCourtId?: string;
+        },
+    ) {
+        return this.teamsService.updateTeam(teamId, userId, body);
     }
 
     /**

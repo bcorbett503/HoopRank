@@ -324,6 +324,69 @@ export class TeamsService {
     }
 
     /**
+     * Update team details (owner only)
+     */
+    async updateTeam(
+        teamId: string,
+        userId: string,
+        updates: {
+            name?: string;
+            description?: string;
+            city?: string;
+            ageGroup?: string;
+            gender?: string;
+            skillLevel?: string;
+            homeCourtId?: string;
+        },
+    ): Promise<any> {
+        const team = await this.teamsRepository.findOne({ where: { id: teamId } });
+        if (!team) {
+            throw new NotFoundException('Team not found');
+        }
+        if (team.ownerId !== userId) {
+            throw new ForbiddenException('Only the owner can update the team');
+        }
+
+        // Build dynamic update
+        const setClauses: string[] = [];
+        const params: any[] = [];
+        let paramIndex = 1;
+
+        const fieldMap: Record<string, string> = {
+            name: 'name',
+            description: 'description',
+            city: 'city',
+            ageGroup: 'age_group',
+            gender: 'gender',
+            skillLevel: 'skill_level',
+            homeCourtId: 'home_court_id',
+        };
+
+        for (const [key, column] of Object.entries(fieldMap)) {
+            if (updates[key] !== undefined) {
+                setClauses.push(`${column} = $${paramIndex}`);
+                params.push(updates[key]);
+                paramIndex++;
+            }
+        }
+
+        if (setClauses.length === 0) {
+            return team;
+        }
+
+        setClauses.push(`updated_at = NOW()`);
+        params.push(teamId);
+
+        await this.dataSource.query(
+            `UPDATE teams SET ${setClauses.join(', ')} WHERE id = $${paramIndex}`,
+            params,
+        );
+
+        // Return updated team
+        return this.getTeamDetail(teamId, userId);
+    }
+
+    /**
      * Invite player to team
      */
     async invitePlayer(teamId: string, inviterId: string, playerId: string): Promise<void> {

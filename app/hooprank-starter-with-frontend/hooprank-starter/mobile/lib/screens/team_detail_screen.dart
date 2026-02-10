@@ -176,6 +176,209 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     }
   }
 
+  void _showEditTeamDialog() {
+    if (_team == null) return;
+    final team = _team!;
+
+    final nameController = TextEditingController(text: team['name'] ?? '');
+    final cityController = TextEditingController(text: team['city'] ?? '');
+    final descriptionController = TextEditingController(text: team['description'] ?? '');
+    String? skillLevel = team['skillLevel'];
+    String? ageGroup = team['ageGroup'];
+    String? gender = team['gender'];
+
+    final ageGroups = ['U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'];
+    final genders = ['Mens', 'Womens', 'Coed'];
+    final skillLevels = ['Recreational', 'Competitive', 'Elite'];
+    final skillIcons = {
+      'Recreational': Icons.directions_walk,
+      'Competitive': Icons.fitness_center,
+      'Elite': Icons.emoji_events,
+    };
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E2A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Edit Team', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Team Name
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Team Name',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.deepOrange),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Skill Level
+                const Text('Skill Level', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: skillLevels.map((sl) => ChoiceChip(
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(skillIcons[sl], size: 14, color: skillLevel == sl ? Colors.white : Colors.grey[400]),
+                        const SizedBox(width: 4),
+                        Text(sl, style: TextStyle(fontSize: 12, color: skillLevel == sl ? Colors.white : Colors.grey[400])),
+                      ],
+                    ),
+                    selected: skillLevel == sl,
+                    selectedColor: Colors.deepPurple,
+                    backgroundColor: Colors.grey[800],
+                    onSelected: (_) => setDialogState(() => skillLevel = skillLevel == sl ? null : sl),
+                  )).toList(),
+                ),
+                const SizedBox(height: 14),
+
+                // Age Group
+                const Text('Age Group', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: ageGroups.map((ag) => ChoiceChip(
+                    label: Text(ag, style: TextStyle(fontSize: 12, color: ageGroup == ag ? Colors.white : Colors.grey[400])),
+                    selected: ageGroup == ag,
+                    selectedColor: Colors.teal,
+                    backgroundColor: Colors.grey[800],
+                    onSelected: (_) => setDialogState(() => ageGroup = ageGroup == ag ? null : ag),
+                  )).toList(),
+                ),
+                const SizedBox(height: 14),
+
+                // Gender
+                const Text('Gender', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: genders.map((g) => ChoiceChip(
+                    label: Text(g, style: TextStyle(fontSize: 12, color: gender == g ? Colors.white : Colors.grey[400])),
+                    selected: gender == g,
+                    selectedColor: Colors.indigo,
+                    backgroundColor: Colors.grey[800],
+                    onSelected: (_) => setDialogState(() => gender = gender == g ? null : g),
+                  )).toList(),
+                ),
+                const SizedBox(height: 14),
+
+                // City
+                TextField(
+                  controller: cityController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'City',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    prefixIcon: Icon(Icons.location_on, color: Colors.grey[600], size: 20),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.deepOrange),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Description
+                TextField(
+                  controller: descriptionController,
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 3,
+                  maxLength: 200,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    counterStyle: TextStyle(color: Colors.grey[600]),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.deepOrange),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey[500])),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepOrange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final updates = <String, dynamic>{};
+                if (nameController.text.isNotEmpty && nameController.text != team['name']) {
+                  updates['name'] = nameController.text;
+                }
+                if (cityController.text != (team['city'] ?? '')) {
+                  updates['city'] = cityController.text;
+                }
+                if (descriptionController.text != (team['description'] ?? '')) {
+                  updates['description'] = descriptionController.text;
+                }
+                if (skillLevel != team['skillLevel']) {
+                  updates['skillLevel'] = skillLevel;
+                }
+                if (ageGroup != team['ageGroup']) {
+                  updates['ageGroup'] = ageGroup;
+                }
+                if (gender != team['gender']) {
+                  updates['gender'] = gender;
+                }
+
+                if (updates.isEmpty) {
+                  Navigator.pop(dialogContext);
+                  return;
+                }
+
+                Navigator.pop(dialogContext);
+                final result = await ApiService.updateTeam(widget.teamId, updates);
+                if (result != null) {
+                  _loadTeam();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Team updated!'), backgroundColor: Colors.green),
+                    );
+                  }
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -221,6 +424,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           ),
           if (isOwner)
             IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              tooltip: 'Edit team',
+              onPressed: _showEditTeamDialog,
+            ),
+          if (isOwner)
+            IconButton(
               icon: const Icon(Icons.delete),
               onPressed: _deleteTeam,
             )
@@ -243,7 +452,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: team['teamType'] == '3v3' ? Colors.blue : Colors.purple,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: team['teamType'] == '3v3'
+                        ? [const Color(0xFF1565C0), const Color(0xFF0D47A1), const Color(0xFF1A237E)]
+                        : [const Color(0xFF7B1FA2), const Color(0xFF6A1B9A), const Color(0xFF4A148C)],
+                  ),
                 ),
                 child: Column(
                   children: [

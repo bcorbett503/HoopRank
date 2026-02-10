@@ -801,6 +801,22 @@ class ApiService {
     return response.statusCode == 200;
   }
 
+  /// Update team details (owner only)
+  static Future<Map<String, dynamic>?> updateTeam(String teamId, Map<String, dynamic> updates) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/teams/$teamId'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(updates),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    return null;
+  }
+
   /// Invite player to team
   static Future<bool> inviteToTeam(String teamId, String userId) async {
     final response = await http.post(
