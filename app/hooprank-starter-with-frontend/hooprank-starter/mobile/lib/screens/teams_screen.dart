@@ -1715,6 +1715,49 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     ],
                   ],
                 ),
+                // Pending invites section
+                if ((team['pendingMembers'] as List?)?.isNotEmpty == true) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.deepOrange.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.deepOrange.withOpacity(0.15)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.pending_actions, size: 14, color: Colors.deepOrange[300]),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Pending Invites',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.deepOrange[300]),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ...(team['pendingMembers'] as List).map<Widget>((member) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Row(
+                              children: [
+                                Icon(Icons.schedule, size: 12, color: Colors.grey[500]),
+                                const SizedBox(width: 6),
+                                Text(
+                                  member['name'] ?? 'Unknown',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  ),
+                ],
                 if (descriptionVal != null && descriptionVal.toString().isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(

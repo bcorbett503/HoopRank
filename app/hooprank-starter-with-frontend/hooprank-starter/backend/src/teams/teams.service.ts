@@ -34,9 +34,24 @@ export class TeamsService {
             relations: ['team'],
         });
 
-        return memberships
-            .filter(m => m.team)  // Filter out memberships where team couldn't be loaded
-            .map(m => ({
+        const result: any[] = [];
+        for (const m of memberships) {
+            if (!m.team) continue;
+
+            // Get pending members for this team
+            const pendingMembers = await this.dataSource.query(`
+                SELECT tm.user_id, u.name, u.photo_url
+                FROM team_members tm
+                LEFT JOIN users u ON u.id = tm.user_id
+                WHERE tm.team_id = $1 AND tm.status = 'pending'
+            `, [m.team.id]);
+
+            // Get active member count
+            const activeCount = await this.membersRepository.count({
+                where: { teamId: m.team.id, status: 'active' },
+            });
+
+            result.push({
                 id: m.team.id,
                 name: m.team.name,
                 teamType: m.team.teamType,
@@ -51,9 +66,16 @@ export class TeamsService {
                 losses: m.team.losses,
                 logoUrl: m.team.logoUrl,
                 isOwner: m.team.ownerId === userId,
-                memberCount: 0,
-                pendingCount: 0,
-            }));
+                memberCount: activeCount,
+                pendingCount: pendingMembers.length,
+                pendingMembers: pendingMembers.map(p => ({
+                    id: p.user_id,
+                    name: p.name || 'Unknown',
+                    photoUrl: p.photo_url,
+                })),
+            });
+        }
+        return result;
     }
 
     /**
