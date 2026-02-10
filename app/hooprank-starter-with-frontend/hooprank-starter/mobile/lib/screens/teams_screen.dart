@@ -113,21 +113,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       return;
     }
 
-    // Capture CourtService from widget context BEFORE opening dialog
-    final courtService = context.read<CourtService>();
-
     final nameController = TextEditingController();
-    final cityController = TextEditingController();
-    final descriptionController = TextEditingController();
     String teamType = '5v5';
     String? ageGroup;
     String? gender;
     String? skillLevel;
-    Court? selectedCourt;
     File? selectedImage;
-    List<Court> courtSearchResults = [];
-    final courtSearchController = TextEditingController();
-    bool showCourtResults = false;
 
     final ageGroups = ['U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'];
     final genders = ['Mens', 'Womens', 'Coed'];
@@ -148,6 +139,44 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // --- Team Logo ---
+                Center(
+                  child: GestureDetector(
+                    onTap: () async {
+                      final picker = ImagePicker();
+                      final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 512, maxHeight: 512);
+                      if (picked != null) {
+                        setDialogState(() => selectedImage = File(picked.path));
+                      }
+                    },
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundColor: Colors.grey[700],
+                          backgroundImage: selectedImage != null ? FileImage(selectedImage!) : null,
+                          child: selectedImage == null
+                              ? const Icon(Icons.groups, size: 36, color: Colors.white54)
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.deepOrange,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
                 // --- Team Name ---
                 TextField(
                   controller: nameController,
@@ -241,141 +270,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   )).toList(),
                 ),
 
-                const SizedBox(height: 16),
-
-                // --- Home Court ---
-                const Text('Home Court', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                if (selectedCourt != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.sports_basketball, color: Colors.green, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(selectedCourt!.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                              if (selectedCourt!.address != null)
-                                Text(selectedCourt!.address!, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () => setDialogState(() {
-                            selectedCourt = null;
-                            cityController.clear();
-                          }),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
-                  )
-                else ...
-                  [
-                    TextField(
-                      controller: courtSearchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search courts...',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onChanged: (query) {
-                        setDialogState(() {
-                          if (query.length >= 2) {
-                            courtSearchResults = courtService.searchCourts(query).take(5).toList();
-                            showCourtResults = true;
-                          } else {
-                            courtSearchResults = [];
-                            showCourtResults = false;
-                          }
-                        });
-                      },
-                    ),
-                    if (showCourtResults && courtSearchResults.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        constraints: const BoxConstraints(maxHeight: 150),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: courtSearchResults.length,
-                          itemBuilder: (ctx, i) {
-                            final court = courtSearchResults[i];
-                            return ListTile(
-                              dense: true,
-                              leading: Icon(
-                                court.isIndoor ? Icons.home : Icons.wb_sunny,
-                                size: 18,
-                                color: court.isIndoor ? Colors.blue : Colors.amber,
-                              ),
-                              title: Text(court.name, style: const TextStyle(fontSize: 13)),
-                              subtitle: court.address != null
-                                  ? Text(court.address!, style: const TextStyle(fontSize: 11))
-                                  : null,
-                              onTap: () {
-                                setDialogState(() {
-                                  selectedCourt = court;
-                                  showCourtResults = false;
-                                  courtSearchController.clear();
-                                  // Auto-fill city from court address
-                                  if (court.address != null) {
-                                    final parts = court.address!.split(',');
-                                    if (parts.length >= 2) {
-                                      cityController.text = parts[parts.length - 2].trim();
-                                    }
-                                  }
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                  ],
-
-                const SizedBox(height: 16),
-
-                // --- City ---
-                TextField(
-                  controller: cityController,
-                  decoration: const InputDecoration(
-                    labelText: 'City',
-                    hintText: 'e.g. Portland, OR',
-                    isDense: true,
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // --- Description ---
-                TextField(
-                  controller: descriptionController,
-                  decoration: InputDecoration(
-                    labelText: 'Description',
-                    hintText: 'Short team bio...',
-                    isDense: true,
-                    counterText: '${descriptionController.text.length}/200',
-                  ),
-                  maxLines: 2,
-                  maxLength: 200,
-                  onChanged: (_) => setDialogState(() {}),
-                ),
-
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   teamType == '3v3' ? 'Max 5 members' : 'Max 10 members',
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
@@ -399,9 +294,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   ageGroup: ageGroup,
                   gender: gender,
                   skillLevel: skillLevel,
-                  homeCourtId: selectedCourt?.id,
-                  city: cityController.text.trim().isNotEmpty ? cityController.text.trim() : null,
-                  description: descriptionController.text.trim().isNotEmpty ? descriptionController.text.trim() : null,
                 );
               },
               style: ElevatedButton.styleFrom(
