@@ -23,6 +23,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   List<Map<String, dynamic>> _myTeams = [];
   List<Map<String, dynamic>> _invites = [];
   List<Map<String, dynamic>> _events = [];
+  List<Map<String, dynamic>> _allTeams = []; // cached for opponent search
   bool _isLoading = true;
   late TabController _tabController;
 
@@ -58,6 +59,20 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       ]);
       // Ensure courts are loaded for court picker (same pattern as status composer)
       await CourtService().loadCourts();
+      // Load all teams for opponent search (from 5v5 + 3v3 rankings)
+      try {
+        final fiveResults = await ApiService.getTeamRankings(teamType: '5v5');
+        final threeResults = await ApiService.getTeamRankings(teamType: '3v3');
+        final seen = <String>{};
+        _allTeams = [];
+        for (final t in [...fiveResults, ...threeResults]) {
+          final id = t['id']?.toString() ?? '';
+          if (id.isNotEmpty && seen.add(id)) _allTeams.add(t);
+        }
+        debugPrint('TEAMS_SEARCH: loaded ${_allTeams.length} teams for search');
+      } catch (e) {
+        debugPrint('Failed to load all teams for search: $e');
+      }
       if (mounted) {
         setState(() {
           _myTeams = results[0] as List<Map<String, dynamic>>;
@@ -444,6 +459,18 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       debugPrint('COURT_SEARCH ERROR: $e');
       return [];
     }
+  }
+
+  /// Search cached teams by name for opponent picker
+  List<Map<String, dynamic>> _searchTeams(String query) {
+    if (query.isEmpty || _allTeams.isEmpty) return [];
+    final lowerQuery = query.toLowerCase();
+    final myTeamIds = _myTeams.map((t) => t['id']?.toString()).toSet();
+    return _allTeams.where((team) {
+      final name = (team['name'] ?? team['teamName'] ?? '').toString().toLowerCase();
+      final id = team['id']?.toString() ?? '';
+      return name.contains(lowerQuery) && !myTeamIds.contains(id);
+    }).take(5).toList();
   }
 
   // ==============================
@@ -1125,6 +1152,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         hintText: 'Search or type team name...',
                         hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
                         prefixIcon: Icon(Icons.search, size: 18, color: Colors.white.withOpacity(0.3)),
+                        suffixIcon: opponentController.text.isNotEmpty
+                            ? GestureDetector(
+                                onTap: () => setSheetState(() => opponentController.clear()),
+                                child: Icon(Icons.close, size: 18, color: Colors.white.withOpacity(0.4)),
+                              )
+                            : null,
                         isDense: true,
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.04),
@@ -1134,43 +1167,83 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         contentPadding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                       style: const TextStyle(fontSize: 13),
-                      onSubmitted: (value) {
-                        if (value.trim().isNotEmpty) {
-                          setSheetState(() {
-                            selectedOpponentName = value.trim();
-                            selectedOpponentId = null;
-                          });
-                        }
-                      },
+                      onChanged: (_) => setSheetState(() {}),
                     ),
-                    if (opponentController.text.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: InkWell(
-                          onTap: () => setSheetState(() {
-                            selectedOpponentName = opponentController.text.trim();
-                            selectedOpponentId = null;
-                          }),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.purple.withOpacity(0.2)),
-                              color: Colors.purple.withOpacity(0.06),
+                    // Live search results
+                    Builder(builder: (_) {
+                      final query = opponentController.text.trim();
+                      if (query.isEmpty) return const SizedBox.shrink();
+                      final teamResults = _searchTeams(query);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (teamResults.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              constraints: const BoxConstraints(maxHeight: 200),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                                color: Colors.grey[850],
+                              ),
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                padding: EdgeInsets.zero,
+                                itemCount: teamResults.length,
+                                separatorBuilder: (_, __) => Divider(height: 1, color: Colors.white.withOpacity(0.06)),
+                                itemBuilder: (_, i) {
+                                  final team = teamResults[i];
+                                  final teamName = (team['name'] ?? team['teamName'] ?? 'Unknown').toString();
+                                  final teamType = (team['teamType'] ?? '').toString();
+                                  return ListTile(
+                                    dense: true,
+                                    visualDensity: const VisualDensity(vertical: -3),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                                    leading: const Icon(Icons.groups, size: 18, color: Colors.purple),
+                                    title: Text(teamName, style: const TextStyle(fontSize: 13, color: Colors.white)),
+                                    subtitle: teamType.isNotEmpty
+                                        ? Text(teamType, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.4)))
+                                        : null,
+                                    onTap: () => setSheetState(() {
+                                      selectedOpponentId = team['id']?.toString();
+                                      selectedOpponentName = teamName;
+                                      opponentController.clear();
+                                    }),
+                                  );
+                                },
+                              ),
                             ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.add, size: 16, color: Colors.purple),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Use "${opponentController.text.trim()}"',
-                                  style: const TextStyle(fontSize: 13, color: Colors.purple),
+                          // "Use custom name" option
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: InkWell(
+                              onTap: () => setSheetState(() {
+                                selectedOpponentName = opponentController.text.trim();
+                                selectedOpponentId = null;
+                              }),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                                  color: Colors.purple.withOpacity(0.06),
                                 ),
-                              ],
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.add, size: 16, color: Colors.purple),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Use "${opponentController.text.trim()}"',
+                                      style: const TextStyle(fontSize: 13, color: Colors.purple),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                        ],
+                      );
+                    }),
                   ],
                   const SizedBox(height: 20),
 
