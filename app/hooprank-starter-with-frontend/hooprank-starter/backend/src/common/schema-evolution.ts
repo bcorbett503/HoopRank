@@ -152,6 +152,12 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
               AND te.opponent_team_name IS NOT NULL
         `);
 
+        // Confirm/Amend flow columns for team matches
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS submitted_by_team_id TEXT`);
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS amended_score_creator INT`);
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS amended_score_opponent INT`);
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS amended_by_team_id TEXT`);
+
         console.log('[SchemaEvolution] All migrations completed successfully');
     } catch (error) {
         console.error('[SchemaEvolution] Migration error:', error.message);

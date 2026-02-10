@@ -972,6 +972,71 @@ class ApiService {
     throw Exception('Failed to submit score: ${response.body}');
   }
 
+  /// Confirm opponent's submitted team match score
+  static Future<Map<String, dynamic>> confirmTeamMatchScore({
+    required String teamId,
+    required String matchId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/confirm'),
+      headers: {'x-user-id': _userId ?? '', 'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to confirm score: ${response.body}');
+  }
+
+  /// Amend opponent's submitted team match score
+  static Future<Map<String, dynamic>> amendTeamMatchScore({
+    required String teamId,
+    required String matchId,
+    required int myScore,
+    required int opponentScore,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/amend'),
+      headers: {'x-user-id': _userId ?? '', 'Content-Type': 'application/json'},
+      body: jsonEncode({'myScore': myScore, 'opponentScore': opponentScore}),
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to amend score: ${response.body}');
+  }
+
+  /// Accept an amendment proposed by the opponent team
+  static Future<Map<String, dynamic>> confirmAmendment({
+    required String teamId,
+    required String matchId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/confirm-amendment'),
+      headers: {'x-user-id': _userId ?? '', 'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to confirm amendment: ${response.body}');
+  }
+
+  /// Reject an amendment proposed by the opponent team
+  static Future<Map<String, dynamic>> rejectAmendment({
+    required String teamId,
+    required String matchId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/reject-amendment'),
+      headers: {'x-user-id': _userId ?? '', 'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to reject amendment: ${response.body}');
+  }
+
+  /// Get pending team match scores for the current user
+  static Future<List<dynamic>> getPendingTeamScores() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/teams/pending-scores'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to get pending scores: ${response.body}');
+  }
+
   // ===================
   // Team Events (Practices & Games)
   // ===================

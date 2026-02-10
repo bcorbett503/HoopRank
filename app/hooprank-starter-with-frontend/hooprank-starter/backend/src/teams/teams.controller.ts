@@ -61,6 +61,16 @@ export class TeamsController {
     }
 
     /**
+     * Get pending team score confirmations/amendments for the current user
+     * Must be before :id route
+     */
+    @Get('pending-scores')
+    async getPendingTeamScores(@Headers('x-user-id') userId: string) {
+        if (!userId) return [];
+        return this.teamsService.getPendingTeamScores(userId);
+    }
+
+    /**
      * Get teams for a specific user (mobile path: GET /teams/user/:userId)
      */
     @Get('user/:userId')
@@ -307,6 +317,59 @@ export class TeamsController {
         @Body() body: { me: number; opponent: number },
     ) {
         return this.teamsService.submitTeamMatchScore(matchId, teamId, userId, body.me, body.opponent);
+    }
+
+    /**
+     * Confirm opponent's submitted score
+     */
+    @Post(':id/matches/:matchId/confirm')
+    @HttpCode(200)
+    async confirmTeamMatchScore(
+        @Param('id') teamId: string,
+        @Param('matchId') matchId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.teamsService.confirmTeamMatchScore(matchId, teamId, userId);
+    }
+
+    /**
+     * Amend opponent's submitted score
+     */
+    @Post(':id/matches/:matchId/amend')
+    @HttpCode(200)
+    async amendTeamMatchScore(
+        @Param('id') teamId: string,
+        @Param('matchId') matchId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: { myScore: number; opponentScore: number },
+    ) {
+        return this.teamsService.amendTeamMatchScore(matchId, teamId, userId, body.myScore, body.opponentScore);
+    }
+
+    /**
+     * Accept an amendment proposed by opponent
+     */
+    @Post(':id/matches/:matchId/confirm-amendment')
+    @HttpCode(200)
+    async confirmAmendment(
+        @Param('id') teamId: string,
+        @Param('matchId') matchId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.teamsService.confirmAmendment(matchId, teamId, userId);
+    }
+
+    /**
+     * Reject an amendment proposed by opponent
+     */
+    @Post(':id/matches/:matchId/reject-amendment')
+    @HttpCode(200)
+    async rejectAmendment(
+        @Param('id') teamId: string,
+        @Param('matchId') matchId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.teamsService.rejectAmendment(matchId, teamId, userId);
     }
 
     // ====================

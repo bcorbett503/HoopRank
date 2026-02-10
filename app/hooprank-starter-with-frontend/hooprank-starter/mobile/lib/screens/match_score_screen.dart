@@ -65,7 +65,20 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         if (!mounted) return;
         match.setScores(userScore, oppScore);
         
-        // Use actual rating changes from backend response
+        // Check if score needs opponent confirmation
+        if (response != null && response['status'] == 'pending_confirmation') {
+          // Score submitted, awaiting opponent confirmation
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Score submitted! Waiting for opponent to confirm.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          context.go('/teams');
+          return;
+        }
+        
+        // Match finalized immediately (unregistered opponent) — use rating changes
         final won = userScore > oppScore;
         double delta = won ? 0.1 : -0.1;  // Default fallback
         double ratingBefore = 3.0;

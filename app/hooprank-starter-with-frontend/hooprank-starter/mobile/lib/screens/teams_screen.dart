@@ -25,6 +25,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   List<Map<String, dynamic>> _myTeams = [];
   List<Map<String, dynamic>> _invites = [];
   List<Map<String, dynamic>> _events = [];
+  List<dynamic> _pendingScores = [];
   List<Map<String, dynamic>> _allTeams = []; // cached for opponent search
   bool _isLoading = true;
   late TabController _tabController;
@@ -82,6 +83,13 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
           _events = results[2] as List<Map<String, dynamic>>;
           _isLoading = false;
         });
+        // Load pending scores separately (non-blocking)
+        try {
+          final ps = await ApiService.getPendingTeamScores();
+          if (mounted) setState(() => _pendingScores = ps);
+        } catch (e) {
+          debugPrint('Failed to load pending scores: $e');
+        }
       }
     } catch (e) {
       debugPrint('Error loading teams: $e');
@@ -1383,8 +1391,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       matchState.opponentTeamName = opponentName;
       matchState.setMatchId(match['id']?.toString());
 
-      // Navigate to match setup
-      context.go('/match/setup');
+      // Navigate directly to score input
+      context.go('/match/score');
     } catch (e) {
       debugPrint('Error starting match from event: $e');
       if (mounted) {
@@ -1787,10 +1795,330 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   }
 
   // ==============================
+  // PENDING SCORE CARDS
+  // ==============================
+  Widget _buildPendingScoreCard(dynamic ps) {
+    final status = ps['status']?.toString() ?? '';
+    final matchId = ps['matchId']?.toString() ?? '';
+    final creatorName = ps['creatorTeamName'] ?? 'Team A';
+    final opponentName = ps['opponentTeamName'] ?? 'Team B';
+    final scoreCreator = ps['score_creator'];
+    final scoreOpponent = ps['score_opponent'];
+    final submittedByTeamId = ps['submitted_by_team_id']?.toString() ?? '';
+    final amendedCreator = ps['amended_score_creator'];
+    final amendedOpponent = ps['amended_score_opponent'];
+
+    // Determine which of my teams is involved
+    final myTeam = _myTeams.firstWhere(
+      (t) => t['id']?.toString() == ps['creator_team_id']?.toString() ||
+             t['id']?.toString() == ps['opponent_team_id']?.toString(),
+      orElse: () => <String, dynamic>{},
+    );
+    final myTeamId = myTeam['id']?.toString() ?? '';
+    final isSubmitter = submittedByTeamId == myTeamId;
+
+    final isPendingConfirmation = status == 'pending_confirmation' && !isSubmitter;
+    final isPendingAmendment = status == 'pending_amendment' && isSubmitter;
+    final isWaiting = (status == 'pending_confirmation' && isSubmitter) ||
+                      (status == 'pending_amendment' && !isSubmitter);
+
+    final accentColor = isPendingAmendment ? Colors.orange : Colors.blue;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: accentColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accentColor.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(
+                  isPendingAmendment ? Icons.edit_note : Icons.scoreboard,
+                  color: accentColor, size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isPendingConfirmation
+                        ? 'Score Submitted'
+                        : isPendingAmendment
+                            ? 'Score Amendment Proposed'
+                            : 'Awaiting Opponent',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Score display
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(creatorName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${scoreCreator ?? '-'} - ${scoreOpponent ?? '-'}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(opponentName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              ],
+            ),
+            // Amended scores (if pending_amendment)
+            if (isPendingAmendment && amendedCreator != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Proposed: ', style: TextStyle(color: Colors.orange[300], fontSize: 12)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      '$amendedCreator - $amendedOpponent',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.orange[300]),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            // Action buttons
+            if (isPendingConfirmation)
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          await ApiService.confirmTeamMatchScore(teamId: myTeamId, matchId: matchId);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Score confirmed! Ratings updated.')),
+                            );
+                            _loadData();
+                          }
+                        } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        }
+                      },
+                      icon: const Icon(Icons.check, size: 16),
+                      label: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green, foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showAmendScoreDialog(myTeamId, matchId),
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Amend Score', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        side: const BorderSide(color: Colors.orange),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (isPendingAmendment)
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          await ApiService.confirmAmendment(teamId: myTeamId, matchId: matchId);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Amendment accepted! Ratings updated.')),
+                            );
+                            _loadData();
+                          }
+                        } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        }
+                      },
+                      icon: const Icon(Icons.check, size: 16),
+                      label: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green, foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        try {
+                          await ApiService.rejectAmendment(teamId: myTeamId, matchId: matchId);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Amendment rejected. Waiting for opponent to re-confirm.')),
+                            );
+                            _loadData();
+                          }
+                        } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        }
+                      },
+                      icon: const Icon(Icons.close, size: 16),
+                      label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (isWaiting)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey[500]),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      status == 'pending_confirmation'
+                          ? 'Waiting for opponent to confirm...'
+                          : 'Waiting for opponent to review amendment...',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAmendScoreDialog(String teamId, String matchId) {
+    final myCtrl = TextEditingController();
+    final oppCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.edit, color: Colors.orange, size: 24),
+            const SizedBox(width: 8),
+            const Text('Amend Score'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Enter the correct scores:', style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: myCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      hintText: '0', labelText: 'Your Score',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: oppCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      hintText: '0', labelText: 'Opp. Score',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final my = int.tryParse(myCtrl.text);
+              final opp = int.tryParse(oppCtrl.text);
+              if (my == null || opp == null) return;
+              Navigator.pop(ctx);
+              try {
+                await ApiService.amendTeamMatchScore(
+                  teamId: teamId, matchId: matchId,
+                  myScore: my, opponentScore: opp,
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Score amendment submitted!')),
+                  );
+                  _loadData();
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+            child: const Text('Submit Amendment'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==============================
   // SCHEDULE tab
   // ==============================
   Widget _buildScheduleTab() {
-    if (_events.isEmpty) {
+    if (_events.isEmpty && _pendingScores.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1815,10 +2143,17 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: ListView.builder(
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-        itemCount: _events.length,
-        itemBuilder: (context, index) => _buildEventCard(_events[index]),
+        children: [
+          // Pending Scores section
+          if (_pendingScores.isNotEmpty) ...[
+            ..._pendingScores.map((ps) => _buildPendingScoreCard(ps)).toList(),
+            const SizedBox(height: 8),
+          ],
+          // Regular events
+          ..._events.map((e) => _buildEventCard(e)).toList(),
+        ],
       ),
     );
   }
@@ -1974,12 +2309,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   ),
                 ),
                 const Spacer(),
-                // Start Game button (games only)
+                // Track Outcome button (games only)
                 if (!isPractice)
                   ElevatedButton.icon(
                     onPressed: () => _startGameFromEvent(event),
-                    icon: const Icon(Icons.sports_basketball, size: 16),
-                    label: const Text('Start Game', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.scoreboard, size: 16),
+                    label: const Text('Track Outcome', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purple,
                       foregroundColor: Colors.white,

@@ -876,7 +876,9 @@ export class TeamsService {
     }
 
     /**
-     * Submit scores for a team match and update team ratings
+     * Submit scores for a team match.
+     * If opponent is a registered team, sets status to pending_confirmation.
+     * If opponent is unregistered, finalizes immediately.
      */
     async submitTeamMatchScore(
         matchId: string,
@@ -893,104 +895,295 @@ export class TeamsService {
                 where: { teamId, userId, status: 'active' },
             });
             if (!membership) {
-                console.log(`[TeamsService] User ${userId} is not a member of team ${teamId}`);
                 throw new ForbiddenException('You must be a member of the team');
             }
-
-            // Schema migrations are now handled by schema-evolution.ts at startup
 
             // Get match
             const matches = await this.dataSource.query(`
                 SELECT * FROM matches WHERE id = $1 AND team_match = true
             `, [matchId]);
             if (matches.length === 0) {
-                console.log(`[TeamsService] No team match found with id=${matchId}`);
                 throw new NotFoundException('Team match not found');
             }
             const match = matches[0];
-            console.log(`[TeamsService] Found match: creator_team=${match.creator_team_id}, opponent_team=${match.opponent_team_id}`);
 
-            // Determine which team submitted and set scores
+            // Determine scores relative to creator/opponent
             const isCreatorTeam = match.creator_team_id === teamId;
             const creatorScore = isCreatorTeam ? myScore : opponentScore;
             const opponentTeamScore = isCreatorTeam ? opponentScore : myScore;
-            const winnerTeamId = myScore > opponentScore ? teamId : (isCreatorTeam ? match.opponent_team_id : match.creator_team_id);
 
-            // Get current team ratings - use separate queries to avoid IN clause issues
-            const creatorTeamResult = await this.dataSource.query(`
-                SELECT id, rating FROM teams WHERE id = $1
-            `, [match.creator_team_id]);
-            const opponentTeamResult = await this.dataSource.query(`
-                SELECT id, rating FROM teams WHERE id = $1
-            `, [match.opponent_team_id]);
+            if (match.opponent_team_id) {
+                // Registered opponent → pending confirmation
+                await this.dataSource.query(`
+                    UPDATE matches SET
+                        status = 'pending_confirmation',
+                        score_creator = $1,
+                        score_opponent = $2,
+                        submitted_by_team_id = $3
+                    WHERE id = $4
+                `, [creatorScore, opponentTeamScore, teamId, matchId]);
 
-            const creatorTeam = creatorTeamResult[0];
-            const opponentTeam = opponentTeamResult[0];
-
-            const creatorRating = parseFloat(creatorTeam?.rating || '3.0');
-            const opponentRating = parseFloat(opponentTeam?.rating || '3.0');
-            console.log(`[TeamsService] Current ratings: creator=${creatorRating}, opponent=${opponentRating}`);
-
-            // Calculate new Elo ratings (same formula as 1v1)
-            const K = 0.2;
-            const expectedCreator = 1 / (1 + Math.pow(10, (opponentRating - creatorRating) / 1));
-            const creatorWon = match.creator_team_id === winnerTeamId ? 1 : 0;
-
-            const newCreatorRating = Math.max(1, Math.min(5, creatorRating + K * (creatorWon - expectedCreator)));
-            const newOpponentRating = Math.max(1, Math.min(5, opponentRating + K * ((1 - creatorWon) - (1 - expectedCreator))));
-
-            // Determine winner/loser old/new ratings for feed display
-            const winnerOldRating = match.creator_team_id === winnerTeamId ? creatorRating : opponentRating;
-            const winnerNewRating = match.creator_team_id === winnerTeamId ? newCreatorRating : newOpponentRating;
-            const loserOldRating = match.creator_team_id === winnerTeamId ? opponentRating : creatorRating;
-            const loserNewRating = match.creator_team_id === winnerTeamId ? newOpponentRating : newCreatorRating;
-
-            // Update match with scores and rating changes
-            await this.dataSource.query(`
-                UPDATE matches SET 
-                    status = 'completed',
-                    winner_id = $1,
-                    score_creator = $2,
-                    score_opponent = $3,
-                    completed_at = NOW(),
-                    winner_old_rating = $5,
-                    winner_new_rating = $6,
-                    loser_old_rating = $7,
-                    loser_new_rating = $8
-                WHERE id = $4
-            `, [winnerTeamId, creatorScore, opponentTeamScore, matchId,
-                winnerOldRating.toFixed(2), winnerNewRating.toFixed(2),
-                loserOldRating.toFixed(2), loserNewRating.toFixed(2)]);
-
-            // Update team ratings and W/L records - separate queries for clarity
-            if (match.creator_team_id === winnerTeamId) {
-                await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
-                    [newCreatorRating.toFixed(2), match.creator_team_id]);
-                await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
-                    [newOpponentRating.toFixed(2), match.opponent_team_id]);
+                console.log(`[TeamsService] Match ${matchId} set to pending_confirmation, awaiting opponent team ${match.opponent_team_id}`);
+                return {
+                    matchId,
+                    status: 'pending_confirmation',
+                    scores: { creator: creatorScore, opponent: opponentTeamScore },
+                };
             } else {
-                await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
-                    [newCreatorRating.toFixed(2), match.creator_team_id]);
-                await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
-                    [newOpponentRating.toFixed(2), match.opponent_team_id]);
+                // Unregistered opponent → finalize immediately
+                return await this._finalizeTeamMatch(matchId, match, creatorScore, opponentTeamScore, teamId);
             }
-
-            console.log(`[TeamsService] Team match ${matchId} completed. Winner: ${winnerTeamId}`);
-            console.log(`[TeamsService] Rating changes: ${match.creator_team_id}: ${creatorRating} -> ${newCreatorRating.toFixed(2)}, ${match.opponent_team_id}: ${opponentRating} -> ${newOpponentRating.toFixed(2)}`);
-
-            return {
-                matchId,
-                winnerTeamId,
-                scores: { creator: creatorScore, opponent: opponentTeamScore },
-                ratingChanges: {
-                    [match.creator_team_id]: { old: creatorRating, new: newCreatorRating },
-                    [match.opponent_team_id]: { old: opponentRating, new: newOpponentRating },
-                },
-            };
         } catch (error) {
             console.error(`[TeamsService] submitTeamMatchScore ERROR:`, error);
             throw error;
         }
+    }
+
+    /**
+     * Opponent confirms the submitted score → finalize the match
+     */
+    async confirmTeamMatchScore(matchId: string, teamId: string, userId: string): Promise<any> {
+        console.log(`[TeamsService] confirmTeamMatchScore: matchId=${matchId}, teamId=${teamId}`);
+
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        const matches = await this.dataSource.query(`
+            SELECT * FROM matches WHERE id = $1 AND team_match = true AND status = 'pending_confirmation'
+        `, [matchId]);
+        if (matches.length === 0) {
+            throw new NotFoundException('No pending team match found');
+        }
+        const match = matches[0];
+
+        // Ensure this team is NOT the one that submitted
+        if (match.submitted_by_team_id === teamId) {
+            throw new ForbiddenException('You cannot confirm your own score submission');
+        }
+
+        return await this._finalizeTeamMatch(matchId, match, match.score_creator, match.score_opponent, null);
+    }
+
+    /**
+     * Opponent proposes amended scores
+     */
+    async amendTeamMatchScore(
+        matchId: string, teamId: string, userId: string,
+        myScore: number, opponentScore: number,
+    ): Promise<any> {
+        console.log(`[TeamsService] amendTeamMatchScore: matchId=${matchId}, teamId=${teamId}, myScore=${myScore}, oppScore=${opponentScore}`);
+
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        const matches = await this.dataSource.query(`
+            SELECT * FROM matches WHERE id = $1 AND team_match = true AND status = 'pending_confirmation'
+        `, [matchId]);
+        if (matches.length === 0) {
+            throw new NotFoundException('No pending team match found');
+        }
+        const match = matches[0];
+
+        if (match.submitted_by_team_id === teamId) {
+            throw new ForbiddenException('You cannot amend your own score submission');
+        }
+
+        // Store amended scores relative to creator/opponent
+        const isCreatorTeam = match.creator_team_id === teamId;
+        const amendedCreator = isCreatorTeam ? myScore : opponentScore;
+        const amendedOpponent = isCreatorTeam ? opponentScore : myScore;
+
+        await this.dataSource.query(`
+            UPDATE matches SET
+                status = 'pending_amendment',
+                amended_score_creator = $1,
+                amended_score_opponent = $2,
+                amended_by_team_id = $3
+            WHERE id = $4
+        `, [amendedCreator, amendedOpponent, teamId, matchId]);
+
+        return { matchId, status: 'pending_amendment' };
+    }
+
+    /**
+     * Original submitter accepts the amendment → finalize with amended scores
+     */
+    async confirmAmendment(matchId: string, teamId: string, userId: string): Promise<any> {
+        console.log(`[TeamsService] confirmAmendment: matchId=${matchId}, teamId=${teamId}`);
+
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        const matches = await this.dataSource.query(`
+            SELECT * FROM matches WHERE id = $1 AND team_match = true AND status = 'pending_amendment'
+        `, [matchId]);
+        if (matches.length === 0) {
+            throw new NotFoundException('No pending amendment found');
+        }
+        const match = matches[0];
+
+        // Only the original submitter can accept the amendment
+        if (match.submitted_by_team_id !== teamId) {
+            throw new ForbiddenException('Only the original score submitter can accept amendments');
+        }
+
+        // Finalize with amended scores
+        return await this._finalizeTeamMatch(matchId, match, match.amended_score_creator, match.amended_score_opponent, null);
+    }
+
+    /**
+     * Original submitter rejects the amendment → revert to pending_confirmation
+     */
+    async rejectAmendment(matchId: string, teamId: string, userId: string): Promise<any> {
+        console.log(`[TeamsService] rejectAmendment: matchId=${matchId}, teamId=${teamId}`);
+
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        const matches = await this.dataSource.query(`
+            SELECT * FROM matches WHERE id = $1 AND team_match = true AND status = 'pending_amendment'
+        `, [matchId]);
+        if (matches.length === 0) {
+            throw new NotFoundException('No pending amendment found');
+        }
+        const match = matches[0];
+
+        if (match.submitted_by_team_id !== teamId) {
+            throw new ForbiddenException('Only the original score submitter can reject amendments');
+        }
+
+        // Revert to pending_confirmation with original scores
+        await this.dataSource.query(`
+            UPDATE matches SET
+                status = 'pending_confirmation',
+                amended_score_creator = NULL,
+                amended_score_opponent = NULL,
+                amended_by_team_id = NULL
+            WHERE id = $1
+        `, [matchId]);
+
+        return { matchId, status: 'pending_confirmation' };
+    }
+
+    /**
+     * Get pending team scores (pending_confirmation or pending_amendment) for teams user belongs to
+     */
+    async getPendingTeamScores(userId: string): Promise<any[]> {
+        const results = await this.dataSource.query(`
+            SELECT m.id as "matchId", m.status, m.score_creator, m.score_opponent,
+                   m.creator_team_id, m.opponent_team_id, m.submitted_by_team_id,
+                   m.amended_score_creator, m.amended_score_opponent, m.amended_by_team_id,
+                   COALESCE(t1.name, 'Unknown') as "creatorTeamName",
+                   COALESCE(t2.name, m.opponent_name, 'Unknown') as "opponentTeamName"
+            FROM matches m
+            LEFT JOIN teams t1 ON t1.id = m.creator_team_id::uuid
+            LEFT JOIN teams t2 ON t2.id = m.opponent_team_id::uuid
+            INNER JOIN team_members tm ON (tm.team_id = m.creator_team_id OR tm.team_id = m.opponent_team_id)
+            WHERE m.team_match = true
+              AND m.status IN ('pending_confirmation', 'pending_amendment')
+              AND tm.user_id = $1
+              AND tm.status = 'active'
+        `, [userId]);
+
+        return results;
+    }
+
+    /**
+     * Private: Finalize a team match with given scores — updates ratings, W/L, and match status
+     */
+    private async _finalizeTeamMatch(
+        matchId: string, match: any,
+        creatorScore: number, opponentScore: number,
+        submittingTeamId: string | null,
+    ): Promise<any> {
+        const winnerTeamId = creatorScore > opponentScore ? match.creator_team_id : match.opponent_team_id;
+
+        // Get current team ratings
+        const creatorTeamResult = await this.dataSource.query(`SELECT id, rating FROM teams WHERE id = $1`, [match.creator_team_id]);
+        const opponentTeamResult = match.opponent_team_id
+            ? await this.dataSource.query(`SELECT id, rating FROM teams WHERE id = $1`, [match.opponent_team_id])
+            : [null];
+
+        const creatorTeam = creatorTeamResult[0];
+        const opponentTeam = opponentTeamResult[0];
+
+        const creatorRating = parseFloat(creatorTeam?.rating || '3.0');
+        const opponentRating = parseFloat(opponentTeam?.rating || '3.0');
+
+        // Calculate new Elo ratings
+        const K = 0.2;
+        const expectedCreator = 1 / (1 + Math.pow(10, (opponentRating - creatorRating) / 1));
+        const creatorWon = match.creator_team_id === winnerTeamId ? 1 : 0;
+
+        const newCreatorRating = Math.max(1, Math.min(5, creatorRating + K * (creatorWon - expectedCreator)));
+        const newOpponentRating = Math.max(1, Math.min(5, opponentRating + K * ((1 - creatorWon) - (1 - expectedCreator))));
+
+        const winnerOldRating = match.creator_team_id === winnerTeamId ? creatorRating : opponentRating;
+        const winnerNewRating = match.creator_team_id === winnerTeamId ? newCreatorRating : newOpponentRating;
+        const loserOldRating = match.creator_team_id === winnerTeamId ? opponentRating : creatorRating;
+        const loserNewRating = match.creator_team_id === winnerTeamId ? newOpponentRating : newCreatorRating;
+
+        await this.dataSource.query(`
+            UPDATE matches SET
+                status = 'completed',
+                winner_id = $1,
+                score_creator = $2,
+                score_opponent = $3,
+                completed_at = NOW(),
+                winner_old_rating = $5,
+                winner_new_rating = $6,
+                loser_old_rating = $7,
+                loser_new_rating = $8
+            WHERE id = $4
+        `, [winnerTeamId, creatorScore, opponentScore, matchId,
+            winnerOldRating.toFixed(2), winnerNewRating.toFixed(2),
+            loserOldRating.toFixed(2), loserNewRating.toFixed(2)]);
+
+        // Update team ratings and W/L records
+        if (match.creator_team_id === winnerTeamId) {
+            await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
+                [newCreatorRating.toFixed(2), match.creator_team_id]);
+            if (match.opponent_team_id) {
+                await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
+                    [newOpponentRating.toFixed(2), match.opponent_team_id]);
+            }
+        } else {
+            await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
+                [newCreatorRating.toFixed(2), match.creator_team_id]);
+            if (match.opponent_team_id) {
+                await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
+                    [newOpponentRating.toFixed(2), match.opponent_team_id]);
+            }
+        }
+
+        console.log(`[TeamsService] Match ${matchId} finalized. Winner: ${winnerTeamId}, Creator: ${creatorRating} → ${newCreatorRating.toFixed(2)}, Opponent: ${opponentRating} → ${newOpponentRating.toFixed(2)}`);
+
+        return {
+            matchId,
+            status: 'completed',
+            winnerTeamId,
+            scores: { creator: creatorScore, opponent: opponentScore },
+            ratingChanges: {
+                [match.creator_team_id]: { old: creatorRating, new: newCreatorRating },
+                ...(match.opponent_team_id ? { [match.opponent_team_id]: { old: opponentRating, new: newOpponentRating } } : {}),
+            },
+        };
     }
 
     // ====================
