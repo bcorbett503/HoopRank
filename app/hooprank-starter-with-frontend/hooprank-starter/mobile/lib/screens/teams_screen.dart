@@ -674,7 +674,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             child: CupertinoDatePicker(
               mode: CupertinoDatePickerMode.date,
               initialDateTime: selectedDate,
-              minimumDate: DateTime.now().subtract(const Duration(hours: 1)),
+              minimumDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
               maximumDate: DateTime.now().add(const Duration(days: 365)),
               onDateTimeChanged: onChanged,
             ),
