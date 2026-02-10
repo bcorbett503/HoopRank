@@ -281,13 +281,24 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
-                if (nameController.text.trim().isEmpty) return;
-                Navigator.pop(context);
+                if (nameController.text.trim().isEmpty ||
+                    skillLevel == null ||
+                    ageGroup == null ||
+                    gender == null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please fill in all fields'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext);
                 await _createTeam(
                   nameController.text.trim(),
                   teamType,
