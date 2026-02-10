@@ -158,6 +158,13 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS amended_score_opponent INT`);
         await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS amended_by_team_id TEXT`);
 
+        // Update status constraint to include pending_confirmation and pending_amendment
+        await dataSource.query(`ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_status_check`);
+        await dataSource.query(`
+            ALTER TABLE matches ADD CONSTRAINT matches_status_check
+            CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested', 'pending_confirmation', 'pending_amendment'))
+        `);
+
         console.log('[SchemaEvolution] All migrations completed successfully');
     } catch (error) {
         console.error('[SchemaEvolution] Migration error:', error.message);
