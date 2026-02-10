@@ -1442,6 +1442,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   // FABs
   // ==============================
   Widget? _buildMyTeamsFAB() {
+    final hasTeam = _myTeams.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
@@ -1449,8 +1450,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         children: [
           FloatingActionButton.extended(
             heroTag: 'createTeam',
-            onPressed: _showCreateTeamDialog,
-            backgroundColor: Colors.deepOrange,
+            onPressed: hasTeam ? null : _showCreateTeamDialog,
+            backgroundColor: hasTeam ? Colors.grey.shade700 : Colors.deepOrange,
+            foregroundColor: hasTeam ? Colors.grey.shade500 : Colors.white,
             icon: const Icon(Icons.add),
             label: const Text('Create Team'),
           ),

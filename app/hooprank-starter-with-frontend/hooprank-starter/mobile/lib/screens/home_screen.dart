@@ -209,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _pickVideo() async {
     final XFile? video = await _imagePicker.pickVideo(
       source: ImageSource.gallery,
-      maxDuration: const Duration(seconds: 15),
+      maxDuration: const Duration(seconds: 30),
     );
     
     if (video != null) {
@@ -224,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Video must be 15 seconds or less. Please trim it first.'),
+                content: Text('Video must be 30 seconds or less. Please trim it first.'),
                 backgroundColor: Colors.red,
               ),
             );

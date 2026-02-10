@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:video_player/video_player.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../services/court_service.dart';
+import '../services/video_upload_service.dart';
 import '../state/check_in_state.dart';
 
 /// Full-screen status composer with rich options for posting
@@ -33,6 +35,9 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   
   XFile? _selectedImage;
+  XFile? _selectedVideo;
+  int? _videoDurationMs;
+  bool _isUploadingVideo = false;
   DateTime? _scheduledTime;
   bool _isRecurring = false;
   bool _isSubmitting = false;
@@ -193,14 +198,54 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   Future<void> _pickImage() async {
     final image = await _imagePicker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 75);
     if (image != null) {
-      setState(() => _selectedImage = image);
+      setState(() {
+        _selectedImage = image;
+        _selectedVideo = null;
+        _videoDurationMs = null;
+      });
     }
   }
 
   Future<void> _takePhoto() async {
     final image = await _imagePicker.pickImage(source: ImageSource.camera, maxWidth: 1024, maxHeight: 1024, imageQuality: 75);
     if (image != null) {
-      setState(() => _selectedImage = image);
+      setState(() {
+        _selectedImage = image;
+        _selectedVideo = null;
+        _videoDurationMs = null;
+      });
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    final XFile? video = await _imagePicker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(seconds: 30),
+    );
+    if (video != null) {
+      final controller = VideoPlayerController.file(File(video.path));
+      try {
+        await controller.initialize();
+        final durationMs = controller.value.duration.inMilliseconds;
+        if (!VideoUploadService.isValidDuration(durationMs)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Video must be 30 seconds or less. Please trim it first.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+        setState(() {
+          _selectedVideo = video;
+          _videoDurationMs = durationMs;
+          _selectedImage = null;
+        });
+      } finally {
+        controller.dispose();
+      }
     }
   }
 
@@ -615,30 +660,62 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
 
   Future<void> _submitPost() async {
     final text = _textController.text.trim();
-    if (text.isEmpty && _selectedImage == null) return;
+    if (text.isEmpty && _selectedImage == null && _selectedVideo == null) return;
     
     setState(() => _isSubmitting = true);
     
     try {
       // Encode image as base64 data URL if selected
       String? imageUrl;
+      String? videoUrl;
+      String? videoThumbnailUrl;
+      int? videoDurationMs;
+      
       if (_selectedImage != null) {
         debugPrint('STATUS_IMAGE: Encoding image from ${_selectedImage!.path}');
         final bytes = await File(_selectedImage!.path).readAsBytes();
-        debugPrint('STATUS_IMAGE: Read ${bytes.length} bytes');
         final mimeType = _selectedImage!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
         imageUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
-        debugPrint('STATUS_IMAGE: Encoded to data URL of length ${imageUrl.length}');
-      } else {
-        debugPrint('STATUS_IMAGE: No image selected');
       }
       
-      debugPrint('STATUS_IMAGE: Calling createStatus with imageUrl=${imageUrl != null ? 'data URL (${imageUrl.length} chars)' : 'null'}');
+      // Upload video to Firebase Storage
+      if (_selectedVideo != null) {
+        setState(() => _isUploadingVideo = true);
+        try {
+          final authState = Provider.of<AuthState>(context, listen: false);
+          final userId = authState.currentUser?.id ?? '';
+          
+          videoUrl = await VideoUploadService.uploadVideo(
+            File(_selectedVideo!.path),
+            userId,
+          );
+          videoThumbnailUrl = await VideoUploadService.generateAndUploadThumbnail(
+            _selectedVideo!.path,
+            userId,
+          );
+          videoDurationMs = _videoDurationMs;
+          debugPrint('STATUS_VIDEO: Uploaded: $videoUrl');
+        } catch (e) {
+          debugPrint('STATUS_VIDEO: Upload failed: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Video upload failed: $e'), backgroundColor: Colors.red),
+            );
+          }
+          setState(() { _isSubmitting = false; _isUploadingVideo = false; });
+          return;
+        }
+        setState(() => _isUploadingVideo = false);
+      }
+      
       await ApiService.createStatus(
         text,
         imageUrl: imageUrl,
         scheduledAt: _scheduledTime,
         courtId: _taggedCourt?.id,
+        videoUrl: videoUrl,
+        videoThumbnailUrl: videoThumbnailUrl,
+        videoDurationMs: videoDurationMs,
         gameMode: _scheduledTime != null ? _gameMode : null,
         courtType: _scheduledTime != null ? _courtType : null,
         ageRange: _scheduledTime != null ? _ageRange : null,
@@ -647,10 +724,10 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
       );
       
       if (mounted) {
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_scheduledTime != null ? 'Game scheduled! 🎉' : 'Posted! 🏀'),
+            content: Text(_scheduledTime != null ? 'Game scheduled! 🎉' : _selectedVideo != null ? 'Video posted! 🎬' : 'Posted! 🏀'),
             backgroundColor: Colors.green,
           ),
         );
@@ -667,7 +744,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasContent = _textController.text.isNotEmpty || _selectedImage != null;
+    final hasContent = _textController.text.isNotEmpty || _selectedImage != null || _selectedVideo != null;
     
     return Scaffold(
       backgroundColor: Colors.grey[900],
@@ -901,6 +978,65 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                       ],
                     ),
                   
+                  // Video preview
+                  if (_selectedVideo != null)
+                    Stack(
+                      children: [
+                        Container(
+                          height: 200,
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.videocam, color: Colors.deepOrange.shade300, size: 48),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Video ready',
+                                  style: TextStyle(color: Colors.grey.shade300, fontSize: 14),
+                                ),
+                                if (_videoDurationMs != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.deepOrange.withOpacity(0.3),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        VideoUploadService.formatDuration(_videoDurationMs!),
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: () => setState(() { _selectedVideo = null; _videoDurationMs = null; }),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(Icons.close, color: Colors.white, size: 18),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  
                   // Main text input
                   TextField(
                     controller: _textController,
@@ -1106,6 +1242,12 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                       icon: const Icon(Icons.photo_library, color: Colors.white70),
                       onPressed: _pickImage,
                       tooltip: 'Add photo',
+                    ),
+                    // Video from gallery
+                    IconButton(
+                      icon: const Icon(Icons.videocam, color: Colors.white70),
+                      onPressed: _pickVideo,
+                      tooltip: 'Add video',
                     ),
                   ],
                   // Tag court - always available

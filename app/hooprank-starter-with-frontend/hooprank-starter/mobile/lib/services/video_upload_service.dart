@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 /// Service for uploading videos to Firebase Storage with 15-second limit
 class VideoUploadService {
-  static const int maxDurationSeconds = 15;
+  static const int maxDurationSeconds = 30;
   static const int maxFileSizeMB = 50;
   
   static final FirebaseStorage _storage = FirebaseStorage.instance;
