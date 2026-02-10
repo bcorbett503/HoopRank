@@ -48,6 +48,9 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   String _teamFilter = '3v3'; // '3v3' or '5v5'
   String _teamSearchQuery = '';
   bool _isTeamLocal = false;
+  String? _teamGenderFilter;
+  String? _teamAgeFilter;
+  String? _teamSkillFilter;
   
   // User's teams for invite functionality
   List<Map<String, dynamic>> _myTeams = [];
@@ -190,8 +193,11 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     try {
       // Use /rankings endpoint with mode=3v3 or 5v5 to get all teams (not just user's teams)
       final scope = _isTeamLocal ? 'local' : 'global';
+      var url = '${ApiService.baseUrl}/rankings?mode=$_teamFilter&scope=$scope';
+      if (_teamGenderFilter != null) url += '&gender=$_teamGenderFilter';
+      if (_teamAgeFilter != null) url += '&ageGroup=$_teamAgeFilter';
       final response = await http.get(
-        Uri.parse('${ApiService.baseUrl}/rankings?mode=$_teamFilter&scope=$scope'),
+        Uri.parse(url),
         headers: {'x-user-id': ApiService.userId ?? ''},
       );
       
@@ -1011,10 +1017,12 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   }
 
   Widget _buildTeamsTab() {
-    // Filter teams by search query
+    // Filter teams by search query and skill level (client-side)
     final filteredTeams = _teams.where((t) {
       final name = (t['name'] ?? '').toString().toLowerCase();
-      return name.contains(_teamSearchQuery.toLowerCase());
+      if (!name.contains(_teamSearchQuery.toLowerCase())) return false;
+      if (_teamSkillFilter != null && t['skillLevel'] != _teamSkillFilter) return false;
+      return true;
     }).toList();
     
     return Column(
@@ -1085,6 +1093,65 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 },
               ),
             ],
+          ),
+        ),
+
+        // Attribute filters (gender, age, skill)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ...['Mens', 'Womens', 'Coed'].map((g) => Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: FilterChip(
+                    label: Text(g, style: const TextStyle(fontSize: 11)),
+                    selected: _teamGenderFilter == g,
+                    onSelected: (_) {
+                      setState(() => _teamGenderFilter = _teamGenderFilter == g ? null : g);
+                      _fetchTeams();
+                    },
+                    selectedColor: Colors.indigo,
+                    labelStyle: TextStyle(color: _teamGenderFilter == g ? Colors.white : null),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                )),
+                const SizedBox(width: 6),
+                Container(width: 1, height: 20, color: Colors.grey[700]),
+                const SizedBox(width: 6),
+                ...['U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'].map((ag) => Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: FilterChip(
+                    label: Text(ag, style: const TextStyle(fontSize: 11)),
+                    selected: _teamAgeFilter == ag,
+                    onSelected: (_) {
+                      setState(() => _teamAgeFilter = _teamAgeFilter == ag ? null : ag);
+                      _fetchTeams();
+                    },
+                    selectedColor: Colors.teal,
+                    labelStyle: TextStyle(color: _teamAgeFilter == ag ? Colors.white : null),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                )),
+                const SizedBox(width: 6),
+                Container(width: 1, height: 20, color: Colors.grey[700]),
+                const SizedBox(width: 6),
+                ...['Recreational', 'Competitive', 'Elite'].map((sl) => Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: FilterChip(
+                    label: Text(sl, style: const TextStyle(fontSize: 11)),
+                    selected: _teamSkillFilter == sl,
+                    onSelected: (_) {
+                      setState(() => _teamSkillFilter = _teamSkillFilter == sl ? null : sl);
+                    },
+                    selectedColor: Colors.deepPurple,
+                    labelStyle: TextStyle(color: _teamSkillFilter == sl ? Colors.white : null),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                )),
+              ],
+            ),
           ),
         ),
         

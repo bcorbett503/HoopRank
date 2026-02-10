@@ -1306,7 +1306,7 @@ app.get(
 
       // Build dynamic query with optional ageGroup/gender filters
       let query = `SELECT t.id, t.name, t.rating, t.matches_played, t.wins, t.losses,
-           t.age_group, t.gender, t.logo_url,
+           t.age_group, t.gender, t.skill_level, t.logo_url,
            (SELECT COUNT(*) FROM team_members WHERE team_id = t.id AND status = 'accepted') as member_count,
            u.name as owner_name
          FROM teams t
@@ -1347,6 +1347,7 @@ app.get(
           losses: t.losses,
           ageGroup: t.age_group || null,
           gender: t.gender || null,
+          skillLevel: t.skill_level || null,
           logoUrl: t.logo_url || null,
           memberCount: Number(t.member_count),
           ownerName: t.owner_name,

@@ -113,6 +113,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       return;
     }
 
+    // Capture CourtService from widget context BEFORE opening dialog
+    final courtService = context.read<CourtService>();
+
     final nameController = TextEditingController();
     final cityController = TextEditingController();
     final descriptionController = TextEditingController();
@@ -137,8 +140,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: const Text('Create Team'),
           content: SingleChildScrollView(
             child: Column(
@@ -289,7 +292,6 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       onChanged: (query) {
-                        final courtService = context.read<CourtService>();
                         setDialogState(() {
                           if (query.length >= 2) {
                             courtSearchResults = courtService.searchCourts(query).take(5).toList();
