@@ -1018,6 +1018,24 @@ class ApiService {
     throw Exception('Failed to create event: ${response.body}');
   }
 
+  /// Start a match from a scheduled game event (creates match if needed)
+  static Future<Map<String, dynamic>> startMatchFromEvent({
+    required String teamId,
+    required String eventId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/teams/$teamId/events/$eventId/start-match'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to start match from event: ${response.body}');
+  }
+
   /// Get upcoming events for a team
   static Future<List<Map<String, dynamic>>> getTeamEvents(String teamId) async {
     final response = await http.get(

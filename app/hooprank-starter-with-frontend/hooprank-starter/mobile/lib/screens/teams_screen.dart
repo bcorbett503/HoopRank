@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../services/court_service.dart';
 import '../models.dart';
+import '../state/app_state.dart';
 import '../state/check_in_state.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
 import 'team_detail_screen.dart';
@@ -1343,6 +1345,56 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     }
   }
 
+  /// Start a match from a scheduled game event
+  Future<void> _startGameFromEvent(Map<String, dynamic> event) async {
+    final teamId = event['teamId']?.toString() ?? '';
+    final eventId = event['id']?.toString() ?? '';
+    if (teamId.isEmpty || eventId.isEmpty) return;
+
+    try {
+      // Call API to create/get match for this event
+      final result = await ApiService.startMatchFromEvent(
+        teamId: teamId,
+        eventId: eventId,
+      );
+
+      final match = result['match'];
+      if (match == null) {
+        throw Exception('No match returned from API');
+      }
+
+      // Look up team type from _myTeams
+      final team = _myTeams.firstWhere(
+        (t) => t['id']?.toString() == teamId,
+        orElse: () => <String, dynamic>{},
+      );
+      final teamType = team['teamType']?.toString() ?? '5v5';
+      final teamName = event['teamName']?.toString() ?? team['name']?.toString() ?? 'My Team';
+      final opponentName = event['opponentTeamName']?.toString() ?? 'Opponent';
+
+      if (!mounted) return;
+
+      // Hydrate MatchState (same pattern as team challenge acceptance)
+      final matchState = Provider.of<MatchState>(context, listen: false);
+      matchState.reset();
+      matchState.mode = teamType;
+      matchState.myTeamId = teamId;
+      matchState.myTeamName = teamName;
+      matchState.opponentTeamName = opponentName;
+      matchState.setMatchId(match['id']?.toString());
+
+      // Navigate to match setup
+      context.go('/match/setup');
+    } catch (e) {
+      debugPrint('Error starting match from event: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start match: $e')),
+        );
+      }
+    }
+  }
+
   // ==============================
   // BUILD
   // ==============================
@@ -1877,8 +1929,22 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   ),
                 ),
                 const Spacer(),
+                // Start Game button (games only)
+                if (!isPractice)
+                  ElevatedButton.icon(
+                    onPressed: () => _startGameFromEvent(event),
+                    icon: const Icon(Icons.sports_basketball, size: 16),
+                    label: const Text('Start Game', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
                 // Notes indicator
-                if (event['notes'] != null && (event['notes'] as String).isNotEmpty)
+                if (isPractice && event['notes'] != null && (event['notes'] as String).isNotEmpty)
                   Tooltip(
                     message: event['notes'],
                     child: Icon(Icons.note, size: 16, color: Colors.grey[600]),
