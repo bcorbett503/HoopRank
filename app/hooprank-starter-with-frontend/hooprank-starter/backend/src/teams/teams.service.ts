@@ -292,6 +292,19 @@ export class TeamsService {
 
         membership.status = 'active';
         await this.membersRepository.save(membership);
+
+        // Notify team owner
+        try {
+            const team = await this.teamsRepository.findOne({ where: { id: teamId } });
+            const user = await this.dataSource.query(`SELECT name FROM users WHERE id = $1`, [userId]);
+            if (team && user.length > 0) {
+                this.notificationsService.sendTeamInviteAcceptedNotification(
+                    team.ownerId, user[0].name || 'A player', team.name,
+                ).catch(err => console.error('Failed to send invite accepted notification:', err));
+            }
+        } catch (e) {
+            console.error('Error sending invite accepted notification:', e);
+        }
     }
 
     /**
@@ -459,6 +472,11 @@ export class TeamsService {
             role: 'member',
         });
         await this.membersRepository.save(invite);
+
+        // Send push notification to invited player
+        this.notificationsService.sendTeamInviteNotification(playerId, team.name).catch(err => {
+            console.error('Failed to send team invite notification:', err);
+        });
     }
 
     /**
@@ -924,6 +942,18 @@ export class TeamsService {
                 `, [creatorScore, opponentTeamScore, teamId, matchId]);
 
                 console.log(`[TeamsService] Match ${matchId} set to pending_confirmation, awaiting opponent team ${match.opponent_team_id}`);
+
+                // Notify opponent team
+                try {
+                    const submitterTeam = await this.dataSource.query(`SELECT name FROM teams WHERE id = $1`, [teamId]);
+                    const submitterName = submitterTeam[0]?.name || 'Opponent';
+                    this.notificationsService.sendTeamScoreSubmittedNotification(
+                        match.opponent_team_id, submitterName, creatorScore, opponentTeamScore, matchId,
+                    ).catch(err => console.error('Failed to send score submitted notification:', err));
+                } catch (e) {
+                    console.error('Error sending score submitted notification:', e);
+                }
+
                 return {
                     matchId,
                     status: 'pending_confirmation',
@@ -1010,6 +1040,17 @@ export class TeamsService {
             WHERE id = $4
         `, [amendedCreator, amendedOpponent, teamId, matchId]);
 
+        // Notify original submitter team
+        try {
+            const amenderTeam = await this.dataSource.query(`SELECT name FROM teams WHERE id = $1`, [teamId]);
+            const amenderName = amenderTeam[0]?.name || 'Opponent';
+            this.notificationsService.sendTeamAmendmentNotification(
+                match.submitted_by_team_id, amenderName, amendedCreator, amendedOpponent, matchId,
+            ).catch(err => console.error('Failed to send amendment notification:', err));
+        } catch (e) {
+            console.error('Error sending amendment notification:', e);
+        }
+
         return { matchId, status: 'pending_amendment' };
     }
 
@@ -1040,7 +1081,22 @@ export class TeamsService {
         }
 
         // Finalize with amended scores
-        return await this._finalizeTeamMatch(matchId, match, match.amended_score_creator, match.amended_score_opponent, null);
+        const result = await this._finalizeTeamMatch(matchId, match, match.amended_score_creator, match.amended_score_opponent, null);
+
+        // Notify amender team their amendment was accepted
+        if (match.amended_by_team_id) {
+            try {
+                const responderTeam = await this.dataSource.query(`SELECT name FROM teams WHERE id = $1`, [teamId]);
+                const responderName = responderTeam[0]?.name || 'Team';
+                this.notificationsService.sendTeamAmendmentResponseNotification(
+                    match.amended_by_team_id, responderName, true,
+                ).catch(err => console.error('Failed to send amendment accepted notification:', err));
+            } catch (e) {
+                console.error('Error sending amendment accepted notification:', e);
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -1068,7 +1124,6 @@ export class TeamsService {
             throw new ForbiddenException('Only the original score submitter can reject amendments');
         }
 
-        // Revert to pending_confirmation with original scores
         await this.dataSource.query(`
             UPDATE matches SET
                 status = 'pending_confirmation',
@@ -1077,6 +1132,19 @@ export class TeamsService {
                 amended_by_team_id = NULL
             WHERE id = $1
         `, [matchId]);
+
+        // Notify amender team their amendment was rejected
+        if (match.amended_by_team_id) {
+            try {
+                const responderTeam = await this.dataSource.query(`SELECT name FROM teams WHERE id = $1`, [teamId]);
+                const responderName = responderTeam[0]?.name || 'Team';
+                this.notificationsService.sendTeamAmendmentResponseNotification(
+                    match.amended_by_team_id, responderName, false,
+                ).catch(err => console.error('Failed to send amendment rejected notification:', err));
+            } catch (e) {
+                console.error('Error sending amendment rejected notification:', e);
+            }
+        }
 
         return { matchId, status: 'pending_confirmation' };
     }
@@ -1173,6 +1241,31 @@ export class TeamsService {
         }
 
         console.log(`[TeamsService] Match ${matchId} finalized. Winner: ${winnerTeamId}, Creator: ${creatorRating} → ${newCreatorRating.toFixed(2)}, Opponent: ${opponentRating} → ${newOpponentRating.toFixed(2)}`);
+
+        // Notify both teams of result
+        const score = `${creatorScore}-${opponentScore}`;
+        try {
+            const creatorTeamInfo = await this.dataSource.query(`SELECT name FROM teams WHERE id = $1`, [match.creator_team_id]);
+            const opponentTeamInfo = match.opponent_team_id
+                ? await this.dataSource.query(`SELECT name FROM teams WHERE id = $1`, [match.opponent_team_id])
+                : [];
+            const creatorName = creatorTeamInfo[0]?.name || 'Team';
+            const opponentName = opponentTeamInfo[0]?.name || 'Opponent';
+
+            this.notificationsService.sendTeamMatchFinalizedNotification(
+                match.creator_team_id, opponentName,
+                match.creator_team_id === winnerTeamId, score,
+            ).catch(err => console.error('Failed to send finalized notification to creator:', err));
+
+            if (match.opponent_team_id) {
+                this.notificationsService.sendTeamMatchFinalizedNotification(
+                    match.opponent_team_id, creatorName,
+                    match.opponent_team_id === winnerTeamId, score,
+                ).catch(err => console.error('Failed to send finalized notification to opponent:', err));
+            }
+        } catch (e) {
+            console.error('Error sending finalized notifications:', e);
+        }
 
         return {
             matchId,
@@ -1280,6 +1373,12 @@ export class TeamsService {
                 // Don't fail the event creation if match creation fails
             }
         }
+        // Notify team members about the new event
+        const eventDateObj = new Date(dto.eventDate);
+        const dateStr = eventDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        this.notificationsService.sendTeamEventNotification(
+            teamId, userId, dto.type, dto.title, dateStr,
+        ).catch(err => console.error('Failed to send event notification:', err));
 
         return saved;
     }

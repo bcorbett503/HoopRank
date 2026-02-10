@@ -351,4 +351,131 @@ export class NotificationsService {
             matchId,
         });
     }
+
+    // =====================
+    // TEAM NOTIFICATIONS
+    // =====================
+
+    /**
+     * Helper: send multicast push notification to all active members of a team,
+     * optionally excluding one user (e.g. the sender).
+     */
+    async sendToTeamMembers(
+        teamId: string,
+        excludeUserId: string | null,
+        title: string,
+        body: string,
+        data: Record<string, string> = {},
+    ): Promise<void> {
+        try {
+            const excludeClause = excludeUserId ? `AND tm.user_id != $2` : '';
+            const params = excludeUserId ? [teamId, excludeUserId] : [teamId];
+
+            const result = await this.dataSource.query(`
+                SELECT u.fcm_token
+                FROM users u
+                JOIN team_members tm ON u.id = tm.user_id
+                WHERE tm.team_id = $1
+                  AND tm.status = 'active'
+                  ${excludeClause}
+                  AND u.fcm_token IS NOT NULL
+            `, params);
+
+            const tokens = result.map((r: any) => r.fcm_token).filter((t: string) => t);
+            if (tokens.length === 0) return;
+
+            const message: admin.messaging.MulticastMessage = {
+                tokens,
+                notification: { title, body },
+                data,
+                apns: { payload: { aps: { sound: 'default' } } },
+            };
+            const response = await admin.messaging().sendEachForMulticast(message);
+            console.log(`[TeamNotif] ${title}: ${response.successCount} sent, ${response.failureCount} failed`);
+        } catch (error) {
+            console.error(`[TeamNotif] Error sending to team ${teamId}:`, error.message);
+        }
+    }
+
+    /** Notify player they've been invited to a team */
+    async sendTeamInviteNotification(playerId: string, teamName: string): Promise<void> {
+        await this.sendToUser(playerId, '🏀 Team Invite!', `You've been invited to join ${teamName}`, {
+            type: 'team_invite',
+        });
+    }
+
+    /** Notify team owner that an invite was accepted */
+    async sendTeamInviteAcceptedNotification(ownerId: string, playerName: string, teamName: string): Promise<void> {
+        await this.sendToUser(ownerId, '🎉 New Teammate!', `${playerName} joined ${teamName}`, {
+            type: 'team_invite_accepted',
+        });
+    }
+
+    /** Notify all team members about a new event (practice or game) */
+    async sendTeamEventNotification(
+        teamId: string, creatorId: string,
+        eventType: string, title: string, dateStr: string,
+    ): Promise<void> {
+        const emoji = eventType === 'practice' ? '🏋️' : '🏀';
+        await this.sendToTeamMembers(
+            teamId, creatorId,
+            `${emoji} New ${eventType === 'practice' ? 'Practice' : 'Game'}`,
+            `${title} — ${dateStr}`,
+            { type: 'team_event', teamId },
+        );
+    }
+
+    /** Notify opponent team that a score was submitted and needs confirmation */
+    async sendTeamScoreSubmittedNotification(
+        opponentTeamId: string, submitterTeamName: string,
+        scoreCreator: number, scoreOpponent: number, matchId: string,
+    ): Promise<void> {
+        await this.sendToTeamMembers(
+            opponentTeamId, null,
+            '📊 Confirm Score',
+            `${submitterTeamName} submitted a score (${scoreCreator}-${scoreOpponent}). Open Teams → Schedule to confirm or amend.`,
+            { type: 'team_score_submitted', matchId },
+        );
+    }
+
+    /** Notify original submitter team that an amendment was proposed */
+    async sendTeamAmendmentNotification(
+        submitterTeamId: string, amenderTeamName: string,
+        amendedCreator: number, amendedOpponent: number, matchId: string,
+    ): Promise<void> {
+        await this.sendToTeamMembers(
+            submitterTeamId, null,
+            '✏️ Score Amendment',
+            `${amenderTeamName} proposed ${amendedCreator}-${amendedOpponent}. Open Teams → Schedule to accept or reject.`,
+            { type: 'team_amendment', matchId },
+        );
+    }
+
+    /** Notify a team that a match was finalized with ratings */
+    async sendTeamMatchFinalizedNotification(
+        teamId: string, opponentName: string,
+        won: boolean, score: string,
+    ): Promise<void> {
+        const title = won ? '🏆 Victory!' : '📊 Match Finalized';
+        const body = won
+            ? `Your team beat ${opponentName} (${score}). Ratings updated!`
+            : `${opponentName} won (${score}). Ratings updated.`;
+        await this.sendToTeamMembers(teamId, null, title, body, {
+            type: 'team_match_finalized',
+        });
+    }
+
+    /** Notify amender team that their amendment was accepted or rejected */
+    async sendTeamAmendmentResponseNotification(
+        amenderTeamId: string, responderTeamName: string,
+        accepted: boolean,
+    ): Promise<void> {
+        const title = accepted ? '✅ Amendment Accepted' : '❌ Amendment Rejected';
+        const body = accepted
+            ? `${responderTeamName} accepted your score amendment. Match finalized!`
+            : `${responderTeamName} rejected your amendment. Original score stands for confirmation.`;
+        await this.sendToTeamMembers(amenderTeamId, null, title, body, {
+            type: 'team_amendment_response',
+        });
+    }
 }
