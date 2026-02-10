@@ -8,6 +8,7 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../services/court_service.dart';
 import '../services/video_upload_service.dart';
+import '../state/app_state.dart';
 import '../state/check_in_state.dart';
 
 /// Full-screen status composer with rich options for posting
