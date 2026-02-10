@@ -37,7 +37,7 @@ export class MatchesService implements OnModuleInit {
       `).catch(() => { });
       await this.dataSource.query(`
         ALTER TABLE matches ADD CONSTRAINT matches_status_check
-        CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested'))
+        CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested', 'pending_confirmation', 'pending_amendment'))
       `).catch(() => { });
 
       // Add games_contested column to users
@@ -232,7 +232,7 @@ export class MatchesService implements OnModuleInit {
     `).catch(() => { });
     await this.dataSource.query(`
       ALTER TABLE matches ADD CONSTRAINT matches_status_check
-      CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested'))
+      CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested', 'pending_confirmation', 'pending_amendment'))
     `).catch(() => { /* constraint may already exist */ });
 
     const match = await this.get(id);
