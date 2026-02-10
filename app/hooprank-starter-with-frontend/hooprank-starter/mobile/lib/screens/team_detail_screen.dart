@@ -181,8 +181,6 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     final team = _team!;
 
     final nameController = TextEditingController(text: team['name'] ?? '');
-    final cityController = TextEditingController(text: team['city'] ?? '');
-    final descriptionController = TextEditingController(text: team['description'] ?? '');
     String? skillLevel = team['skillLevel'];
     String? ageGroup = team['ageGroup'];
     String? gender = team['gender'];
@@ -278,48 +276,6 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                     onSelected: (_) => setDialogState(() => gender = gender == g ? null : g),
                   )).toList(),
                 ),
-                const SizedBox(height: 14),
-
-                // City
-                TextField(
-                  controller: cityController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'City',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.location_on, color: Colors.grey[600], size: 20),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.deepOrange),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Description
-                TextField(
-                  controller: descriptionController,
-                  style: const TextStyle(color: Colors.white),
-                  maxLines: 3,
-                  maxLength: 200,
-                  decoration: InputDecoration(
-                    labelText: 'Description',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
-                    counterStyle: TextStyle(color: Colors.grey[600]),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.deepOrange),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -339,12 +295,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 if (nameController.text.isNotEmpty && nameController.text != team['name']) {
                   updates['name'] = nameController.text;
                 }
-                if (cityController.text != (team['city'] ?? '')) {
-                  updates['city'] = cityController.text;
-                }
-                if (descriptionController.text != (team['description'] ?? '')) {
-                  updates['description'] = descriptionController.text;
-                }
+
                 if (skillLevel != team['skillLevel']) {
                   updates['skillLevel'] = skillLevel;
                 }
@@ -568,28 +519,6 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (team['city'] != null && team['city'].toString().isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.location_on, size: 14, color: Colors.white.withOpacity(0.7)),
-                          const SizedBox(width: 4),
-                          Text(
-                            team['city'],
-                            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (team['description'] != null && team['description'].toString().isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        team['description'],
-                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13, fontStyle: FontStyle.italic),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
