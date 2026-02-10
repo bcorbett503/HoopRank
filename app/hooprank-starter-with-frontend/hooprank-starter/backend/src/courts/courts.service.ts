@@ -34,7 +34,7 @@ export class CourtsService {
                     ST_X(geog::geometry) as lng
                 FROM courts
                 ORDER BY name ASC
-                LIMIT 500
+                LIMIT 5000
             `);
             return courts;
         }
