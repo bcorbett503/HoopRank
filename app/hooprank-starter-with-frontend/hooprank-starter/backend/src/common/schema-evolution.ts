@@ -142,6 +142,16 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         // Store custom opponent name for unregistered teams
         await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_name TEXT`);
 
+        // Backfill opponent_name from linked team_events for existing matches
+        await dataSource.query(`
+            UPDATE matches m
+            SET opponent_name = te.opponent_team_name
+            FROM team_events te
+            WHERE te.match_id = m.id
+              AND m.opponent_name IS NULL
+              AND te.opponent_team_name IS NOT NULL
+        `);
+
         console.log('[SchemaEvolution] All migrations completed successfully');
     } catch (error) {
         console.error('[SchemaEvolution] Migration error:', error.message);
