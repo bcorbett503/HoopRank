@@ -44,7 +44,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   LatLng _initialCenter = const LatLng(38.0194, -122.5376); // Default to San Rafael
   double _currentZoom = 14.0;
   bool _showFollowedOnly = false; // Filter for courts with followers
-  bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
+  bool? _filterIndoor = true; // null=all, true=indoor only, false=outdoor only
   String? _filterAccess; // null=all, 'public', 'private'
   String? _runsFilter; // null=off, 'today'=runs today, 'all'=all upcoming runs
   Set<String> _courtsWithRuns = {}; // Court IDs with runs (based on filter)

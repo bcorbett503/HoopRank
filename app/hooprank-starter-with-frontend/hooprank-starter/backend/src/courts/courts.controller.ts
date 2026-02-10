@@ -69,6 +69,32 @@ export class CourtsController {
         return { success: true, deleted: result.length, courts: result };
     }
 
+    @Post('admin/update-source')
+    async updateSource(
+        @Headers('x-user-id') userId: string,
+        @Query('source') source: string,
+        @Query('indoor') indoor?: string,
+        @Query('state') state?: string,
+    ) {
+        let query = `UPDATE courts SET source = $1 WHERE 1=1`;
+        const params: any[] = [source];
+        let idx = 2;
+
+        if (indoor !== undefined) {
+            query += ` AND indoor = $${idx}`;
+            params.push(indoor === 'true');
+            idx++;
+        }
+        if (state) {
+            query += ` AND city LIKE $${idx}`;
+            params.push(`%, ${state}`);
+            idx++;
+        }
+
+        const result = await this.dataSource.query(query + ' RETURNING id', params);
+        return { success: true, updated: result.length, source };
+    }
+
     @Get('follower-counts')
     async getFollowerCounts() {
         return this.courtsService.getFollowerCounts();
