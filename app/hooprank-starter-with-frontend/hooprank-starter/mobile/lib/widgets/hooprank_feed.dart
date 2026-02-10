@@ -354,25 +354,38 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => context.go('/rankings'),
-                            icon: const Icon(Icons.person, size: 18),
-                            label: const Text('Follow Players'),
+                            icon: const Icon(Icons.person, size: 16),
+                            label: const Text('Players', style: TextStyle(fontSize: 12)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => context.go('/courts'),
-                            icon: const Icon(Icons.location_on, size: 18),
-                            label: const Text('Follow Courts'),
+                            icon: const Icon(Icons.location_on, size: 16),
+                            label: const Text('Courts', style: TextStyle(fontSize: 12)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.go('/rankings?tab=teams&teamType=5v5&region=local'),
+                            icon: const Icon(Icons.groups, size: 16),
+                            label: const Text('Teams', style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                             ),
                           ),
                         ),

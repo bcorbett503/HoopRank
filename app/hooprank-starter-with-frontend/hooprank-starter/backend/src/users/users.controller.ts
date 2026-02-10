@@ -96,7 +96,7 @@ export class UsersController {
     console.log('getFollows controller: userId received:', userId);
     if (!userId) {
       console.log('getFollows controller: no userId, returning empty');
-      return { courts: [], players: [] };
+      return { courts: [], players: [], teams: [] };
     }
     const result = await this.usersService.getFollows(userId);
     console.log('getFollows controller: returning result:', result);
@@ -200,6 +200,40 @@ export class UsersController {
     }
     await this.usersService.unfollowPlayer(userId, playerId);
     return { success: true };
+  }
+
+  @Post('me/follows/teams')
+  async followTeam(
+    @Headers('x-user-id') userId: string,
+    @Body() body: { teamId: string },
+  ) {
+    if (!userId || !body.teamId) {
+      return { success: false, error: 'User ID and Team ID required' };
+    }
+    try {
+      await this.usersService.followTeam(userId, body.teamId);
+      return { success: true };
+    } catch (error) {
+      console.error('followTeam error:', error);
+      return { success: false, error: `Failed to follow team: ${error.message}` };
+    }
+  }
+
+  @Delete('me/follows/teams/:teamId')
+  async unfollowTeam(
+    @Headers('x-user-id') userId: string,
+    @Param('teamId') teamId: string,
+  ) {
+    if (!userId || !teamId) {
+      return { success: false, error: 'User ID and Team ID required' };
+    }
+    try {
+      await this.usersService.unfollowTeam(userId, teamId);
+      return { success: true };
+    } catch (error) {
+      console.error('unfollowTeam error:', error.message);
+      return { success: false, error: 'Failed to unfollow team' };
+    }
   }
 
   @Post('me/fcm-token')

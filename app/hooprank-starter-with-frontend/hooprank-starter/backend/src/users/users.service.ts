@@ -380,7 +380,31 @@ export class UsersService {
     await this.dataSource.query(query, [followerId, followedId]);
   }
 
-  async getFollows(userId: string): Promise<{ courts: any[]; players: any[] }> {
+  async followTeam(userId: string, teamId: string): Promise<void> {
+    const isPostgres = !!process.env.DATABASE_URL;
+    if (isPostgres) {
+      await this.dataSource.query(`
+        INSERT INTO user_followed_teams (user_id, team_id)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id, team_id) DO NOTHING
+      `, [userId, teamId]);
+    } else {
+      await this.dataSource.query(`
+        INSERT OR IGNORE INTO user_followed_teams (user_id, team_id)
+        VALUES (?, ?)
+      `, [userId, teamId]);
+    }
+  }
+
+  async unfollowTeam(userId: string, teamId: string): Promise<void> {
+    const isPostgres = !!process.env.DATABASE_URL;
+    const query = isPostgres
+      ? `DELETE FROM user_followed_teams WHERE user_id = $1 AND team_id = $2`
+      : `DELETE FROM user_followed_teams WHERE user_id = ? AND team_id = ?`;
+    await this.dataSource.query(query, [userId, teamId]);
+  }
+
+  async getFollows(userId: string): Promise<{ courts: any[]; players: any[]; teams: any[] }> {
     console.log('getFollows called, userId:', userId);
 
     // Query courts
@@ -393,7 +417,7 @@ export class UsersService {
       console.log('getFollows courts SUCCESS:', JSON.stringify(courts));
     } catch (courtError) {
       console.error('getFollows courts ERROR:', courtError.message);
-      return { courts: [], players: [], courtsError: courtError.message } as any;
+      return { courts: [], players: [], teams: [], courtsError: courtError.message } as any;
     }
 
     // Query players - separate try-catch
@@ -406,10 +430,26 @@ export class UsersService {
       console.log('getFollows players SUCCESS:', JSON.stringify(players));
     } catch (playerError) {
       console.error('getFollows players ERROR:', playerError.message);
-      return { courts, players: [], playersError: playerError.message } as any;
+      return { courts, players: [], teams: [], playersError: playerError.message } as any;
     }
 
-    return { courts, players };
+    // Query teams - only return teams that still exist (JOIN against teams table)
+    let teams: any[] = [];
+    try {
+      teams = await this.dataSource.query(
+        `SELECT uft.team_id as "teamId", t.name as "teamName"
+         FROM user_followed_teams uft
+         JOIN teams t ON t.id = uft.team_id
+         WHERE uft.user_id = $1`,
+        [userId]
+      );
+      console.log('getFollows teams SUCCESS:', JSON.stringify(teams));
+    } catch (teamError) {
+      console.error('getFollows teams ERROR:', teamError.message);
+      // Don't fail - just return empty teams
+    }
+
+    return { courts, players, teams };
   }
 
   async debugFollowedCourts(): Promise<any> {
@@ -1010,6 +1050,27 @@ export class UsersService {
         results.push('check_ins table does not exist or has no court_id column');
       } else {
         results.push('check_ins.court_id already correct type: ' + checkInsCourtIdType[0].data_type);
+      }
+
+      // Fix 10: Create user_followed_teams table if missing
+      results.push('Checking user_followed_teams table...');
+      const followedTeamsCheck = await this.dataSource.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_name = 'user_followed_teams'
+      `);
+      if (followedTeamsCheck.length === 0) {
+        await this.dataSource.query(`
+          CREATE TABLE user_followed_teams (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR(255) NOT NULL,
+            team_id UUID NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, team_id)
+          )
+        `);
+        results.push('Created user_followed_teams table');
+      } else {
+        results.push('user_followed_teams table already exists');
       }
 
       return { success: true, results };
