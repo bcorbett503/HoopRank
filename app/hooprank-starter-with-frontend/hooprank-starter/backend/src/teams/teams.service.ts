@@ -1115,6 +1115,7 @@ export class TeamsService {
                 courtId: event.courtId,
                 opponentTeamId: event.opponentTeamId,
                 opponentTeamName: event.opponentTeamName,
+                matchId: event.matchId || null,
                 recurrenceRule: event.recurrenceRule,
                 notes: event.notes,
                 createdBy: event.createdBy,
@@ -1227,5 +1228,65 @@ export class TeamsService {
         });
 
         return result;
+    }
+
+    /**
+     * Start a match from a scheduled game event.
+     * If the event already has a match_id, return that match.
+     * Otherwise create a new match record and link it to the event.
+     */
+    async startMatchFromEvent(teamId: string, eventId: string, userId: string): Promise<any> {
+        // Verify membership
+        const membership = await this.membersRepository.findOne({
+            where: { teamId, userId, status: 'active' },
+        });
+        if (!membership) {
+            throw new ForbiddenException('You must be a member of the team');
+        }
+
+        // Get event
+        const event = await this.eventsRepository.findOne({
+            where: { id: eventId, teamId },
+        });
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+        if (event.type !== 'game') {
+            throw new ForbiddenException('Only game events can start a match');
+        }
+
+        // If event already has a match, return it
+        if (event.matchId) {
+            const existingMatch = await this.dataSource.query(
+                `SELECT * FROM matches WHERE id = $1`, [event.matchId]
+            );
+            if (existingMatch.length > 0) {
+                console.log(`[TeamsService] Event ${eventId} already has match ${event.matchId}`);
+                return { match: existingMatch[0], event };
+            }
+        }
+
+        // Determine match type from team
+        const team = await this.teamsRepository.findOne({ where: { id: teamId } });
+        const matchType = team?.teamType || '5v5';
+
+        // Ensure schema
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false`);
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS creator_team_id UUID`);
+        await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_team_id UUID`);
+
+        // Create match
+        const matchResult = await this.dataSource.query(`
+            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id)
+            VALUES ($1, 'accepted', true, $2, $3, $4)
+            RETURNING *
+        `, [matchType, teamId, event.opponentTeamId || null, userId]);
+        const match = matchResult[0];
+
+        // Link event to match
+        await this.dataSource.query(`UPDATE team_events SET match_id = $1 WHERE id = $2`, [match.id, eventId]);
+
+        console.log(`[TeamsService] Started match ${match.id} from event ${eventId}`);
+        return { match, event };
     }
 }

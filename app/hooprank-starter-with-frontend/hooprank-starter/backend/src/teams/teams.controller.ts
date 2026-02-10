@@ -375,4 +375,17 @@ export class TeamsController {
         await this.teamsService.deleteTeamEvent(teamId, eventId, userId);
         return { success: true };
     }
+
+    /**
+     * Start a match from a scheduled game event
+     */
+    @Post(':id/events/:eventId/start-match')
+    @HttpCode(200)
+    async startMatchFromEvent(
+        @Param('id') teamId: string,
+        @Param('eventId') eventId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.teamsService.startMatchFromEvent(teamId, eventId, userId);
+    }
 }
