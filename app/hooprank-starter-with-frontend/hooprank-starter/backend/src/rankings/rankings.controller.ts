@@ -28,6 +28,7 @@ export class RankingsController {
                         t.team_type as "teamType",
                         t.age_group as "ageGroup",
                         t.gender,
+                        t.skill_level as "skillLevel",
                         t.logo_url as "logoUrl",
                         COALESCE(t.rating, 3.0) as "rating",
                         COALESCE(t.wins, 0) as "wins",
