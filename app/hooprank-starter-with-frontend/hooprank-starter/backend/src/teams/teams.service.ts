@@ -1651,7 +1651,7 @@ export class TeamsService {
         // Create match (include court_id from event)
         const matchResult = await this.dataSource.query(`
             INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id, opponent_name, court_id)
-            VALUES ($1, 'accepted', true, $2, $3, $4, $5, $6)
+            VALUES ($1, 'accepted', true, $2, $3, $4, $5, $6::uuid)
             RETURNING *
         `, [matchType, teamId, event.opponentTeamId || null, userId, event.opponentTeamName || null, event.courtId || null]);
         const match = matchResult[0];
