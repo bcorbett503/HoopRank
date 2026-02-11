@@ -1554,7 +1554,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Share a status, schedule a run, or check in @CourtName',
+                                      'Post a status, schedule a run, or share a photo',
                                       style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
