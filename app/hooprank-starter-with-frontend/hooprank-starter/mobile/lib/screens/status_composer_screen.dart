@@ -988,24 +988,29 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                   
                   // Tagged court badge
                   if (_taggedCourt != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on, size: 16, color: Colors.blue),
-                          const SizedBox(width: 8),
-                          Text(
-                            _taggedCourt!.name,
-                            style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w500),
-                          ),
-                        ],
+                    GestureDetector(
+                      onTap: () => setState(() => _taggedCourt = null),
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 12, bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on, size: 16, color: Colors.blue),
+                            const SizedBox(width: 8),
+                            Text(
+                              _taggedCourt!.name,
+                              style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.close, size: 14, color: Colors.blue),
+                          ],
+                        ),
                       ),
                     ),
                   
