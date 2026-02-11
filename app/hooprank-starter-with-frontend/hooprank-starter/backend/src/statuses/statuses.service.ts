@@ -464,6 +464,7 @@ export class StatusesService {
                 SELECT 
                     'status' as type,
                     ps.id::TEXT as id,
+                    ps.id as "statusId",
                     ps.created_at as "createdAt",
                     ps.user_id::TEXT as "userId",
                     COALESCE(u.name, 'Unknown') as "userName",
