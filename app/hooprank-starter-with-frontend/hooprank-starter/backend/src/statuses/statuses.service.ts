@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class StatusesService {
     private dialect: DbDialect;
+    private statusIdMigrated = false;
 
     constructor(
         private dataSource: DataSource,
@@ -457,6 +458,12 @@ export class StatusesService {
 
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50, lat?: number, lng?: number): Promise<any[]> {
         try {
+            // Ensure status_id column exists on matches before querying
+            if (!this.statusIdMigrated) {
+                await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS status_id INTEGER`).catch(() => { });
+                this.statusIdMigrated = true;
+            }
+
             console.log('getUnifiedFeed: filter=', filter, 'userId=', userId, 'lat=', lat, 'lng=', lng);
 
             // Status SELECT clause with additional fields for scoring
