@@ -251,7 +251,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
       return Future.error('Location permissions are permanently denied.');
     } 
 
-    return await Geolocator.getCurrentPosition();
+    return await Geolocator.getCurrentPosition(
+    desiredAccuracy: LocationAccuracy.bestForNavigation,
+  );
   }
 
   Future<void> _moveToUserLocation() async {

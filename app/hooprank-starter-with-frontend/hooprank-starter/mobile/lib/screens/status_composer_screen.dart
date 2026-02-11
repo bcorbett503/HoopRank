@@ -17,6 +17,7 @@ class StatusComposerScreen extends StatefulWidget {
   final String? initialContent;
   final XFile? initialImage;
   final Court? initialCourt;
+  final bool autoShowSchedule;
   
   const StatusComposerScreen({
     super.key,
@@ -24,6 +25,7 @@ class StatusComposerScreen extends StatefulWidget {
     this.initialContent,
     this.initialImage,
     this.initialCourt,
+    this.autoShowSchedule = false,
   });
 
   @override
@@ -80,14 +82,18 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     _scheduledTime = widget.initialScheduledTime;
     _taggedCourt = widget.initialCourt;
     
-    // If initial court is set, add @courtname to text
+    // If initial court is set, add court name to text (no @ prefix)
     if (widget.initialCourt != null && _textController.text.isEmpty) {
-      _textController.text = '@${widget.initialCourt!.name} ';
+      _textController.text = '${widget.initialCourt!.name} ';
     }
     
-    // Auto-focus the text field
+    // Auto-focus the text field (unless auto-showing schedule)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
+      if (widget.autoShowSchedule) {
+        _showScheduleSheet();
+      } else {
+        _focusNode.requestFocus();
+      }
     });
     
     // Listen for @ mentions
@@ -762,7 +768,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
             child: ElevatedButton(
               onPressed: hasContent && !_isSubmitting ? _submitPost : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepOrange,
+                backgroundColor: _scheduledTime != null ? Colors.green : Colors.deepOrange,
                 disabledBackgroundColor: Colors.grey[700],
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

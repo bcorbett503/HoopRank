@@ -414,6 +414,7 @@ class _MapScreenState extends State<MapScreen> {
                     MaterialPageRoute(
                       builder: (_) => StatusComposerScreen(
                         initialCourt: court,
+                        autoShowSchedule: true,
                       ),
                     ),
                   );
