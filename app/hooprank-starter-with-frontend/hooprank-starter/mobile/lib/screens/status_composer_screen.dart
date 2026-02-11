@@ -82,6 +82,11 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     _scheduledTime = widget.initialScheduledTime;
     _taggedCourt = widget.initialCourt;
     
+    // Pre-select "All" friends when scheduling a run
+    if (widget.autoShowSchedule) {
+      _tagMode = 'all';
+    }
+    
     // If initial court is set, add court name to text (no @ prefix)
     if (widget.initialCourt != null && _textController.text.isEmpty) {
       _textController.text = '${widget.initialCourt!.name} ';
