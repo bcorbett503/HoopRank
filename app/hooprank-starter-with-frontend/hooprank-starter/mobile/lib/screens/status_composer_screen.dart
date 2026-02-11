@@ -33,6 +33,8 @@ class StatusComposerScreen extends StatefulWidget {
 class _StatusComposerScreenState extends State<StatusComposerScreen> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final TextEditingController _courtSearchController = TextEditingController();
+  final FocusNode _courtSearchFocusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
   
   XFile? _selectedImage;
@@ -99,6 +101,8 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   void dispose() {
     _textController.dispose();
     _focusNode.dispose();
+    _courtSearchController.dispose();
+    _courtSearchFocusNode.dispose();
     super.dispose();
   }
   
@@ -143,34 +147,20 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   }
 
   void _onTextChanged() {
-    final text = _textController.text;
-    final cursorPos = _textController.selection.baseOffset;
-    
-    if (cursorPos <= 0 || cursorPos > text.length) {
-      setState(() => _showCourtSuggestions = false);
-      return;
-    }
-    
-    final textBeforeCursor = text.substring(0, cursorPos);
-    final lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    
-    if (lastAtIndex >= 0) {
-      final textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-      if (!textAfterAt.contains(' ') && textAfterAt.isNotEmpty) {
-        _searchCourts(textAfterAt);
-      } else if (textAfterAt.isEmpty) {
-        _searchCourts('');
-      } else {
-        setState(() => _showCourtSuggestions = false);
-      }
-    } else {
-      setState(() => _showCourtSuggestions = false);
-    }
+    // Just trigger rebuild for Post button state
+    setState(() {});
   }
 
-  void _searchCourts(String query) {
+  void _onCourtSearchChanged(String query) {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _courtSuggestions = [];
+        _showCourtSuggestions = false;
+      });
+      return;
+    }
     final courtService = Provider.of<CourtService>(context, listen: false);
-    final courts = courtService.searchCourts(query);
+    final courts = courtService.searchCourts(query.trim());
     setState(() {
       _courtSuggestions = courts.take(5).toList();
       _showCourtSuggestions = courts.isNotEmpty;
@@ -178,22 +168,12 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   }
 
   void _selectCourt(Court court) {
-    final text = _textController.text;
-    final cursorPos = _textController.selection.baseOffset;
-    final textBeforeCursor = text.substring(0, cursorPos);
-    final lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    
-    if (lastAtIndex >= 0) {
-      final textAfterCursor = cursorPos < text.length ? text.substring(cursorPos) : '';
-      final newText = text.substring(0, lastAtIndex) + '@${court.name} ' + textAfterCursor;
-      _textController.text = newText;
-      _textController.selection = TextSelection.collapsed(offset: lastAtIndex + court.name.length + 2);
-    }
-    
     setState(() {
       _taggedCourt = court;
       _showCourtSuggestions = false;
+      _courtSearchController.clear();
     });
+    _courtSearchFocusNode.unfocus();
   }
 
   Future<void> _pickImage() async {
@@ -800,7 +780,85 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  
+                  // ── Court Search Bar ──
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 14, color: Colors.blue.withOpacity(0.7)),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Tag a court:',
+                            style: TextStyle(color: Colors.white54, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _courtSearchController,
+                        focusNode: _courtSearchFocusNode,
+                        onChanged: _onCourtSearchChanged,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Search courts...',
+                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14),
+                          prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.4), size: 20),
+                          suffixIcon: _courtSearchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(Icons.close, color: Colors.white.withOpacity(0.4), size: 18),
+                                  onPressed: () {
+                                    _courtSearchController.clear();
+                                    _onCourtSearchChanged('');
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.06),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.blue.withOpacity(0.5)),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          isDense: true,
+                        ),
+                      ),
+                      // Court search results
+                      if (_showCourtSuggestions && _courtSuggestions.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                          ),
+                          child: ListView(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            children: _courtSuggestions.map((court) => ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                              title: Text(court.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                              subtitle: court.address != null
+                                  ? Text(court.address!, style: TextStyle(color: Colors.grey[400], fontSize: 11))
+                                  : null,
+                              onTap: () => _selectCourt(court),
+                            )).toList(),
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
+
                   // Followed Courts - quick select
                   FutureBuilder<List<Court>>(
                     future: _loadFollowedCourts(context),
@@ -882,14 +940,6 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                                           setState(() => _taggedCourt = null);
                                         } else {
                                           setState(() => _taggedCourt = court);
-                                          if (!_textController.text.contains('@${court.name}')) {
-                                            final current = _textController.text;
-                                            if (current.isNotEmpty && !current.endsWith(' ')) {
-                                              _textController.text = '$current @${court.name}';
-                                            } else {
-                                              _textController.text = '${current}@${court.name}';
-                                            }
-                                          }
                                         }
                                       },
                                     )).toList(),
@@ -1060,32 +1110,13 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                     minLines: 3,
                     style: const TextStyle(color: Colors.white, fontSize: 18),
                     decoration: const InputDecoration(
-                      hintText: 'What\'s on your mind, hooper?\n\nType @ to tag a court...',
+                      hintText: 'What\'s on your mind, hooper?',
                       hintStyle: TextStyle(color: Colors.white30, fontSize: 16),
                       border: InputBorder.none,
                     ),
                   ),
                   
-                  // Court suggestions
-                  if (_showCourtSuggestions && _courtSuggestions.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[800],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        children: _courtSuggestions.map((court) => ListTile(
-                          leading: const Icon(Icons.location_on, color: Colors.blue),
-                          title: Text(court.name, style: const TextStyle(color: Colors.white)),
-                          subtitle: court.address != null 
-                              ? Text(court.address!, style: TextStyle(color: Colors.grey[400]))
-                              : null,
-                          onTap: () => _selectCourt(court),
-                        )).toList(),
-                      ),
-                    ),
+                  // (Court suggestions moved to search bar above)
                   
                   // ── Run Attribute Badges (shown when scheduling) ──
                   if (_scheduledTime != null) ...[
