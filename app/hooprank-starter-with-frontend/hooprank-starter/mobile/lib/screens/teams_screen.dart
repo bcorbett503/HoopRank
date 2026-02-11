@@ -27,6 +27,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   List<Map<String, dynamic>> _events = [];
   List<dynamic> _pendingScores = [];
   List<Map<String, dynamic>> _allTeams = []; // cached for opponent search
+  bool _didLoadOnce = false;
   bool _isLoading = true;
   late TabController _tabController;
 
@@ -49,51 +50,60 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _loadData();
+    // Only reload if we've already loaded once (e.g. coming back to this tab)
+    // Skip on first call since initState already triggers _loadData
+    if (_didLoadOnce) {
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // Fire ALL network calls in parallel
       final results = await Future.wait([
-        ApiService.getMyTeams(),
-        ApiService.getTeamInvites(),
-        ApiService.getAllTeamEvents(),
+        ApiService.getMyTeams(),           // 0
+        ApiService.getTeamInvites(),        // 1
+        ApiService.getAllTeamEvents(),       // 2
+        CourtService().loadCourts(),        // 3 (returns void, won't be used)
+        ApiService.getTeamRankings(teamType: '5v5'),  // 4
+        ApiService.getTeamRankings(teamType: '3v3'),  // 5
       ]);
-      // Ensure courts are loaded for court picker (same pattern as status composer)
-      await CourtService().loadCourts();
-      // Load all teams for opponent search (from 5v5 + 3v3 rankings)
-      try {
-        final fiveResults = await ApiService.getTeamRankings(teamType: '5v5');
-        final threeResults = await ApiService.getTeamRankings(teamType: '3v3');
-        final seen = <String>{};
-        _allTeams = [];
-        for (final t in [...fiveResults, ...threeResults]) {
-          final id = t['id']?.toString() ?? '';
-          if (id.isNotEmpty && seen.add(id)) _allTeams.add(t);
-        }
-        debugPrint('TEAMS_SEARCH: loaded ${_allTeams.length} teams for search');
-      } catch (e) {
-        debugPrint('Failed to load all teams for search: $e');
-      }
+      
       if (mounted) {
+        // Process team rankings for opponent search
+        try {
+          final fiveResults = results[4] as List<Map<String, dynamic>>;
+          final threeResults = results[5] as List<Map<String, dynamic>>;
+          final seen = <String>{};
+          _allTeams = [];
+          for (final t in [...fiveResults, ...threeResults]) {
+            final id = t['id']?.toString() ?? '';
+            if (id.isNotEmpty && seen.add(id)) _allTeams.add(t);
+          }
+          debugPrint('TEAMS_SEARCH: loaded ${_allTeams.length} teams for search');
+        } catch (e) {
+          debugPrint('Failed to process team rankings: $e');
+        }
+
         setState(() {
           _myTeams = results[0] as List<Map<String, dynamic>>;
           _invites = results[1] as List<Map<String, dynamic>>;
           _events = results[2] as List<Map<String, dynamic>>;
           _isLoading = false;
+          _didLoadOnce = true;
         });
-        // Load pending scores separately (non-blocking)
-        try {
-          final ps = await ApiService.getPendingTeamScores();
+        
+        // Load pending scores in background (non-blocking)
+        ApiService.getPendingTeamScores().then((ps) {
           if (mounted) setState(() => _pendingScores = ps);
-        } catch (e) {
+        }).catchError((e) {
           debugPrint('Failed to load pending scores: $e');
-        }
+        });
       }
     } catch (e) {
       debugPrint('Error loading teams: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() { _isLoading = false; _didLoadOnce = true; });
     }
   }
 
