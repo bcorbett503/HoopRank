@@ -579,7 +579,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                         ),
                       children: [
                         TileLayer(
-                          urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                          urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
                           userAgentPackageName: 'com.bcorbett.hooprank',
                         ),
                         MarkerLayer(
