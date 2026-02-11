@@ -43,6 +43,7 @@ export class CourtsController {
         @Query('indoor') indoor?: string,
         @Query('rims') rims?: string,
         @Query('access') access?: string,
+        @Query('venue_type') venue_type?: string,
     ) {
         return this.courtsService.createCourt({
             id,
@@ -53,6 +54,7 @@ export class CourtsController {
             indoor: indoor === 'true',
             rims: rims ? parseInt(rims) : 2,
             access: access || 'public',
+            venue_type: venue_type || undefined,
         });
     }
 
@@ -93,6 +95,32 @@ export class CourtsController {
 
         const result = await this.dataSource.query(query + ' RETURNING id', params);
         return { success: true, updated: result.length, source };
+    }
+
+    @Post('admin/update-venue-type')
+    async updateVenueType(
+        @Headers('x-user-id') userId: string,
+        @Query('venue_type') venue_type: string,
+        @Query('name_pattern') name_pattern?: string,
+        @Query('indoor') indoor?: string,
+    ) {
+        let query = `UPDATE courts SET venue_type = $1 WHERE 1=1`;
+        const params: any[] = [venue_type];
+        let idx = 2;
+
+        if (name_pattern) {
+            query += ` AND name ILIKE $${idx}`;
+            params.push(name_pattern);
+            idx++;
+        }
+        if (indoor !== undefined) {
+            query += ` AND indoor = $${idx}`;
+            params.push(indoor === 'true');
+            idx++;
+        }
+
+        const result = await this.dataSource.query(query + ' RETURNING id, name', params);
+        return { success: true, updated: result.length, venue_type };
     }
 
     @Get('follower-counts')

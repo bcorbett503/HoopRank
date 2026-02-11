@@ -274,6 +274,7 @@ class Court {
   final bool isSignature; // Signature courts are high-traffic/famous venues
   final bool isIndoor; // Indoor venues (gyms, schools, rec centers)
   final String access; // 'public', 'members', or 'paid'
+  final String? venueType; // 'school', 'college', 'rec_center', 'gym', 'outdoor', 'other'
   final int? followerCount; // Number of users following this court
   // King of the Court for each mode (name, rating, and user ID for challenges)
   final String? king1v1;
@@ -295,6 +296,7 @@ class Court {
     this.isSignature = false,
     this.isIndoor = false,
     this.access = 'public',
+    this.venueType,
     this.followerCount = 0,
     this.king1v1,
     this.king1v1Id,
@@ -336,6 +338,7 @@ class Court {
       isSignature: isSignature,
       isIndoor: isIndoor,
       access: access,
+      venueType: venueType,
       followerCount: followerCount ?? this.followerCount,
       king1v1: king1v1 ?? this.king1v1,
       king1v1Id: king1v1Id ?? this.king1v1Id,
@@ -359,6 +362,7 @@ class Court {
       isSignature: json['signature'] == true || json['isSignature'] == true,
       isIndoor: json['indoor'] == true || json['isIndoor'] == true,
       access: json['access']?.toString() ?? 'public',
+      venueType: json['venue_type']?.toString() ?? json['venueType']?.toString(),
       followerCount: _parseInt(json['follower_count'] ?? json['followerCount']),
       king1v1: json['king1v1']?.toString() ?? json['king']?.toString(),
       king1v1Id: json['king1v1Id']?.toString(),

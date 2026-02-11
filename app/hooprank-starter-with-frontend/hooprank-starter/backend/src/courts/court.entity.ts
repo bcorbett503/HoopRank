@@ -31,6 +31,9 @@ export class Court {
     @Column({ type: 'text', nullable: true, default: 'public' })
     access: string; // 'public' | 'members' | 'paid'
 
+    @Column({ type: 'text', nullable: true })
+    venue_type: string; // 'school' | 'college' | 'rec_center' | 'gym' | 'outdoor' | 'other'
+
     // Note: geog is PostGIS geography type - handled via raw queries in service
     // We don't map it directly as TypeORM doesn't natively support PostGIS
 

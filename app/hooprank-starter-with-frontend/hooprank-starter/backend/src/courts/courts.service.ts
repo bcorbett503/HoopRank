@@ -29,7 +29,7 @@ export class CourtsService {
         if (this.dialect.isPostgres) {
             const courts = await this.dataSource.query(`
                 SELECT 
-                    id, name, city, indoor, rims, source, signature, access,
+                    id, name, city, indoor, rims, source, signature, access, venue_type,
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng
                 FROM courts
@@ -50,7 +50,7 @@ export class CourtsService {
         if (this.dialect.isPostgres) {
             const results = await this.dataSource.query(`
                 SELECT 
-                    id, name, city, indoor, rims, source, signature, access,
+                    id, name, city, indoor, rims, source, signature, access, venue_type,
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng
                 FROM courts
@@ -70,7 +70,7 @@ export class CourtsService {
             // Use PostGIS spatial query for production
             const courts = await this.dataSource.query(`
                 SELECT 
-                    id, name, city, indoor, rims, source, signature, access,
+                    id, name, city, indoor, rims, source, signature, access, venue_type,
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng,
                     (SELECT COUNT(*) FROM user_court_alerts WHERE court_id = courts.id::text) as follower_count
@@ -235,30 +235,32 @@ export class CourtsService {
         indoor?: boolean;
         rims?: number;
         access?: string;
+        venue_type?: string;
     }): Promise<any> {
         try {
             if (this.dialect.isPostgres) {
                 const result = await this.dataSource.query(`
-                    INSERT INTO courts (id, name, city, indoor, rims, access, source, geog)
-                    VALUES ($1, $2, $3, $4, $5, $6, 'curated', ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography)
+                    INSERT INTO courts (id, name, city, indoor, rims, access, venue_type, source, geog)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, 'curated', ST_SetSRID(ST_MakePoint($8, $9), 4326)::geography)
                     ON CONFLICT (id) DO UPDATE SET
                         name = EXCLUDED.name,
                         city = EXCLUDED.city,
                         indoor = EXCLUDED.indoor,
                         access = EXCLUDED.access,
+                        venue_type = EXCLUDED.venue_type,
                         geog = EXCLUDED.geog,
                         source = EXCLUDED.source
-                    RETURNING id, name, city, access
-                `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.access ?? 'public', data.lng, data.lat]);
+                    RETURNING id, name, city, access, venue_type
+                `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.access ?? 'public', data.venue_type ?? null, data.lng, data.lat]);
 
                 return { success: true, court: result[0] };
             }
 
             // SQLite fallback
             await this.dataSource.query(`
-                INSERT INTO courts (id, name, city, indoor, rims, lat, lng, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'user')
-            `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.lat, data.lng]);
+                INSERT INTO courts (id, name, city, indoor, rims, lat, lng, venue_type, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'user')
+            `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.lat, data.lng, data.venue_type ?? null]);
 
             return { success: true, court: data };
         } catch (error) {
