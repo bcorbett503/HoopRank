@@ -1488,9 +1488,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         ? '$winnerName vs $loserName' 
         : winnerName;
     
-    // Show "Pickup Game" instead of "Unknown Court" for better UX
+    // Show appropriate label when no court is tagged
     final displayCourtName = (courtName == null || courtName == 'Unknown Court' || courtName.isEmpty)
-        ? 'Pickup Game'
+        ? (isTeamMatch ? 'Team Game' : 'Pickup Game')
         : courtName;
 
     String timeAgo = _formatTimeAgo(createdAt);

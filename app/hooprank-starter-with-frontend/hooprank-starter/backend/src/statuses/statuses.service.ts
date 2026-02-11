@@ -505,6 +505,7 @@ export class StatusesService {
                 FROM player_statuses ps
                 LEFT JOIN users u ON ps.user_id::TEXT = u.id::TEXT
                 LEFT JOIN courts c ON ps.court_id::TEXT = c.id::TEXT
+                LEFT JOIN matches shadow_m ON shadow_m.status_id = ps.id
             `;
 
             // Match SELECT clause (for completed 1v1 matches only)
@@ -565,10 +566,10 @@ export class StatusesService {
                     m.winner_id::TEXT as "userId",
                     CASE 
                         WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN COALESCE(ct.name, 'Team A')
-                        ELSE COALESCE(ot.name, 'Team A')
+                        ELSE COALESCE(ot.name, m.opponent_name, 'Team A')
                     END as "userName",
                     NULL as "userPhotoUrl",
-                    COALESCE(ct.name, 'Team A') || ' vs ' || COALESCE(ot.name, 'Team B') as content,
+                    COALESCE(ct.name, 'Team A') || ' vs ' || COALESCE(ot.name, m.opponent_name, 'Team B') as content,
                     NULL as "imageUrl",
                     NULL as "videoUrl",
                     NULL as "videoThumbnailUrl",
@@ -588,12 +589,12 @@ export class StatusesService {
                         ELSE NULL
                     END as "matchScore",
                     CASE 
-                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ct.name
-                        ELSE ot.name
+                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN COALESCE(ct.name, 'Team A')
+                        ELSE COALESCE(ot.name, m.opponent_name, 'Team A')
                     END as "winnerName",
                     CASE 
-                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ot.name
-                        ELSE ct.name
+                        WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN COALESCE(ot.name, m.opponent_name, 'Opponent')
+                        ELSE COALESCE(ct.name, 'Opponent')
                     END as "loserName",
                     COALESCE(m.winner_new_rating, CASE 
                         WHEN m.winner_id::TEXT = m.creator_team_id::TEXT THEN ct.rating
@@ -640,9 +641,9 @@ export class StatusesService {
                     // TIER 1: Own posts + followed content (no geo filter)
                     const tier1Query = `
                         (${statusSelectClause}
-                        WHERE ps.user_id = $1
+                        WHERE shadow_m.id IS NULL AND (ps.user_id = $1
                            OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
-                           OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2))
+                           OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)))
                         UNION ALL
                         (${matchSelectClause}
                         AND (m.creator_id = $1 OR m.opponent_id = $1
@@ -661,7 +662,8 @@ export class StatusesService {
                     const discoveryRadius = 80467; // 50 miles in meters
                     const discoveryQuery = `
                         (${statusSelectClause}
-                        WHERE c.geog IS NOT NULL 
+                        WHERE shadow_m.id IS NULL
+                          AND c.geog IS NOT NULL 
                           AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
                           AND ps.user_id != $1
                           AND (ps.court_id IS NULL OR ps.court_id NOT IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $5))
@@ -688,7 +690,8 @@ export class StatusesService {
                         for (const radius of radiusTiers) {
                             const expandedQuery = `
                                 (${statusSelectClause}
-                                WHERE c.geog IS NOT NULL 
+                                WHERE shadow_m.id IS NULL
+                                  AND c.geog IS NOT NULL 
                                   AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
                                 UNION ALL
                                 (${matchSelectClause}
@@ -713,9 +716,9 @@ export class StatusesService {
                     // No location - fall back to followed content + network-wide popular
                     const fallbackQuery = `
                         (${statusSelectClause}
-                        WHERE ps.user_id = $1
+                        WHERE shadow_m.id IS NULL AND (ps.user_id = $1
                            OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
-                           OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2))
+                           OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)))
                         UNION ALL
                         (${matchSelectClause}
                         AND (m.creator_id = $1 OR m.opponent_id = $1
@@ -731,7 +734,7 @@ export class StatusesService {
                     // If not enough, add network-wide content
                     if (allItems.length < limit) {
                         const networkQuery = `
-                            (${statusSelectClause})
+                            (${statusSelectClause} WHERE shadow_m.id IS NULL)
                             UNION ALL
                             (${matchSelectClause})
                             UNION ALL
@@ -801,9 +804,9 @@ export class StatusesService {
                 // FOLLOWING: Only posts from followed players/courts (unchanged logic)
                 const statusQuery = `
                     ${statusSelectClause}
-                    WHERE ps.user_id = $1
+                    WHERE shadow_m.id IS NULL AND (ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
-                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
+                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
                     ORDER BY "createdAt" DESC
                     LIMIT $4
                 `;
@@ -842,9 +845,9 @@ export class StatusesService {
                 // ALL: Same as following but with scoring (default view)
                 const statusQuery = `
                     ${statusSelectClause}
-                    WHERE ps.user_id = $1
+                    WHERE shadow_m.id IS NULL AND (ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
-                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3)
+                       OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
                     ORDER BY "createdAt" DESC
                     LIMIT $4
                 `;
