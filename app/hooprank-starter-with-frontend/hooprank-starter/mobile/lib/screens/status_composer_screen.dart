@@ -56,7 +56,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   Court? _taggedCourt;
   
   // Friend tagging
-  String _tagMode = 'all'; // 'all', 'local', 'individual'
+  String _tagMode = 'none'; // 'none', 'all', 'local', 'individual'
   final Set<String> _selectedPlayerIds = {};
   List<FollowedPlayerInfo>? _followedPlayers;
   bool _isLoadingPlayers = false;
@@ -565,8 +565,12 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     return GestureDetector(
       onTap: () {
         setState(() {
-          _tagMode = mode;
-          if (mode != 'individual') _individualExpanded = false;
+          if (_tagMode == mode) {
+            _tagMode = 'none';
+          } else {
+            _tagMode = mode;
+          }
+          if (_tagMode != 'individual') _individualExpanded = false;
         });
       },
       child: Container(
