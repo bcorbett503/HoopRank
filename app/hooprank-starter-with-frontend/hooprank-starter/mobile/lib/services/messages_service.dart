@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models.dart';
 import 'api_service.dart';
+import 'auth_service.dart';
 
 class Message {
   final String id;
@@ -174,6 +175,11 @@ class MessagesService {
   final _storage = const FlutterSecureStorage();
 
   Future<String?> _getToken() async {
+    // Prefer a fresh Firebase ID token (auto-refreshed); fall back to stored token
+    try {
+      final freshToken = await AuthService.getIdToken();
+      if (freshToken != null && freshToken.isNotEmpty) return freshToken;
+    } catch (_) {}
     return await _storage.read(key: 'auth_token');
   }
 
