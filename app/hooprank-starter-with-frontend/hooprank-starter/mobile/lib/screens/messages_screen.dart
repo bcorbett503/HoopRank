@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../state/app_state.dart';
 import '../services/messages_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
 import 'chat_screen.dart';
@@ -25,6 +26,18 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    _loadAllConversations();
+    // Auto-refresh when a push notification arrives
+    NotificationService.addOnNotificationListener(_onPushReceived);
+  }
+
+  @override
+  void dispose() {
+    NotificationService.removeOnNotificationListener(_onPushReceived);
+    super.dispose();
+  }
+
+  void _onPushReceived() {
     _loadAllConversations();
   }
   
@@ -83,15 +96,6 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton.small(
-        heroTag: 'refreshMessages',
-        onPressed: () {
-          setState(() => _isLoading = true);
-          _loadAllConversations();
-        },
-        backgroundColor: Colors.grey[800],
-        child: const Icon(Icons.refresh, size: 20),
-      ),
     );
   }
   
