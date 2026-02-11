@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -39,6 +40,7 @@ class CourtMapWidget extends StatefulWidget {
 class _CourtMapWidgetState extends State<CourtMapWidget> {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
   List<Court> _courts = [];
   bool _isLoading = true;
   LatLng _initialCenter = const LatLng(38.0194, -122.5376); // Default to San Rafael
@@ -100,6 +102,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _mapController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -566,14 +570,17 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                           },
                           onPositionChanged: (position, hasGesture) {
                             _currentZoom = position.zoom ?? 10.0;
-                            // Update courts based on visible bounds on ANY change
-                            _updateCourtsForMapCenter();
+                            // Debounce court updates to avoid rebuilding on every frame
+                            _debounceTimer?.cancel();
+                            _debounceTimer = Timer(const Duration(milliseconds: 150), () {
+                              _updateCourtsForMapCenter();
+                            });
                           },
                         ),
                       children: [
                         TileLayer(
-                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.example.mobile',
+                          urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                          userAgentPackageName: 'com.bcorbett.hooprank',
                         ),
                         MarkerLayer(
                           markers: _courts.map((court) {
