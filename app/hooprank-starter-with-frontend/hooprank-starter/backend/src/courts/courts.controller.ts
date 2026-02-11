@@ -58,6 +58,7 @@ export class CourtsController {
         @Query('rims') rims?: string,
         @Query('access') access?: string,
         @Query('venue_type') venue_type?: string,
+        @Query('address') address?: string,
     ) {
         return this.courtsService.createCourt({
             id,
@@ -69,6 +70,7 @@ export class CourtsController {
             rims: rims ? parseInt(rims) : 2,
             access: access || 'public',
             venue_type: venue_type || undefined,
+            address: address || undefined,
         });
     }
 

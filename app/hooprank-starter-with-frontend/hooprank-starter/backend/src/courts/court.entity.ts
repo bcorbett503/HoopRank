@@ -34,6 +34,9 @@ export class Court {
     @Column({ type: 'text', nullable: true })
     venue_type: string; // 'school' | 'college' | 'rec_center' | 'gym' | 'outdoor' | 'other'
 
+    @Column({ type: 'text', nullable: true })
+    address: string; // Full street address for maps/directions
+
     // Note: geog is PostGIS geography type - handled via raw queries in service
     // We don't map it directly as TypeORM doesn't natively support PostGIS
 
