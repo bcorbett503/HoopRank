@@ -197,26 +197,28 @@ export class TeamsService {
 
         // Get members with real names from users table
         const activeMembers = await this.dataSource.query(`
-            SELECT tm.user_id as "userId", tm.role, COALESCE(u.name, 'Player') as name,
-                   u.avatar_url as "photoUrl"
+            SELECT tm.user_id as "userId", tm.role, tm.status, COALESCE(u.name, 'Player') as name,
+                   u.avatar_url as "photoUrl", COALESCE(u.hoop_rank, 3.0) as rating
             FROM team_members tm
             LEFT JOIN users u ON u.id = tm.user_id
             WHERE tm.team_id = $1 AND tm.status = 'active'
         `, [teamId]);
 
         const pendingMembers = await this.dataSource.query(`
-            SELECT tm.user_id as "userId", COALESCE(u.name, 'Player') as name,
+            SELECT tm.user_id as "userId", tm.status, COALESCE(u.name, 'Player') as name,
                    u.avatar_url as "photoUrl"
             FROM team_members tm
             LEFT JOIN users u ON u.id = tm.user_id
             WHERE tm.team_id = $1 AND tm.status = 'pending'
         `, [teamId]);
 
-        // Get owner name
+        // Get owner info
         const ownerResult = await this.dataSource.query(`
-            SELECT name FROM users WHERE id = $1
+            SELECT name, avatar_url as "photoUrl", COALESCE(hoop_rank, 3.0) as rating FROM users WHERE id = $1
         `, [team.ownerId]);
         const ownerName = ownerResult[0]?.name || 'Team Owner';
+        const ownerPhotoUrl = ownerResult[0]?.photoUrl || null;
+        const ownerRating = ownerResult[0]?.rating || 3.0;
 
         // Get recent matches (last 10)
         const recentMatches = await this.dataSource.query(`
@@ -255,16 +257,36 @@ export class TeamsService {
             isOwner: team.ownerId === userId,
             memberCount,
             pendingCount,
-            members: activeMembers.map(m => ({
-                id: m.userId,
-                name: m.name,
-                photoUrl: m.photoUrl,
-                role: m.role,
-            })),
+            members: [
+                // Owner always first in roster
+                {
+                    id: team.ownerId,
+                    userId: team.ownerId,
+                    name: ownerName,
+                    photoUrl: ownerPhotoUrl,
+                    role: 'owner',
+                    status: 'active',
+                    rating: parseFloat(ownerRating) || 3.0,
+                },
+                // Then active members (excluding owner if they're also in team_members)
+                ...activeMembers
+                    .filter(m => m.userId !== team.ownerId)
+                    .map(m => ({
+                        id: m.userId,
+                        userId: m.userId,
+                        name: m.name,
+                        photoUrl: m.photoUrl,
+                        role: m.role || 'member',
+                        status: 'active',
+                        rating: parseFloat(m.rating) || 3.0,
+                    })),
+            ],
             pending: pendingMembers.map(m => ({
                 id: m.userId,
+                userId: m.userId,
                 name: m.name,
                 photoUrl: m.photoUrl,
+                status: 'pending',
             })),
             recentMatches: recentMatches.map(m => ({
                 id: m.id,

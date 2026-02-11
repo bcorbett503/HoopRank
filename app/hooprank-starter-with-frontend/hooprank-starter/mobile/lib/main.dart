@@ -19,6 +19,7 @@ import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/teams_screen.dart';
+import 'screens/team_chat_screen.dart';
 import 'screens/match_setup_screen.dart';
 import 'screens/match_map_screen.dart';
 import 'screens/match_live_screen.dart';
@@ -201,6 +202,18 @@ class _HoopRankAppState extends State<HoopRankApp> {
                         final userId = state.pathParameters['userId'] ?? '';
                         // For now we'll handle the user lookup in ChatScreen
                         return ChatScreen(userId: userId);
+                      },
+                    ),
+                    GoRoute(
+                      path: 'team-chat/:teamId',
+                      builder: (context, state) {
+                        final teamId = state.pathParameters['teamId'] ?? '';
+                        final extra = state.extra as Map<String, dynamic>? ?? {};
+                        return TeamChatScreen(
+                          teamId: teamId,
+                          teamName: extra['teamName'] ?? 'Team',
+                          teamType: extra['teamType'] ?? '5v5',
+                        );
                       },
                     ),
                   ],

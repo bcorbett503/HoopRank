@@ -349,7 +349,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     final team = _team!;
     final isOwner = team['isOwner'] == true;
     final members = (team['members'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final acceptedMembers = members.where((m) => m['status'] == 'accepted').toList();
+    final acceptedMembers = members.where((m) => m['status'] == 'active').toList();
     final pendingMembers = members.where((m) => m['status'] == 'pending').toList();
 
     final checkInState = Provider.of<CheckInState>(context);
@@ -539,26 +539,24 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
               ),
 
               // Team chat button
-              if (team['threadId'] != null)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      // Navigate to team chat
-                      // TODO: Navigate to messages screen with this thread
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Team chat coming soon!')),
-                      );
-                    },
-                    icon: const Icon(Icons.chat),
-                    label: const Text('Team Chat'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 48),
-                    ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    context.push('/messages/team-chat/${widget.teamId}', extra: {
+                      'teamName': team['name'] ?? 'Team',
+                      'teamType': team['teamType'] ?? '5v5',
+                    });
+                  },
+                  icon: const Icon(Icons.chat),
+                  label: const Text('Team Chat'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 48),
                   ),
                 ),
+              ),
 
               // Roster section
               Padding(
