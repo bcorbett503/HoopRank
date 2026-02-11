@@ -1457,6 +1457,14 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final itemType = item['type']?.toString() ?? 'match';
     final isTeamMatch = itemType == 'team_match';
     
+    // statusId links to player_statuses for likes/comments
+    final statusId = item['statusId'] is int ? item['statusId'] as int : int.tryParse(item['statusId']?.toString() ?? '');
+    final serverLikeCount = item['likeCount'] is int ? item['likeCount'] as int : int.tryParse(item['likeCount']?.toString() ?? '0') ?? 0;
+    final likeCount = statusId != null ? (_likeCounts[statusId] ?? serverLikeCount) : serverLikeCount;
+    final isLiked = statusId != null ? (_likeStates[statusId] ?? (item['isLikedByMe'] == true)) : false;
+    final commentCount = item['commentCount'] is int ? item['commentCount'] as int : int.tryParse(item['commentCount']?.toString() ?? '0') ?? 0;
+    final isCommentsExpanded = statusId != null && (_expandedComments[statusId] == true);
+    
     // Get both winner and loser names for proper display
     final winnerName = item['winnerName']?.toString() ?? userName;
     final loserName = item['loserName']?.toString();
@@ -1580,35 +1588,122 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             if (winnerRating != null && loserRating != null) ...[
               const SizedBox(height: 10),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Winner rating (with before → after if available)
-                  Row(
-                    children: [
-                      Icon(Icons.trending_up, size: 14, color: Colors.green),
-                      const SizedBox(width: 4),
-                      Text('${winnerName ?? 'Winner'}: ', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-                      if (winnerOldRating != null) ...[
-                        Text(winnerOldRating.toStringAsFixed(2), style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-                        Text(' → ', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                  // Winner rating
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.trending_up, size: 14, color: Colors.green),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '${winnerName ?? 'Winner'}: ${winnerOldRating != null ? '${winnerOldRating.toStringAsFixed(2)} → ' : ''}${winnerRating.toStringAsFixed(2)}',
+                            style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
-                      Text(winnerRating.toStringAsFixed(2), style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
-                    ],
+                    ),
                   ),
-                  // Loser rating (with before → after if available)
-                  Row(
-                    children: [
-                      Icon(Icons.trending_down, size: 14, color: Colors.red.shade300),
-                      const SizedBox(width: 4),
-                      Text('${loserName ?? 'Loser'}: ', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-                      if (loserOldRating != null) ...[
-                        Text(loserOldRating.toStringAsFixed(2), style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-                        Text(' → ', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                  const SizedBox(width: 8),
+                  // Loser rating
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.trending_down, size: 14, color: Colors.red.shade300),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '${loserName ?? 'Loser'}: ${loserOldRating != null ? '${loserOldRating.toStringAsFixed(2)} → ' : ''}${loserRating.toStringAsFixed(2)}',
+                            style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
-                      Text(loserRating.toStringAsFixed(2), style: TextStyle(color: Colors.red.shade300, fontWeight: FontWeight.bold, fontSize: 12)),
-                    ],
+                    ),
                   ),
                 ],
+              ),
+            ],
+            // Like/Comment/Share bar (only if we have a statusId)
+            if (statusId != null) ...[
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    // Like Button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => _toggleLike(statusId, isLiked, likeCount),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isLiked ? Icons.favorite : Icons.favorite_border_rounded,
+                                size: 20,
+                                color: isLiked ? Colors.redAccent : Colors.grey[500],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$likeCount',
+                                style: TextStyle(
+                                  color: isLiked ? Colors.redAccent : Colors.grey[500],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Comment Button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => _toggleComments(statusId),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 20,
+                                color: isCommentsExpanded ? Colors.blue : Colors.grey[500],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$commentCount',
+                                style: TextStyle(
+                                  color: isCommentsExpanded ? Colors.blue : Colors.grey[500],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Share Button
+                    GestureDetector(
+                      onTap: () {
+                        final shareText = '${displayName} - ${matchScore ?? 'Game'} on HoopRank! 🏀';
+                        Share.share(shareText);
+                      },
+                      child: Icon(Icons.share_outlined, color: Colors.grey[600], size: 20),
+                    ),
+                  ],
+                ),
               ),
             ],
           ],
@@ -1616,6 +1711,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       ),
     );
   }
+
 
   /// Build a card for new player registration activity
   Widget _buildNewPlayerCard(Map<String, dynamic> item) {

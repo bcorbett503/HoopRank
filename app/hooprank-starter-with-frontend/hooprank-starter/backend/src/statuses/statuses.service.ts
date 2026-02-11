@@ -504,6 +504,7 @@ export class StatusesService {
                 SELECT 
                     'match' as type,
                     m.id::TEXT as id,
+                    m.status_id as "statusId",
                     m.updated_at as "createdAt",
                     m.winner_id::TEXT as "userId",
                     COALESCE(winner.name, 'Unknown') as "userName",
@@ -533,9 +534,9 @@ export class StatusesService {
                     loser.hoop_rank as "loserRating",
                     NULL::DOUBLE PRECISION as "winnerOldRating",
                     NULL::DOUBLE PRECISION as "loserOldRating",
-                    0 as "likeCount",
-                    0 as "commentCount",
-                    false as "isLikedByMe",
+                    COALESCE((SELECT COUNT(*) FROM status_likes WHERE status_id = m.status_id), 0)::INTEGER as "likeCount",
+                    COALESCE((SELECT COUNT(*) FROM status_comments WHERE status_id = m.status_id), 0)::INTEGER as "commentCount",
+                    COALESCE(EXISTS(SELECT 1 FROM status_likes WHERE status_id = m.status_id AND user_id::TEXT = $1), false) as "isLikedByMe",
                     0 as "attendeeCount",
                     false as "isAttendingByMe"
                 FROM matches m
@@ -551,6 +552,7 @@ export class StatusesService {
                 SELECT 
                     'team_match' as type,
                     m.id::TEXT as id,
+                    m.status_id as "statusId",
                     m.updated_at as "createdAt",
                     m.winner_id::TEXT as "userId",
                     CASE 
@@ -595,9 +597,9 @@ export class StatusesService {
                     END) as "loserRating",
                     m.winner_old_rating as "winnerOldRating",
                     m.loser_old_rating as "loserOldRating",
-                    0 as "likeCount",
-                    0 as "commentCount",
-                    false as "isLikedByMe",
+                    COALESCE((SELECT COUNT(*) FROM status_likes WHERE status_id = m.status_id), 0)::INTEGER as "likeCount",
+                    COALESCE((SELECT COUNT(*) FROM status_comments WHERE status_id = m.status_id), 0)::INTEGER as "commentCount",
+                    COALESCE(EXISTS(SELECT 1 FROM status_likes WHERE status_id = m.status_id AND user_id::TEXT = $1), false) as "isLikedByMe",
                     0 as "attendeeCount",
                     false as "isAttendingByMe"
                 FROM matches m

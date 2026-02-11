@@ -1289,6 +1289,30 @@ export class TeamsService {
             console.error('Error sending finalized notifications:', e);
         }
 
+        // Create shadow player_status for likes/comments
+        try {
+            const creatorTeamInfo2 = await this.dataSource.query(`SELECT name FROM teams WHERE id = $1`, [match.creator_team_id]);
+            const opponentTeamInfo2 = match.opponent_team_id
+                ? await this.dataSource.query(`SELECT name FROM teams WHERE id = $1`, [match.opponent_team_id])
+                : [];
+            const cName = creatorTeamInfo2[0]?.name || 'Team A';
+            const oName = opponentTeamInfo2[0]?.name || match.opponent_name || 'Opponent';
+            const content = `${cName} vs ${oName}: ${creatorScore}-${opponentScore}`;
+
+            const statusResult = await this.dataSource.query(`
+                INSERT INTO player_statuses (user_id, content, court_id, created_at)
+                VALUES ($1, $2, $3, NOW())
+                RETURNING id
+            `, [winnerTeamId, content, match.court_id || null]);
+
+            if (statusResult[0]?.id) {
+                await this.dataSource.query(`UPDATE matches SET status_id = $1 WHERE id = $2`, [statusResult[0].id, matchId]);
+                console.log(`[TeamsService] Created shadow status ${statusResult[0].id} for team match ${matchId}`);
+            }
+        } catch (e) {
+            console.error('[TeamsService] Shadow status creation error (non-fatal):', e.message);
+        }
+
         return {
             matchId,
             status: 'completed',

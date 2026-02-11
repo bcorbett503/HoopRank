@@ -45,7 +45,12 @@ export class MatchesService implements OnModuleInit {
         ALTER TABLE users ADD COLUMN IF NOT EXISTS games_contested INT DEFAULT 0
       `).catch(() => { });
 
-      console.log('[MatchesService] Schema migration complete: score_submitter_id, matches_status_check, games_contested');
+      // Add status_id column to matches (links to player_statuses for likes/comments)
+      await this.dataSource.query(`
+        ALTER TABLE matches ADD COLUMN IF NOT EXISTS status_id INTEGER
+      `).catch(() => { });
+
+      console.log('[MatchesService] Schema migration complete: score_submitter_id, matches_status_check, games_contested, status_id');
     } catch (e) {
       console.error('[MatchesService] Schema migration error (non-fatal):', e.message);
     }
@@ -191,6 +196,32 @@ export class MatchesService implements OnModuleInit {
         WHERE match_id = $1
       `, [id]);
       console.log(`[completeWithScores] Marked challenge completed for match ${id}`);
+
+      // Create shadow player_status for likes/comments (only on first completion)
+      if (isFirstCompletion) {
+        try {
+          const updatedMatch = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [id]);
+          const um = updatedMatch[0];
+          const creatorName = (await this.users.get(um.creator_id) as any)?.name || 'Player';
+          const opponentName = (await this.users.get(um.opponent_id) as any)?.name || 'Opponent';
+          const scoreStr = um.score_creator != null && um.score_opponent != null
+            ? `: ${um.score_creator}-${um.score_opponent}` : '';
+          const content = `${creatorName} vs ${opponentName}${scoreStr}`;
+
+          const statusResult = await this.dataSource.query(`
+            INSERT INTO player_statuses (user_id, content, court_id, created_at)
+            VALUES ($1, $2, $3, NOW())
+            RETURNING id
+          `, [winnerId, content, um.court_id || null]);
+
+          if (statusResult[0]?.id) {
+            await this.dataSource.query(`UPDATE matches SET status_id = $1 WHERE id = $2`, [statusResult[0].id, id]);
+            console.log(`[completeWithScores] Created shadow status ${statusResult[0].id} for match ${id}`);
+          }
+        } catch (e) {
+          console.error('[completeWithScores] Shadow status creation error (non-fatal):', e.message);
+        }
+      }
 
       const result = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [id]);
       return result[0];
