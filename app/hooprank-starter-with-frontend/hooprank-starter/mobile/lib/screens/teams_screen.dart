@@ -1454,7 +1454,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             backgroundColor: hasTeam ? Colors.grey.shade700 : Colors.deepOrange,
             foregroundColor: hasTeam ? Colors.grey.shade500 : Colors.white,
             icon: Icon(hasTeam ? Icons.lock : Icons.add),
-            label: Text(hasTeam ? 'Subscribe to create more teams (coming soon)' : 'Create Team'),
+            label: Text(hasTeam ? '1 Team Max' : 'Create Team'),
           ),
         ],
       ),
