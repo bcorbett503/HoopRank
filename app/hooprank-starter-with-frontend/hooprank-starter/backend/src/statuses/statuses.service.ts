@@ -821,9 +821,9 @@ export class StatusesService {
                     LIMIT $1
                 `;
                 const [statusResults, matchResults, teamMatchResults] = await Promise.all([
-                    this.dataSource.query(statusQuery, [userId, userId, userId, limit]),
-                    this.dataSource.query(matchQuery, [userId, userId, limit]),
-                    this.dataSource.query(teamMatchQuery, [limit])
+                    this.dataSource.query(statusQuery, [userId, userId, userId, limit]).catch(e => { console.error('FOLLOWING statusQuery error:', e.message); return []; }),
+                    this.dataSource.query(matchQuery, [userId, userId, limit]).catch(e => { console.error('FOLLOWING matchQuery error:', e.message); return []; }),
+                    this.dataSource.query(teamMatchQuery, [limit]).catch(e => { console.error('FOLLOWING teamMatchQuery error:', e.message); return []; })
                 ]);
 
                 // Score and sort
@@ -862,9 +862,9 @@ export class StatusesService {
                     LIMIT $1
                 `;
                 const [statusResults, matchResults, teamMatchResults] = await Promise.all([
-                    this.dataSource.query(statusQuery, [userId, userId, userId, limit]),
-                    this.dataSource.query(matchQuery, [userId, userId, limit]),
-                    this.dataSource.query(teamMatchQuery, [limit])
+                    this.dataSource.query(statusQuery, [userId, userId, userId, limit]).catch(e => { console.error('ALL statusQuery error:', e.message); return []; }),
+                    this.dataSource.query(matchQuery, [userId, userId, limit]).catch(e => { console.error('ALL matchQuery error:', e.message); return []; }),
+                    this.dataSource.query(teamMatchQuery, [limit]).catch(e => { console.error('ALL teamMatchQuery error:', e.message); return []; })
                 ]);
 
                 // Score and sort
