@@ -1648,12 +1648,12 @@ export class TeamsService {
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_team_id UUID`);
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_name TEXT`);
 
-        // Create match
+        // Create match (include court_id from event)
         const matchResult = await this.dataSource.query(`
-            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id, opponent_name)
-            VALUES ($1, 'accepted', true, $2, $3, $4, $5)
+            INSERT INTO matches (match_type, status, team_match, creator_team_id, opponent_team_id, creator_id, opponent_name, court_id)
+            VALUES ($1, 'accepted', true, $2, $3, $4, $5, $6)
             RETURNING *
-        `, [matchType, teamId, event.opponentTeamId || null, userId, event.opponentTeamName || null]);
+        `, [matchType, teamId, event.opponentTeamId || null, userId, event.opponentTeamName || null, event.courtId || null]);
         const match = matchResult[0];
 
         // Link event to match

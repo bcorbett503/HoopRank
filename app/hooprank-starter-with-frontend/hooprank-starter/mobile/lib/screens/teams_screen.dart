@@ -1141,7 +1141,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                               child: Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: teamNames.entries.map((entry) => ActionChip(
+                                children: teamNames.entries
+                                    .where((entry) => entry.key != selectedTeamId)
+                                    .map((entry) => ActionChip(
                                   avatar: const Icon(Icons.groups, size: 16, color: Colors.purple),
                                   label: Text(
                                     entry.value,
