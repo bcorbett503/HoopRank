@@ -12,6 +12,20 @@ export class CourtsController {
         private readonly dataSource: DataSource,
     ) { }
 
+    @Post('admin/migrate')
+    async runMigrations(
+        @Headers('x-user-id') userId: string,
+    ) {
+        const results: string[] = [];
+        try {
+            await this.dataSource.query(`ALTER TABLE courts ADD COLUMN IF NOT EXISTS venue_type TEXT`);
+            results.push('venue_type column ensured');
+        } catch (e) {
+            results.push(`venue_type: ${e.message}`);
+        }
+        return { success: true, migrations: results };
+    }
+
     @Get()
     async findAll(
         @Query('minLat') minLat?: string,

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Court } from './court.entity';
@@ -7,7 +7,7 @@ import { UsersService } from '../users/users.service';
 import { DbDialect } from '../common/db-utils';
 
 @Injectable()
-export class CourtsService {
+export class CourtsService implements OnModuleInit {
     private dialect: DbDialect;
 
     constructor(
@@ -18,6 +18,18 @@ export class CourtsService {
         private dataSource: DataSource,
     ) {
         this.dialect = new DbDialect(dataSource);
+    }
+
+    async onModuleInit() {
+        // Auto-create venue_type column if missing (production has synchronize: false)
+        if (this.dialect.isPostgres) {
+            try {
+                await this.dataSource.query(`ALTER TABLE courts ADD COLUMN IF NOT EXISTS venue_type TEXT`);
+                console.log('[CourtsService] venue_type column ensured');
+            } catch (e) {
+                console.error('[CourtsService] Failed to add venue_type column:', e.message);
+            }
+        }
     }
 
     // Note: Courts are seeded via scripts/seed-courts.ts
