@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { NotificationsService } from './notifications/notifications.service';
+import { Public } from './auth/public.decorator';
 
 @Controller()
 export class HealthController {
@@ -10,6 +11,7 @@ export class HealthController {
     ) { }
 
     @Get('health')
+    @Public()
     getHealth() {
         return {
             status: 'ok',

@@ -1,50 +1,123 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+    CanActivate,
+    ExecutionContext,
+    ForbiddenException,
+    Injectable,
+    UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import * as admin from 'firebase-admin';
+import { IS_PUBLIC_KEY } from './public.decorator';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-    async canActivate(context: ExecutionContext): Promise<boolean> {
-        const request = context.switchToHttp().getRequest();
-        const token = this.extractTokenFromHeader(request);
-        console.log(`[AuthGuard] Checking token: ${token ? 'Found' : 'Missing'}`);
+    constructor(
+        private readonly reflector: Reflector,
+        private readonly configService: ConfigService,
+    ) { }
 
-        if (!token) {
-            throw new UnauthorizedException();
+    async canActivate(context: ExecutionContext): Promise<boolean> {
+        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+            context.getHandler(),
+            context.getClass(),
+        ]);
+        if (isPublic) {
+            return true;
         }
 
-        // Allow dev token for testing
-        if (token === 'dev-token') {
-            request['user'] = { uid: 'dev-user-id', email: 'dev@example.com' };
-            return true;
+        const request = context.switchToHttp().getRequest();
+        const token = this.extractTokenFromHeader(request);
+        const allowInsecureAuth = this.configService.get<string>('ALLOW_INSECURE_AUTH') === 'true';
+
+        if (!token) {
+            // Explicitly opt-in dev fallback only; never enabled by default.
+            if (allowInsecureAuth) {
+                const fallbackUid = request.headers['x-user-id'] || request.body?.id;
+                if (!fallbackUid) {
+                    throw new UnauthorizedException('Missing authentication token');
+                }
+                request.headers['x-user-id'] = String(fallbackUid);
+                request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
+                return this.enforceAdminForSensitiveRoutes(request, String(fallbackUid));
+            }
+            throw new UnauthorizedException('Missing authentication token');
+        }
+
+        if (admin.apps.length === 0) {
+            // Fail closed in secure mode when Firebase is unavailable.
+            if (!allowInsecureAuth) {
+                throw new UnauthorizedException('Authentication service unavailable');
+            }
+            const fallbackUid = request.headers['x-user-id'] || request.body?.id;
+            if (!fallbackUid) {
+                throw new UnauthorizedException('Authentication service unavailable');
+            }
+            request.headers['x-user-id'] = String(fallbackUid);
+            request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
+            return this.enforceAdminForSensitiveRoutes(request, String(fallbackUid));
         }
 
         try {
-            // Check if Firebase is initialized
-            if (admin.apps.length === 0) {
-                console.log('[AuthGuard] Firebase not initialized - allowing request with x-user-id or body.id');
-                // Allow request to proceed - controller will use body.id
-                request['user'] = { uid: request.body?.id || request.headers['x-user-id'], email: '' };
-                return true;
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            const uid = decodedToken.uid;
+
+            // Never trust caller-supplied user identifiers that do not match token subject.
+            const headerUid = this.normalizeHeaderValue(request.headers['x-user-id']);
+            if (headerUid && headerUid !== uid) {
+                throw new UnauthorizedException('x-user-id does not match authenticated user');
+            }
+            if (!headerUid) {
+                request.headers['x-user-id'] = uid;
             }
 
-            const decodedToken = await admin.auth().verifyIdToken(token);
             request['user'] = decodedToken;
-            return true;
+            return this.enforceAdminForSensitiveRoutes(request, uid);
         } catch (error) {
-            console.log('[AuthGuard] Token verification failed:', error.message);
-            // If Firebase verification fails but we have a user id, allow the request
-            const fallbackUid = request.body?.id || request.headers['x-user-id'];
-            if (fallbackUid) {
-                console.log('[AuthGuard] Falling back to uid from request:', fallbackUid);
-                request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
-                return true;
+            if (error instanceof UnauthorizedException || error instanceof ForbiddenException) {
+                throw error;
             }
-            throw new UnauthorizedException();
+            throw new UnauthorizedException('Invalid authentication token');
         }
     }
 
     private extractTokenFromHeader(request: any): string | undefined {
         const [type, token] = request.headers.authorization?.split(' ') ?? [];
         return type === 'Bearer' ? token : undefined;
+    }
+
+    private normalizeHeaderValue(value: unknown): string | undefined {
+        if (!value) return undefined;
+        if (Array.isArray(value)) return value[0] ? String(value[0]) : undefined;
+        return String(value);
+    }
+
+    private enforceAdminForSensitiveRoutes(request: any, uid: string): boolean {
+        const rawPath = String(request.path || request.originalUrl || '').toLowerCase();
+        const sensitivePrefixes = ['admin', 'debug', 'migrate', 'seed', 'cleanup'];
+        const segments = rawPath.split('/').filter(Boolean);
+        const isSensitive = segments.some((segment) =>
+            sensitivePrefixes.some((prefix) => segment === prefix || segment.startsWith(`${prefix}-`)),
+        );
+
+        if (!isSensitive) {
+            return true;
+        }
+
+        const adminIdsRaw = this.configService.get<string>('ADMIN_USER_IDS') || '';
+        const adminIds = adminIdsRaw
+            .split(',')
+            .map((id) => id.trim())
+            .filter((id) => id.length > 0);
+        const isAdminUser = adminIds.includes(uid);
+
+        const configuredSecret = this.configService.get<string>('ADMIN_SECRET') || '';
+        const providedSecret = this.normalizeHeaderValue(request.headers['x-admin-secret']) || '';
+        const hasValidSecret = configuredSecret.length > 0 && providedSecret === configuredSecret;
+
+        if (!isAdminUser && !hasValidSecret) {
+            throw new ForbiddenException('Admin privileges required');
+        }
+        return true;
     }
 }

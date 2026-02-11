@@ -2329,12 +2329,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   ),
                 ),
                 const Spacer(),
-                // Track Outcome button (games only)
+                // Input Outcome button (games only)
                 if (!isPractice)
                   ElevatedButton.icon(
                     onPressed: () => _startGameFromEvent(event),
                     icon: const Icon(Icons.scoreboard, size: 16),
-                    label: const Text('Track Outcome', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text('Input Outcome', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purple,
                       foregroundColor: Colors.white,

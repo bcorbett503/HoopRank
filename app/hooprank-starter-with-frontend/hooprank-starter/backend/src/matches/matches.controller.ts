@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Param, Post } from '@nestjs/common';
 import { MatchesService } from './matches.service';
 import { Match } from './match.entity';
 import { CreateMatchDto } from './dto/create-match.dto';
@@ -12,9 +12,16 @@ export class MatchesController {
   ) { }
 
   @Post()
-  async create(@Body() body: CreateMatchDto & { message?: string }): Promise<Match> {
+  async create(
+    @Headers('x-user-id') userId: string,
+    @Body() body: CreateMatchDto & { message?: string },
+  ): Promise<Match> {
     // Use creatorId/opponentId - mapped from hostId/guestId in DTO
-    const creatorId = body.hostId || (body as any).creatorId;
+    const creatorId = userId;
+    const requestedCreatorId = body.hostId || (body as any).creatorId;
+    if (requestedCreatorId && requestedCreatorId !== creatorId) {
+      throw new ForbiddenException('hostId must match authenticated user');
+    }
     const opponentId = body.guestId || (body as any).opponentId;
     const match = await this.matches.create(creatorId, opponentId, body.courtId);
 
@@ -31,13 +38,34 @@ export class MatchesController {
     @Body() body: { guestId?: string; opponentId?: string },
     @Headers('x-user-id') userId?: string,
   ): Promise<Match> {
-    const opponentId = body.guestId || body.opponentId || userId;
+    const requestedOpponentId = body.guestId || body.opponentId;
+    if (requestedOpponentId && userId && requestedOpponentId !== userId) {
+      throw new ForbiddenException('opponentId must match authenticated user');
+    }
+    const opponentId = userId;
     if (!opponentId) throw new Error('opponentId required');
     return await this.matches.accept(id, opponentId);
   }
 
   @Post(':id/complete')
-  async complete(@Param('id') id: string, @Body() body: { winner: string }): Promise<Match> {
+  async complete(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId: string,
+    @Body() body: { winner: string },
+  ): Promise<Match> {
+    if (!userId) {
+      throw new Error('Authentication required');
+    }
+    if (body.winner !== userId) {
+      throw new ForbiddenException('winner must match authenticated user');
+    }
+    const match = await this.matches.get(id);
+    if (!match) throw new Error('Match not found');
+    const creatorId = (match as any).creator_id || (match as any).creatorId;
+    const opponentId = (match as any).opponent_id || (match as any).opponentId;
+    if (userId !== creatorId && userId !== opponentId) {
+      throw new ForbiddenException('You are not a participant in this match');
+    }
     return await this.matches.complete(id, body.winner);
   }
 

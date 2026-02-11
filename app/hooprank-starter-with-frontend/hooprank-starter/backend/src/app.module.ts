@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { MatchesModule } from './matches/matches.module';
@@ -15,6 +16,7 @@ import { Team, TeamMember, TeamMessage } from './teams/team.entity';
 import { TeamEvent, TeamEventAttendance } from './teams/team-event.entity';
 import { PlayerStatus, StatusLike, StatusComment, EventAttendee, UserFollowedCourt, UserFollowedPlayer, CheckIn } from './statuses/status.entity';
 import { FirebaseModule } from './auth/firebase.module';
+import { AuthGuard } from './auth/auth.guard';
 import { MessagesModule } from './messages/messages.module';
 import { ChallengesModule } from './challenges/challenges.module';
 import { Challenge } from './challenges/challenge.entity';
@@ -73,6 +75,11 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     RunsModule,
   ],
   controllers: [HealthController, UploadController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard,
+    },
+  ],
 })
 export class AppModule { }
-

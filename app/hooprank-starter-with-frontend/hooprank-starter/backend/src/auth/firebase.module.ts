@@ -9,10 +9,6 @@ import { ConfigService } from '@nestjs/config';
 function normalizePrivateKey(key: string | undefined): string | undefined {
     if (!key) return undefined;
 
-    // Log the first 100 chars for debugging (obscures most of the key)
-    console.log(`[Firebase] Raw private key preview: ${key.substring(0, 100)}...`);
-    console.log(`[Firebase] Raw key length: ${key.length}`);
-
     // Handle JSON stringified format (key wrapped in quotes with escaped chars)
     if (key.startsWith('"') && key.endsWith('"')) {
         try {
@@ -34,10 +30,9 @@ function normalizePrivateKey(key: string | undefined): string | undefined {
         normalized = normalized.split('\\n').join('\n');
     }
 
-    // Count newlines to verify
+    // Count newlines to verify structural correctness without logging key material.
     const newlineCount = (normalized.match(/\n/g) || []).length;
     console.log(`[Firebase] Normalized key has ${newlineCount} newlines`);
-    console.log(`[Firebase] Normalized key preview: ${normalized.substring(0, 80).replace(/\n/g, '\\n')}...`);
 
     // Ensure proper PEM format with newlines
     if (newlineCount === 0) {
@@ -68,9 +63,6 @@ function normalizePrivateKey(key: string | undefined): string | undefined {
                 const clientEmail = configService.get<string>('FIREBASE_CLIENT_EMAIL');
                 const privateKeyRaw = configService.get<string>('FIREBASE_PRIVATE_KEY');
 
-                console.log(`[Firebase] Initializing with projectId=${projectId}, clientEmail=${clientEmail?.substring(0, 20)}...`);
-                console.log(`[Firebase] privateKey length=${privateKeyRaw?.length || 0}, starts with -----BEGIN=${privateKeyRaw?.startsWith('-----BEGIN') || false}`);
-
                 // Skip Firebase initialization only if using dev project or missing credentials
                 if (projectId === 'hooprank-dev') {
                     console.log('[Firebase] Skipping initialization - dev project detected');
@@ -98,7 +90,7 @@ function normalizePrivateKey(key: string | undefined): string | undefined {
                     return app;
                 } catch (error) {
                     console.error('[Firebase] Failed to initialize:', error.message);
-                    console.log('[Firebase] Falling back to dev-token authentication');
+                    console.log('[Firebase] Firebase Admin SDK unavailable; secure auth requests will fail');
                     return null;
                 }
             },

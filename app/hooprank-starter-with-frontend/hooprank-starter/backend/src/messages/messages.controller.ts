@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, Headers, Inject, forwardRef } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, Headers, Inject, forwardRef, ForbiddenException } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { TeamsService } from '../teams/teams.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -16,11 +16,14 @@ export class MessagesController {
         @Headers('x-user-id') userId: string,
         @Body() body: { senderId?: string; receiverId?: string; toUserId?: string; content: string; matchId?: string; isChallenge?: boolean }
     ) {
-        // Support both formats: {senderId, receiverId} and {toUserId} (mobile)
-        const senderId = body.senderId || userId;
+        // Sender is always the authenticated user; ignore caller-supplied senderId.
+        const senderId = userId;
         const receiverId = body.receiverId || body.toUserId;
         if (!senderId || !receiverId) {
             throw new Error('Receiver ID required (receiverId or toUserId)');
+        }
+        if (body.senderId && body.senderId !== senderId) {
+            throw new ForbiddenException('senderId must match authenticated user');
         }
         return this.messagesService.sendMessage(senderId, receiverId, body.content, body.matchId, body.isChallenge);
     }
@@ -48,8 +51,14 @@ export class MessagesController {
     }
 
     @Get('conversations/:userId')
-    async getConversations(@Param('userId') userId: string) {
-        return this.messagesService.getConversations(userId);
+    async getConversations(
+        @Headers('x-user-id') authUserId: string,
+        @Param('userId') userId: string,
+    ) {
+        if (authUserId !== userId) {
+            throw new ForbiddenException('You can only view your own conversations');
+        }
+        return this.messagesService.getConversations(authUserId);
     }
 
     // GET /messages/:otherUserId — uses x-user-id header (mobile path)
@@ -62,8 +71,15 @@ export class MessagesController {
     }
 
     @Get(':userId/:otherUserId')
-    async getMessages(@Param('userId') userId: string, @Param('otherUserId') otherUserId: string) {
-        return this.messagesService.getMessages(userId, otherUserId);
+    async getMessages(
+        @Headers('x-user-id') authUserId: string,
+        @Param('userId') userId: string,
+        @Param('otherUserId') otherUserId: string,
+    ) {
+        if (authUserId !== userId) {
+            throw new ForbiddenException('You can only view your own messages');
+        }
+        return this.messagesService.getMessages(authUserId, otherUserId);
     }
 
     @Put(':otherUserId/read')

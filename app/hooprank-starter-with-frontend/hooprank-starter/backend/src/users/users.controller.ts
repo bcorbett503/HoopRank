@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards, Request, Query, ForbiddenException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { User } from './user.entity';
@@ -16,9 +16,7 @@ export class UsersController {
   @Post('auth')
   @UseGuards(AuthGuard)
   async authenticate(@Request() req, @Body() body: { id?: string; email?: string }) {
-    // Use id from body (Firebase UID passed by app) if token verification fell back to dev-token
-    // This ensures existing users get their real profile instead of a new one
-    const uid = body.id || req.user?.uid || '';
+    const uid = req.user?.uid || '';
     const email = body.email || req.user?.email || '';
     console.log(`[AUTHENTICATE] uid=${uid}, email=${email}`);
     const user = await this.usersService.findOrCreate(uid, email);
@@ -365,14 +363,15 @@ export class UsersController {
     @Headers('x-user-id') userId: string,
     @Body() data: Partial<User>,
   ) {
-    // Use id from param, fallback to x-user-id header
-    const targetId = id || userId;
-    if (!targetId) {
+    if (!id || !userId) {
       return { success: false, error: 'User ID required' };
     }
+    if (id !== userId) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
     try {
-      console.log('updateProfile: id=', targetId, 'data=', data);
-      const user = await this.usersService.updateProfile(targetId, data);
+      console.log('updateProfile: id=', id, 'data=', data);
+      const user = await this.usersService.updateProfile(id, data);
       return user;
     } catch (error) {
       console.error('updateProfile error:', error.message);
@@ -380,8 +379,8 @@ export class UsersController {
       if (error.message === 'User not found') {
         console.log('updateProfile: user not found, creating...');
         try {
-          await this.usersService.findOrCreate(targetId, data.email || '');
-          const user = await this.usersService.updateProfile(targetId, data);
+          await this.usersService.findOrCreate(id, data.email || '');
+          const user = await this.usersService.updateProfile(id, data);
           return user;
         } catch (createError) {
           console.error('updateProfile: failed to create user:', createError.message);
@@ -394,13 +393,19 @@ export class UsersController {
 
   @Post(':id/friends/:friendId')
   @UseGuards(AuthGuard)
-  addFriend(@Param('id') id: string, @Param('friendId') friendId: string) {
+  addFriend(@Param('id') id: string, @Param('friendId') friendId: string, @Headers('x-user-id') userId: string) {
+    if (id !== userId) {
+      throw new ForbiddenException('You can only modify your own friends');
+    }
     return this.usersService.addFriend(id, friendId);
   }
 
   @Post(':id/friends/:friendId/remove')
   @UseGuards(AuthGuard)
-  removeFriend(@Param('id') id: string, @Param('friendId') friendId: string) {
+  removeFriend(@Param('id') id: string, @Param('friendId') friendId: string, @Headers('x-user-id') userId: string) {
+    if (id !== userId) {
+      throw new ForbiddenException('You can only modify your own friends');
+    }
     return this.usersService.removeFriend(id, friendId);
   }
 
@@ -421,4 +426,3 @@ export class UsersController {
 
 
 }
-

@@ -61,21 +61,65 @@ export class UsersService {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
-      const result = await this.dataSource.query(`SELECT * FROM users WHERE id = $1 LIMIT 1`, [id]);
+      const result = await this.dataSource.query(`
+        SELECT
+          id,
+          email,
+          name,
+          avatar_url,
+          hoop_rank,
+          position,
+          city,
+          games_played,
+          created_at,
+          updated_at
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `, [id]);
       return result.length > 0 ? result[0] : null;
     }
 
-    return this.usersRepository.findOne({ where: { id } });
+    const user = await this.usersRepository.findOne({ where: { id } });
+    return this.sanitizeUser(user);
   }
 
   async getAll(): Promise<User[]> {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
-      return await this.dataSource.query(`SELECT * FROM users ORDER BY hoop_rank DESC LIMIT 100`);
+      // Return only public profile fields; never expose auth or notification tokens.
+      return await this.dataSource.query(`
+        SELECT
+          id,
+          name,
+          avatar_url,
+          hoop_rank,
+          position,
+          city,
+          games_played,
+          created_at,
+          updated_at
+        FROM users
+        ORDER BY hoop_rank DESC
+        LIMIT 100
+      `);
     }
 
-    return this.usersRepository.find();
+    const users = await this.usersRepository.find({
+      order: { hoopRank: 'DESC' },
+      take: 100,
+    });
+    return users.map((user) => this.sanitizeUser(user) as User);
+  }
+
+  private sanitizeUser(user: User | null): User | null {
+    if (!user) return null;
+    const sanitized: any = { ...(user as any) };
+    delete sanitized.authToken;
+    delete sanitized.fcmToken;
+    delete sanitized.authProvider;
+    return sanitized as User;
   }
 
   /**
@@ -1256,4 +1300,3 @@ export class UsersService {
     }
   }
 }
-

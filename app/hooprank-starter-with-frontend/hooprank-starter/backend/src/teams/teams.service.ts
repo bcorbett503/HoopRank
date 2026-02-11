@@ -1449,9 +1449,21 @@ export class TeamsService {
             order: { eventDate: 'ASC' },
         });
 
+        // Filter out events whose linked match is already completed
+        const completedMatchIds = new Set<string>();
+        const matchIds = events.filter(e => e.matchId).map(e => e.matchId);
+        if (matchIds.length > 0) {
+            const completedMatches = await this.dataSource.query(
+                `SELECT id::TEXT FROM matches WHERE id = ANY($1::uuid[]) AND status = 'completed'`,
+                [matchIds]
+            );
+            completedMatches.forEach((m: any) => completedMatchIds.add(m.id));
+        }
+        const activeEvents = events.filter(e => !e.matchId || !completedMatchIds.has(e.matchId));
+
         // Hydrate each event with attendance data
         const result: any[] = [];
-        for (const event of events) {
+        for (const event of activeEvents) {
             const allAttendance = await this.attendanceRepository.find({
                 where: { eventId: event.id },
             });
