@@ -1142,7 +1142,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: teamNames.entries
-                                    .where((entry) => entry.key != selectedTeamId)
+                                    .where((entry) {
+                                      // Exclude all of the user's own teams, not just the selected one
+                                      final myTeamIds = _myTeams.map((t) => t['id']?.toString()).toSet();
+                                      return !myTeamIds.contains(entry.key);
+                                    })
                                     .map((entry) => ActionChip(
                                   avatar: const Icon(Icons.groups, size: 16, color: Colors.purple),
                                   label: Text(
