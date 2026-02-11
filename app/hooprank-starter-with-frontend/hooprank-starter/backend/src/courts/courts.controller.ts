@@ -117,6 +117,7 @@ export class CourtsController {
         @Query('venue_type') venue_type: string,
         @Query('name_pattern') name_pattern?: string,
         @Query('indoor') indoor?: string,
+        @Query('current_venue_type') current_venue_type?: string,
     ) {
         let query = `UPDATE courts SET venue_type = $1 WHERE 1=1`;
         const params: any[] = [venue_type];
@@ -130,6 +131,11 @@ export class CourtsController {
         if (indoor !== undefined) {
             query += ` AND indoor = $${idx}`;
             params.push(indoor === 'true');
+            idx++;
+        }
+        if (current_venue_type) {
+            query += ` AND venue_type = $${idx}`;
+            params.push(current_venue_type);
             idx++;
         }
 
