@@ -7,6 +7,7 @@ import '../state/check_in_state.dart';
 import '../state/tutorial_state.dart';
 import '../models.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/messages_service.dart';
 import '../widgets/player_profile_sheet.dart';
 import 'chat_screen.dart';
@@ -117,9 +118,14 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
           ? '${ApiService.baseUrl}/users/nearby?radiusMiles=25'
           : '${ApiService.baseUrl}/rankings?mode=1v1';
       
+      final token = await AuthService.getIdToken();
+      final headers = <String, String>{
+        'x-user-id': currentUser?.id ?? '',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
       final response = await http.get(
         Uri.parse(url),
-        headers: {'x-user-id': currentUser?.id ?? ''},
+        headers: headers,
       );
       
       if (response.statusCode == 200) {
@@ -203,9 +209,14 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       var url = '${ApiService.baseUrl}/rankings?mode=$_teamFilter&scope=$scope';
       if (_teamGenderFilter != null) url += '&gender=$_teamGenderFilter';
       if (_teamAgeFilter != null) url += '&ageGroup=$_teamAgeFilter';
+      final token = await AuthService.getIdToken();
+      final headers = <String, String>{
+        'x-user-id': ApiService.userId ?? '',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
       final response = await http.get(
         Uri.parse(url),
-        headers: {'x-user-id': ApiService.userId ?? ''},
+        headers: headers,
       );
       
       if (response.statusCode == 200) {
