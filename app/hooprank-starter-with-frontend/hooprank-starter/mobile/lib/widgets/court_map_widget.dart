@@ -579,7 +579,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                         ),
                       children: [
                         TileLayer(
-                          urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                           userAgentPackageName: 'com.bcorbett.hooprank',
                         ),
                         MarkerLayer(
@@ -1091,12 +1091,23 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                           const SizedBox(height: 4),
                                           
                                           // Address line
-                                          if (court.address != null)
-                                            Text(
-                                              court.address!, 
-                                              maxLines: 1, 
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                                          if (court.address != null && court.address!.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 2),
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.location_on, size: 12, color: Colors.grey[500]),
+                                                  const SizedBox(width: 3),
+                                                  Expanded(
+                                                    child: Text(
+                                                      court.address!, 
+                                                      maxLines: 2, 
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                             
                                           // Bottom Row: Kings & Followers
