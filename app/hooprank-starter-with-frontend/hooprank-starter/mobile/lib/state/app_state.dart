@@ -225,6 +225,18 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    final previousUserId = _currentUser?.id;
+
+    // Best-effort server cleanup before auth/user context is cleared.
+    if (previousUserId != null && previousUserId.isNotEmpty) {
+      try {
+        await ApiService.unregisterFcmToken(previousUserId);
+      } catch (e) {
+        debugPrint('Failed to unregister FCM token on logout: $e');
+      }
+    }
+    await NotificationService.clearBadge();
+
     _currentUser = null;
     ApiService.setUserId('');
     notifyListeners();

@@ -31,6 +31,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _profileHeight; // Fresh height from API
   String? _profileTeam; // Fresh team from API
 
+  int _parseIntValue(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString()) ?? 0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -38,7 +45,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadData() async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     debugPrint('Loading profile for userId: $userId');
     if (userId == null) return;
 
@@ -54,36 +62,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ]);
 
       if (mounted) {
+        final statsData = results[0] as Map<String, dynamic>?;
         final profileData = results[3] as Map<String, dynamic>?;
         debugPrint('Profile data loaded: $profileData');
         debugPrint('Profile name from API: ${profileData?['name']}');
         setState(() {
-          _stats = results[0] as Map<String, dynamic>?;
+          _stats = statsData;
           _history = (results[1] as List<Map<String, dynamic>>?) ?? [];
           _recentMatches = (results[2] as List<Map<String, dynamic>>?) ?? [];
           _userPosts = (results[4] as List<Map<String, dynamic>>?) ?? [];
+
+          final hasStatsMatches =
+              statsData?.containsKey('matchesPlayed') == true ||
+                  statsData?.containsKey('totalMatches') == true ||
+                  statsData?.containsKey('matches_played') == true;
+          final hasStatsWins = statsData?.containsKey('wins') == true;
+          final hasStatsLosses = statsData?.containsKey('losses') == true;
+
+          final statsMatches = _parseIntValue(
+            statsData?['matchesPlayed'] ??
+                statsData?['totalMatches'] ??
+                statsData?['matches_played'],
+          );
+          final statsWins = _parseIntValue(statsData?['wins']);
+          final statsLosses = _parseIntValue(statsData?['losses']);
+
           // Parse rating and stats from profile data
           if (profileData != null) {
             _currentRating = (profileData['rating'] is num)
                 ? (profileData['rating'] as num).toDouble()
-                : double.tryParse(profileData['rating']?.toString() ?? '') ?? 3.0;
-            _matchesPlayed = (profileData['matchesPlayed'] is num) 
-                ? (profileData['matchesPlayed'] as num).toInt() 
-                : int.tryParse(profileData['matchesPlayed']?.toString() ?? '') ?? 0;
-            _wins = (profileData['wins'] is num) 
-                ? (profileData['wins'] as num).toInt() 
-                : int.tryParse(profileData['wins']?.toString() ?? '') ?? 0;
-            _losses = (profileData['losses'] is num) 
-                ? (profileData['losses'] as num).toInt() 
-                : int.tryParse(profileData['losses']?.toString() ?? '') ?? 0;
+                : double.tryParse(profileData['rating']?.toString() ?? '') ??
+                    3.0;
+            _matchesPlayed = _parseIntValue(
+                profileData['matchesPlayed'] ?? profileData['matches_played']);
+            _wins = _parseIntValue(profileData['wins']);
+            _losses = _parseIntValue(profileData['losses']);
             // Parse profile info
             _profileName = profileData['name']?.toString();
             _profilePosition = profileData['position']?.toString();
             _profileCity = profileData['city']?.toString();
             _profileHeight = profileData['height']?.toString();
             _profileTeam = profileData['team']?.toString();
-            debugPrint('Parsed _profileName: $_profileName, _profileTeam: $_profileTeam');
+            debugPrint(
+                'Parsed _profileName: $_profileName, _profileTeam: $_profileTeam');
           }
+
+          if (hasStatsMatches) _matchesPlayed = statsMatches;
+          if (hasStatsWins) _wins = statsWins;
+          if (hasStatsLosses) _losses = statsLosses;
+
           _isLoading = false;
         });
       }
@@ -105,9 +132,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    final wins = _wins.toString();
-    final losses = _losses.toString();
-    final matchesPlayed = _matchesPlayed.toString();
+    final resolvedMatchesPlayed =
+        _matchesPlayed > 0 ? _matchesPlayed : player.matchesPlayed;
+    final resolvedWins = _wins > 0 ? _wins : player.wins;
+    final resolvedLosses = _losses > 0 ? _losses : player.losses;
+
+    final wins = resolvedWins.toString();
+    final losses = resolvedLosses.toString();
+    final matchesPlayed = resolvedMatchesPlayed.toString();
 
     return Scaffold(
       appBar: AppBar(
@@ -149,32 +181,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               backgroundColor: const Color(0xFFFF6B35),
                               backgroundImage: player.photoUrl != null
                                   ? (player.photoUrl!.startsWith('data:')
-                                      ? MemoryImage(Uri.parse(player.photoUrl!).data!.contentAsBytes())
-                                      : NetworkImage(player.photoUrl!) as ImageProvider)
+                                      ? MemoryImage(Uri.parse(player.photoUrl!)
+                                          .data!
+                                          .contentAsBytes())
+                                      : NetworkImage(player.photoUrl!)
+                                          as ImageProvider)
                                   : null,
                               child: player.photoUrl == null
                                   ? Text(
-                                      (_profileName ?? player.name).isNotEmpty ? (_profileName ?? player.name)[0] : '?',
-                                      style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
+                                      (_profileName ?? player.name).isNotEmpty
+                                          ? (_profileName ?? player.name)[0]
+                                          : '?',
+                                      style: const TextStyle(
+                                          fontSize: 32,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold),
                                     )
                                   : null,
                             ),
                             const SizedBox(height: 12),
-                            Text(_profileName ?? player.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                            Text('${_profileTeam ?? player.team ?? 'No Team'} • ${_profilePosition ?? player.position ?? 'Unknown'}', style: const TextStyle(color: Colors.grey)),
+                            Text(_profileName ?? player.name,
+                                style: const TextStyle(
+                                    fontSize: 24, fontWeight: FontWeight.bold)),
+                            Text(
+                                '${_profileTeam ?? player.team ?? 'No Team'} • ${_profilePosition ?? player.position ?? 'Unknown'}',
+                                style: const TextStyle(color: Colors.grey)),
                             const SizedBox(height: 12),
                             // Current HoopRank
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Colors.deepOrange.shade600, Colors.orange.shade500],
+                                  colors: [
+                                    Colors.deepOrange.shade600,
+                                    Colors.orange.shade500
+                                  ],
                                 ),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
                                 'HoopRank: ${(_currentRating ?? player.rating).toStringAsFixed(2)}',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -193,14 +244,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 24),
 
                     // All Posts Section
-                    const Text('All Posts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text('All Posts',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     if (_userPosts.isEmpty)
                       const Card(
                         child: Padding(
                           padding: EdgeInsets.all(16),
                           child: Center(
-                            child: Text('No posts yet. Share an update!', style: TextStyle(color: Colors.grey)),
+                            child: Text('No posts yet. Share an update!',
+                                style: TextStyle(color: Colors.grey)),
                           ),
                         ),
                       )
@@ -209,19 +263,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 24),
 
                     // Recent Matches
-                    const Text('Recent Matches', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text('Recent Matches',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     if (_recentMatches.isEmpty)
                       const Card(
                         child: Padding(
                           padding: EdgeInsets.all(16),
                           child: Center(
-                            child: Text('No matches yet. Challenge someone!', style: TextStyle(color: Colors.grey)),
+                            child: Text('No matches yet. Challenge someone!',
+                                style: TextStyle(color: Colors.grey)),
                           ),
                         ),
                       )
                     else
-                      ...(_recentMatches.take(5).map((match) => _buildMatchCard(match, player.id))),
+                      ...(_recentMatches
+                          .take(5)
+                          .map((match) => _buildMatchCard(match, player.id))),
                   ],
                 ),
               ),
@@ -246,16 +305,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Get scores from flat fields
     final scoreCreator = match['score_creator'];
     final scoreOpponent = match['score_opponent'];
-    
+
     int? myScore;
     int? oppScore;
     if (scoreCreator != null && scoreOpponent != null) {
       myScore = isCreator
-          ? (scoreCreator is num ? scoreCreator.toInt() : int.tryParse(scoreCreator.toString()) ?? 0)
-          : (scoreOpponent is num ? scoreOpponent.toInt() : int.tryParse(scoreOpponent.toString()) ?? 0);
+          ? (scoreCreator is num
+              ? scoreCreator.toInt()
+              : int.tryParse(scoreCreator.toString()) ?? 0)
+          : (scoreOpponent is num
+              ? scoreOpponent.toInt()
+              : int.tryParse(scoreOpponent.toString()) ?? 0);
       oppScore = isCreator
-          ? (scoreOpponent is num ? scoreOpponent.toInt() : int.tryParse(scoreOpponent.toString()) ?? 0)
-          : (scoreCreator is num ? scoreCreator.toInt() : int.tryParse(scoreCreator.toString()) ?? 0);
+          ? (scoreOpponent is num
+              ? scoreOpponent.toInt()
+              : int.tryParse(scoreOpponent.toString()) ?? 0)
+          : (scoreCreator is num
+              ? scoreCreator.toInt()
+              : int.tryParse(scoreCreator.toString()) ?? 0);
     }
 
     // Determine win/loss
@@ -275,8 +342,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } catch (_) {}
     }
 
-    final result = match['result'] as Map<String, dynamic>?;
-    final isFinalized = result?['finalized'] == true;
+    final normalizedStatus = (status ?? '').toLowerCase();
+    final isFinalized =
+        normalizedStatus == 'completed' || normalizedStatus == 'ended';
+    final statusLabel = isFinalized ? 'Completed' : (status ?? 'Pending');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -302,7 +371,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap: otherId != null 
+                    onTap: otherId != null
                         ? () => PlayerProfileSheet.showById(context, otherId)
                         : null,
                     child: Text(
@@ -310,12 +379,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
                         color: otherId != null ? Colors.blue : null,
-                        decoration: otherId != null ? TextDecoration.underline : null,
+                        decoration:
+                            otherId != null ? TextDecoration.underline : null,
                       ),
                     ),
                   ),
                   Text(
-                    status == 'ended' ? (isFinalized ? 'Completed' : 'Pending confirmation') : status ?? '',
+                    statusLabel,
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
@@ -324,22 +394,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Score
             if (myScore != null && oppScore != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: didWin == true ? Colors.green.shade50 : Colors.red.shade50,
+                  color: didWin == true
+                      ? Colors.green.shade50
+                      : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '$myScore - $oppScore',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: didWin == true ? Colors.green.shade700 : Colors.red.shade700,
+                    color: didWin == true
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
                   ),
                 ),
               )
             else
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
@@ -351,7 +427,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             const SizedBox(width: 8),
             // Date
-            Text(dateStr, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+            Text(dateStr,
+                style: TextStyle(fontSize: 12, color: Colors.grey[500])),
           ],
         ),
       ),
@@ -363,7 +440,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final createdAt = post['createdAt'];
     final likeCount = post['likeCount'] ?? 0;
     final commentCount = post['commentCount'] ?? 0;
-    
+
     // Format date
     String timeAgo = '';
     if (createdAt != null) {
@@ -395,13 +472,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Icon(Icons.favorite, size: 16, color: Colors.grey[500]),
                 const SizedBox(width: 4),
-                Text('$likeCount', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                Text('$likeCount',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                 const SizedBox(width: 16),
-                Icon(Icons.chat_bubble_outline, size: 16, color: Colors.grey[500]),
+                Icon(Icons.chat_bubble_outline,
+                    size: 16, color: Colors.grey[500]),
                 const SizedBox(width: 4),
-                Text('$commentCount', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                Text('$commentCount',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                 const Spacer(),
-                Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                Text(timeAgo,
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12)),
               ],
             ),
           ],
@@ -421,7 +502,8 @@ class _StatColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
       ],
     );

@@ -33,22 +33,26 @@ class ClickablePlayerName extends StatelessWidget {
           if (showAvatar) ...[
             CircleAvatar(
               radius: 14,
-              backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
+              backgroundImage:
+                  photoUrl != null ? NetworkImage(photoUrl!) : null,
               backgroundColor: Colors.deepOrange.withOpacity(0.2),
               child: photoUrl == null
-                  ? Text(playerName.isNotEmpty ? playerName[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 11, color: Colors.deepOrange))
+                  ? Text(
+                      playerName.isNotEmpty ? playerName[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                          fontSize: 11, color: Colors.deepOrange))
                   : null,
             ),
             const SizedBox(width: 6),
           ],
           Text(
             playerName,
-            style: style ?? const TextStyle(
-              color: Colors.blue,
-              fontWeight: FontWeight.w500,
-              decoration: TextDecoration.underline,
-            ),
+            style: style ??
+                const TextStyle(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.underline,
+                ),
           ),
         ],
       ),
@@ -74,7 +78,9 @@ class PlayerProfileSheet extends StatefulWidget {
   State<PlayerProfileSheet> createState() => _PlayerProfileSheetState();
 
   /// Shows the player profile as a modal bottom sheet
-  static Future<void> show(BuildContext context, User player, {
+  static Future<void> show(
+    BuildContext context,
+    User player, {
     VoidCallback? onChallenge,
     VoidCallback? onMessage,
     VoidCallback? onInviteToTeam,
@@ -93,7 +99,9 @@ class PlayerProfileSheet extends StatefulWidget {
   }
 
   /// Shows the player profile by fetching user data from their ID
-  static Future<void> showById(BuildContext context, String userId, {
+  static Future<void> showById(
+    BuildContext context,
+    String userId, {
     VoidCallback? onChallenge,
     VoidCallback? onMessage,
     VoidCallback? onInviteToTeam,
@@ -145,7 +153,7 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
   Future<void> _loadProfile() async {
     try {
       final profileData = await ApiService.getProfile(widget.userId);
-      
+
       if (!mounted) return;
 
       if (profileData == null) {
@@ -158,7 +166,9 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
 
       // Create User object from profile data
       double rating = 3.0;
-      final ratingValue = profileData['rating'] ?? profileData['hoop_rank'] ?? profileData['hoopRank'];
+      final ratingValue = profileData['rating'] ??
+          profileData['hoop_rank'] ??
+          profileData['hoopRank'];
       if (ratingValue is num) {
         rating = ratingValue.toDouble();
       } else if (ratingValue is String) {
@@ -168,7 +178,8 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
       final user = User(
         id: widget.userId,
         name: profileData['name']?.toString() ?? 'Unknown',
-        photoUrl: profileData['photoUrl']?.toString() ?? profileData['avatar_url']?.toString(),
+        photoUrl: profileData['photoUrl']?.toString() ??
+            profileData['avatar_url']?.toString(),
         position: profileData['position']?.toString(),
         rating: rating,
         city: profileData['city']?.toString(),
@@ -219,7 +230,8 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
             children: [
               Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
               const SizedBox(height: 16),
-              Text(_error ?? 'Player not found', style: TextStyle(color: Colors.grey[600])),
+              Text(_error ?? 'Player not found',
+                  style: TextStyle(color: Colors.grey[600])),
             ],
           ),
         ),
@@ -238,7 +250,7 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
 class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   List<Map<String, dynamic>> _recentMatches = [];
   bool _isLoading = true;
-  
+
   // Fresh data from API
   Map<String, dynamic>? _profileData;
   int _matchesPlayed = 0;
@@ -272,26 +284,41 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
         setState(() {
           _profileData = profileData;
           _recentMatches = matches ?? [];
-          
+
           // Parse stats from API response
           if (profileData != null) {
-            _matchesPlayed = _parseInt(profileData['matchesPlayed'] ?? profileData['matches_played']);
+            _matchesPlayed = _parseInt(
+                profileData['matchesPlayed'] ?? profileData['matches_played']);
             _wins = _parseInt(profileData['wins']);
             _losses = _parseInt(profileData['losses']);
             _height = profileData['height']?.toString();
             _city = profileData['city']?.toString();
-            _zip = profileData['zip']?.toString() ?? profileData['team']?.toString();
+            _zip = profileData['zip']?.toString() ??
+                profileData['team']?.toString();
           }
-          
-          // Stats endpoint may have more accurate counts
+
+          // Stats endpoint may have more accurate counts.
+          // Respect explicit zero values instead of only applying positive values.
           if (stats != null) {
-            _matchesPlayed = _parseInt(stats['totalMatches'] ?? stats['total_matches']) > 0 
-                ? _parseInt(stats['totalMatches'] ?? stats['total_matches']) 
-                : _matchesPlayed;
-            _wins = _parseInt(stats['wins']) > 0 ? _parseInt(stats['wins']) : _wins;
-            _losses = _parseInt(stats['losses']) > 0 ? _parseInt(stats['losses']) : _losses;
+            if (stats.containsKey('matchesPlayed') ||
+                stats.containsKey('matches_played') ||
+                stats.containsKey('totalMatches') ||
+                stats.containsKey('total_matches')) {
+              _matchesPlayed = _parseInt(
+                stats['matchesPlayed'] ??
+                    stats['matches_played'] ??
+                    stats['totalMatches'] ??
+                    stats['total_matches'],
+              );
+            }
+            if (stats.containsKey('wins')) {
+              _wins = _parseInt(stats['wins']);
+            }
+            if (stats.containsKey('losses')) {
+              _losses = _parseInt(stats['losses']);
+            }
           }
-          
+
           _isLoading = false;
         });
       }
@@ -302,7 +329,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
       }
     }
   }
-  
+
   int _parseInt(dynamic value) {
     if (value == null) return 0;
     if (value is int) return value;
@@ -314,15 +341,16 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   @override
   Widget build(BuildContext context) {
     final player = widget.player;
-    
+
     // Use fresh data if available, fallback to User object
-    final matchesPlayed = _matchesPlayed > 0 ? _matchesPlayed : player.matchesPlayed;
+    final matchesPlayed =
+        _matchesPlayed > 0 ? _matchesPlayed : player.matchesPlayed;
     final wins = _wins > 0 ? _wins : player.wins;
     final height = _height ?? player.height;
     final city = _city;
     final zip = _zip ?? player.team;
-    
-    final winRate = matchesPlayed > 0 
+
+    final winRate = matchesPlayed > 0
         ? (wins / matchesPlayed * 100).toStringAsFixed(0)
         : '0';
 
@@ -356,18 +384,21 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       ),
                     ),
                   ),
-                  
+
                   // Player header
                   Row(
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundImage: player.photoUrl != null 
-                            ? NetworkImage(player.photoUrl!) 
+                        backgroundImage: player.photoUrl != null
+                            ? NetworkImage(player.photoUrl!)
                             : null,
                         backgroundColor: Colors.deepOrange[50],
-                        child: player.photoUrl == null 
-                            ? Text(player.name[0], style: TextStyle(fontSize: 32, color: Colors.deepOrange[800]))
+                        child: player.photoUrl == null
+                            ? Text(player.name[0],
+                                style: TextStyle(
+                                    fontSize: 32,
+                                    color: Colors.deepOrange[800]))
                             : null,
                       ),
                       const SizedBox(width: 16),
@@ -385,10 +416,12 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                _buildInfoChip(Icons.leaderboard, player.rating.toStringAsFixed(1)),
+                                _buildInfoChip(Icons.leaderboard,
+                                    player.rating.toStringAsFixed(1)),
                                 const SizedBox(width: 8),
                                 if (player.position != null)
-                                  _buildInfoChip(Icons.sports_basketball, player.position!),
+                                  _buildInfoChip(Icons.sports_basketball,
+                                      player.position!),
                               ],
                             ),
                           ],
@@ -397,11 +430,15 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       // Follow heart icon
                       Consumer<CheckInState>(
                         builder: (context, checkInState, _) {
-                          final isFollowing = checkInState.isFollowingPlayer(player.id);
+                          final isFollowing =
+                              checkInState.isFollowingPlayer(player.id);
                           return IconButton(
-                            onPressed: () => checkInState.toggleFollowPlayer(player.id),
+                            onPressed: () =>
+                                checkInState.toggleFollowPlayer(player.id),
                             icon: Icon(
-                              isFollowing ? Icons.favorite : Icons.favorite_border,
+                              isFollowing
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
                               color: isFollowing ? Colors.red : Colors.grey,
                               size: 28,
                             ),
@@ -410,9 +447,9 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Action buttons
                   Row(
                     children: [
@@ -428,7 +465,8 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             backgroundColor: Colors.grey[100],
                             foregroundColor: Colors.deepOrange,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(color: Colors.deepOrange.withOpacity(0.3)),
+                            side: BorderSide(
+                                color: Colors.deepOrange.withOpacity(0.3)),
                           ),
                         ),
                       ),
@@ -450,7 +488,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       ),
                     ],
                   ),
-                  
+
                   // Invite to Team button
                   if (widget.onInviteToTeam != null) ...[
                     const SizedBox(height: 12),
@@ -471,9 +509,9 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       ),
                     ),
                   ],
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Stats grid - show loading indicator while fetching
                   const Text(
                     'Player Stats',
@@ -484,19 +522,27 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                   ),
                   const SizedBox(height: 12),
                   _isLoading
-                      ? const Center(child: CircularProgressIndicator(color: Colors.deepOrange))
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                              color: Colors.deepOrange))
                       : Row(
                           children: [
-                            Expanded(child: _buildStatCard('Matches', '$matchesPlayed', Icons.sports)),
+                            Expanded(
+                                child: _buildStatCard(
+                                    'Matches', '$matchesPlayed', Icons.sports)),
                             const SizedBox(width: 12),
-                            Expanded(child: _buildStatCard('Wins', '$wins', Icons.emoji_events)),
+                            Expanded(
+                                child: _buildStatCard(
+                                    'Wins', '$wins', Icons.emoji_events)),
                             const SizedBox(width: 12),
-                            Expanded(child: _buildStatCard('Win Rate', '$winRate%', Icons.trending_up)),
+                            Expanded(
+                                child: _buildStatCard('Win Rate', '$winRate%',
+                                    Icons.trending_up)),
                           ],
                         ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Player details
                   const Text(
                     'Details',
@@ -511,21 +557,23 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
-                          _buildDetailRow(Icons.location_city, 'City', 
+                          _buildDetailRow(Icons.location_city, 'City',
                               city ?? _getCityName(zip)),
                           const Divider(),
-                          _buildDetailRow(Icons.height, 'Height', height ?? 'Not set'),
+                          _buildDetailRow(
+                              Icons.height, 'Height', height ?? 'Not set'),
                           const Divider(),
-                          _buildDetailRow(Icons.star, 'Position', player.position ?? 'Not set'),
+                          _buildDetailRow(Icons.star, 'Position',
+                              player.position ?? 'Not set'),
                           const Divider(),
                           _buildCommunityRatingRow(player),
                         ],
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Recent matches
                   const Text(
                     'Recent Matches',
@@ -536,7 +584,9 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                   ),
                   const SizedBox(height: 12),
                   if (_isLoading)
-                    const Center(child: CircularProgressIndicator(color: Colors.deepOrange))
+                    const Center(
+                        child:
+                            CircularProgressIndicator(color: Colors.deepOrange))
                   else if (_recentMatches.isEmpty)
                     Card(
                       child: Padding(
@@ -550,8 +600,10 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       ),
                     )
                   else
-                    ..._recentMatches.take(5).map((match) => _buildMatchCard(match)),
-                  
+                    ..._recentMatches
+                        .take(5)
+                        .map((match) => _buildMatchCard(match)),
+
                   const SizedBox(height: 20),
                 ],
               ),
@@ -565,7 +617,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   /// Simple zip code prefix to city lookup (using first 3 digits)
   String _getCityName(String? zipCode) {
     if (zipCode == null || zipCode.isEmpty) return 'Not set';
-    
+
     // Map of common US zip code prefixes to city names
     final zipToCityMap = {
       '100': 'New York, NY',
@@ -626,7 +678,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
 
     // Get first 3 digits of zip code
     final prefix = zipCode.length >= 3 ? zipCode.substring(0, 3) : zipCode;
-    
+
     // Return city name or the original zip if not found
     return zipToCityMap[prefix] ?? zipCode;
   }
@@ -643,7 +695,9 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
         children: [
           Icon(icon, size: 16, color: Colors.grey[700]),
           const SizedBox(width: 4),
-          Text(text, style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w500)),
+          Text(text,
+              style: TextStyle(
+                  color: Colors.grey[700], fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -707,7 +761,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   /// Build matches contested row showing contest count
   Widget _buildCommunityRatingRow(User player) {
     final contestedCount = player.gamesContested;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -740,40 +794,51 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
     final opponentName = match['opponent_name']?.toString();
     final winnerId = match['winner_id']?.toString();
     final status = match['status']?.toString() ?? '';
-    
+    final normalizedStatus = status.toLowerCase();
+
     // Determine who is the opponent relative to this player
     final isCreator = creatorId == playerId;
     final oppName = isCreator ? opponentName : creatorName;
     final oppId = isCreator ? opponentId : creatorId;
-    final opponentDisplay = oppName ?? (oppId != null && oppId.length > 8 ? '${oppId.substring(0, 8)}...' : oppId ?? 'Unknown');
-    
+    final opponentDisplay = oppName ??
+        (oppId != null && oppId.length > 8
+            ? '${oppId.substring(0, 8)}...'
+            : oppId ?? 'Unknown');
+
     // Parse scores from flat fields
     final scoreCreator = match['score_creator'];
     final scoreOpponent = match['score_opponent'];
     final hasScores = scoreCreator != null && scoreOpponent != null;
-    
+
     String scoreStr;
     bool? isWin;
-    
+
     if (hasScores) {
       final myScore = isCreator ? scoreCreator : scoreOpponent;
       final theirScore = isCreator ? scoreOpponent : scoreCreator;
       scoreStr = '$myScore - $theirScore';
-      
+
       if (winnerId != null) {
         isWin = winnerId == playerId;
       } else {
-        final ms = (myScore is num ? myScore : int.tryParse(myScore.toString()) ?? 0);
-        final ts = (theirScore is num ? theirScore : int.tryParse(theirScore.toString()) ?? 0);
+        final ms =
+            (myScore is num ? myScore : int.tryParse(myScore.toString()) ?? 0);
+        final ts = (theirScore is num
+            ? theirScore
+            : int.tryParse(theirScore.toString()) ?? 0);
         if (ms != ts) isWin = ms > ts;
       }
     } else {
-      scoreStr = status == 'completed' ? 'N/A' : '';
+      scoreStr =
+          (normalizedStatus == 'completed' || normalizedStatus == 'ended')
+              ? 'N/A'
+              : '';
     }
 
     // Status display
     String statusDisplay = status;
-    if (status == 'completed' && isWin != null) {
+    if ((normalizedStatus == 'completed' || normalizedStatus == 'ended') &&
+        isWin != null) {
       statusDisplay = isWin ? 'Victory' : 'Defeat';
     }
 
@@ -781,10 +846,16 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: isWin == true ? Colors.green[100] : (isWin == false ? Colors.red[100] : Colors.grey[100]),
+          backgroundColor: isWin == true
+              ? Colors.green[100]
+              : (isWin == false ? Colors.red[100] : Colors.grey[100]),
           child: Icon(
-            isWin == true ? Icons.check : (isWin == false ? Icons.close : Icons.remove),
-            color: isWin == true ? Colors.green : (isWin == false ? Colors.red : Colors.grey),
+            isWin == true
+                ? Icons.check
+                : (isWin == false ? Icons.close : Icons.remove),
+            color: isWin == true
+                ? Colors.green
+                : (isWin == false ? Colors.red : Colors.grey),
           ),
         ),
         title: Text('vs $opponentDisplay'),

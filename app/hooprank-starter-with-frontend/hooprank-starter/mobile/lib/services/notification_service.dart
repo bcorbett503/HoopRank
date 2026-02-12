@@ -1,6 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'api_service.dart';
 
@@ -9,27 +9,29 @@ class NotificationService with WidgetsBindingObserver {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
+  static const MethodChannel _badgeChannel =
+      MethodChannel('hooprank/notifications');
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = 
+  final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
-  
+
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
-  
+
   /// Callbacks to notify when a push notification is received (for screen refreshes)
   static final List<VoidCallback> _onNotificationCallbacks = [];
-  
+
   /// Register a callback to be called when a push notification is received
   static void addOnNotificationListener(VoidCallback callback) {
     _onNotificationCallbacks.add(callback);
   }
-  
+
   /// Remove a previously registered callback
   static void removeOnNotificationListener(VoidCallback callback) {
     _onNotificationCallbacks.remove(callback);
   }
-  
+
   /// Notify all registered listeners (call this when push notification arrives)
   static void _notifyListeners() {
     for (final callback in _onNotificationCallbacks) {
@@ -45,7 +47,7 @@ class NotificationService with WidgetsBindingObserver {
       badge: true,
       sound: true,
     );
-    
+
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       debugPrint('Push notifications authorized');
     } else {
@@ -54,7 +56,8 @@ class NotificationService with WidgetsBindingObserver {
     }
 
     // Initialize local notifications for foreground display
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -108,23 +111,21 @@ class NotificationService with WidgetsBindingObserver {
   /// Clear the iOS app icon badge count
   static Future<void> clearBadge() async {
     try {
-      // Cancel all local notifications
-      final plugin = FlutterLocalNotificationsPlugin();
-      await plugin.cancelAll();
-      
-      // Explicitly reset iOS badge count to 0
-      final iosPlugin = plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-      if (iosPlugin != null) {
-        await iosPlugin.requestPermissions(badge: true);
-      }
-      
-      // Also tell Firebase to not show badge
-      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      // Cancel all delivered local notifications.
+      await _instance._localNotifications.cancelAll();
+
+      // Explicitly clear the native iOS app icon badge count.
+      // This handles background pushes that may have already set a badge value.
+      await _badgeChannel.invokeMethod('clearBadge');
+
+      // Keep foreground behavior badge-free.
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
         alert: true,
         badge: false,
         sound: true,
       );
-      
+
       debugPrint('Badge cleared');
     } catch (e) {
       debugPrint('Failed to clear badge: $e');
@@ -144,7 +145,7 @@ class NotificationService with WidgetsBindingObserver {
   /// Register the FCM token with the backend
   Future<void> registerToken(String userId) async {
     if (_fcmToken == null) return;
-    
+
     try {
       await ApiService.registerFcmToken(userId, _fcmToken!);
       debugPrint('FCM token registered with backend');
@@ -154,16 +155,24 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> _registerTokenWithBackend() async {
-    // This would need the current user ID - handle in the auth flow
-    debugPrint('FCM token refreshed - should re-register');
+    final userId = ApiService.userId;
+    if (_fcmToken == null || userId == null || userId.isEmpty) {
+      return;
+    }
+    try {
+      await ApiService.registerFcmToken(userId, _fcmToken!);
+      debugPrint('FCM token refreshed and re-registered');
+    } catch (e) {
+      debugPrint('Failed to re-register refreshed FCM token: $e');
+    }
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('Foreground message: ${message.notification?.title}');
-    
+
     // Notify listeners to refresh (e.g., home screen)
     _notifyListeners();
-    
+
     // Show local notification without badge increment
     if (message.notification != null) {
       _localNotifications.show(
@@ -174,7 +183,8 @@ class NotificationService with WidgetsBindingObserver {
           android: AndroidNotificationDetails(
             'hooprank_channel',
             'HoopRank Notifications',
-            channelDescription: 'Notifications for challenges, messages, and games',
+            channelDescription:
+                'Notifications for challenges, messages, and games',
             importance: Importance.high,
             priority: Priority.high,
           ),

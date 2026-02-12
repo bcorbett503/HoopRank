@@ -6,7 +6,8 @@ const crypto = require('crypto');
 
 const BASE = 'heartfelt-appreciation-production-65f1.up.railway.app';
 const USER_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2';
-const KEY = 'AIzaSyCbro8Tiei_T2NtLhN87e9o3N3p9x_A4NA';
+const KEY = process.env.GOOGLE_API_KEY;
+if (!KEY) { console.error('ERROR: GOOGLE_API_KEY env var required'); process.exit(1); }
 
 function httpGet(u) { return new Promise((r, j) => https.get(u, { timeout: 15000 }, (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => r(JSON.parse(d))) }).on('error', j)); }
 function httpPost(p) { return new Promise((r, j) => { const req = https.request({ hostname: BASE, path: p, method: 'POST', headers: { 'x-user-id': USER_ID }, timeout: 10000 }, (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => r({ status: res.statusCode, data: d })) }); req.on('error', j); req.end(); }); }

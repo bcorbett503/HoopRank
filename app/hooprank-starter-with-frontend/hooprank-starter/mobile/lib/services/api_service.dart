@@ -418,7 +418,23 @@ class ApiService {
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to create challenge');
+      String errorMessage = 'Failed to create challenge';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          final serverMessage = (decoded['message'] ?? decoded['error'] ?? decoded['details'])?.toString();
+          if (serverMessage != null && serverMessage.isNotEmpty) {
+            errorMessage = serverMessage;
+          }
+        } else if (response.body.isNotEmpty) {
+          errorMessage = response.body;
+        }
+      } catch (_) {
+        if (response.body.isNotEmpty) {
+          errorMessage = response.body;
+        }
+      }
+      throw Exception(errorMessage);
     }
     return jsonDecode(response.body);
   }
@@ -574,6 +590,18 @@ class ApiService {
     debugPrint('FCM: Response status=${response.statusCode}, body=${response.body}');
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Failed to register FCM token: ${response.statusCode}');
+    }
+  }
+
+  /// Clear FCM token for current user on logout/account switch
+  static Future<void> unregisterFcmToken(String userId) async {
+    final response = await _authedDelete(
+      Uri.parse('$baseUrl/users/me/fcm-token'),
+      userId: userId,
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to unregister FCM token: ${response.statusCode}');
     }
   }
 

@@ -40,6 +40,9 @@ export class InvitesController {
     @Public()
     @Get(':token')
     async getInviteByToken(@Param('token') token: string) {
+        // TODO(security): Keep this route public for deep links, but validate a
+        // signed invite token and load from persistent storage instead of
+        // returning a synthetic placeholder object.
         // Return full Invite shape expected by iOS
         return {
             id: token,
@@ -61,6 +64,8 @@ export class InvitesController {
         @Headers('x-user-id') userId: string,
         @Body() body: any,
     ) {
+        // TODO(product): Persist invite metadata (creator, team, expiry, status)
+        // so GET/accept can return canonical data and avoid decode drift.
         // Return proper Invite shape with generated token
         const token = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         return {
@@ -84,6 +89,8 @@ export class InvitesController {
         @Param('token') token: string,
         @Headers('x-user-id') userId: string,
     ) {
+        // TODO(security): Resolve token -> invite, enforce expiry/ownership
+        // checks, and return the concrete resource IDs (team_id/match_id).
         // Return InviteAcceptResponse shape
         return {
             success: true,

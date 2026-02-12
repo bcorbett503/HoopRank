@@ -18,7 +18,7 @@ class RankingsScreen extends StatefulWidget {
   final int initialTab;
   final String? initialTeamType;
   final String? initialRegion;
-  
+
   const RankingsScreen({
     super.key,
     this.initialTab = 0,
@@ -30,21 +30,23 @@ class RankingsScreen extends StatefulWidget {
   State<RankingsScreen> createState() => _RankingsScreenState();
 }
 
-class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProviderStateMixin {
+class _RankingsScreenState extends State<RankingsScreen>
+    with SingleTickerProviderStateMixin {
   final MessagesService _messagesService = MessagesService();
-  
+
   late TabController _tabController;
-  
+
   // Players tab state
   List<User> _players = [];
   Map<String, String> _playerTeamIds = {}; // Map player id -> team id
   Set<String> _pendingChallengeUserIds = {};
+  Set<String> _activeChallengeUserIds = {};
   bool _isLoadingPlayers = true;
   bool _isLocal = false;
   String _searchQuery = '';
   String _ageFilter = 'All'; // 'All', '13-18', '18-25', '26-35', '35+'
   String _rankFilter = 'All'; // 'All', '1+', '2+', '3+', '4+'
-  
+
   // Teams tab state
   List<Map<String, dynamic>> _teams = [];
   bool _isLoadingTeams = true;
@@ -54,24 +56,25 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   String? _teamGenderFilter;
   String? _teamAgeFilter;
   String? _teamSkillFilter;
-  
+
   // User's teams for invite functionality
   List<Map<String, dynamic>> _myTeams = [];
-  
+
   // Current user's own ranking info
   double _myRating = 3.0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
+    _tabController =
+        TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       if (_tabController.index == 1 && _teams.isEmpty) {
         _fetchTeams();
       }
     });
-    
+
     // Apply initial team type if provided (for deep linking)
     if (widget.initialTeamType != null) {
       _teamFilter = widget.initialTeamType!;
@@ -81,11 +84,11 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       _isLocal = true;
       _isTeamLocal = true;
     }
-    
+
     _fetchPlayers();
     _fetchMyTeams();
     _fetchMyRating();
-    
+
     // If starting on Teams tab, fetch teams immediately
     if (widget.initialTab == 1) {
       _fetchTeams();
@@ -110,14 +113,15 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   }
 
   Future<void> _fetchPlayers() async {
-    final currentUser = Provider.of<AuthState>(context, listen: false).currentUser;
+    final currentUser =
+        Provider.of<AuthState>(context, listen: false).currentUser;
     setState(() => _isLoadingPlayers = true);
-    
+
     try {
-      final url = _isLocal 
+      final url = _isLocal
           ? '${ApiService.baseUrl}/users/nearby?radiusMiles=25'
           : '${ApiService.baseUrl}/rankings?mode=1v1';
-      
+
       final token = await AuthService.getIdToken();
       final headers = <String, String>{
         'x-user-id': currentUser?.id ?? '',
@@ -127,13 +131,12 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
         Uri.parse(url),
         headers: headers,
       );
-      
+
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         // Handle both formats: direct array (users/nearby) or wrapped in 'rankings' key
-        final List<dynamic> jsonList = decoded is List 
-            ? decoded 
-            : (decoded['rankings'] as List?) ?? [];
+        final List<dynamic> jsonList =
+            decoded is List ? decoded : (decoded['rankings'] as List?) ?? [];
         final List<User> players = [];
         final Map<String, String> playerTeamIds = {};
         for (var item in jsonList) {
@@ -146,7 +149,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             } else if (ratingValue is String) {
               rating = double.tryParse(ratingValue) ?? 0.0;
             }
-            
+
             // Parse age from API response
             int? age;
             final ageValue = item['age'];
@@ -155,7 +158,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             } else if (ageValue is num) {
               age = ageValue.toInt();
             }
-            
+
             players.add(User(
               id: id,
               name: item['name']?.toString() ?? 'Unknown',
@@ -173,23 +176,31 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             }
           }
         }
-        
+
         Set<String> pendingIds = {};
+        Set<String> activeIds = {};
         if (currentUser != null) {
           try {
-            final challenges = await _messagesService.getPendingChallenges(currentUser.id);
+            final challenges =
+                await _messagesService.getPendingChallenges(currentUser.id);
             for (final c in challenges) {
-              if (c.isSent) pendingIds.add(c.otherUser.id);
+              final status =
+                  (c.message.challengeStatus ?? 'pending').toLowerCase();
+              if (status == 'pending') {
+                pendingIds.add(c.otherUser.id);
+                activeIds.add(c.otherUser.id);
+              }
             }
           } catch (e) {
             debugPrint('Error loading challenges: $e');
           }
         }
-        
+
         setState(() {
           _players = players;
           _playerTeamIds = playerTeamIds;
           _pendingChallengeUserIds = pendingIds;
+          _activeChallengeUserIds = activeIds;
           _isLoadingPlayers = false;
         });
       } else {
@@ -218,7 +229,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
         Uri.parse(url),
         headers: headers,
       );
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         // Backend returns { mode, rankings: [...] } — extract the rankings array
@@ -231,7 +242,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
           rawList = [];
         }
         final rawTeams = rawList.cast<Map<String, dynamic>>();
-        debugPrint('_fetchTeams: got ${rawTeams.length} teams from /rankings?mode=$_teamFilter');
+        debugPrint(
+            '_fetchTeams: got ${rawTeams.length} teams from /rankings?mode=$_teamFilter');
         setState(() {
           _teams = rawTeams;
           _isLoadingTeams = false;
@@ -266,18 +278,20 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   }
 
   List<User> get _filteredPlayers {
-    final currentUser = Provider.of<AuthState>(context, listen: false).currentUser;
-    
+    final currentUser =
+        Provider.of<AuthState>(context, listen: false).currentUser;
+
     return _players.where((p) {
       if (p.id == currentUser?.id) return false;
-      if (!p.name.toLowerCase().contains(_searchQuery.toLowerCase())) return false;
-      
+      if (!p.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+        return false;
+
       // Rank filter - filter by minimum rating
       if (_rankFilter != 'All') {
         final minRating = double.parse(_rankFilter.replaceAll('+', ''));
         if (p.rating < minRating) return false;
       }
-      
+
       // Age filter - exclude users without age data when filter is active
       if (_ageFilter != 'All') {
         if (p.age == null) return false; // No age data = exclude when filtering
@@ -297,7 +311,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             break;
         }
       }
-      
+
       return true;
     }).toList()
       ..sort((a, b) => b.rating.compareTo(a.rating));
@@ -333,15 +347,23 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             ),
             child: Text(
               label,
-              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+              style: TextStyle(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5),
             ),
           ),
-          Expanded(child: Column(
+          Expanded(
+              child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 rating.toStringAsFixed(2),
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
@@ -362,13 +384,17 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       (t) => t['teamType'] == teamType,
       orElse: () => <String, dynamic>{},
     );
-    
+
     final hasTeam = team.isNotEmpty;
     // Parse rating safely - backend may return String or num
     final ratingValue = team['rating'];
-    final rating = hasTeam ? (ratingValue is num ? ratingValue.toDouble() : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0)) : 0.0;
+    final rating = hasTeam
+        ? (ratingValue is num
+            ? ratingValue.toDouble()
+            : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0))
+        : 0.0;
     final teamName = hasTeam ? (team['name'] ?? teamType) : null;
-    
+
     return GestureDetector(
       onTap: () {
         if (!hasTeam) {
@@ -384,7 +410,10 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: hasTeam ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.05)),
+          border: Border.all(
+              color: hasTeam
+                  ? Colors.white.withOpacity(0.1)
+                  : Colors.white.withOpacity(0.05)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -397,16 +426,24 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               ),
               child: Text(
                 teamType,
-                style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                style: TextStyle(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5),
               ),
             ),
-            Expanded(child: Column(
+            Expanded(
+                child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (hasTeam) ...[
                   Text(
                     rating.toStringAsFixed(2),
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -417,11 +454,15 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                     textAlign: TextAlign.center,
                   ),
                 ] else ...[
-                  const Icon(Icons.add_circle_outline, color: Colors.white30, size: 24),
+                  const Icon(Icons.add_circle_outline,
+                      color: Colors.white30, size: 24),
                   const SizedBox(height: 4),
                   const Text(
                     'JOIN',
-                    style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.white30,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ],
@@ -457,23 +498,25 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   void _showInviteToTeamDialog(User player) async {
     // Always refresh teams to catch newly created ones
     await _fetchMyTeams();
-    
+
     // Fetch player's existing team memberships
     final playerTeams = await ApiService.getUserTeams(player.id);
-    final playerTeamTypes = playerTeams.map((t) => t['teamType'] as String?).toSet();
-    
+    final playerTeamTypes =
+        playerTeams.map((t) => t['teamType'] as String?).toSet();
+
     // Check if player is already on both 3v3 and 5v5 teams
     final hasAll3v3 = playerTeamTypes.contains('3v3');
     final hasAll5v5 = playerTeamTypes.contains('5v5');
     final playerIsOnBothTypes = hasAll3v3 && hasAll5v5;
-    
+
     // Build team names string for message
-    final teamNamesList = playerTeams.map((t) => '${t['name']} (${t['teamType']})').toList();
+    final teamNamesList =
+        playerTeams.map((t) => '${t['name']} (${t['teamType']})').toList();
     final teamsMessage = teamNamesList.join(' and ');
-    
+
     // Filter to teams where user is owner and team isn't full
     final eligibleTeams = _myTeams.where((t) => t['isOwner'] == true).toList();
-    
+
     if (eligibleTeams.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -481,7 +524,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       );
       return;
     }
-    
+
     // If player is already on both team types, show message
     if (playerIsOnBothTypes) {
       if (!mounted) return;
@@ -503,7 +546,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             itemBuilder: (context, index) {
               final team = eligibleTeams[index];
               final teamType = team['teamType'] as String?;
-              
+
               // Check if player is already on a team of this type
               final existingTeamOfType = playerTeams.firstWhere(
                 (t) => t['teamType'] == teamType,
@@ -511,7 +554,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               );
               final isAlreadyOnTeamType = existingTeamOfType.isNotEmpty;
               final existingTeamName = existingTeamOfType['name'] ?? '';
-              
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Padding(
@@ -519,14 +562,20 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: team['teamType'] == '3v3' ? Colors.blue : Colors.purple,
+                          color: team['teamType'] == '3v3'
+                              ? Colors.blue
+                              : Colors.purple,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           team['teamType'] ?? '3v3',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -534,8 +583,12 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(team['name'] ?? 'Team', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            Text('${team['memberCount'] ?? 1} members', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                            Text(team['name'] ?? 'Team',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
+                            Text('${team['memberCount'] ?? 1} members',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[600])),
                           ],
                         ),
                       ),
@@ -545,31 +598,40 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                                 Navigator.pop(ctx);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('${player.name} is already on a $teamType team: $existingTeamName'),
+                                    content: Text(
+                                        '${player.name} is already on a $teamType team: $existingTeamName'),
                                   ),
                                 );
                               }
                             : () async {
                                 Navigator.pop(ctx);
                                 try {
-                                  await ApiService.inviteToTeam(team['id'], player.id);
+                                  await ApiService.inviteToTeam(
+                                      team['id'], player.id);
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Invited ${player.name} to ${team['name']}!')),
+                                      SnackBar(
+                                          content: Text(
+                                              'Invited ${player.name} to ${team['name']}!')),
                                     );
                                   }
                                 } catch (e) {
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed to invite: $e')),
+                                      SnackBar(
+                                          content:
+                                              Text('Failed to invite: $e')),
                                     );
                                   }
                                 }
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isAlreadyOnTeamType ? Colors.grey : Colors.deepOrange,
+                          backgroundColor: isAlreadyOnTeamType
+                              ? Colors.grey
+                              : Colors.deepOrange,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                         ),
                         child: Text(isAlreadyOnTeamType ? 'On Team' : 'Invite'),
                       ),
@@ -592,7 +654,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
 
   void _showChallengeDialog(User player) {
     final messageController = TextEditingController(text: 'Want to play?');
-    
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -611,7 +673,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               controller: messageController,
               decoration: InputDecoration(
                 labelText: 'Your message',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               maxLines: 2,
               autofocus: true,
@@ -628,18 +691,22 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               final message = messageController.text.trim();
               if (message.isEmpty) return;
               Navigator.pop(dialogContext);
-              
+
               try {
-                await ApiService.createChallenge(toUserId: player.id, message: message);
+                await ApiService.createChallenge(
+                    toUserId: player.id, message: message);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Challenge sent to ${player.name}!')),
+                    SnackBar(
+                        content: Text('Challenge sent to ${player.name}!')),
                   );
                 }
               } catch (e) {
                 if (mounted) {
+                  final errorText =
+                      e.toString().replaceFirst('Exception: ', '');
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed: $e')),
+                    SnackBar(content: Text('Failed: $errorText')),
                   );
                 }
               }
@@ -684,7 +751,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
 
   Widget _buildPlayersTab() {
     final filtered = _filteredPlayers;
-    
+
     return Column(
       children: [
         // === My HoopRanks Section ===
@@ -725,7 +792,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                           color: Colors.amber.withOpacity(0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.emoji_events, size: 14, color: Colors.amber),
+                        child: const Icon(Icons.emoji_events,
+                            size: 14, color: Colors.amber),
                       ),
                       const SizedBox(width: 8),
                       const Text(
@@ -745,7 +813,9 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(child: _buildRatingChip('1v1', _myRating, Colors.deepOrange)),
+                      Expanded(
+                          child: _buildRatingChip(
+                              '1v1', _myRating, Colors.deepOrange)),
                       const SizedBox(width: 8),
                       Expanded(child: _buildTeamSlot('3v3', Colors.blue)),
                       const SizedBox(width: 8),
@@ -757,7 +827,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             ),
           ),
         ),
-        
+
         // Search and filter
         Padding(
           padding: const EdgeInsets.all(12),
@@ -776,7 +846,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             onChanged: (v) => setState(() => _searchQuery = v),
           ),
         ),
-        
+
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: SingleChildScrollView(
@@ -802,7 +872,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                     _fetchPlayers();
                     // Complete tutorial step if active
                     final tutorial = context.read<TutorialState>();
-                    if (tutorial.isActive && tutorial.currentStep?.id == 'local_players') {
+                    if (tutorial.isActive &&
+                        tutorial.currentStep?.id == 'local_players') {
                       tutorial.completeStep('local_players');
                     }
                   },
@@ -816,7 +887,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   underline: const SizedBox(),
                   isDense: true,
                   items: ['All', '1+', '2+', '3+', '4+']
-                      .map((r) => DropdownMenuItem(value: r, child: Text('Rating: $r')))
+                      .map((r) =>
+                          DropdownMenuItem(value: r, child: Text('Rating: $r')))
                       .toList(),
                   onChanged: (v) => setState(() => _rankFilter = v ?? 'All'),
                 ),
@@ -829,7 +901,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   underline: const SizedBox(),
                   isDense: true,
                   items: ['All', '13-18', '18-25', '26-35', '35+']
-                      .map((a) => DropdownMenuItem(value: a, child: Text('Age: $a')))
+                      .map((a) =>
+                          DropdownMenuItem(value: a, child: Text('Age: $a')))
                       .toList(),
                   onChanged: (v) => setState(() => _ageFilter = v ?? 'All'),
                 ),
@@ -837,17 +910,20 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             ),
           ),
         ),
-        
+
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Row(
             children: [
-              Text('${filtered.length} players', style: TextStyle(color: Colors.grey[500])),
-              if (_isLocal) Text(' (25 mi)', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+              Text('${filtered.length} players',
+                  style: TextStyle(color: Colors.grey[500])),
+              if (_isLocal)
+                Text(' (25 mi)',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12)),
             ],
           ),
         ),
-        
+
         Expanded(
           child: _isLoadingPlayers
               ? const Center(child: CircularProgressIndicator())
@@ -857,7 +933,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                       onRefresh: _fetchPlayers,
                       child: ListView.builder(
                         itemCount: filtered.length,
-                        itemBuilder: (context, index) => _buildPlayerCard(filtered[index], index),
+                        itemBuilder: (context, index) =>
+                            _buildPlayerCard(filtered[index], index),
                       ),
                     ),
         ),
@@ -867,7 +944,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
 
   Widget _buildPlayerCard(User player, int index) {
     final hasPending = _pendingChallengeUserIds.contains(player.id);
-    
+    final hasActiveChallenge = _activeChallengeUserIds.contains(player.id);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -894,10 +972,16 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: Colors.blue.withOpacity(0.2),
-                  backgroundImage: player.photoUrl != null ? NetworkImage(player.photoUrl!) : null,
+                  backgroundImage: player.photoUrl != null
+                      ? NetworkImage(player.photoUrl!)
+                      : null,
                   child: player.photoUrl == null
-                      ? Text(player.name.isNotEmpty ? player.name[0].toUpperCase() : '?', 
-                          style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold))
+                      ? Text(
+                          player.name.isNotEmpty
+                              ? player.name[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                              color: Colors.blue, fontWeight: FontWeight.bold))
                       : null,
                 ),
                 const SizedBox(width: 16),
@@ -906,8 +990,13 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        player.name, 
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)
+                        player.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.white),
                       ),
                       const SizedBox(height: 4),
                       GestureDetector(
@@ -915,75 +1004,112 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                             ? () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => TeamDetailScreen(teamId: _playerTeamIds[player.id]!),
+                                    builder: (_) => TeamDetailScreen(
+                                        teamId: _playerTeamIds[player.id]!),
                                   ),
                                 )
                             : () => _showInviteToTeamDialog(player),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisSize: MainAxisSize.max,
                           children: [
-                            Text(
-                              player.team ?? 'No Team',
-                              style: TextStyle(
-                                color: _playerTeamIds[player.id] != null ? Colors.blue[300] : Colors.white30,
-                                fontSize: 13,
-                                fontWeight: _playerTeamIds[player.id] != null ? FontWeight.w500 : FontWeight.normal,
+                            Flexible(
+                              child: Text(
+                                player.team ?? 'No Team',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: _playerTeamIds[player.id] != null
+                                      ? Colors.blue[300]
+                                      : Colors.white30,
+                                  fontSize: 13,
+                                  fontWeight: _playerTeamIds[player.id] != null
+                                      ? FontWeight.w500
+                                      : FontWeight.normal,
+                                ),
                               ),
                             ),
                             if (player.team == null) ...[
                               const SizedBox(width: 4),
-                              Icon(Icons.add_circle_outline, size: 14, color: Colors.blue),
+                              Icon(Icons.add_circle_outline,
+                                  size: 14, color: Colors.blue),
                             ],
                           ],
                         ),
                       ),
+                      if (hasPending) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: Colors.orange.withOpacity(0.3)),
+                          ),
+                          child: const Text(
+                            'Pending',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.orange,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                if (hasPending)
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                    ),
-                    child: const Text('Pending', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold)),
-                  ),
                 // Quick action buttons (tutorial target for first player)
                 Row(
-                  key: index == 0 ? TutorialKeys.getKey(TutorialKeys.playerActionButtons) : null,
+                  key: index == 0
+                      ? TutorialKeys.getKey(TutorialKeys.playerActionButtons)
+                      : null,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
                       icon: const Icon(Icons.chat_bubble_outline, size: 20),
                       color: Colors.white30,
                       tooltip: 'Message',
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      constraints:
+                          const BoxConstraints(minWidth: 36, minHeight: 36),
                       padding: EdgeInsets.zero,
                       onPressed: () {
                         // Complete tutorial step if active
                         final tutorial = context.read<TutorialState>();
-                        if (tutorial.isActive && tutorial.currentStep?.id == 'player_actions') {
+                        if (tutorial.isActive &&
+                            tutorial.currentStep?.id == 'player_actions') {
                           tutorial.completeStep('player_actions');
                         }
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => ChatScreen(userId: player.id)),
+                          MaterialPageRoute(
+                              builder: (_) => ChatScreen(userId: player.id)),
                         );
                       },
                     ),
                     IconButton(
                       icon: const Icon(Icons.sports_basketball, size: 20),
-                      color: Colors.deepOrange,
+                      color: hasActiveChallenge
+                          ? Colors.orange
+                          : Colors.deepOrange,
                       tooltip: 'Challenge',
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      constraints:
+                          const BoxConstraints(minWidth: 36, minHeight: 36),
                       padding: EdgeInsets.zero,
                       onPressed: () {
+                        if (hasActiveChallenge) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Challenge already pending with this player.'),
+                            ),
+                          );
+                          return;
+                        }
                         // Complete tutorial step if active
                         final tutorial = context.read<TutorialState>();
-                        if (tutorial.isActive && tutorial.currentStep?.id == 'player_actions') {
+                        if (tutorial.isActive &&
+                            tutorial.currentStep?.id == 'player_actions') {
                           tutorial.completeStep('player_actions');
                         }
                         _showChallengeDialog(player);
@@ -992,21 +1118,27 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                     // Follow heart button
                     Consumer<CheckInState>(
                       builder: (context, checkInState, _) {
-                        final isFollowing = checkInState.isFollowingPlayer(player.id);
+                        final isFollowing =
+                            checkInState.isFollowingPlayer(player.id);
                         return IconButton(
                           icon: Icon(
-                            isFollowing ? Icons.favorite : Icons.favorite_border,
+                            isFollowing
+                                ? Icons.favorite
+                                : Icons.favorite_border,
                             size: 20,
                           ),
-                          color: isFollowing ? Colors.blueAccent : Colors.white30,
+                          color:
+                              isFollowing ? Colors.blueAccent : Colors.white30,
                           tooltip: isFollowing ? 'Unfollow' : 'Follow',
-                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          constraints:
+                              const BoxConstraints(minWidth: 36, minHeight: 36),
                           padding: EdgeInsets.zero,
                           onPressed: () {
                             checkInState.toggleFollowPlayer(player.id);
                             // Complete tutorial step if active
                             final tutorial = context.read<TutorialState>();
-                            if (tutorial.isActive && tutorial.currentStep?.id == 'player_actions') {
+                            if (tutorial.isActive &&
+                                tutorial.currentStep?.id == 'player_actions') {
                               tutorial.completeStep('player_actions');
                             }
                           },
@@ -1020,19 +1152,22 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
-                        player.rating.toStringAsFixed(1), 
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amber)
-                      ),
+                      child: Text(player.rating.toStringAsFixed(1),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.amber)),
                     ),
                     const SizedBox(height: 2),
-                    Text(_getRankLabel(player.rating), 
-                        style: const TextStyle(fontSize: 10, color: Colors.white30)),
+                    Text(_getRankLabel(player.rating),
+                        style: const TextStyle(
+                            fontSize: 10, color: Colors.white30)),
                   ],
                 ),
               ],
@@ -1048,10 +1183,11 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
     final filteredTeams = _teams.where((t) {
       final name = (t['name'] ?? '').toString().toLowerCase();
       if (!name.contains(_teamSearchQuery.toLowerCase())) return false;
-      if (_teamSkillFilter != null && t['skillLevel'] != _teamSkillFilter) return false;
+      if (_teamSkillFilter != null && t['skillLevel'] != _teamSkillFilter)
+        return false;
       return true;
     }).toList();
-    
+
     return Column(
       children: [
         // Search field
@@ -1072,7 +1208,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             onChanged: (v) => setState(() => _teamSearchQuery = v),
           ),
         ),
-        
+
         // Mode and location filter
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1082,7 +1218,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 label: const Text('3v3'),
                 selected: _teamFilter == '3v3',
                 selectedColor: Colors.blue,
-                labelStyle: TextStyle(color: _teamFilter == '3v3' ? Colors.white : null),
+                labelStyle: TextStyle(
+                    color: _teamFilter == '3v3' ? Colors.white : null),
                 onSelected: (_) {
                   setState(() => _teamFilter = '3v3');
                   _fetchTeams();
@@ -1093,7 +1230,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 label: const Text('5v5'),
                 selected: _teamFilter == '5v5',
                 selectedColor: Colors.purple,
-                labelStyle: TextStyle(color: _teamFilter == '5v5' ? Colors.white : null),
+                labelStyle: TextStyle(
+                    color: _teamFilter == '5v5' ? Colors.white : null),
                 onSelected: (_) {
                   setState(() => _teamFilter = '5v5');
                   _fetchTeams();
@@ -1131,67 +1269,85 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
             child: Row(
               children: [
                 ...['Mens', 'Womens', 'Coed'].map((g) => Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: FilterChip(
-                    label: Text(g, style: const TextStyle(fontSize: 11)),
-                    selected: _teamGenderFilter == g,
-                    onSelected: (_) {
-                      setState(() => _teamGenderFilter = _teamGenderFilter == g ? null : g);
-                      _fetchTeams();
-                    },
-                    selectedColor: Colors.indigo,
-                    labelStyle: TextStyle(color: _teamGenderFilter == g ? Colors.white : null),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                )),
+                      padding: const EdgeInsets.only(right: 4),
+                      child: FilterChip(
+                        label: Text(g, style: const TextStyle(fontSize: 11)),
+                        selected: _teamGenderFilter == g,
+                        onSelected: (_) {
+                          setState(() => _teamGenderFilter =
+                              _teamGenderFilter == g ? null : g);
+                          _fetchTeams();
+                        },
+                        selectedColor: Colors.indigo,
+                        labelStyle: TextStyle(
+                            color:
+                                _teamGenderFilter == g ? Colors.white : null),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )),
                 const SizedBox(width: 6),
                 Container(width: 1, height: 20, color: Colors.grey[700]),
                 const SizedBox(width: 6),
-                ...['U10', 'U12', 'U14', 'U18', 'HS', 'College', 'Open'].map((ag) => Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: FilterChip(
-                    label: Text(ag, style: const TextStyle(fontSize: 11)),
-                    selected: _teamAgeFilter == ag,
-                    onSelected: (_) {
-                      setState(() => _teamAgeFilter = _teamAgeFilter == ag ? null : ag);
-                      _fetchTeams();
-                    },
-                    selectedColor: Colors.teal,
-                    labelStyle: TextStyle(color: _teamAgeFilter == ag ? Colors.white : null),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                )),
+                ...[
+                  'U10',
+                  'U12',
+                  'U14',
+                  'U18',
+                  'HS',
+                  'College',
+                  'Open'
+                ].map((ag) => Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: FilterChip(
+                        label: Text(ag, style: const TextStyle(fontSize: 11)),
+                        selected: _teamAgeFilter == ag,
+                        onSelected: (_) {
+                          setState(() => _teamAgeFilter =
+                              _teamAgeFilter == ag ? null : ag);
+                          _fetchTeams();
+                        },
+                        selectedColor: Colors.teal,
+                        labelStyle: TextStyle(
+                            color: _teamAgeFilter == ag ? Colors.white : null),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )),
                 const SizedBox(width: 6),
                 Container(width: 1, height: 20, color: Colors.grey[700]),
                 const SizedBox(width: 6),
                 ...['Recreational', 'Competitive', 'Elite'].map((sl) => Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: FilterChip(
-                    label: Text(sl, style: const TextStyle(fontSize: 11)),
-                    selected: _teamSkillFilter == sl,
-                    onSelected: (_) {
-                      setState(() => _teamSkillFilter = _teamSkillFilter == sl ? null : sl);
-                    },
-                    selectedColor: Colors.deepPurple,
-                    labelStyle: TextStyle(color: _teamSkillFilter == sl ? Colors.white : null),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                )),
+                      padding: const EdgeInsets.only(right: 4),
+                      child: FilterChip(
+                        label: Text(sl, style: const TextStyle(fontSize: 11)),
+                        selected: _teamSkillFilter == sl,
+                        onSelected: (_) {
+                          setState(() => _teamSkillFilter =
+                              _teamSkillFilter == sl ? null : sl);
+                        },
+                        selectedColor: Colors.deepPurple,
+                        labelStyle: TextStyle(
+                            color:
+                                _teamSkillFilter == sl ? Colors.white : null),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )),
               ],
             ),
           ),
         ),
-        
+
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              Text('${filteredTeams.length} teams', style: TextStyle(color: Colors.grey[500])),
-              if (_isTeamLocal) const Text(' (25 mi)', style: TextStyle(color: Colors.grey)),
+              Text('${filteredTeams.length} teams',
+                  style: TextStyle(color: Colors.grey[500])),
+              if (_isTeamLocal)
+                const Text(' (25 mi)', style: TextStyle(color: Colors.grey)),
             ],
           ),
         ),
-        
+
         Expanded(
           child: _isLoadingTeams
               ? const Center(child: CircularProgressIndicator())
@@ -1202,7 +1358,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                         children: [
                           Icon(Icons.groups, size: 64, color: Colors.grey[400]),
                           const SizedBox(height: 16),
-                          Text('No $_teamFilter teams found', style: TextStyle(color: Colors.grey[600])),
+                          Text('No $_teamFilter teams found',
+                              style: TextStyle(color: Colors.grey[600])),
                         ],
                       ),
                     )
@@ -1210,7 +1367,8 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                       onRefresh: _fetchTeams,
                       child: ListView.builder(
                         itemCount: filteredTeams.length,
-                        itemBuilder: (context, index) => _buildTeamRankingCard(filteredTeams[index], index + 1),
+                        itemBuilder: (context, index) => _buildTeamRankingCard(
+                            filteredTeams[index], index + 1),
                       ),
                     ),
         ),
@@ -1221,12 +1379,18 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   Widget _buildTeamRankingCard(Map<String, dynamic> team, int rank) {
     // Parse safely - backend may return String or num
     final ratingValue = team['rating'];
-    final rating = ratingValue is num ? ratingValue.toDouble() : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0);
+    final rating = ratingValue is num
+        ? ratingValue.toDouble()
+        : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0);
     final winsValue = team['wins'];
-    final wins = winsValue is int ? winsValue : (int.tryParse(winsValue?.toString() ?? '') ?? 0);
+    final wins = winsValue is int
+        ? winsValue
+        : (int.tryParse(winsValue?.toString() ?? '') ?? 0);
     final lossesValue = team['losses'];
-    final losses = lossesValue is int ? lossesValue : (int.tryParse(lossesValue?.toString() ?? '') ?? 0);
-    
+    final losses = lossesValue is int
+        ? lossesValue
+        : (int.tryParse(lossesValue?.toString() ?? '') ?? 0);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -1255,55 +1419,61 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: rank <= 3 ? Colors.amber.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                    color: rank <= 3
+                        ? Colors.amber.withOpacity(0.2)
+                        : Colors.white.withOpacity(0.05),
                     shape: BoxShape.circle,
-                    border: rank <= 3 ? Border.all(color: Colors.amber.withOpacity(0.5)) : null,
+                    border: rank <= 3
+                        ? Border.all(color: Colors.amber.withOpacity(0.5))
+                        : null,
                   ),
                   child: Center(
-                    child: Text(
-                      '#$rank', 
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold, 
-                        fontSize: 12,
-                        color: rank <= 3 ? Colors.amber : Colors.white54
-                      )
-                    ),
+                    child: Text('#$rank',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: rank <= 3 ? Colors.amber : Colors.white54)),
                   ),
                 ),
                 const SizedBox(width: 16),
                 // Team type badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _teamFilter == '3v3' ? Colors.blue.withOpacity(0.2) : Colors.purple.withOpacity(0.2),
+                    color: _teamFilter == '3v3'
+                        ? Colors.blue.withOpacity(0.2)
+                        : Colors.purple.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: _teamFilter == '3v3' ? Colors.blue.withOpacity(0.3) : Colors.purple.withOpacity(0.3),
+                      color: _teamFilter == '3v3'
+                          ? Colors.blue.withOpacity(0.3)
+                          : Colors.purple.withOpacity(0.3),
                     ),
                   ),
-                  child: Text(
-                    _teamFilter, 
-                    style: TextStyle(
-                      color: _teamFilter == '3v3' ? Colors.blue[300] : Colors.purple[200], 
-                      fontWeight: FontWeight.bold, 
-                      fontSize: 11
-                    )
-                  ),
+                  child: Text(_teamFilter,
+                      style: TextStyle(
+                          color: _teamFilter == '3v3'
+                              ? Colors.blue[300]
+                              : Colors.purple[200],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11)),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        team['name'] ?? 'Team', 
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)
-                      ),
+                      Text(team['name'] ?? 'Team',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.white)),
                       const SizedBox(height: 4),
                       Text(
-                        '${team['memberCount'] ?? 1} members • ${team['ownerName'] ?? 'Unknown'}', 
-                        style: const TextStyle(color: Colors.white30, fontSize: 12)
-                      ),
+                          '${team['memberCount'] ?? 1} members • ${team['ownerName'] ?? 'Unknown'}',
+                          style: const TextStyle(
+                              color: Colors.white30, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -1311,30 +1481,42 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 Consumer<CheckInState>(
                   builder: (context, checkInState, _) {
                     final teamId = team['id']?.toString() ?? '';
-                    final isOwnTeam = _myTeams.any((t) => t['id'] == team['id']);
+                    final isOwnTeam =
+                        _myTeams.any((t) => t['id'] == team['id']);
                     final isFollowing = checkInState.isFollowingTeam(teamId);
                     // Auto-follow own team
                     if (isOwnTeam && !isFollowing) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
-                        checkInState.followTeam(teamId, teamName: team['name']?.toString());
+                        checkInState.followTeam(teamId,
+                            teamName: team['name']?.toString());
                       });
                     }
                     return IconButton(
                       icon: Icon(
-                        (isFollowing || isOwnTeam) ? Icons.favorite : Icons.favorite_border,
+                        (isFollowing || isOwnTeam)
+                            ? Icons.favorite
+                            : Icons.favorite_border,
                         size: 20,
                       ),
-                      color: (isFollowing || isOwnTeam) ? Colors.red : Colors.white30,
-                      tooltip: isOwnTeam ? 'Your team' : (isFollowing ? 'Unfollow' : 'Follow'),
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      color: (isFollowing || isOwnTeam)
+                          ? Colors.red
+                          : Colors.white30,
+                      tooltip: isOwnTeam
+                          ? 'Your team'
+                          : (isFollowing ? 'Unfollow' : 'Follow'),
+                      constraints:
+                          const BoxConstraints(minWidth: 36, minHeight: 36),
                       padding: EdgeInsets.zero,
-                      onPressed: isOwnTeam ? null : () {
-                        if (isFollowing) {
-                          checkInState.unfollowTeam(teamId);
-                        } else {
-                          checkInState.followTeam(teamId, teamName: team['name']?.toString());
-                        }
-                      },
+                      onPressed: isOwnTeam
+                          ? null
+                          : () {
+                              if (isFollowing) {
+                                checkInState.unfollowTeam(teamId);
+                              } else {
+                                checkInState.followTeam(teamId,
+                                    teamName: team['name']?.toString());
+                              }
+                            },
                     );
                   },
                 ),
@@ -1342,21 +1524,22 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
-                        rating.toStringAsFixed(2), 
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)
-                      ),
+                      child: Text(rating.toStringAsFixed(2),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.white)),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '$wins W - $losses L', 
-                      style: const TextStyle(fontSize: 11, color: Colors.white30)
-                    ),
+                    Text('$wins W - $losses L',
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.white30)),
                   ],
                 ),
               ],
@@ -1368,12 +1551,13 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
   }
 
   void _showTeamActionSheet(Map<String, dynamic> team) {
-    final hasTeamOfType = _myTeams.any((t) => t['teamType'] == team['teamType']);
+    final hasTeamOfType =
+        _myTeams.any((t) => t['teamType'] == team['teamType']);
     // Check if this is the user's own team
     final isOwnTeam = _myTeams.any((t) => t['id'] == team['id']);
     // Can only challenge if user has a team of this type AND it's not their own team
     final canChallenge = hasTeamOfType && !isOwnTeam;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
@@ -1390,88 +1574,120 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: team['teamType'] == '3v3' ? Colors.blue : Colors.purple,
+                      color: team['teamType'] == '3v3'
+                          ? Colors.blue
+                          : Colors.purple,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(team['teamType'] ?? '3v3', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: Text(team['teamType'] ?? '3v3',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       team['name'] ?? 'Team',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
                     ),
                   ),
                   if (isOwnTeam)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.green.withOpacity(0.5)),
+                        border:
+                            Border.all(color: Colors.green.withOpacity(0.5)),
                       ),
-                      child: const Text('Your Team', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text('Your Team',
+                          style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold)),
                     ),
                 ],
               ),
               const SizedBox(height: 8),
               Builder(builder: (context) {
-                final rv = team['rating']; 
-                final ratingD = rv is num ? rv.toDouble() : (double.tryParse(rv?.toString() ?? '') ?? 3.0);
-                return Text('Rating: ${ratingD.toStringAsFixed(2)} • ${team['wins'] ?? 0}W-${team['losses'] ?? 0}L',
+                final rv = team['rating'];
+                final ratingD = rv is num
+                    ? rv.toDouble()
+                    : (double.tryParse(rv?.toString() ?? '') ?? 3.0);
+                return Text(
+                    'Rating: ${ratingD.toStringAsFixed(2)} • ${team['wins'] ?? 0}W-${team['losses'] ?? 0}L',
                     style: TextStyle(color: Colors.grey[400]));
               }),
               const SizedBox(height: 20),
-              
+
               // View Details
               ListTile(
                 leading: const Icon(Icons.visibility, color: Colors.white),
-                title: const Text('View Team Details', style: TextStyle(color: Colors.white)),
+                title: const Text('View Team Details',
+                    style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => TeamDetailScreen(teamId: team['id'])));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              TeamDetailScreen(teamId: team['id'])));
                 },
               ),
-              
+
               // Message Team (only show if not own team)
               if (!isOwnTeam)
                 ListTile(
-                  leading: const Icon(Icons.chat_bubble_outline, color: Colors.blue),
-                  title: const Text('Message Team', style: TextStyle(color: Colors.white)),
-                  subtitle: Text('Chat with ${team['name']}', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                  leading:
+                      const Icon(Icons.chat_bubble_outline, color: Colors.blue),
+                  title: const Text('Message Team',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Chat with ${team['name']}',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12)),
                   onTap: () {
                     Navigator.pop(ctx);
                     // Navigate to team chat (using team's chat_id if available)
                     final chatId = team['chatId'];
                     if (chatId != null) {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(userId: chatId)));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ChatScreen(userId: chatId)));
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Team chat not available')),
+                        const SnackBar(
+                            content: Text('Team chat not available')),
                       );
                     }
                   },
                 ),
-              
+
               // Challenge Team (disabled if own team or no team of same type)
               if (!isOwnTeam)
                 ListTile(
-                  leading: Icon(Icons.sports_basketball, 
+                  leading: Icon(Icons.sports_basketball,
                       color: canChallenge ? Colors.deepOrange : Colors.grey),
-                  title: Text('Challenge Team', 
-                      style: TextStyle(color: canChallenge ? Colors.white : Colors.grey)),
+                  title: Text('Challenge Team',
+                      style: TextStyle(
+                          color: canChallenge ? Colors.white : Colors.grey)),
                   subtitle: Text(
-                    canChallenge 
-                        ? 'Send a ${team['teamType']} challenge' 
+                    canChallenge
+                        ? 'Send a ${team['teamType']} challenge'
                         : 'You need a ${team['teamType']} team to challenge',
                     style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
-                  onTap: canChallenge ? () {
-                    Navigator.pop(ctx);
-                    _showChallengeTeamDialog(team);
-                  } : null,
+                  onTap: canChallenge
+                      ? () {
+                          Navigator.pop(ctx);
+                          _showChallengeTeamDialog(team);
+                        }
+                      : null,
                 ),
             ],
           ),
@@ -1507,14 +1723,15 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
               decoration: InputDecoration(
                 labelText: 'Message (optional)',
                 hintText: 'Add a message to your challenge...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 filled: true,
                 fillColor: Colors.grey[800],
               ),
               maxLines: 2,
             ),
             const SizedBox(height: 8),
-            Text('They will receive a notification to accept or decline.', 
+            Text('They will receive a notification to accept or decline.',
                 style: TextStyle(color: Colors.grey[600], fontSize: 12)),
           ],
         ),
@@ -1530,11 +1747,15 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
                 await ApiService.challengeTeam(
                   teamId: myTeam['id'],
                   opponentTeamId: opponentTeam['id'],
-                  message: messageController.text.isNotEmpty ? messageController.text : null,
+                  message: messageController.text.isNotEmpty
+                      ? messageController.text
+                      : null,
                 );
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Challenge sent to ${opponentTeam['name']}!')),
+                    SnackBar(
+                        content:
+                            Text('Challenge sent to ${opponentTeam['name']}!')),
                   );
                 }
               } catch (e) {

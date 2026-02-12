@@ -149,7 +149,19 @@ export class UsersController {
 
   @Get('me')
   async getMe(@Headers('x-user-id') userId: string) {
-    return this.usersService.findOne(userId);
+    const user = await this.usersService.findOne(userId);
+    if (!user) return user;
+    const u = user as any;
+    return {
+      ...u,
+      rating: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
+      hoop_rank: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
+      matchesPlayed: u.gamesPlayed ?? u.games_played ?? 0,
+      games_played: u.gamesPlayed ?? u.games_played ?? 0,
+      photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
+      avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
+      photo_url: u.avatarUrl ?? u.avatar_url ?? null,
+    };
   }
 
   @Put('me')
@@ -344,6 +356,22 @@ export class UsersController {
     }
   }
 
+  @Delete('me/fcm-token')
+  async clearFcmToken(
+    @Headers('x-user-id') userId: string,
+  ) {
+    if (!userId) {
+      return { success: false, error: 'User ID required' };
+    }
+    try {
+      await this.notificationsService.clearFcmToken(userId);
+      return { success: true };
+    } catch (error) {
+      console.error('clearFcmToken error:', error.message);
+      return { success: false, error: 'Failed to clear FCM token' };
+    }
+  }
+
   /**
    * Privacy settings stub — returns sensible defaults.
    */
@@ -403,7 +431,7 @@ export class UsersController {
     // Return the user's match history formatted as rating changes.
     try {
       const matches = await this.usersService.getMatches(id);
-      return (matches || []).filter((m: any) => m.status === 'completed').map((m: any) => ({
+      return (matches || []).filter((m: any) => ['completed', 'ended'].includes((m?.status || '').toString())).map((m: any) => ({
         date: m.completed_at || m.updated_at,
         rating: parseFloat(m.winner_id === id ? '3.1' : '2.9'),
         matchId: m.id,
@@ -454,15 +482,21 @@ export class UsersController {
   async findOne(@Param('id') id: string) {
     const user = await this.usersService.findOne(id);
     if (!user) return user;
+    const stats = await this.usersService.getUserStats(id).catch(() => null);
     // Return both native camelCase and iOS-expected aliases
     const u = user as any;
+    const matchesPlayed = stats?.matchesPlayed ?? u.gamesPlayed ?? u.games_played ?? 0;
+    const wins = stats?.wins ?? 0;
+    const losses = stats?.losses ?? 0;
     return {
       ...u,
       // iOS User.swift expects these fields
       rating: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
       hoop_rank: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
-      matchesPlayed: u.gamesPlayed ?? u.games_played ?? 0,
-      games_played: u.gamesPlayed ?? u.games_played ?? 0,
+      matchesPlayed,
+      games_played: matchesPlayed,
+      wins,
+      losses,
       photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
       avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
       photo_url: u.avatarUrl ?? u.avatar_url ?? null,
@@ -575,7 +609,7 @@ export class UsersController {
 
   @Get(':id/recent-games')
   getRecentGames(@Param('id') id: string) {
-    return this.usersService.getMatches(id);
+    return this.usersService.getRecentGames(id);
   }
 
 

@@ -11,6 +11,9 @@ class MatchesScreen extends StatefulWidget {
 
 class _MatchesScreenState extends State<MatchesScreen> {
   // In a real app, this would be fetched from a service/provider
+  // TODO(status-compat): This mock screen is still hard-wired to legacy
+  // statuses (pending/accepted/completed). If wired to live API data, map
+  // waiting/live/ended (and optionally backendStatus) before rendering.
   List<Match> _matches = List.from(mockMatches);
 
   void _accept(String id) {
@@ -181,6 +184,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
   }
 
   Color _getStatusColor(String status) {
+    // TODO(status-compat): Extend this switch for waiting/live/ended when this
+    // screen moves from mock data to API-backed data.
     switch (status) {
       case 'pending':
         return Colors.orange;

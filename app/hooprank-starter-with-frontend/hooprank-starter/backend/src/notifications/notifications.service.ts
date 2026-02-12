@@ -113,14 +113,25 @@ export class NotificationsService {
     async saveFcmToken(userId: string, token: string): Promise<void> {
         console.log('saveFcmToken: userId=', userId, 'token=', token.substring(0, 20) + '...');
         try {
-            // Use raw SQL for more reliable update
+            // Ensure one token maps to one user (prevents cross-account push delivery on shared devices)
             if (this.isPostgres) {
+                await this.dataSource.query(`
+                    UPDATE users
+                    SET fcm_token = NULL, updated_at = NOW()
+                    WHERE fcm_token = $1 AND id::TEXT <> $2::TEXT
+                `, [token, userId]);
+
                 const result = await this.dataSource.query(`
                     UPDATE users SET fcm_token = $1, updated_at = NOW()
                     WHERE id = $2
                 `, [token, userId]);
                 console.log('saveFcmToken: update result=', result);
             } else {
+                await this.dataSource.query(`
+                    UPDATE users SET fcm_token = ?, updated_at = datetime('now')
+                    WHERE fcm_token = ? AND id <> ?
+                `, [null, token, userId]);
+
                 await this.dataSource.query(`
                     UPDATE users SET fcm_token = ?, updated_at = datetime('now')
                     WHERE id = ?
@@ -130,6 +141,25 @@ export class NotificationsService {
             console.error('saveFcmToken error:', error.message);
             throw error;
         }
+    }
+
+    /**
+     * Clear FCM token for a user on logout/account switch.
+     */
+    async clearFcmToken(userId: string): Promise<void> {
+        if (this.isPostgres) {
+            await this.dataSource.query(`
+                UPDATE users
+                SET fcm_token = NULL, updated_at = NOW()
+                WHERE id::TEXT = $1::TEXT
+            `, [userId]);
+            return;
+        }
+        await this.dataSource.query(`
+            UPDATE users
+            SET fcm_token = ?, updated_at = datetime('now')
+            WHERE id = ?
+        `, [null, userId]);
     }
 
     /**

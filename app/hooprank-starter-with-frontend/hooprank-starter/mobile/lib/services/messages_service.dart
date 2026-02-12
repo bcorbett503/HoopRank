@@ -204,28 +204,52 @@ class MessagesService {
       final List<dynamic> data = json.decode(response.body);
       print('Parsed ${data.length} challenges');
       // Transform new API format to ChallengeRequest format
-      return data.map((c) {
-        // New API returns challenges with fromUser/toUser objects
-        final fromUser = c['fromUser'] ?? {};
-        final toUser = c['toUser'] ?? {};
-        final court = c['court'];
-        
+      return data.map((raw) {
+        final c = raw as Map<String, dynamic>;
+
+        Map<String, dynamic> asMap(dynamic value) {
+          if (value is Map<String, dynamic>) return value;
+          if (value is Map) return value.cast<String, dynamic>();
+          return <String, dynamic>{};
+        }
+
+        // New API returns fromUser/toUser, but keep legacy key support.
+        final fromUser = asMap(c['fromUser']);
+        final toUser = asMap(c['toUser']);
+        final court = c['court'] is Map ? (c['court'] as Map).cast<String, dynamic>() : null;
+
+        final fromUserId = (c['from_user_id'] ?? c['fromUserId'] ?? fromUser['id'])?.toString() ?? '';
+        final toUserId = (c['to_user_id'] ?? c['toUserId'] ?? toUser['id'])?.toString() ?? '';
+        final isSent = fromUserId == userId;
+
+        // Direction must reflect sender/receiver so feed and rankings remain accurate.
+        final direction = isSent ? 'sent' : 'received';
+        final otherUserJson = isSent ? toUser : fromUser;
+        final fallbackOtherUser = <String, dynamic>{
+          'id': isSent ? toUserId : fromUserId,
+          'name': 'Unknown',
+        };
+
         // Create a pseudo-message for compatibility
         final message = Message(
-          id: c['id'] ?? '',
-          senderId: c['from_user_id'] ?? '',
-          receiverId: c['to_user_id'] ?? '',
-          content: c['message'] ?? '',
-          createdAt: c['created_at'] != null ? DateTime.parse(c['created_at']) : DateTime.now(),
-          matchId: c['match_id'],
+          id: c['id']?.toString() ?? '',
+          senderId: fromUserId,
+          receiverId: toUserId,
+          content: c['message']?.toString() ?? '',
+          createdAt: c['created_at'] != null
+              ? DateTime.parse(c['created_at'])
+              : c['createdAt'] != null
+                  ? DateTime.parse(c['createdAt'])
+                  : DateTime.now(),
+          matchId: (c['match_id'] ?? c['matchId'])?.toString(),
           isChallenge: true,
-          challengeStatus: c['status'],
+          challengeStatus: c['status']?.toString(),
         );
-        
+
         return ChallengeRequest(
           message: message,
-          otherUser: User.fromJson(fromUser.isEmpty ? {'id': c['from_user_id'], 'name': 'Unknown'} : fromUser),
-          direction: 'received',
+          otherUser: User.fromJson(otherUserJson.isEmpty ? fallbackOtherUser : otherUserJson),
+          direction: direction,
           court: court,
         );
       }).toList();

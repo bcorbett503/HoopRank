@@ -11,7 +11,8 @@
 const https = require('https');
 const crypto = require('crypto');
 
-const GOOGLE_API_KEY = 'AIzaSyCbro8Tiei_T2NtLhN87e9o3N3p9x_A4NA';
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+if (!GOOGLE_API_KEY) { console.error('ERROR: GOOGLE_API_KEY env var required'); process.exit(1); }
 const BASE = 'heartfelt-appreciation-production-65f1.up.railway.app';
 const USER_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2';
 

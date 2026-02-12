@@ -21,11 +21,24 @@ export class ChallengesService {
         const isPostgres = !!process.env.DATABASE_URL;
 
         if (isPostgres) {
-            // Check for existing active challenge
+            // Block duplicate challenge creation only when there is an unresolved active challenge.
+            // Accepted challenges tied to finished/score-submitted matches should not prevent rematches.
             const existing = await this.dataSource.query(`
-                SELECT id FROM challenges 
-                WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))
-                AND status IN ('pending', 'accepted')
+                SELECT c.id
+                FROM challenges c
+                LEFT JOIN matches m ON m.id = c.match_id
+                WHERE ((c.from_user_id = $1 AND c.to_user_id = $2) OR (c.from_user_id = $2 AND c.to_user_id = $1))
+                  AND (
+                    c.status = 'pending'
+                    OR (
+                      c.status = 'accepted'
+                      AND (
+                        c.match_id IS NULL
+                        OR COALESCE(m.status, 'accepted') IN ('pending', 'accepted', 'live', 'score_submitted', 'pending_confirmation')
+                      )
+                    )
+                  )
+                LIMIT 1
             `, [fromUserId, toUserId]);
 
             if (existing.length > 0) {
@@ -359,9 +372,20 @@ export class ChallengesService {
 
         if (isPostgres) {
             const result = await this.dataSource.query(`
-                SELECT COUNT(*) as count FROM challenges 
-                WHERE ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))
-                AND status IN ('pending', 'accepted')
+                SELECT COUNT(*) as count
+                FROM challenges c
+                LEFT JOIN matches m ON m.id = c.match_id
+                WHERE ((c.from_user_id = $1 AND c.to_user_id = $2) OR (c.from_user_id = $2 AND c.to_user_id = $1))
+                  AND (
+                    c.status = 'pending'
+                    OR (
+                      c.status = 'accepted'
+                      AND (
+                        c.match_id IS NULL
+                        OR COALESCE(m.status, 'accepted') IN ('pending', 'accepted', 'live', 'score_submitted', 'pending_confirmation')
+                      )
+                    )
+                  )
             `, [userId1, userId2]);
             return parseInt(result[0].count) > 0;
         }

@@ -2,9 +2,12 @@ import Flutter
 import UIKit
 import FirebaseCore
 import FirebaseMessaging
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private let badgeChannelName = "hooprank/notifications"
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -24,9 +27,32 @@ import FirebaseMessaging
     
     // Set Firebase Messaging delegate
     Messaging.messaging().delegate = self
-    
+
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let badgeChannel = FlutterMethodChannel(name: badgeChannelName, binaryMessenger: controller.binaryMessenger)
+      badgeChannel.setMethodCallHandler { [weak self] call, result in
+        guard let self = self else {
+          result(FlutterError(code: "DEALLOCATED", message: "AppDelegate deallocated", details: nil))
+          return
+        }
+        switch call.method {
+        case "clearBadge":
+          self.clearApplicationBadge()
+          result(nil)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
     GeneratedPluginRegistrant.register(with: self)
+    clearApplicationBadge()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    super.applicationDidBecomeActive(application)
+    clearApplicationBadge()
   }
   
   // Receive device token for push notifications
@@ -34,6 +60,17 @@ import FirebaseMessaging
                           didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
     Messaging.messaging().apnsToken = deviceToken
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+  }
+
+  private func clearApplicationBadge() {
+    DispatchQueue.main.async {
+      UIApplication.shared.applicationIconBadgeNumber = 0
+      let center = UNUserNotificationCenter.current()
+      if #available(iOS 16.0, *) {
+        center.setBadgeCount(0) { _ in }
+      }
+      center.removeAllDeliveredNotifications()
+    }
   }
 }
 

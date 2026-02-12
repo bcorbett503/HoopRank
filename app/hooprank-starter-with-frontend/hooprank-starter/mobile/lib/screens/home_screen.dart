@@ -17,6 +17,7 @@ import '../models.dart';
 import '../services/court_service.dart';
 import '../services/video_upload_service.dart';
 import '../widgets/hooprank_feed.dart';
+import '../widgets/scaffold_with_nav_bar.dart';
 import 'status_composer_screen.dart';
 import 'package:video_player/video_player.dart';
 
@@ -38,26 +39,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   double? _currentRating; // Fresh rating from API
   List<Map<String, dynamic>> _myTeams = []; // User's teams with ratings
   List<Map<String, dynamic>> _teamInvites = []; // Pending team invites
-  List<Map<String, dynamic>> _teamChallenges = []; // Pending team challenges (3v3/5v5)
+  List<Map<String, dynamic>> _teamChallenges =
+      []; // Pending team challenges (3v3/5v5)
   final TextEditingController _statusController = TextEditingController();
   XFile? _selectedImage; // Selected image for post
   XFile? _selectedVideo; // Selected video for post
   int? _videoDurationMs; // Video duration in milliseconds
   bool _isUploadingVideo = false; // Video upload in progress
   final ImagePicker _imagePicker = ImagePicker();
-  
+
   // Court tagging autocomplete state
   List<Court> _courtSuggestions = [];
   bool _showCourtSuggestions = false;
   Court? _taggedCourt;
-  
+
   // Game scheduling state
   DateTime? _scheduledTime;
   bool _isRecurring = false;
   String _recurrenceType = 'weekly'; // 'daily', 'weekly'
-  
+
   // Status bar expansion state
   bool _isStatusBarExpanded = false;
+  int _feedReloadVersion = 0;
 
   @override
   void initState() {
@@ -65,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // Register for push notification refresh
     NotificationService.addOnNotificationListener(_refreshAll);
+    ScaffoldWithNavBar.refreshFeedTab = _refreshEmbeddedFeed;
     _loadCurrentRating(); // Fetch fresh rating from API
     _loadChallenges();
     _loadPendingConfirmations();
@@ -73,7 +77,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadTeamInvites(); // Load pending team invites
     _loadTeamChallenges(); // Load pending team challenges
     _updateLocation();
-    _statusController.addListener(_onStatusTextChanged); // Court tagging listener
+    _statusController
+        .addListener(_onStatusTextChanged); // Court tagging listener
   }
 
   /// Safely parse rating that could be String or num
@@ -84,42 +89,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _submitStatus(String status) async {
-    if (status.isEmpty && _selectedImage == null && _selectedVideo == null) return;
-    
+    if (status.isEmpty && _selectedImage == null && _selectedVideo == null)
+      return;
+
     final authState = Provider.of<AuthState>(context, listen: false);
     final user = authState.currentUser;
     final checkInState = Provider.of<CheckInState>(context, listen: false);
-    
+
     if (user != null) {
       // Encode image as base64 data URL
       String? imageUrl;
       String? videoUrl;
       String? videoThumbnailUrl;
       int? videoDurationMs;
-      
+
       if (_selectedImage != null) {
         final bytes = await File(_selectedImage!.path).readAsBytes();
-        final mimeType = _selectedImage!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        final mimeType = _selectedImage!.path.toLowerCase().endsWith('.png')
+            ? 'image/png'
+            : 'image/jpeg';
         imageUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
         debugPrint('HOME_STATUS: Encoded image to ${imageUrl.length} chars');
       }
-      
+
       // Upload video to Firebase Storage
       if (_selectedVideo != null) {
         setState(() => _isUploadingVideo = true);
         try {
           debugPrint('HOME_STATUS: Uploading video...');
           videoUrl = await VideoUploadService.uploadVideo(
-            File(_selectedVideo!.path), 
+            File(_selectedVideo!.path),
             user.id,
           );
-          
+
           // Generate and upload thumbnail
-          videoThumbnailUrl = await VideoUploadService.generateAndUploadThumbnail(
-            _selectedVideo!.path, 
+          videoThumbnailUrl =
+              await VideoUploadService.generateAndUploadThumbnail(
+            _selectedVideo!.path,
             user.id,
           );
-          
+
           videoDurationMs = _videoDurationMs;
           debugPrint('HOME_STATUS: Video uploaded: $videoUrl');
         } catch (e) {
@@ -137,24 +146,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         setState(() => _isUploadingVideo = false);
       }
-      
+
       // Update local status display
-      await checkInState.setMyStatus(
-        status, 
-        userName: user.name, 
-        photoUrl: user.photoUrl
-      );
-      
+      await checkInState.setMyStatus(status,
+          userName: user.name, photoUrl: user.photoUrl);
+
       // Also create status in backend API (with scheduled time if set)
       await ApiService.createStatus(
-        status, 
+        status,
         imageUrl: imageUrl,
         scheduledAt: _scheduledTime,
         videoUrl: videoUrl,
         videoThumbnailUrl: videoThumbnailUrl,
         videoDurationMs: videoDurationMs,
       );
-      
+
       if (mounted) {
         String message = 'Status updated!';
         if (_scheduledTime != null) {
@@ -164,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         } else if (_selectedImage != null) {
           message = 'Post with photo shared!';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
@@ -173,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _selectedImage = null;
           _selectedVideo = null;
           _videoDurationMs = null;
-          _scheduledTime = null;  // Clear scheduled time after posting
+          _scheduledTime = null; // Clear scheduled time after posting
           _isRecurring = false;
         });
         // Unfocus keyboard
@@ -211,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       source: ImageSource.gallery,
       maxDuration: const Duration(seconds: 30),
     );
-    
+
     if (video != null) {
       // Validate duration
       final controller = VideoPlayerController.file(File(video.path));
@@ -219,19 +225,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         await controller.initialize();
         final duration = controller.value.duration;
         final durationMs = duration.inMilliseconds;
-        
+
         if (!VideoUploadService.isValidDuration(durationMs)) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Video must be 30 seconds or less. Please trim it first.'),
+                content: Text(
+                    'Video must be 30 seconds or less. Please trim it first.'),
                 backgroundColor: Colors.red,
               ),
             );
           }
           return;
         }
-        
+
         setState(() {
           _selectedVideo = video;
           _videoDurationMs = durationMs;
@@ -247,9 +254,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _onStatusTextChanged() {
     final text = _statusController.text;
     final cursorPos = _statusController.selection.baseOffset;
-    
+
     debugPrint('STATUS_TAG: text="$text" cursor=$cursorPos');
-    
+
     if (cursorPos < 0 || cursorPos > text.length) {
       setState(() {
         _showCourtSuggestions = false;
@@ -257,13 +264,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
       return;
     }
-    
+
     // Find last @ before cursor
     final textBeforeCursor = text.substring(0, cursorPos);
     final lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    
-    debugPrint('STATUS_TAG: textBeforeCursor="$textBeforeCursor" lastAtIndex=$lastAtIndex');
-    
+
+    debugPrint(
+        'STATUS_TAG: textBeforeCursor="$textBeforeCursor" lastAtIndex=$lastAtIndex');
+
     if (lastAtIndex >= 0) {
       final query = textBeforeCursor.substring(lastAtIndex + 1);
       debugPrint('STATUS_TAG: query="$query"');
@@ -273,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
     }
-    
+
     setState(() {
       _showCourtSuggestions = false;
       _courtSuggestions = [];
@@ -282,10 +290,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _searchCourtsForTag(String query) async {
     // Ensure courts are loaded before searching
-    debugPrint('STATUS_TAG: isLoaded=${CourtService().isLoaded} courts=${CourtService().courts.length}');
+    debugPrint(
+        'STATUS_TAG: isLoaded=${CourtService().isLoaded} courts=${CourtService().courts.length}');
     await CourtService().loadCourts();
     final courts = CourtService().courts;
-    debugPrint('STATUS_TAG: after loadCourts isLoaded=${CourtService().isLoaded} courts=${courts.length}');
+    debugPrint(
+        'STATUS_TAG: after loadCourts isLoaded=${CourtService().isLoaded} courts=${courts.length}');
     final results = CourtService().searchCourts(query).take(5).toList();
     debugPrint('STATUS_TAG: found ${results.length} results');
     if (mounted) {
@@ -301,19 +311,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final cursorPos = _statusController.selection.baseOffset;
     final textBeforeCursor = text.substring(0, cursorPos);
     final lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    
+
     if (lastAtIndex >= 0) {
-      final textAfterCursor = cursorPos < text.length ? text.substring(cursorPos) : '';
-      final newText = text.substring(0, lastAtIndex) + 
-                      '@${court.name} ' + 
-                      textAfterCursor;
+      final textAfterCursor =
+          cursorPos < text.length ? text.substring(cursorPos) : '';
+      final newText =
+          text.substring(0, lastAtIndex) + '@${court.name} ' + textAfterCursor;
       _statusController.text = newText;
-      _statusController.selection = TextSelection.collapsed(
-        offset: lastAtIndex + court.name.length + 2
-      );
+      _statusController.selection =
+          TextSelection.collapsed(offset: lastAtIndex + court.name.length + 2);
       _taggedCourt = court;
     }
-    
+
     setState(() {
       _showCourtSuggestions = false;
       _courtSuggestions = [];
@@ -322,7 +331,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   // Game scheduling: show compact schedule sheet with date/time/recurring
   Future<void> _showScheduleSheet() async {
-    DateTime tempDate = _scheduledTime ?? DateTime.now().add(const Duration(hours: 1));
+    DateTime tempDate =
+        _scheduledTime ?? DateTime.now().add(const Duration(hours: 1));
     TimeOfDay tempTime = TimeOfDay.fromDateTime(tempDate);
     bool tempRecurring = _isRecurring;
     String tempRecurrenceType = _recurrenceType;
@@ -340,7 +350,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Schedule Game', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('Schedule Game',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               // Date & Time row
               Row(
@@ -353,19 +367,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           context: context,
                           initialDate: tempDate,
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 90)),
-                          builder: (ctx, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: Colors.deepOrange)), child: child!),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 90)),
+                          builder: (ctx, child) => Theme(
+                              data: ThemeData.dark().copyWith(
+                                  colorScheme: const ColorScheme.dark(
+                                      primary: Colors.deepOrange)),
+                              child: child!),
                         );
-                        if (date != null) setSheetState(() => tempDate = DateTime(date.year, date.month, date.day, tempTime.hour, tempTime.minute));
+                        if (date != null)
+                          setSheetState(() => tempDate = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              tempTime.hour,
+                              tempTime.minute));
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 14),
+                        decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: BorderRadius.circular(8)),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today, color: Colors.deepOrange, size: 18),
+                            const Icon(Icons.calendar_today,
+                                color: Colors.deepOrange, size: 18),
                             const SizedBox(width: 8),
-                            Text('${tempDate.month}/${tempDate.day}/${tempDate.year}', style: const TextStyle(color: Colors.white)),
+                            Text(
+                                '${tempDate.month}/${tempDate.day}/${tempDate.year}',
+                                style: const TextStyle(color: Colors.white)),
                           ],
                         ),
                       ),
@@ -379,18 +410,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         final time = await showTimePicker(
                           context: context,
                           initialTime: tempTime,
-                          builder: (ctx, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: Colors.deepOrange)), child: child!),
+                          builder: (ctx, child) => Theme(
+                              data: ThemeData.dark().copyWith(
+                                  colorScheme: const ColorScheme.dark(
+                                      primary: Colors.deepOrange)),
+                              child: child!),
                         );
                         if (time != null) setSheetState(() => tempTime = time);
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 14),
+                        decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: BorderRadius.circular(8)),
                         child: Row(
                           children: [
-                            const Icon(Icons.access_time, color: Colors.deepOrange, size: 18),
+                            const Icon(Icons.access_time,
+                                color: Colors.deepOrange, size: 18),
                             const SizedBox(width: 8),
-                            Text(tempTime.format(context), style: const TextStyle(color: Colors.white)),
+                            Text(tempTime.format(context),
+                                style: const TextStyle(color: Colors.white)),
                           ],
                         ),
                       ),
@@ -402,7 +442,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               // Recurring toggle
               Row(
                 children: [
-                  const Text('Recurring', style: TextStyle(color: Colors.white)),
+                  const Text('Recurring',
+                      style: TextStyle(color: Colors.white)),
                   const Spacer(),
                   Switch(
                     value: tempRecurring,
@@ -417,34 +458,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setSheetState(() => tempRecurrenceType = 'weekly'),
+                        onTap: () =>
+                            setSheetState(() => tempRecurrenceType = 'weekly'),
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: tempRecurrenceType == 'weekly' ? Colors.deepOrange : Colors.grey[800],
+                            color: tempRecurrenceType == 'weekly'
+                                ? Colors.deepOrange
+                                : Colors.grey[800],
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Center(child: Text('Weekly', style: TextStyle(color: Colors.white))),
+                          child: const Center(
+                              child: Text('Weekly',
+                                  style: TextStyle(color: Colors.white))),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setSheetState(() => tempRecurrenceType = 'daily'),
+                        onTap: () =>
+                            setSheetState(() => tempRecurrenceType = 'daily'),
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: tempRecurrenceType == 'daily' ? Colors.deepOrange : Colors.grey[800],
+                            color: tempRecurrenceType == 'daily'
+                                ? Colors.deepOrange
+                                : Colors.grey[800],
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Center(child: Text('Daily', style: TextStyle(color: Colors.white))),
+                          child: const Center(
+                              child: Text('Daily',
+                                  style: TextStyle(color: Colors.white))),
                         ),
                       ),
                     ),
                   ],
                 ),
-                Text('Creates up to 10 scheduled events', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                Text('Creates up to 10 scheduled events',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12)),
               ],
               const SizedBox(height: 20),
               // Confirm button
@@ -452,11 +504,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context, {
-                    'date': DateTime(tempDate.year, tempDate.month, tempDate.day, tempTime.hour, tempTime.minute),
+                    'date': DateTime(tempDate.year, tempDate.month,
+                        tempDate.day, tempTime.hour, tempTime.minute),
                     'isRecurring': tempRecurring,
                     'recurrenceType': tempRecurrenceType,
                   }),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepOrange,
+                      padding: const EdgeInsets.symmetric(vertical: 14)),
                   child: const Text('Schedule'),
                 ),
               ),
@@ -482,25 +537,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     String dateStr;
     if (_scheduledTime!.day == now.day && _scheduledTime!.month == now.month) {
       dateStr = 'Today';
-    } else if (_scheduledTime!.day == now.day + 1 && _scheduledTime!.month == now.month) {
+    } else if (_scheduledTime!.day == now.day + 1 &&
+        _scheduledTime!.month == now.month) {
       dateStr = 'Tomorrow';
     } else {
       dateStr = '${_scheduledTime!.month}/${_scheduledTime!.day}';
     }
     String result = '$dateStr $timeStr';
-    if (_isRecurring) result += ' (${_recurrenceType == 'weekly' ? 'Weekly' : 'Daily'})';
+    if (_isRecurring)
+      result += ' (${_recurrenceType == 'weekly' ? 'Weekly' : 'Daily'})';
     return result;
   }
 
   Future<void> _loadCurrentRating() async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
-    
+
     try {
       final userData = await ApiService.getProfile(userId);
       if (userData != null && mounted) {
         setState(() {
-          _currentRating = (userData['rating'] is num) 
+          _currentRating = (userData['rating'] is num)
               ? (userData['rating'] as num).toDouble()
               : double.tryParse(userData['rating']?.toString() ?? '') ?? 3.0;
         });
@@ -549,6 +607,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     NotificationService.removeOnNotificationListener(_refreshAll);
+    if (ScaffoldWithNavBar.refreshFeedTab == _refreshEmbeddedFeed) {
+      ScaffoldWithNavBar.refreshFeedTab = null;
+    }
     WidgetsBinding.instance.removeObserver(this);
     _statusController.dispose();
     super.dispose();
@@ -562,6 +623,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _loadChallenges();
       _loadPendingConfirmations();
       _loadLocalActivity();
+      _refreshEmbeddedFeed();
     }
   }
 
@@ -581,10 +643,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadTeamInvites();
     _loadTeamChallenges();
     _loadCurrentRating();
+    _refreshEmbeddedFeed();
+  }
+
+  void _refreshEmbeddedFeed() {
+    if (!mounted) return;
+    setState(() => _feedReloadVersion++);
   }
 
   Future<void> _loadChallenges() async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) {
       setState(() => _isLoadingChallenges = false);
       return;
@@ -636,8 +705,269 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  int? _parseScoreValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  Future<void> _adjustPendingScore(Map<String, dynamic> confirmation) async {
+    final score =
+        confirmation['score'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    final matchId = confirmation['matchId']?.toString();
+    if (matchId == null || matchId.isEmpty) return;
+
+    final myScoreCtrl = TextEditingController(
+      text: (_parseScoreValue(score['me']) ?? '').toString(),
+    );
+    final opponentScoreCtrl = TextEditingController(
+      text: (_parseScoreValue(score['opponent']) ?? '').toString(),
+    );
+
+    try {
+      final adjusted = await showDialog<Map<String, int>>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Adjust Score'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: myScoreCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Your score'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: opponentScoreCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Opponent score'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final me = int.tryParse(myScoreCtrl.text.trim());
+                final opponent = int.tryParse(opponentScoreCtrl.text.trim());
+                if (me == null || opponent == null || me < 0 || opponent < 0) {
+                  return;
+                }
+                Navigator.pop(ctx, {'me': me, 'opponent': opponent});
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      );
+
+      if (adjusted == null) return;
+      final me = adjusted['me'];
+      final opponent = adjusted['opponent'];
+      if (me == null || opponent == null) return;
+
+      // Re-submit score from this user. Backend flips submitter and waits for
+      // the other participant to confirm, preserving the 2-phase workflow.
+      await ApiService.submitScore(
+        matchId: matchId,
+        myScore: me,
+        opponentScore: opponent,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Adjusted score submitted. Waiting for opponent confirmation.'),
+        ),
+      );
+      _loadPendingConfirmations();
+      _refreshEmbeddedFeed();
+    } finally {
+      myScoreCtrl.dispose();
+      opponentScoreCtrl.dispose();
+    }
+  }
+
+  Widget _buildPendingConfirmationsSection() {
+    if (_pendingConfirmations.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Pending Score Confirmations',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        ..._pendingConfirmations.map((conf) {
+          final score = conf['score'] as Map<String, dynamic>?;
+          final opponentName = conf['opponentName'] ?? 'Opponent';
+          final matchId = conf['matchId']?.toString() ?? '';
+          final myScore = _parseScoreValue(score?['me']);
+          final opponentScore = _parseScoreValue(score?['opponent']);
+
+          return Card(
+            color: Colors.blue.shade900.withOpacity(0.3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.blue.shade700, width: 1),
+            ),
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.scoreboard, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$opponentName submitted a score',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (myScore != null && opponentScore != null)
+                    Text(
+                      'Score: $myScore - $opponentScore',
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            try {
+                              await ApiService.confirmScore(matchId);
+                              if (context.mounted) {
+                                await Provider.of<AuthState>(context,
+                                        listen: false)
+                                    .refreshUser();
+                              }
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Score confirmed!')),
+                              );
+                              _loadPendingConfirmations();
+                              _loadLocalActivity();
+                              _refreshEmbeddedFeed();
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Confirm'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _adjustPendingScore(conf),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.blue[200],
+                          ),
+                          child: const Text('Adjust'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: Colors.grey[900],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                title: Row(
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded,
+                                        color: Colors.orange, size: 28),
+                                    const SizedBox(width: 8),
+                                    const Text('Contest Score?'),
+                                  ],
+                                ),
+                                content: const Text(
+                                  'Contest will void this score submission and notify the opponent.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Contest'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed != true) return;
+
+                            try {
+                              await ApiService.contestScore(matchId);
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Score contested')),
+                              );
+                              _loadPendingConfirmations();
+                              _refreshEmbeddedFeed();
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                          child: const Text('Contest'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Future<void> _updateLocation() async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
@@ -689,15 +1019,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             child: Text(
               label,
-              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+              style: TextStyle(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5),
             ),
           ),
-          Expanded(child: Column(
+          Expanded(
+              child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 rating.toStringAsFixed(2),
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               // Use Opacity to preserve layout space even if teamName is null
@@ -725,13 +1063,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       (t) => t['teamType'] == teamType,
       orElse: () => <String, dynamic>{},
     );
-    
+
     final hasTeam = team.isNotEmpty;
     // Parse rating safely - backend may return String or num
     final rv = team['rating'];
-    final rating = hasTeam ? (rv is num ? rv.toDouble() : (double.tryParse(rv?.toString() ?? '') ?? 3.0)) : 0.0;
+    final rating = hasTeam
+        ? (rv is num
+            ? rv.toDouble()
+            : (double.tryParse(rv?.toString() ?? '') ?? 3.0))
+        : 0.0;
     final teamName = hasTeam ? (team['name'] ?? teamType) : null;
-    
+
     return GestureDetector(
       onTap: () {
         if (!hasTeam) {
@@ -744,7 +1086,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: hasTeam ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.05)),
+          border: Border.all(
+              color: hasTeam
+                  ? Colors.white.withOpacity(0.1)
+                  : Colors.white.withOpacity(0.05)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -757,16 +1102,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               child: Text(
                 teamType,
-                style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                style: TextStyle(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5),
               ),
             ),
-            Expanded(child: Column(
+            Expanded(
+                child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (hasTeam) ...[
                   Text(
                     rating.toStringAsFixed(2),
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -777,11 +1130,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     textAlign: TextAlign.center,
                   ),
                 ] else ...[
-                  const Icon(Icons.add_circle_outline, color: Colors.white30, size: 24),
+                  const Icon(Icons.add_circle_outline,
+                      color: Colors.white30, size: 24),
                   const SizedBox(height: 4),
                   const Text(
                     'JOIN',
-                    style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.white30,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ],
@@ -820,7 +1177,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                   child: const Icon(Icons.person, color: Colors.deepOrange),
                 ),
-                title: const Text('1v1', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('1v1',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: const Text('Find local players to challenge'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -839,7 +1197,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                   child: const Icon(Icons.groups, color: Colors.blue),
                 ),
-                title: const Text('3v3', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('3v3',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: const Text('Find 3v3 teams to challenge'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -858,7 +1217,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                   child: const Icon(Icons.groups, color: Colors.purple),
                 ),
-                title: const Text('5v5', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('5v5',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: const Text('Find 5v5 teams to challenge'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -877,9 +1237,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _has3v3Team() => _myTeams.any((t) => t['teamType'] == '3v3');
   bool _has5v5Team() => _myTeams.any((t) => t['teamType'] == '5v5');
 
-  void _showStatusUpdateDialog(BuildContext context, CheckInState checkInState) {
+  void _showStatusUpdateDialog(
+      BuildContext context, CheckInState checkInState) {
     final user = Provider.of<AuthState>(context, listen: false).currentUser;
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -896,7 +1257,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _showQuickChallengeSheet(BuildContext context, String playerId, String playerName) {
+  void _showQuickChallengeSheet(
+      BuildContext context, String playerId, String playerName) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
@@ -963,7 +1325,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       (t) => t['teamType'] == teamType,
       orElse: () => <String, dynamic>{},
     );
-    
+
     if (myTeam.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('You need to join a $teamType team first')),
@@ -997,7 +1359,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               );
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Challenge sent to ${opponentTeam['name']}!')),
+                  SnackBar(
+                      content:
+                          Text('Challenge sent to ${opponentTeam['name']}!')),
                 );
               }
             } catch (e) {
@@ -1017,9 +1381,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final playerId = player['id'] as String?;
     final playerName = player['name'] ?? 'Player';
     final playerRating = (player['rating'] ?? 0).toDouble();
-    
+
     if (playerId == null) return;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1035,13 +1399,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ? NetworkImage(player['avatarUrl'])
                   : null,
               child: player['avatarUrl'] == null
-                  ? Text(playerName[0].toUpperCase(), style: const TextStyle(fontSize: 24))
+                  ? Text(playerName[0].toUpperCase(),
+                      style: const TextStyle(fontSize: 24))
                   : null,
             ),
             const SizedBox(height: 12),
-            Text('⭐ ${playerRating.toStringAsFixed(1)}', style: const TextStyle(color: Colors.grey)),
+            Text('⭐ ${playerRating.toStringAsFixed(1)}',
+                style: const TextStyle(color: Colors.grey)),
             if (player['city'] != null)
-              Text('📍 ${player['city']}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              Text('📍 ${player['city']}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
           ],
         ),
         actions: [
@@ -1054,7 +1421,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Navigator.pop(context);
               // Send challenge to this player
               try {
-                await ApiService.createChallenge(toUserId: playerId, message: 'Want to play?');
+                await ApiService.createChallenge(
+                    toUserId: playerId, message: 'Want to play?');
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Challenge sent to $playerName!')),
@@ -1083,14 +1451,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildChallengeBadge(ChallengeRequest challenge) {
     final isSent = challenge.isSent;
     final status = challenge.message.challengeStatus ?? 'pending';
-    
+
     // Determine colors based on direction and status
     Color bgColor;
     Color borderColor;
     Color iconColor;
     IconData? icon;
     String? label;
-    
+
     if (isSent) {
       // Sent challenges show status
       switch (status) {
@@ -1125,7 +1493,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       iconColor = Colors.deepOrange;
       label = 'CHALLENGE';
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1133,8 +1501,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
       ),
-      child: label != null 
-          ? Text(label, style: TextStyle(fontSize: 10, color: iconColor, fontWeight: FontWeight.bold))
+      child: label != null
+          ? Text(label,
+              style: TextStyle(
+                  fontSize: 10, color: iconColor, fontWeight: FontWeight.bold))
           : Icon(icon, size: 16, color: iconColor),
     );
   }
@@ -1152,18 +1522,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.sports_basketball, size: 14, color: Colors.deepOrange),
+            const Icon(Icons.sports_basketball,
+                size: 14, color: Colors.deepOrange),
             const SizedBox(width: 4),
-            const Text('NEW', style: TextStyle(fontSize: 11, color: Colors.deepOrange, fontWeight: FontWeight.w600)),
+            const Text('NEW',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.deepOrange,
+                    fontWeight: FontWeight.w600)),
           ],
         ),
       );
     }
-    
+
     // Sent challenge status
     IconData icon;
     Color color;
-    
+
     switch (status) {
       case 'accepted':
         icon = Icons.check_circle_outline;
@@ -1181,7 +1556,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         icon = Icons.schedule;
         color = Colors.blue;
     }
-    
+
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -1193,9 +1568,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _cancelChallenge(ChallengeRequest challenge) async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
-    
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1214,7 +1590,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ],
       ),
     );
-    
+
     if (confirm == true) {
       try {
         await _messagesService.cancelChallenge(userId, challenge.message.id);
@@ -1235,14 +1611,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _declineChallenge(ChallengeRequest challenge) async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
-    
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Decline Challenge?'),
-        content: Text('Decline the challenge from ${challenge.otherUser.name}?'),
+        content:
+            Text('Decline the challenge from ${challenge.otherUser.name}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1256,13 +1634,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ],
       ),
     );
-    
+
     if (confirm == true) {
       try {
         await _messagesService.declineChallenge(userId, challenge.message.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Declined challenge from ${challenge.otherUser.name}')),
+            SnackBar(
+                content: Text(
+                    'Declined challenge from ${challenge.otherUser.name}')),
           );
           _loadChallenges();
         }
@@ -1277,12 +1657,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _acceptChallenge(ChallengeRequest challenge) async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
       // Accept the challenge and get the matchId from backend
-      final result = await _messagesService.acceptChallenge(userId, challenge.message.id);
+      final result =
+          await _messagesService.acceptChallenge(userId, challenge.message.id);
       final matchId = result['matchId'] as String?;
 
       if (!mounted) return;
@@ -1372,7 +1754,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             builder: (context, auth, _) {
               final photoUrl = auth.currentUser?.photoUrl;
               // TODO: Replace with actual notification count from API
-              final notificationCount = 0; // Placeholder - can be wired to real data
+              final notificationCount =
+                  0; // Placeholder - can be wired to real data
               return GestureDetector(
                 onTap: () => context.push('/profile'),
                 child: Padding(
@@ -1381,11 +1764,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     children: [
                       CircleAvatar(
                         radius: 16,
-                        backgroundImage: photoUrl != null 
-                          ? (photoUrl.startsWith('data:') 
-                              ? MemoryImage(Uri.parse(photoUrl).data!.contentAsBytes()) 
-                              : NetworkImage(photoUrl) as ImageProvider)
-                          : null,
+                        backgroundImage: photoUrl != null
+                            ? (photoUrl.startsWith('data:')
+                                ? MemoryImage(
+                                    Uri.parse(photoUrl).data!.contentAsBytes())
+                                : NetworkImage(photoUrl) as ImageProvider)
+                            : null,
                         child: photoUrl == null
                             ? const Icon(Icons.person, size: 18)
                             : null,
@@ -1406,7 +1790,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               minHeight: 14,
                             ),
                             child: Text(
-                              notificationCount > 9 ? '9+' : '$notificationCount',
+                              notificationCount > 9
+                                  ? '9+'
+                                  : '$notificationCount',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 9,
@@ -1426,7 +1812,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.help_outline),
             tooltip: 'View Tutorial',
             onPressed: () async {
-              final tutorial = Provider.of<TutorialState>(context, listen: false);
+              final tutorial =
+                  Provider.of<TutorialState>(context, listen: false);
               await tutorial.resetTutorial();
               if (context.mounted) {
                 context.go('/courts');
@@ -1453,10 +1840,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             children: [
               Consumer<AuthState>(
                 builder: (context, auth, _) {
-                  final rating = _currentRating ?? auth.currentUser?.rating ?? 0.0;
+                  final rating =
+                      _currentRating ?? auth.currentUser?.rating ?? 0.0;
                   // Take up to 2 teams to show alongside individual rating
                   final teamsToShow = _myTeams.take(2).toList();
-                  
+
                   return Column(
                     children: [
                       // === Status Section Header (Single Line) ===
@@ -1470,19 +1858,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 color: Colors.blue.withOpacity(0.1),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.edit_note, size: 14, color: Colors.blue),
+                              child: const Icon(Icons.edit_note,
+                                  size: 14, color: Colors.blue),
                             ),
                             const SizedBox(width: 10),
                             const Text(
                               'STATUS',
                               style: TextStyle(
-                                fontSize: 12, 
-                                fontWeight: FontWeight.bold, 
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
                                 letterSpacing: 1.0,
                                 color: Colors.white70,
                               ),
                             ),
-
                           ],
                         ),
                       ),
@@ -1490,7 +1878,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       GestureDetector(
                         onTap: () async {
                           final result = await Navigator.push<bool>(
-                            context, 
+                            context,
                             MaterialPageRoute(
                               builder: (_) => const StatusComposerScreen(),
                               fullscreenDialog: true,
@@ -1503,7 +1891,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         child: Container(
                           width: double.infinity,
                           margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
@@ -1519,28 +1908,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             children: [
                               // User Avatar
                               Consumer<AuthState>(
-                                builder: (context, authState, _) {
-                                  final user = authState.currentUser;
-                                  final photoUrl = user?.photoUrl;
-                                  final name = user?.name ?? '?';
-                                  
-                                  return CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor: Colors.deepOrange,
-                                    backgroundImage: photoUrl != null 
-                                      ? (photoUrl.startsWith('data:') 
-                                          ? MemoryImage(Uri.parse(photoUrl).data!.contentAsBytes()) 
-                                          : NetworkImage(photoUrl) as ImageProvider)
+                                  builder: (context, authState, _) {
+                                final user = authState.currentUser;
+                                final photoUrl = user?.photoUrl;
+                                final name = user?.name ?? '?';
+
+                                return CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Colors.deepOrange,
+                                  backgroundImage: photoUrl != null
+                                      ? (photoUrl.startsWith('data:')
+                                          ? MemoryImage(Uri.parse(photoUrl)
+                                              .data!
+                                              .contentAsBytes())
+                                          : NetworkImage(photoUrl)
+                                              as ImageProvider)
                                       : null,
-                                    child: photoUrl == null
-                                        ? Text(
-                                            name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                          )
-                                        : null,
-                                  );
-                                }
-                              ),
+                                  child: photoUrl == null
+                                      ? Text(
+                                          name.isNotEmpty
+                                              ? name[0].toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold),
+                                        )
+                                      : null,
+                                );
+                              }),
                               const SizedBox(width: 12),
                               // Placeholder Text
                               Expanded(
@@ -1550,12 +1945,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   children: [
                                     Text(
                                       'What\'s on your mind?',
-                                      style: TextStyle(color: Colors.grey.shade800, fontSize: 14, fontWeight: FontWeight.w500),
+                                      style: TextStyle(
+                                          color: Colors.grey.shade800,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       'Share a status, schedule a run, or post a highlight',
-                                      style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                      style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 11),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -1566,12 +1966,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      
                     ],
                   );
                 },
               ),
               const SizedBox(height: 12),
+
+              if (_pendingConfirmations.isNotEmpty) ...[
+                _buildPendingConfirmationsSection(),
+                const SizedBox(height: 12),
+              ],
 
               // === HoopRank Feed Section ===
               Padding(
@@ -1584,14 +1988,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         color: Colors.deepOrange.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.dynamic_feed, size: 16, color: Colors.deepOrange),
+                      child: const Icon(Icons.dynamic_feed,
+                          size: 16, color: Colors.deepOrange),
                     ),
                     const SizedBox(width: 12),
                     const Text(
                       'FEED',
                       style: TextStyle(
-                        fontSize: 13, 
-                        fontWeight: FontWeight.bold, 
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
                         color: Colors.white70,
                       ),
@@ -1599,191 +2004,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ],
                 ),
               ),
-              
+
               // Feed with tabs (All / Courts)
               SizedBox(
                 height: 500, // Fixed height for feed section
-                child: const HoopRankFeed(),
+                child: HoopRankFeed(
+                    key: ValueKey('hooprank-feed-$_feedReloadVersion')),
               ),
               const SizedBox(height: 24),
-
-
-              // Pending Score Confirmations Section
-              if (_pendingConfirmations.isNotEmpty) ...[
-                const Text(
-                  '📊 Confirm Scores',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                ...(_pendingConfirmations.map((conf) {
-                  final score = conf['score'] as Map<String, dynamic>?;
-                  final opponentName = conf['opponentName'] ?? 'Opponent';
-                  final matchId = conf['matchId'] as String;
-                  
-                  return Card(
-                    color: Colors.blue.shade900.withOpacity(0.3),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.blue.shade700, width: 1),
-                    ),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.scoreboard, color: Colors.blue),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '$opponentName submitted a score',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          if (score != null)
-                            Text(
-                              'Score: ${score.values.join(' - ')}',
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    try {
-                                      await ApiService.confirmScore(matchId);
-                                      // Refresh user data to get updated rating
-                                      if (context.mounted) {
-                                        await Provider.of<AuthState>(context, listen: false).refreshUser();
-                                      }
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Score confirmed!')),
-                                      );
-                                      _loadPendingConfirmations();
-                                    } catch (e) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Error: $e')),
-                                      );
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Confirm'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () async {
-                                    // Show confirmation dialog
-                                    final confirmed = await showDialog<bool>(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        backgroundColor: Colors.grey[900],
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        title: Row(
-                                          children: [
-                                            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-                                            const SizedBox(width: 8),
-                                            const Text('Contest Score?'),
-                                          ],
-                                        ),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'Are you sure you want to contest this score?',
-                                              style: TextStyle(fontWeight: FontWeight.bold),
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Icon(Icons.notifications, color: Colors.grey[400], size: 18),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    '$opponentName will be notified of this contest.',
-                                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Icon(Icons.history, color: Colors.grey[400], size: 18),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    'This will be logged on your profile.',
-                                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(ctx, false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () => Navigator.pop(ctx, true),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red,
-                                              foregroundColor: Colors.white,
-                                            ),
-                                            child: const Text('Contest'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    
-                                    if (confirmed != true) return;
-                                    
-                                    try {
-                                      await ApiService.contestScore(matchId);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Score contested')),
-                                      );
-                                      _loadPendingConfirmations();
-                                    } catch (e) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Error: $e')),
-                                      );
-                                    }
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.red,
-                                  ),
-                                  child: const Text('Contest'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                })),
-                const SizedBox(height: 16),
-              ],
-
-
 
               // Team Invites Section
               if (_teamInvites.isNotEmpty) ...[
@@ -1793,18 +2021,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(width: 8),
                     const Text(
                       'Team Invites',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.blue,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         '${_teamInvites.length}',
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -1823,14 +2056,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: invite['teamType'] == '3v3' ? Colors.blue : Colors.purple,
+                              color: invite['teamType'] == '3v3'
+                                  ? Colors.blue
+                                  : Colors.purple,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               invite['teamType'] ?? '3v3',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1840,11 +2079,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               children: [
                                 Text(
                                   invite['name'] ?? 'Team',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16),
                                 ),
                                 Text(
                                   'Invited by ${invite['ownerName'] ?? 'Unknown'}',
-                                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                  style: TextStyle(
+                                      color: Colors.grey[400], fontSize: 12),
                                 ),
                               ],
                             ),
@@ -1854,7 +2096,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             tooltip: 'Decline',
                             onPressed: () async {
                               try {
-                                await ApiService.declineTeamInvite(invite['id']);
+                                await ApiService.declineTeamInvite(
+                                    invite['id']);
                                 _loadTeamInvites();
                               } catch (e) {
                                 debugPrint('Error declining invite: $e');
@@ -1880,7 +2123,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   );
                 }).toList()),
               ],
-
 
               const SizedBox(height: 24),
 
@@ -2443,7 +2685,8 @@ class _TeamSelectionSheetState extends State<_TeamSelectionSheet> {
               const SizedBox(height: 12),
               Text(
                 'Challenge ${widget.teamType} Team',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               Text(
                 'as ${widget.myTeamName}',
@@ -2487,18 +2730,25 @@ class _TeamSelectionSheetState extends State<_TeamSelectionSheet> {
                             backgroundColor: color.withOpacity(0.3),
                             child: Text(
                               (team['name'] ?? '?')[0].toUpperCase(),
-                              style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: color, fontWeight: FontWeight.bold),
                             ),
                           ),
                           title: Text(team['name'] ?? 'Team'),
                           subtitle: Builder(builder: (context) {
                             final rv = team['rating'];
-                            final ratingStr = rv is num ? rv.toStringAsFixed(1) : (double.tryParse(rv?.toString() ?? '')?.toStringAsFixed(1) ?? '3.0');
-                            return Text('Rating: $ratingStr • ${team['wins'] ?? 0}W-${team['losses'] ?? 0}L');
+                            final ratingStr = rv is num
+                                ? rv.toStringAsFixed(1)
+                                : (double.tryParse(rv?.toString() ?? '')
+                                        ?.toStringAsFixed(1) ??
+                                    '3.0');
+                            return Text(
+                                'Rating: $ratingStr • ${team['wins'] ?? 0}W-${team['losses'] ?? 0}L');
                           }),
                           trailing: ElevatedButton(
                             onPressed: () => widget.onTeamSelected(team),
-                            style: ElevatedButton.styleFrom(backgroundColor: color),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: color),
                             child: const Text('Challenge'),
                           ),
                         );
@@ -2531,24 +2781,24 @@ class _StatusComposerSheet extends StatefulWidget {
 class _StatusComposerSheetState extends State<_StatusComposerSheet> {
   late TextEditingController _controller;
   final FocusNode _focusNode = FocusNode();
-  
+
   // Tagged entities
   final List<Map<String, String>> _taggedPlayers = [];
   final List<Map<String, String>> _taggedCourts = [];
-  
+
   // Autocomplete state
   bool _showAutocomplete = false;
   String _searchQuery = '';
   String _searchType = 'player'; // 'player' or 'court'
   int _mentionStartIndex = -1;
-  
+
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialStatus ?? '');
     _controller.addListener(_onTextChanged);
   }
-  
+
   @override
   void dispose() {
     _controller.removeListener(_onTextChanged);
@@ -2556,16 +2806,16 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
     _focusNode.dispose();
     super.dispose();
   }
-  
+
   void _onTextChanged() {
     final text = _controller.text;
     final cursorPos = _controller.selection.baseOffset;
-    
+
     if (cursorPos < 0 || cursorPos > text.length) {
       _hideAutocomplete();
       return;
     }
-    
+
     // Look backwards for @ symbol
     int atIndex = -1;
     for (int i = cursorPos - 1; i >= 0; i--) {
@@ -2576,7 +2826,7 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
         break;
       }
     }
-    
+
     if (atIndex >= 0) {
       final query = text.substring(atIndex + 1, cursorPos).toLowerCase();
       setState(() {
@@ -2588,7 +2838,7 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
       _hideAutocomplete();
     }
   }
-  
+
   void _hideAutocomplete() {
     if (_showAutocomplete) {
       setState(() {
@@ -2598,10 +2848,10 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
       });
     }
   }
-  
+
   List<Map<String, dynamic>> _getPlayerSuggestions() {
     final players = <Map<String, dynamic>>[];
-    
+
     // Add followed players
     for (final playerId in widget.checkInState.followedPlayers) {
       final name = widget.checkInState.getPlayerName(playerId);
@@ -2609,7 +2859,7 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
         players.add({'id': playerId, 'name': name, 'type': 'player'});
       }
     }
-    
+
     // Add mock suggestions if empty
     if (players.isEmpty && _searchQuery.isEmpty) {
       players.addAll([
@@ -2618,14 +2868,14 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
         {'id': 'demo_player_3', 'name': 'Mike Williams', 'type': 'player'},
       ]);
     }
-    
+
     return players.take(5).toList();
   }
-  
+
   List<Map<String, dynamic>> _getCourtSuggestions() {
     final courts = <Map<String, dynamic>>[];
     final courtService = CourtService();
-    
+
     // Add followed courts
     for (final courtId in widget.checkInState.followedCourts) {
       final court = courtService.getCourtById(courtId);
@@ -2633,7 +2883,7 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
         courts.add({'id': courtId, 'name': court.name, 'type': 'court'});
       }
     }
-    
+
     // If no matches from followed, search all courts
     if (courts.isEmpty && _searchQuery.length >= 2) {
       for (final court in courtService.courts.take(50)) {
@@ -2643,41 +2893,44 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
         }
       }
     }
-    
+
     return courts.take(5).toList();
   }
-  
+
   void _insertMention(Map<String, dynamic> item) {
     final text = _controller.text;
     final cursorPos = _controller.selection.baseOffset;
-    
+
     // Replace @query with @name
     final beforeMention = text.substring(0, _mentionStartIndex);
-    final afterMention = cursorPos < text.length ? text.substring(cursorPos) : '';
+    final afterMention =
+        cursorPos < text.length ? text.substring(cursorPos) : '';
     final mentionText = '@${item['name']} ';
-    
+
     final newText = beforeMention + mentionText + afterMention;
     _controller.text = newText;
     _controller.selection = TextSelection.collapsed(
       offset: beforeMention.length + mentionText.length,
     );
-    
+
     // Add to tagged list
     setState(() {
       if (item['type'] == 'player') {
         if (!_taggedPlayers.any((p) => p['id'] == item['id'])) {
-          _taggedPlayers.add({'id': item['id'] as String, 'name': item['name'] as String});
+          _taggedPlayers.add(
+              {'id': item['id'] as String, 'name': item['name'] as String});
         }
       } else {
         if (!_taggedCourts.any((c) => c['id'] == item['id'])) {
-          _taggedCourts.add({'id': item['id'] as String, 'name': item['name'] as String});
+          _taggedCourts.add(
+              {'id': item['id'] as String, 'name': item['name'] as String});
         }
       }
     });
-    
+
     _hideAutocomplete();
   }
-  
+
   void _removeTag(String type, String id) {
     setState(() {
       if (type == 'player') {
@@ -2687,7 +2940,7 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
       }
     });
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -2723,7 +2976,7 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
             style: TextStyle(color: Colors.grey[400], fontSize: 13),
           ),
           const SizedBox(height: 16),
-          
+
           // Text input - larger
           TextField(
             controller: _controller,
@@ -2744,7 +2997,7 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
               contentPadding: const EdgeInsets.all(16),
             ),
           ),
-          
+
           // Autocomplete dropdown
           if (_showAutocomplete) ...[
             const SizedBox(height: 4),
@@ -2767,18 +3020,28 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: _searchType == 'player' ? Colors.deepOrange.withOpacity(0.3) : null,
-                              borderRadius: const BorderRadius.only(topLeft: Radius.circular(11)),
+                              color: _searchType == 'player'
+                                  ? Colors.deepOrange.withOpacity(0.3)
+                                  : null,
+                              borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(11)),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.person, size: 16, color: _searchType == 'player' ? Colors.deepOrange : Colors.grey),
+                                Icon(Icons.person,
+                                    size: 16,
+                                    color: _searchType == 'player'
+                                        ? Colors.deepOrange
+                                        : Colors.grey),
                                 const SizedBox(width: 4),
-                                Text('Players', style: TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  color: _searchType == 'player' ? Colors.deepOrange : Colors.grey,
-                                )),
+                                Text('Players',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      color: _searchType == 'player'
+                                          ? Colors.deepOrange
+                                          : Colors.grey,
+                                    )),
                               ],
                             ),
                           ),
@@ -2790,18 +3053,28 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: _searchType == 'court' ? Colors.blue.withOpacity(0.3) : null,
-                              borderRadius: const BorderRadius.only(topRight: Radius.circular(11)),
+                              color: _searchType == 'court'
+                                  ? Colors.blue.withOpacity(0.3)
+                                  : null,
+                              borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(11)),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.location_on, size: 16, color: _searchType == 'court' ? Colors.blue : Colors.grey),
+                                Icon(Icons.location_on,
+                                    size: 16,
+                                    color: _searchType == 'court'
+                                        ? Colors.blue
+                                        : Colors.grey),
                                 const SizedBox(width: 4),
-                                Text('Courts', style: TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  color: _searchType == 'court' ? Colors.blue : Colors.grey,
-                                )),
+                                Text('Courts',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      color: _searchType == 'court'
+                                          ? Colors.blue
+                                          : Colors.grey,
+                                    )),
                               ],
                             ),
                           ),
@@ -2815,21 +3088,28 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
                     child: ListView(
                       shrinkWrap: true,
                       padding: EdgeInsets.zero,
-                      children: (_searchType == 'player' ? _getPlayerSuggestions() : _getCourtSuggestions())
+                      children: (_searchType == 'player'
+                              ? _getPlayerSuggestions()
+                              : _getCourtSuggestions())
                           .map((item) => ListTile(
                                 dense: true,
                                 leading: CircleAvatar(
                                   radius: 14,
-                                  backgroundColor: item['type'] == 'player' 
-                                      ? Colors.deepOrange.withOpacity(0.3) 
+                                  backgroundColor: item['type'] == 'player'
+                                      ? Colors.deepOrange.withOpacity(0.3)
                                       : Colors.blue.withOpacity(0.3),
                                   child: Icon(
-                                    item['type'] == 'player' ? Icons.person : Icons.location_on,
+                                    item['type'] == 'player'
+                                        ? Icons.person
+                                        : Icons.location_on,
                                     size: 14,
-                                    color: item['type'] == 'player' ? Colors.deepOrange : Colors.blue,
+                                    color: item['type'] == 'player'
+                                        ? Colors.deepOrange
+                                        : Colors.blue,
                                   ),
                                 ),
-                                title: Text(item['name'] as String, style: const TextStyle(fontSize: 14)),
+                                title: Text(item['name'] as String,
+                                    style: const TextStyle(fontSize: 14)),
                                 onTap: () => _insertMention(item),
                               ))
                           .toList(),
@@ -2839,7 +3119,7 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
               ),
             ),
           ],
-          
+
           // Tagged chips
           if (_taggedPlayers.isNotEmpty || _taggedCourts.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -2848,25 +3128,29 @@ class _StatusComposerSheetState extends State<_StatusComposerSheet> {
               runSpacing: 6,
               children: [
                 ..._taggedPlayers.map((p) => Chip(
-                  avatar: const Icon(Icons.person, size: 16, color: Colors.deepOrange),
-                  label: Text(p['name']!, style: const TextStyle(fontSize: 12)),
-                  backgroundColor: Colors.deepOrange.withOpacity(0.2),
-                  deleteIcon: const Icon(Icons.close, size: 14),
-                  onDeleted: () => _removeTag('player', p['id']!),
-                )),
+                      avatar: const Icon(Icons.person,
+                          size: 16, color: Colors.deepOrange),
+                      label: Text(p['name']!,
+                          style: const TextStyle(fontSize: 12)),
+                      backgroundColor: Colors.deepOrange.withOpacity(0.2),
+                      deleteIcon: const Icon(Icons.close, size: 14),
+                      onDeleted: () => _removeTag('player', p['id']!),
+                    )),
                 ..._taggedCourts.map((c) => Chip(
-                  avatar: const Icon(Icons.location_on, size: 16, color: Colors.blue),
-                  label: Text(c['name']!, style: const TextStyle(fontSize: 12)),
-                  backgroundColor: Colors.blue.withOpacity(0.2),
-                  deleteIcon: const Icon(Icons.close, size: 14),
-                  onDeleted: () => _removeTag('court', c['id']!),
-                )),
+                      avatar: const Icon(Icons.location_on,
+                          size: 16, color: Colors.blue),
+                      label: Text(c['name']!,
+                          style: const TextStyle(fontSize: 12)),
+                      backgroundColor: Colors.blue.withOpacity(0.2),
+                      deleteIcon: const Icon(Icons.close, size: 14),
+                      onDeleted: () => _removeTag('court', c['id']!),
+                    )),
               ],
             ),
           ],
-          
+
           const SizedBox(height: 16),
-          
+
           // Action buttons
           Row(
             children: [
@@ -2944,12 +3228,14 @@ class _RecurrenceDialogState extends State<_RecurrenceDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: Colors.grey[900],
-      title: const Text('Schedule Options', style: TextStyle(color: Colors.white)),
+      title:
+          const Text('Schedule Options', style: TextStyle(color: Colors.white)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           SwitchListTile(
-            title: const Text('Recurring Event', style: TextStyle(color: Colors.white)),
+            title: const Text('Recurring Event',
+                style: TextStyle(color: Colors.white)),
             subtitle: Text(
               _isRecurring ? 'Creates 10 scheduled games' : 'One-time event',
               style: TextStyle(color: Colors.grey[400], fontSize: 12),
@@ -2968,13 +3254,14 @@ class _RecurrenceDialogState extends State<_RecurrenceDialog> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
-                        color: _recurrenceType == 'weekly' 
-                            ? Colors.deepOrange 
+                        color: _recurrenceType == 'weekly'
+                            ? Colors.deepOrange
                             : Colors.grey[800],
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Center(
-                        child: Text('Weekly', style: TextStyle(color: Colors.white)),
+                        child: Text('Weekly',
+                            style: TextStyle(color: Colors.white)),
                       ),
                     ),
                   ),
@@ -2986,13 +3273,14 @@ class _RecurrenceDialogState extends State<_RecurrenceDialog> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
-                        color: _recurrenceType == 'daily' 
-                            ? Colors.deepOrange 
+                        color: _recurrenceType == 'daily'
+                            ? Colors.deepOrange
                             : Colors.grey[800],
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Center(
-                        child: Text('Daily', style: TextStyle(color: Colors.white)),
+                        child: Text('Daily',
+                            style: TextStyle(color: Colors.white)),
                       ),
                     ),
                   ),

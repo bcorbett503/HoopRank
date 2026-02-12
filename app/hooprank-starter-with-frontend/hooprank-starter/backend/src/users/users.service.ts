@@ -338,6 +338,38 @@ export class UsersService {
     return [...(user.createdMatches || []), ...(user.opponentMatches || [])];
   }
 
+  /**
+   * Historical (finalized) matches only.
+   * Used by profile "recent games" views so pending/contested games do not
+   * appear in history before score confirmation is complete.
+   */
+  async getRecentGames(userId: string): Promise<any[]> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      return await this.dataSource.query(`
+        SELECT m.*,
+          c.name as court_name, c.city as court_city,
+          u_creator.name as creator_name, u_creator.avatar_url as creator_photo,
+          u_opponent.name as opponent_name, u_opponent.avatar_url as opponent_photo
+        FROM matches m
+        LEFT JOIN courts c ON m.court_id = c.id
+        LEFT JOIN users u_creator ON m.creator_id = u_creator.id
+        LEFT JOIN users u_opponent ON m.opponent_id = u_opponent.id
+        WHERE (m.creator_id = $1 OR m.opponent_id = $1)
+          AND m.status IN ('completed', 'ended')
+        ORDER BY COALESCE(m.updated_at, m.created_at) DESC
+        LIMIT 20
+      `, [userId]);
+    }
+
+    const allMatches = await this.getMatches(userId);
+    return (allMatches || []).filter((m: any) => {
+      const status = (m?.status || '').toString().toLowerCase();
+      return status === 'completed' || status === 'ended';
+    });
+  }
+
   async getUserStats(userId: string): Promise<any> {
     const isPostgres = !!process.env.DATABASE_URL;
 
@@ -350,7 +382,7 @@ export class UsersService {
           COUNT(*) as matches_played
         FROM matches
         WHERE (creator_id = $1 OR opponent_id = $1)
-          AND status = 'completed'
+          AND status IN ('completed', 'ended')
       `, [userId]);
 
       const user = await this.dataSource.query(`SELECT hoop_rank FROM users WHERE id = $1`, [userId]);

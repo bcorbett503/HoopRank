@@ -47,7 +47,6 @@ export class CourtsService implements OnModuleInit {
                     ST_X(geog::geometry) as lng
                 FROM courts
                 ORDER BY name ASC
-                LIMIT 5000
             `);
             return courts;
         }

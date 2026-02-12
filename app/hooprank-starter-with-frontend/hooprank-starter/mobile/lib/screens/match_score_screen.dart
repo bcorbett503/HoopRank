@@ -31,10 +31,9 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     }
 
     final match = context.read<MatchState>();
-    final auth = context.read<AuthState>();
     final matchId = match.matchId;
     final isTeamMatch = _isTeamMatch(match);
-    
+
     if (matchId == null) {
       // Fallback to mock flow if no match ID
       _submitMock(userScore, oppScore);
@@ -54,48 +53,52 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
           setState(() => _error = 'Team ID not found');
           return;
         }
-        
+
         final response = await ApiService.submitTeamScore(
           teamId: teamId,
           matchId: matchId,
           myTeamScore: userScore,
           opponentTeamScore: oppScore,
         );
-        
+
         if (!mounted) return;
         match.setScores(userScore, oppScore);
-        
+
         // Check if score needs opponent confirmation
         if (response != null && response['status'] == 'pending_confirmation') {
           // Score submitted, awaiting opponent confirmation
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Score submitted! Waiting for opponent to confirm.'),
+              content:
+                  Text('Score submitted! Waiting for opponent to confirm.'),
               duration: Duration(seconds: 3),
             ),
           );
           context.go('/teams');
           return;
         }
-        
+
         // Match finalized immediately (unregistered opponent) — use rating changes
         final won = userScore > oppScore;
-        double delta = won ? 0.1 : -0.1;  // Default fallback
+        double delta = won ? 0.1 : -0.1; // Default fallback
         double ratingBefore = 3.0;
         double ratingAfter = 3.0;
-        
+
         if (response != null) {
-          final ratingChanges = response['ratingChanges'] as Map<String, dynamic>?;
+          final ratingChanges =
+              response['ratingChanges'] as Map<String, dynamic>?;
           if (ratingChanges != null && teamId != null) {
             final teamRatingChange = ratingChanges[teamId];
             if (teamRatingChange != null) {
-              ratingBefore = (teamRatingChange['old'] as num?)?.toDouble() ?? 3.0;
-              ratingAfter = (teamRatingChange['new'] as num?)?.toDouble() ?? 3.0;
+              ratingBefore =
+                  (teamRatingChange['old'] as num?)?.toDouble() ?? 3.0;
+              ratingAfter =
+                  (teamRatingChange['new'] as num?)?.toDouble() ?? 3.0;
               delta = ratingAfter - ratingBefore;
             }
           }
         }
-        
+
         match.setOutcome(
           deltaVal: delta,
           rBefore: ratingBefore,
@@ -105,7 +108,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         );
       } else {
         // Submit 1v1 score with court if available
-        debugPrint('SCORE_SUBMIT: matchId=$matchId, court=${match.court?.name}, courtId=${match.court?.id}');
+        debugPrint(
+            'SCORE_SUBMIT: matchId=$matchId, court=${match.court?.name}, courtId=${match.court?.id}');
         await ApiService.submitScore(
           matchId: matchId,
           myScore: userScore,
@@ -115,25 +119,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
 
         if (!mounted) return;
         match.setScores(userScore, oppScore);
-
-        // Get updated user rating from backend
-        final userId = auth.currentUser?.id;
-        if (userId != null) {
-          final ratingInfo = await ApiService.getUserRating(userId);
-          if (ratingInfo != null && mounted) {
-            final newRating = (ratingInfo['hoopRank'] as num?)?.toDouble() ?? 3.0;
-            final oldRating = auth.currentUser?.rating ?? 3.0;
-            final delta = newRating - oldRating;
-            
-            match.setOutcome(
-              deltaVal: delta,
-              rBefore: oldRating,
-              rAfter: newRating,
-              rkBefore: 0,
-              rkAfter: 0,
-            );
-          }
-        }
+        // 1v1 is a two-phase flow: submitter posts score, opponent confirms/adjusts.
+        // Do not treat submit as finalized rating update yet.
       }
 
       context.go('/match/result');
@@ -159,7 +146,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     final won = userScore > oppScore;
     final delta = won ? 0.15 : -0.1;
     final currentRating = me?.rating ?? 3.0;
-    
+
     match.setOutcome(
       deltaVal: delta,
       rBefore: currentRating,
@@ -180,10 +167,9 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     final isTeamMatch = _isTeamMatch(match);
 
     // For team matches, show team names instead of player names
-    final myDisplayName = isTeamMatch 
-        ? (match.myTeamName ?? 'Your Team')
-        : (me?.name ?? 'You');
-    final oppDisplayName = isTeamMatch 
+    final myDisplayName =
+        isTeamMatch ? (match.myTeamName ?? 'Your Team') : (me?.name ?? 'You');
+    final oppDisplayName = isTeamMatch
         ? (match.opponentTeamName ?? 'Opponent Team')
         : (opp?.name ?? 'Opponent');
 
@@ -197,14 +183,18 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
             if (isTeamMatch)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: match.mode == '3v3' ? Colors.blue.shade700 : Colors.purple.shade700,
+                  color: match.mode == '3v3'
+                      ? Colors.blue.shade700
+                      : Colors.purple.shade700,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
                   '${match.mode} Team Match',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
             if (_error != null)
@@ -216,7 +206,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                   color: Colors.red.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(_error!, style: TextStyle(color: Colors.red.shade800)),
+                child:
+                    Text(_error!, style: TextStyle(color: Colors.red.shade800)),
               ),
             Row(
               children: [
@@ -226,14 +217,19 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         children: [
-                          Text(isTeamMatch ? 'Your Team' : 'You', style: const TextStyle(color: Colors.grey)),
-                          Text(myDisplayName, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                          Text(isTeamMatch ? 'Your Team' : 'You',
+                              style: const TextStyle(color: Colors.grey)),
+                          Text(myDisplayName,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _userScoreCtrl,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            decoration: const InputDecoration(hintText: '0', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                                hintText: '0', border: OutlineInputBorder()),
                           ),
                         ],
                       ),
@@ -247,14 +243,19 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         children: [
-                          Text(isTeamMatch ? 'Opponent Team' : 'Opponent', style: const TextStyle(color: Colors.grey)),
-                          Text(oppDisplayName, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                          Text(isTeamMatch ? 'Opponent Team' : 'Opponent',
+                              style: const TextStyle(color: Colors.grey)),
+                          Text(oppDisplayName,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _oppScoreCtrl,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            decoration: const InputDecoration(hintText: '0', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                                hintText: '0', border: OutlineInputBorder()),
                           ),
                         ],
                       ),
@@ -273,9 +274,13 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: _isSubmitting 
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Submit Score'),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Submit Score'),
               ),
             ),
           ],

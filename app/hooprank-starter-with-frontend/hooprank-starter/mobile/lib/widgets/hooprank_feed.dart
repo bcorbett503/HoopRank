@@ -90,13 +90,20 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       final challenges = await _messagesService.getPendingChallenges(userId);
       debugPrint('FEED: Got ${challenges.length} total challenges from API');
       for (var c in challenges) {
-        debugPrint('FEED: Challenge from ${c.otherUser.name}, direction=${c.direction}');
+        debugPrint('FEED: Challenge from ${c.otherUser.name}, direction=${c.direction}, status=${c.message.challengeStatus}');
       }
-      // Only show incoming challenges
-      final incoming = challenges.where((c) => c.direction == 'received').toList();
-      debugPrint('FEED: ${incoming.length} incoming challenges after filter');
+      // Show only still-pending 1v1 challenges, with incoming first so actions are obvious.
+      final pendingChallenges = challenges.where((c) {
+        final status = (c.message.challengeStatus ?? 'pending').toLowerCase();
+        return status == 'pending';
+      }).toList()
+        ..sort((a, b) {
+          if (a.isReceived == b.isReceived) return 0;
+          return a.isReceived ? -1 : 1;
+        });
+      debugPrint('FEED: ${pendingChallenges.length} pending challenges after filter');
       if (mounted) {
-        setState(() => _pendingChallenges = incoming);
+        setState(() => _pendingChallenges = pendingChallenges);
         debugPrint('FEED: setState complete, _pendingChallenges.length=${_pendingChallenges.length}');
       }
     } catch (e, stack) {
@@ -817,6 +824,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     debugPrint('FEED: Building challenge card for ${challenge.otherUser.name}');
     final opponent = challenge.otherUser;
     final message = challenge.message;
+    final isIncoming = challenge.isReceived;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8), // Reduced from 12
@@ -865,9 +873,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         children: [
                           const Icon(Icons.bolt, size: 12, color: Colors.orange), // Smaller bolt
                           const SizedBox(width: 4),
-                          const Text(
-                            'CHALLENGE',
-                            style: TextStyle(
+                          Text(
+                            isIncoming ? 'CHALLENGE' : 'CHALLENGE SENT',
+                            style: const TextStyle(
                               color: Colors.orange,
                               fontWeight: FontWeight.w900,
                               fontSize: 10, // Smaller font
@@ -938,67 +946,128 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             else 
                const SizedBox(height: 8),
 
-            // Reply / Decline / Start Match buttons - Compact row
-            Row(
-              children: [
-                // Decline button
-                Expanded(
-                  flex: 2, 
-                  child: SizedBox(
-                    height: 32, // Fixed smaller height
-                    child: OutlinedButton(
-                      onPressed: () => _declineChallenge(challenge),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: const BorderSide(color: Colors.white24),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                      ),
-                      child: const Text('Decline', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Reply button
-                Expanded(
-                  flex: 2,
-                  child: SizedBox(
-                    height: 32,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _replyToChallenge(challenge),
-                      icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                      label: const Text('Reply', style: TextStyle(fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.orange.withOpacity(0.5)),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            if (isIncoming)
+              // Incoming challenge: actionable accept/decline/reply.
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 32,
+                      child: OutlinedButton(
+                        onPressed: () => _declineChallenge(challenge),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          side: const BorderSide(color: Colors.white24),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        child: const Text('Decline', style: TextStyle(fontSize: 12)),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                // Start Match button
-                Expanded(
-                  flex: 3, // Give more space
-                  child: SizedBox(
-                    height: 32,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _acceptChallenge(challenge),
-                      icon: const Icon(Icons.sports_basketball, size: 14),
-                      label: const Text('Start Match', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.zero,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 32,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _replyToChallenge(challenge),
+                        icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                        label: const Text('Reply', style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.orange.withOpacity(0.5)),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: SizedBox(
+                      height: 32,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _acceptChallenge(challenge),
+                        icon: const Icon(Icons.sports_basketball, size: 14),
+                        label: const Text('Start Match', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              // Outgoing challenge: show wait state with cancel + reply.
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.hourglass_empty, size: 14, color: Colors.orange),
+                        SizedBox(width: 6),
+                        Text(
+                          'Waiting for response',
+                          style: TextStyle(color: Colors.orange, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 32,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _replyToChallenge(challenge),
+                            icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                            label: const Text('Reply', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: BorderSide(color: Colors.orange.withOpacity(0.5)),
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 32,
+                          child: OutlinedButton(
+                            onPressed: () => _cancelChallenge(challenge),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: const BorderSide(color: Colors.white24),
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
           ],
         ),
       ),
@@ -1314,6 +1383,28 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   void _replyToChallenge(ChallengeRequest challenge) {
     // Navigate to chat with the opponent
     context.go('/messages/chat/${challenge.otherUser.id}');
+  }
+
+  /// Cancel an outgoing challenge
+  Future<void> _cancelChallenge(ChallengeRequest challenge) async {
+    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _messagesService.cancelChallenge(userId, challenge.message.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Challenge cancelled'), backgroundColor: Colors.grey),
+        );
+        _loadPendingChallenges(); // Refresh challenges
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to cancel: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   /// Decline a challenge

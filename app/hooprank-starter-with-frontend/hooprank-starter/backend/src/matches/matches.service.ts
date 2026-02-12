@@ -269,6 +269,13 @@ export class MatchesService implements OnModuleInit {
     const match = await this.get(id);
     if (!match) throw new Error('Match not found');
 
+    const status = ((match as any).status || '').toString().toLowerCase();
+    // Allow score submission while match is active, or while replacing a
+    // previously submitted score before final confirmation.
+    if (!['accepted', 'live', 'score_submitted', 'pending_confirmation'].includes(status)) {
+      throw new Error(`Cannot submit score while match status is '${status}'`);
+    }
+
     const creatorId = (match as any).creator_id || match.creatorId;
     const opponentId = (match as any).opponent_id || match.opponentId;
 

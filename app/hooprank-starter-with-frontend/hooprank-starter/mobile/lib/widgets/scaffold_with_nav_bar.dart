@@ -12,9 +12,12 @@ class ScaffoldWithNavBar extends StatefulWidget {
   }) : super(key: key ?? const ValueKey<String>('ScaffoldWithNavBar'));
 
   final StatefulNavigationShell navigationShell;
-  
+
   /// Static callback to refresh the badge from anywhere (e.g., after reading messages)
   static void Function()? refreshBadge;
+
+  /// Static callback used by HomeScreen to force-refresh the embedded feed tab.
+  static void Function()? refreshFeedTab;
 
   @override
   State<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
@@ -32,7 +35,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
     _loadBadgeCounts();
     ScaffoldWithNavBar.refreshBadge = _loadBadgeCounts;
   }
-  
+
   @override
   void dispose() {
     ScaffoldWithNavBar.refreshBadge = null;
@@ -57,12 +60,25 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
         ApiService.getPendingChallenges(),
       ]);
       if (mounted) {
+        final myUserId = ApiService.userId ?? '';
+        final challenges = results[2] as List;
+        final incomingPendingCount = challenges.where((raw) {
+          if (raw is! Map<String, dynamic>) return false;
+          final status = (raw['status'] ?? '').toString().toLowerCase();
+          if (status != 'pending') return false;
+
+          final dynamic toUser = raw['toUser'];
+          final toUserId = (raw['to_user_id'] ??
+                  raw['toUserId'] ??
+                  (toUser is Map ? toUser['id'] : null))
+              ?.toString();
+          return myUserId.isNotEmpty && toUserId == myUserId;
+        }).length;
+
         setState(() {
           _unreadCount = results[0] as int;
           _teamInvitesCount = (results[1] as List).length;
-          // Count incoming challenges (where user is receiver)
-          final challenges = results[2] as List;
-          _challengeCount = challenges.where((c) => c['direction'] == 'incoming').length;
+          _challengeCount = incomingPendingCount;
           _hasLoadedInitially = true;
         });
       }
@@ -82,6 +98,12 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
       }
     }
 
+    if (index == 2) {
+      // Feed runs inside an IndexedStack branch, so trigger an explicit refresh
+      // when users switch to that tab to avoid stale challenge cards.
+      ScaffoldWithNavBar.refreshFeedTab?.call();
+    }
+
     // If navigating to messages tab, badge will be refreshed when they exit a chat
     widget.navigationShell.goBranch(
       index,
@@ -93,7 +115,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
   Widget build(BuildContext context) {
     // Check if current screen is Feed (index 2) - Feed has its own app bar
     final isFeedScreen = widget.navigationShell.currentIndex == 2;
-    
+
     return Scaffold(
       appBar: isFeedScreen ? null : const HoopRankAppBar(),
       body: widget.navigationShell,
@@ -145,4 +167,3 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
     );
   }
 }
-
