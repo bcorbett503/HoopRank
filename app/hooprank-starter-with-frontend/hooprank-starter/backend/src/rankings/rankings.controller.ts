@@ -55,7 +55,7 @@ export class RankingsController {
 
                 const teams = await this.dataSource.query(query, params);
                 console.log('getRankings: found', teams.length, 'teams for mode', mode);
-                return teams;
+                return { mode, rankings: teams };
             }
 
             // For 1v1, return individual players
@@ -89,10 +89,10 @@ export class RankingsController {
             `);
 
             console.log('getRankings: found', players.length, 'players');
-            return players;
+            return { mode, rankings: players };
         } catch (error) {
             console.error('getRankings error:', error.message);
-            return [];
+            return { mode, rankings: [] };
         }
     }
 

@@ -27,6 +27,7 @@ import { RunsModule } from './runs/runs.module';
 import { ScheduledRun, RunAttendee } from './runs/scheduled-run.entity';
 import { HealthController } from './health.controller';
 import { UploadController } from './upload.controller';
+import { MeController, InvitesController, ThreadsController } from './stubs.controller';
 import { SnakeNamingStrategy } from './snake-naming.strategy';
 
 @Module({
@@ -74,7 +75,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     RankingsModule,
     RunsModule,
   ],
-  controllers: [HealthController, UploadController],
+  controllers: [HealthController, UploadController, MeController, InvitesController, ThreadsController],
   providers: [
     {
       provide: APP_GUARD,

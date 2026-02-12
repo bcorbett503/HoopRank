@@ -22,6 +22,14 @@ export class TeamsController {
     }
 
     /**
+     * Get user's teams (explicit /my route alias)
+     */
+    @Get('my')
+    async getMyTeamsMy(@Headers('x-user-id') userId: string) {
+        return this.teamsService.getUserTeams(userId);
+    }
+
+    /**
      * Get pending team invites
      */
     @Get('invites')
@@ -30,14 +38,15 @@ export class TeamsController {
     }
 
     /**
-     * Create a new team
+     * Create a new team — accepts both teamType and team_type for compatibility
      */
     @Post()
     async createTeam(
         @Headers('x-user-id') userId: string,
-        @Body() body: { name: string; teamType: string; ageGroup?: string; gender?: string; skillLevel?: string; homeCourtId?: string; city?: string; description?: string },
+        @Body() body: { name: string; teamType?: string; team_type?: string; ageGroup?: string; gender?: string; skillLevel?: string; homeCourtId?: string; city?: string; description?: string },
     ) {
-        return this.teamsService.createTeam(userId, body.name, body.teamType, body.ageGroup, body.gender, body.skillLevel, body.homeCourtId, body.city, body.description);
+        const teamType = body.teamType || body.team_type || '3v3';
+        return this.teamsService.createTeam(userId, body.name, teamType, body.ageGroup, body.gender, body.skillLevel, body.homeCourtId, body.city, body.description);
     }
 
     /**
