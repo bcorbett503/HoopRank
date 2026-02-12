@@ -55,6 +55,27 @@ export class StatusesService {
             const createdStatus = result[0];
             console.log('createStatus success:', createdStatus);
 
+            // Bridge: also write to scheduled_runs so Courts→Runs filter works
+            if (scheduledAt && courtId) {
+                try {
+                    await this.dataSource.query(`
+                        INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, created_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                    `, [
+                        courtId,
+                        userId,
+                        content || null,
+                        gameMode || '5v5',
+                        courtType || null,
+                        ageRange || null,
+                        new Date(scheduledAt),
+                    ]);
+                    console.log('createStatus: bridged to scheduled_runs for court', courtId);
+                } catch (bridgeErr) {
+                    console.warn('createStatus: scheduled_runs bridge failed (non-fatal):', bridgeErr.message);
+                }
+            }
+
             // Auto-mark creator as attending for scheduled runs
             if (scheduledAt && createdStatus.id) {
                 try {

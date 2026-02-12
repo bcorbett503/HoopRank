@@ -343,7 +343,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     }
     
     // Runs filter (today or all upcoming)
-    if (_runsFilter != null && _courtsWithRuns.isNotEmpty) {
+    if (_runsFilter != null) {
       filtered = filtered.where((court) => _courtsWithRuns.contains(court.id)).toList();
     }
     

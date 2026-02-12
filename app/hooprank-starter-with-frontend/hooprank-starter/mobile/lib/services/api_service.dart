@@ -660,6 +660,9 @@ class ApiService {
       },
     );
 
+    // NOTE: Round 5 backend now standardizes this endpoint to HTTP 200.
+    // If this starts returning 201 again in a future deploy, broaden this check
+    // to 200/201 to avoid false client-side failures.
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -680,6 +683,9 @@ class ApiService {
       },
     );
 
+    // NOTE: Round 5 backend now standardizes this endpoint to HTTP 200.
+    // If this starts returning 201 again in a future deploy, broaden this check
+    // to 200/201 to avoid false client-side failures.
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -1692,7 +1698,7 @@ class ApiService {
     );
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
-      return data.map((r) => r['courtId'].toString()).toSet();
+      return data.map((r) => (r['courtId'] ?? r['court_id'])?.toString() ?? '').where((id) => id.isNotEmpty).toSet();
     }
     return {};
   }
