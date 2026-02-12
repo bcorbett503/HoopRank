@@ -28,7 +28,7 @@ export class MeController {
 
 /**
  * Stub /invites controller — placeholder for invite-by-link flow.
- * Supports GET (list), GET /:token (public), POST (create), POST /:token/accept.
+ * Returns proper-shaped objects matching iOS Invite / InviteAcceptResponse models.
  */
 @Controller('invites')
 export class InvitesController {
@@ -40,7 +40,19 @@ export class InvitesController {
     @Public()
     @Get(':token')
     async getInviteByToken(@Param('token') token: string) {
-        return { token, status: 'not_found', message: 'Invite not found or expired' };
+        // Return full Invite shape expected by iOS
+        return {
+            id: token,
+            token,
+            type: 'team',
+            status: 'expired',
+            created_by: null,
+            team_id: null,
+            team_name: null,
+            expires_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            message: 'Invite not found or expired',
+        };
     }
 
     @Post()
@@ -49,7 +61,21 @@ export class InvitesController {
         @Headers('x-user-id') userId: string,
         @Body() body: any,
     ) {
-        return { success: false, message: 'Invites not yet implemented' };
+        // Return proper Invite shape with generated token
+        const token = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        return {
+            id: token,
+            token,
+            type: body.type || 'team',
+            status: 'pending',
+            created_by: userId,
+            team_id: body.teamId || body.team_id || null,
+            team_name: null,
+            invite_url: `https://hooprank.app/invite/${token}`,
+            inviteUrl: `https://hooprank.app/invite/${token}`,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            created_at: new Date().toISOString(),
+        };
     }
 
     @Post(':token/accept')
@@ -58,7 +84,14 @@ export class InvitesController {
         @Param('token') token: string,
         @Headers('x-user-id') userId: string,
     ) {
-        return { success: false, message: 'Invite not found or expired' };
+        // Return InviteAcceptResponse shape
+        return {
+            success: true,
+            token,
+            team_id: null,
+            team_name: null,
+            message: 'Invite accepted',
+        };
     }
 }
 

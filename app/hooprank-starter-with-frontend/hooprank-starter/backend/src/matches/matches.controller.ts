@@ -17,8 +17,10 @@ function mapMatchForIOS(match: any): any {
   if (!match || match.error) return match;
   return {
     ...match,
-    // iOS-compatible status
-    iosStatus: STATUS_MAP[match.status] || match.status,
+    // Map status directly to iOS enum values
+    status: STATUS_MAP[match.status] || match.status,
+    // Keep original status as a fallback
+    backendStatus: match.status,
     // snake_case aliases for iOS models
     creator_id: match.creatorId ?? match.creator_id,
     opponent_id: match.opponentId ?? match.opponent_id,

@@ -11,13 +11,7 @@ export class TeamsController {
     @Get()
     async getMyTeams(@Headers('x-user-id') userId: string) {
         const teams = await this.teamsService.getUserTeams(userId);
-        // Add snake_case aliases for iOS Team.swift
-        return Array.isArray(teams) ? teams.map((t: any) => ({
-            ...t,
-            team_type: t.teamType ?? t.team_type,
-            logo_url: t.logoUrl ?? t.logo_url ?? null,
-            home_court_id: t.homeCourtId ?? t.home_court_id ?? null,
-        })) : teams;
+        return Array.isArray(teams) ? teams.map((t: any) => this.addTeamSnakeCaseAliases(t)) : teams;
     }
 
     /**
@@ -25,7 +19,8 @@ export class TeamsController {
      */
     @Get('mine')
     async getMyTeamsExplicit(@Headers('x-user-id') userId: string) {
-        return this.teamsService.getUserTeams(userId);
+        const teams = await this.teamsService.getUserTeams(userId);
+        return Array.isArray(teams) ? teams.map((t: any) => this.addTeamSnakeCaseAliases(t)) : teams;
     }
 
     /**
@@ -33,7 +28,8 @@ export class TeamsController {
      */
     @Get('my')
     async getMyTeamsMy(@Headers('x-user-id') userId: string) {
-        return this.teamsService.getUserTeams(userId);
+        const teams = await this.teamsService.getUserTeams(userId);
+        return Array.isArray(teams) ? teams.map((t: any) => this.addTeamSnakeCaseAliases(t)) : teams;
     }
 
     /**
@@ -107,19 +103,7 @@ export class TeamsController {
     ) {
         const detail = await this.teamsService.getTeamDetail(teamId, userId);
         if (!detail) return detail;
-        const d = detail as any;
-        // Add both camelCase and snake_case for cross-client compat
-        return {
-            ...d,
-            team_type: d.teamType ?? d.team_type,
-            logo_url: d.logoUrl ?? d.logo_url ?? null,
-            home_court_id: d.homeCourtId ?? d.home_court_id ?? null,
-            // Ensure members have team_id
-            members: Array.isArray(d.members) ? d.members.map((m: any) => ({
-                ...m,
-                team_id: m.team_id ?? m.teamId ?? teamId,
-            })) : d.members,
-        };
+        return this.addTeamSnakeCaseAliases(detail, teamId);
     }
 
     /**
@@ -516,5 +500,35 @@ export class TeamsController {
         @Headers('x-user-id') userId: string,
     ) {
         return this.teamsService.startMatchFromEvent(teamId, eventId, userId);
+    }
+
+    /**
+     * Add comprehensive snake_case aliases to a team object for iOS compatibility.
+     */
+    private addTeamSnakeCaseAliases(team: any, teamId?: string): any {
+        if (!team) return team;
+        const t = team as any;
+        const id = teamId || t.id;
+        return {
+            ...t,
+            // snake_case aliases for iOS Team.swift
+            team_type: t.teamType ?? t.team_type,
+            owner_id: t.ownerId ?? t.owner_id,
+            skill_level: t.skillLevel ?? t.skill_level ?? null,
+            age_group: t.ageGroup ?? t.age_group ?? null,
+            logo_url: t.logoUrl ?? t.logo_url ?? null,
+            home_court_id: t.homeCourtId ?? t.home_court_id ?? null,
+            member_count: t.memberCount ?? t.member_count ?? 0,
+            pending_count: t.pendingCount ?? t.pending_count ?? 0,
+            is_owner: t.isOwner ?? t.is_owner ?? false,
+            owner_name: t.ownerName ?? t.owner_name ?? null,
+            created_at: t.createdAt ?? t.created_at ?? null,
+            updated_at: t.updatedAt ?? t.updated_at ?? null,
+            // Ensure members have team_id
+            members: Array.isArray(t.members) ? t.members.map((m: any) => ({
+                ...m,
+                team_id: m.team_id ?? m.teamId ?? id,
+            })) : t.members,
+        };
     }
 }

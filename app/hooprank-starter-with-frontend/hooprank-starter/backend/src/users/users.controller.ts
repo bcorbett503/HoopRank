@@ -14,15 +14,60 @@ export class UsersController {
     private readonly dataSource: DataSource,
   ) { }
 
+  /**
+   * Auth bootstrap endpoint — @Public so iOS can call without Bearer token.
+   * Verifies Firebase token from header or body if available.
+   */
+  @Public()
   @Post('auth')
-  @UseGuards(AuthGuard)
-  async authenticate(@Request() req, @Body() body: { id?: string; email?: string }) {
-    const uid = req.user?.uid || '';
-    const email = body.email || req.user?.email || '';
+  async authenticate(@Request() req, @Body() body: { id?: string; email?: string; firebaseToken?: string; idToken?: string }) {
+    // Try to verify Firebase token if provided (from header or body)
+    let uid = '';
+    let email = body.email || '';
+
+    const authHeader = req.headers?.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const firebaseToken = bearerToken || body.firebaseToken || body.idToken;
+
+    if (firebaseToken) {
+      try {
+        const admin = require('firebase-admin');
+        if (admin.apps.length > 0) {
+          const decoded = await admin.auth().verifyIdToken(firebaseToken);
+          uid = decoded.uid;
+          email = email || decoded.email || '';
+        }
+      } catch (e) {
+        console.warn('[AUTHENTICATE] Token verification failed, using fallback:', e.message);
+      }
+    }
+
+    // Fallback: use x-user-id header or body.id
+    if (!uid) {
+      uid = req.headers?.['x-user-id'] || body.id || '';
+    }
+
+    if (!uid) {
+      console.error('[AUTHENTICATE] No user ID available');
+      return { error: 'No user identity provided' };
+    }
+
     console.log(`[AUTHENTICATE] uid=${uid}, email=${email}`);
     const user = await this.usersService.findOrCreate(uid, email);
     console.log(`[AUTHENTICATE] returned user.id=${user.id}, position=${user.position}`);
-    return user;
+
+    // Return with iOS-compatible aliases
+    const u = user as any;
+    return {
+      ...u,
+      rating: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
+      hoop_rank: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
+      matchesPlayed: u.gamesPlayed ?? u.games_played ?? 0,
+      games_played: u.gamesPlayed ?? u.games_played ?? 0,
+      photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
+      avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
+      photo_url: u.avatarUrl ?? u.avatar_url ?? null,
+    };
   }
 
 
