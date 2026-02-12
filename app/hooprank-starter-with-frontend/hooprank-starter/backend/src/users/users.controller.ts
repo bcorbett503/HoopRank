@@ -406,8 +406,22 @@ export class UsersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  async findOne(@Param('id') id: string) {
+    const user = await this.usersService.findOne(id);
+    if (!user) return user;
+    // Return both native camelCase and iOS-expected aliases
+    const u = user as any;
+    return {
+      ...u,
+      // iOS User.swift expects these fields
+      rating: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
+      hoop_rank: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
+      matchesPlayed: u.gamesPlayed ?? u.games_played ?? 0,
+      games_played: u.gamesPlayed ?? u.games_played ?? 0,
+      photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
+      avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
+      photo_url: u.avatarUrl ?? u.avatar_url ?? null,
+    };
   }
 
   /**

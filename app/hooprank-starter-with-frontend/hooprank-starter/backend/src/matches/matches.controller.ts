@@ -4,6 +4,33 @@ import { Match } from './match.entity';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { MessagesService } from '../messages/messages.service';
 
+/** Map backend status to iOS MatchStatus enum values */
+const STATUS_MAP: Record<string, string> = {
+  pending: 'waiting',
+  accepted: 'live',
+  completed: 'ended',
+  cancelled: 'cancelled',
+  contested: 'contested',
+};
+
+function mapMatchForIOS(match: any): any {
+  if (!match || match.error) return match;
+  return {
+    ...match,
+    // iOS-compatible status
+    iosStatus: STATUS_MAP[match.status] || match.status,
+    // snake_case aliases for iOS models
+    creator_id: match.creatorId ?? match.creator_id,
+    opponent_id: match.opponentId ?? match.opponent_id,
+    court_id: match.courtId ?? match.court_id,
+    score_creator: match.scoreCreator ?? match.score_creator,
+    score_opponent: match.scoreOpponent ?? match.score_opponent,
+    match_type: match.matchType ?? match.match_type ?? '1v1',
+    created_at: match.createdAt ?? match.created_at,
+    updated_at: match.updatedAt ?? match.updated_at,
+  };
+}
+
 @Controller('api/v1/matches')
 export class MatchesController {
   constructor(
@@ -29,7 +56,7 @@ export class MatchesController {
       await this.messages.sendMessage(creatorId, opponentId, body.message, match.id);
     }
 
-    return match;
+    return mapMatchForIOS(match);
   }
 
   @Post(':id/accept')
@@ -44,7 +71,7 @@ export class MatchesController {
     }
     const opponentId = userId;
     if (!opponentId) throw new Error('opponentId required');
-    return await this.matches.accept(id, opponentId);
+    return mapMatchForIOS(await this.matches.accept(id, opponentId));
   }
 
   @Post(':id/complete')
@@ -66,7 +93,7 @@ export class MatchesController {
     if (userId !== creatorId && userId !== opponentId) {
       throw new ForbiddenException('You are not a participant in this match');
     }
-    return await this.matches.complete(id, body.winner);
+    return mapMatchForIOS(await this.matches.complete(id, body.winner));
   }
 
   /**
@@ -98,7 +125,7 @@ export class MatchesController {
       const updatedMatch = await this.matches.submitScoreOnly(id, userId, scoreCreator, scoreOpponent, body.courtId);
 
       console.log(`[submitScore] Score submitted — awaiting opponent confirmation`);
-      return { match: updatedMatch };
+      return { match: mapMatchForIOS(updatedMatch) };
     } catch (error) {
       console.error(`[submitScore] Error for match ${id}:`, error);
       throw error;
@@ -118,7 +145,7 @@ export class MatchesController {
   ): Promise<{ match: Match }> {
     if (!userId) throw new Error('Authentication required');
     const match = await this.matches.confirmScore(id, userId);
-    return { match };
+    return { match: mapMatchForIOS(match) };
   }
 
   @Post(':id/contest')
@@ -128,13 +155,13 @@ export class MatchesController {
   ): Promise<{ match: Match }> {
     if (!userId) throw new Error('Authentication required');
     const match = await this.matches.contestScore(id, userId);
-    return { match };
+    return { match: mapMatchForIOS(match) };
   }
 
   @Get(':id')
   async get(@Param('id') id: string): Promise<Match | { error: string }> {
     const match = await this.matches.get(id);
-    return match ?? { error: 'not found' };
+    return mapMatchForIOS(match) ?? { error: 'not found' };
   }
 }
 
@@ -160,7 +187,7 @@ export class MatchesAliasController {
     if (body.message && opponentId) {
       await this.messages.sendMessage(creatorId, opponentId, body.message, match.id);
     }
-    return match;
+    return mapMatchForIOS(match);
   }
 
   @Post(':id/accept')
@@ -170,7 +197,7 @@ export class MatchesAliasController {
     @Headers('x-user-id') userId?: string,
   ): Promise<Match> {
     if (!userId) throw new Error('opponentId required');
-    return await this.matches.accept(id, userId);
+    return mapMatchForIOS(await this.matches.accept(id, userId));
   }
 
   @Post(':id/score')
@@ -186,7 +213,7 @@ export class MatchesAliasController {
     const scoreCreator = isSubmitterCreator ? body.me : body.opponent;
     const scoreOpponent = isSubmitterCreator ? body.opponent : body.me;
     const updatedMatch = await this.matches.submitScoreOnly(id, userId, scoreCreator, scoreOpponent, body.courtId);
-    return { match: updatedMatch };
+    return { match: mapMatchForIOS(updatedMatch) };
   }
 
   @Get('pending-confirmation')
@@ -202,7 +229,7 @@ export class MatchesAliasController {
   ): Promise<{ match: Match }> {
     if (!userId) throw new Error('Authentication required');
     const match = await this.matches.confirmScore(id, userId);
-    return { match };
+    return { match: mapMatchForIOS(match) };
   }
 
   @Post(':id/contest')
@@ -212,12 +239,12 @@ export class MatchesAliasController {
   ): Promise<{ match: Match }> {
     if (!userId) throw new Error('Authentication required');
     const match = await this.matches.contestScore(id, userId);
-    return { match };
+    return { match: mapMatchForIOS(match) };
   }
 
   @Get(':id')
   async get(@Param('id') id: string): Promise<Match | { error: string }> {
     const match = await this.matches.get(id);
-    return match ?? { error: 'not found' };
+    return mapMatchForIOS(match) ?? { error: 'not found' };
   }
 }

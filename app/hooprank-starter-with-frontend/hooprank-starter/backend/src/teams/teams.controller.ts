@@ -10,7 +10,14 @@ export class TeamsController {
      */
     @Get()
     async getMyTeams(@Headers('x-user-id') userId: string) {
-        return this.teamsService.getUserTeams(userId);
+        const teams = await this.teamsService.getUserTeams(userId);
+        // Add snake_case aliases for iOS Team.swift
+        return Array.isArray(teams) ? teams.map((t: any) => ({
+            ...t,
+            team_type: t.teamType ?? t.team_type,
+            logo_url: t.logoUrl ?? t.logo_url ?? null,
+            home_court_id: t.homeCourtId ?? t.home_court_id ?? null,
+        })) : teams;
     }
 
     /**
@@ -98,7 +105,21 @@ export class TeamsController {
         @Param('id') teamId: string,
         @Headers('x-user-id') userId: string,
     ) {
-        return this.teamsService.getTeamDetail(teamId, userId);
+        const detail = await this.teamsService.getTeamDetail(teamId, userId);
+        if (!detail) return detail;
+        const d = detail as any;
+        // Add both camelCase and snake_case for cross-client compat
+        return {
+            ...d,
+            team_type: d.teamType ?? d.team_type,
+            logo_url: d.logoUrl ?? d.logo_url ?? null,
+            home_court_id: d.homeCourtId ?? d.home_court_id ?? null,
+            // Ensure members have team_id
+            members: Array.isArray(d.members) ? d.members.map((m: any) => ({
+                ...m,
+                team_id: m.team_id ?? m.teamId ?? teamId,
+            })) : d.members,
+        };
     }
 
     /**
@@ -208,19 +229,20 @@ export class TeamsController {
 
     /**
      * Invite player to team (body-based alias)
-     * Accepts { playerId: string } in the request body.
+     * Accepts { playerId: string } or { userId: string } in the request body.
      */
     @Post(':id/invite')
     @HttpCode(200)
     async invitePlayerByBody(
         @Param('id') teamId: string,
         @Headers('x-user-id') userId: string,
-        @Body() body: { playerId: string },
+        @Body() body: { playerId?: string; userId?: string },
     ) {
-        if (!body.playerId) {
-            return { success: false, error: 'playerId is required' };
+        const targetId = body.playerId || body.userId;
+        if (!targetId) {
+            return { success: false, error: 'playerId or userId is required' };
         }
-        await this.teamsService.invitePlayer(teamId, userId, body.playerId);
+        await this.teamsService.invitePlayer(teamId, userId, targetId);
         return { success: true };
     }
 
@@ -233,7 +255,12 @@ export class TeamsController {
         @Headers('x-user-id') userId: string,
     ) {
         const detail = await this.teamsService.getTeamDetail(teamId, userId);
-        return (detail as any)?.members || [];
+        const members = (detail as any)?.members || [];
+        // Ensure each member has team_id
+        return members.map((m: any) => ({
+            ...m,
+            team_id: m.team_id ?? m.teamId ?? teamId,
+        }));
     }
 
     /**
