@@ -46,7 +46,7 @@ export class ChallengesController {
     }
 
     /**
-     * Accept a challenge
+     * Accept a challenge (PUT)
      */
     @Put(':id/accept')
     async acceptChallenge(
@@ -60,10 +60,38 @@ export class ChallengesController {
     }
 
     /**
-     * Decline a challenge
+     * Accept a challenge (POST alias)
+     */
+    @Post(':id/accept')
+    async acceptChallengePost(
+        @Headers('x-user-id') userId: string,
+        @Param('id') challengeId: string
+    ) {
+        if (!userId) {
+            throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+        }
+        return this.challengesService.accept(challengeId, userId);
+    }
+
+    /**
+     * Decline a challenge (PUT)
      */
     @Put(':id/decline')
     async declineChallenge(
+        @Headers('x-user-id') userId: string,
+        @Param('id') challengeId: string
+    ) {
+        if (!userId) {
+            throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+        }
+        return this.challengesService.decline(challengeId, userId);
+    }
+
+    /**
+     * Decline a challenge (POST alias)
+     */
+    @Post(':id/decline')
+    async declineChallengePost(
         @Headers('x-user-id') userId: string,
         @Param('id') challengeId: string
     ) {

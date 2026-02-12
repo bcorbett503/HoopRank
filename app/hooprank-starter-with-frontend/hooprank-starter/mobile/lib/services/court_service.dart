@@ -17,48 +17,48 @@ class CourtService {
     if (_isLoaded) return;
 
     try {
-      debugPrint('CourtService: Loading courts from local assets...');
+      debugPrint('CourtService: Loading courts from API (primary source)...');
       
-      // Load courts from local JSON asset for full map coverage
-      final jsonString = await rootBundle.loadString('assets/data/courts_named.json');
-      final List<dynamic> jsonData = jsonDecode(jsonString);
-      
-      _courts = jsonData.map((json) => Court(
-        id: json['id'] as String? ?? 'unknown',
-        name: json['name'] as String? ?? 'Court',
-        lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
-        lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
-        address: json['city'] as String?,
-        isIndoor: json['indoor'] == true,
-        access: json['access'] as String? ?? 'public',
-        isSignature: json['signatureCity'] == true,
-      )).toList();
-      
-      debugPrint('CourtService: Loaded ${_courts.length} courts from assets');
-      
-      // Also fetch API courts for proper UUIDs (for match submission)
+      // PRIMARY: Fetch ALL courts from API (includes all discovery data)
+      bool apiLoaded = false;
       try {
-        final apiCourts = await ApiService.getCourtsFromApi(limit: 200);
+        // Startup timeout: avoid blocking first-load on weak networks.
+        // Falls back to local assets if API doesn't respond in 10 seconds.
+        final apiCourts = await ApiService.getCourtsFromApi(limit: 5000)
+            .timeout(const Duration(seconds: 10));
         debugPrint('CourtService: Fetched ${apiCourts.length} courts from API');
         
-        // Merge API courts - replace or add courts with proper UUIDs
-        for (final apiCourt in apiCourts) {
-          // Always register API court for ID lookup
-          _registerApiCourt(apiCourt);
-          
-          final existingIndex = _courts.indexWhere(
-            (c) => c.name.toLowerCase() == apiCourt.name.toLowerCase() &&
-                   (c.lat - apiCourt.lat).abs() < 0.01 &&
-                   (c.lng - apiCourt.lng).abs() < 0.01
-          );
-          if (existingIndex >= 0) {
-            _courts[existingIndex] = apiCourt; // Replace with API version (has proper UUID)
-          } else {
-            _courts.add(apiCourt); // Add new API court
+        if (apiCourts.isNotEmpty) {
+          _courts = apiCourts;
+          for (final court in apiCourts) {
+            _registerApiCourt(court);
           }
+          apiLoaded = true;
         }
       } catch (e) {
-        debugPrint('CourtService: API fetch failed, using assets only: $e');
+        debugPrint('CourtService: API fetch failed: $e');
+      }
+      
+      // FALLBACK: Load from local JSON asset if API failed
+      if (!apiLoaded) {
+        // Telemetry: log fallback usage so auth/backend failures don't silently
+        // degrade into stale local court data.
+        debugPrint('[TELEMETRY] CourtService: API unreachable — falling back to local assets. '
+            'This may indicate auth timing or network issues.');
+        final jsonString = await rootBundle.loadString('assets/data/courts_named.json');
+        final List<dynamic> jsonData = jsonDecode(jsonString);
+        
+        _courts = jsonData.map((json) => Court(
+          id: json['id'] as String? ?? 'unknown',
+          name: json['name'] as String? ?? 'Court',
+          lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
+          lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
+          address: json['city'] as String?,
+          isIndoor: json['indoor'] == true,
+          access: json['access'] as String? ?? 'public',
+          isSignature: json['signatureCity'] == true,
+        )).toList();
+        debugPrint('CourtService: Loaded ${_courts.length} courts from local assets (fallback)');
       }
 
       // Always include The Olympic Club as a featured court

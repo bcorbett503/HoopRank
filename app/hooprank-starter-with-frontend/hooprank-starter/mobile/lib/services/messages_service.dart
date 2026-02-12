@@ -173,6 +173,8 @@ class TeamConversation {
 class MessagesService {
   String get baseUrl => ApiService.baseUrl; // Use same URL as ApiService
   final _storage = const FlutterSecureStorage();
+  // NOTE: methods below that still use raw http.get/post should be migrated to
+  // ApiService._authedGet/_authedPost over time for consistent token refresh.
 
   Future<String?> _getToken() async {
     // Prefer a fresh Firebase ID token (auto-refreshed); fall back to stored token
@@ -297,7 +299,8 @@ class MessagesService {
   Future<List<Conversation>> getConversations(String userId) async {
     final token = await _getToken();
     final response = await http.get(
-      Uri.parse('$baseUrl/messages/conversations/$userId'),
+      // Header-driven route: userId comes from x-user-id header, not the path.
+      Uri.parse('$baseUrl/messages/conversations'),
       headers: {
         'Authorization': 'Bearer $token',
         'x-user-id': userId,
@@ -331,7 +334,8 @@ class MessagesService {
   Future<List<Message>> getMessages(String userId, String otherUserId) async {
     final token = await _getToken();
     final response = await http.get(
-      Uri.parse('$baseUrl/messages/$userId/$otherUserId'),
+      // Header-driven route: userId comes from x-user-id header, not the path.
+      Uri.parse('$baseUrl/messages/$otherUserId'),
       headers: {
         'Authorization': 'Bearer $token',
         'x-user-id': userId,
@@ -619,4 +623,3 @@ class TeamChallengeRequest {
   String get opponentTeamName => isIncoming ? fromTeamName : toTeamName;
   String get opponentTeamId => isIncoming ? fromTeamId : toTeamId;
 }
-

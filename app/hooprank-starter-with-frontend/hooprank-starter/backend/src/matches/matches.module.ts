@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MatchesService } from './matches.service';
-import { MatchesController } from './matches.controller';
+import { MatchesController, MatchesAliasController } from './matches.controller';
 import { UsersModule } from '../users/users.module';
 import { MessagesModule } from '../messages/messages.module';
 import { Match } from './match.entity';
@@ -14,7 +14,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     MessagesModule,
     NotificationsModule,
   ],
-  controllers: [MatchesController],
+  controllers: [MatchesController, MatchesAliasController],
   providers: [MatchesService],
   exports: [MatchesService],
 })

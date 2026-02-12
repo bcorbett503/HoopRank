@@ -125,9 +125,11 @@ class AuthService {
     }
   }
 
-  // Get current ID Token
-  static Future<String?> getIdToken() async {
-    return await _auth.currentUser?.getIdToken();
+  /// Get current Firebase ID token.
+  /// [forceRefresh] bypasses the SDK cache and fetches a new token from Firebase.
+  /// Used by the 401-retry logic when the backend rejects an expired token.
+  static Future<String?> getIdToken({bool forceRefresh = false}) async {
+    return await _auth.currentUser?.getIdToken(forceRefresh);
   }
 
   // Sign out

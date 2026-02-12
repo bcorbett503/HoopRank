@@ -49,8 +49,9 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
   
   // Run attributes (visible when scheduling)
   String _gameMode = '5v5';
-  String? _courtType; // null=any, 'full', 'half'
-  String? _ageRange; // null=any, '18+', '21+', '30+', '40+'
+  String _courtType = 'full'; // 'full', 'half'
+  String _ageRange = 'Open'; // 'Open', 'Youth', 'Adult', '40+', 'Golden'
+  bool _showRunDetails = false;
   
   // Court tagging
   List<Court> _courtSuggestions = [];
@@ -87,10 +88,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
       _tagMode = 'all';
     }
     
-    // If initial court is set, add court name to text (no @ prefix)
-    if (widget.initialCourt != null && _textController.text.isEmpty) {
-      _textController.text = '${widget.initialCourt!.name} ';
-    }
+    // Court name shown via tag chip — no need to duplicate in text field
     
     // Auto-focus the text field (unless auto-showing schedule)
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -670,7 +668,8 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
 
   Future<void> _submitPost() async {
     final text = _textController.text.trim();
-    if (text.isEmpty && _selectedImage == null && _selectedVideo == null) return;
+    // Allow posting with just a scheduled time + court (text is optional for runs)
+    if (text.isEmpty && _selectedImage == null && _selectedVideo == null && _scheduledTime == null) return;
     
     setState(() => _isSubmitting = true);
     
@@ -754,7 +753,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasContent = _textController.text.isNotEmpty || _selectedImage != null || _selectedVideo != null;
+    final hasContent = _textController.text.isNotEmpty || _selectedImage != null || _selectedVideo != null || (_scheduledTime != null && _taggedCourt != null);
     
     return Scaffold(
       backgroundColor: Colors.grey[900],
@@ -1138,145 +1137,196 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                   
                   // (Court suggestions moved to search bar above)
                   
-                  // ── Run Attribute Badges (shown when scheduling) ──
+                  // ── Run Details (collapsible, below the fold) ──
                   if (_scheduledTime != null) ...[
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.04),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.tune, size: 14, color: Colors.deepOrange.withOpacity(0.7)),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Run details:',
-                                style: TextStyle(color: Colors.white54, fontSize: 12),
+                    const SizedBox(height: 16),
+                    // Slider bar to expand/collapse run details
+                    GestureDetector(
+                      onTap: () => setState(() => _showRunDetails = !_showRunDetails),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _showRunDetails
+                              ? Colors.white.withOpacity(0.04)
+                              : Colors.deepOrange.withOpacity(0.08),
+                          borderRadius: _showRunDetails
+                              ? const BorderRadius.vertical(top: Radius.circular(16))
+                              : BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _showRunDetails
+                                ? Colors.white.withOpacity(0.08)
+                                : Colors.deepOrange.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.tune, size: 16, color: Colors.deepOrange.withOpacity(_showRunDetails ? 0.7 : 1.0)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Run Details',
+                              style: TextStyle(
+                                color: _showRunDetails ? Colors.white70 : Colors.deepOrange,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          
-                          // Game Mode chips
-                          const Text('Game Mode', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: ['3v3', '5v5'].map((mode) {
-                              final isSelected = _gameMode == mode;
-                              final color = mode == '3v3' ? Colors.blue : Colors.purple;
-                              return ActionChip(
-                                avatar: Icon(
-                                  isSelected ? Icons.check_circle : Icons.sports_basketball,
-                                  size: 16,
-                                  color: isSelected ? color : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            // Show current defaults as summary when collapsed
+                            if (!_showRunDetails)
+                              Expanded(
+                                child: Text(
+                                  '$_ageRange · $_gameMode · ${_courtType == 'full' ? 'Full' : 'Half'} — tap to customize',
+                                  style: TextStyle(color: Colors.deepOrange.withOpacity(0.5), fontSize: 11),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                label: Text(
-                                  mode,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: isSelected ? color : Colors.white70,
-                                  ),
-                                ),
-                                backgroundColor: isSelected
-                                    ? color.withOpacity(0.2)
-                                    : Colors.grey[800],
-                                side: BorderSide(
-                                  color: isSelected
-                                      ? color.withOpacity(0.5)
-                                      : Colors.transparent,
-                                ),
-                                onPressed: () => setState(() => _gameMode = mode),
-                              );
-                            }).toList(),
-                          ),
-                          
-                          const SizedBox(height: 14),
-                          
-                          // Court Type chips
-                          const Text('Court Type', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: [null, 'full', 'half'].map((type) {
-                              final isSelected = _courtType == type;
-                              final label = type == null ? 'Any' : (type == 'full' ? 'Full Court' : 'Half Court');
-                              final icon = type == null ? Icons.all_inclusive : (type == 'full' ? Icons.rectangle_outlined : Icons.crop_square);
-                              return ActionChip(
-                                avatar: Icon(
-                                  isSelected ? Icons.check_circle : icon,
-                                  size: 16,
-                                  color: isSelected ? Colors.teal : Colors.grey,
-                                ),
-                                label: Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: isSelected ? Colors.teal : Colors.white70,
-                                  ),
-                                ),
-                                backgroundColor: isSelected
-                                    ? Colors.teal.withOpacity(0.2)
-                                    : Colors.grey[800],
-                                side: BorderSide(
-                                  color: isSelected
-                                      ? Colors.teal.withOpacity(0.5)
-                                      : Colors.transparent,
-                                ),
-                                onPressed: () => setState(() => _courtType = type),
-                              );
-                            }).toList(),
-                          ),
-                          
-                          const SizedBox(height: 14),
-                          
-                          // Age Range chips
-                          const Text('Age Range', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: [null, '18+', '21+', '30+', '40+'].map((age) {
-                              final isSelected = _ageRange == age;
-                              final label = age ?? 'Open';
-                              return ActionChip(
-                                avatar: Icon(
-                                  isSelected ? Icons.check_circle : Icons.people_outline,
-                                  size: 16,
-                                  color: isSelected ? Colors.amber : Colors.grey,
-                                ),
-                                label: Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: isSelected ? Colors.amber : Colors.white70,
-                                  ),
-                                ),
-                                backgroundColor: isSelected
-                                    ? Colors.amber.withOpacity(0.2)
-                                    : Colors.grey[800],
-                                side: BorderSide(
-                                  color: isSelected
-                                      ? Colors.amber.withOpacity(0.5)
-                                      : Colors.transparent,
-                                ),
-                                onPressed: () => setState(() => _ageRange = age),
-                              );
-                            }).toList(),
-                          ),
-                        ],
+                              ),
+                            if (_showRunDetails) const Spacer(),
+                            AnimatedRotation(
+                              turns: _showRunDetails ? 0.5 : 0.0,
+                              duration: const Duration(milliseconds: 200),
+                              child: Icon(Icons.expand_more, size: 20, color: _showRunDetails ? Colors.white.withOpacity(0.4) : Colors.deepOrange.withOpacity(0.6)),
+                            ),
+                          ],
+                        ),
                       ),
+                    ),
+                    // Expandable run details content
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      alignment: Alignment.topCenter,
+                      child: _showRunDetails
+                        ? Container(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.04),
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                              border: Border(
+                                left: BorderSide(color: Colors.white.withOpacity(0.08)),
+                                right: BorderSide(color: Colors.white.withOpacity(0.08)),
+                                bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 8),
+                                
+                                // Game Mode chips
+                                const Text('Game Mode', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  children: ['3v3', '5v5'].map((mode) {
+                                    final isSelected = _gameMode == mode;
+                                    final color = mode == '3v3' ? Colors.blue : Colors.purple;
+                                    return ActionChip(
+                                      avatar: Icon(
+                                        isSelected ? Icons.check_circle : Icons.sports_basketball,
+                                        size: 16,
+                                        color: isSelected ? color : Colors.grey,
+                                      ),
+                                      label: Text(
+                                        mode,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected ? color : Colors.white70,
+                                        ),
+                                      ),
+                                      backgroundColor: isSelected
+                                          ? color.withOpacity(0.2)
+                                          : Colors.grey[800],
+                                      side: BorderSide(
+                                        color: isSelected
+                                            ? color.withOpacity(0.5)
+                                            : Colors.transparent,
+                                      ),
+                                      onPressed: () => setState(() => _gameMode = mode),
+                                    );
+                                  }).toList(),
+                                ),
+                                
+                                const SizedBox(height: 14),
+                                
+                                // Court Type chips
+                                const Text('Court Type', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  children: ['full', 'half'].map((type) {
+                                    final isSelected = _courtType == type;
+                                    final label = type == 'full' ? 'Full Court' : 'Half Court';
+                                    final icon = type == 'full' ? Icons.rectangle_outlined : Icons.crop_square;
+                                    return ActionChip(
+                                      avatar: Icon(
+                                        isSelected ? Icons.check_circle : icon,
+                                        size: 16,
+                                        color: isSelected ? Colors.teal : Colors.grey,
+                                      ),
+                                      label: Text(
+                                        label,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: isSelected ? Colors.teal : Colors.white70,
+                                        ),
+                                      ),
+                                      backgroundColor: isSelected
+                                          ? Colors.teal.withOpacity(0.2)
+                                          : Colors.grey[800],
+                                      side: BorderSide(
+                                        color: isSelected
+                                            ? Colors.teal.withOpacity(0.5)
+                                            : Colors.transparent,
+                                      ),
+                                      onPressed: () => setState(() => _courtType = type),
+                                    );
+                                  }).toList(),
+                                ),
+                                
+                                const SizedBox(height: 14),
+                                
+                                // Age Range chips
+                                const Text('Age Range', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  children: ['Open', 'Youth', 'Adult', '40+', 'Golden'].map((age) {
+                                    final isSelected = _ageRange == age;
+                                    return ActionChip(
+                                      avatar: Icon(
+                                        isSelected ? Icons.check_circle : Icons.people_outline,
+                                        size: 16,
+                                        color: isSelected ? Colors.amber : Colors.grey,
+                                      ),
+                                      label: Text(
+                                        age,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: isSelected ? Colors.amber : Colors.white70,
+                                        ),
+                                      ),
+                                      backgroundColor: isSelected
+                                          ? Colors.amber.withOpacity(0.2)
+                                          : Colors.grey[800],
+                                      side: BorderSide(
+                                        color: isSelected
+                                            ? Colors.amber.withOpacity(0.5)
+                                            : Colors.transparent,
+                                      ),
+                                      onPressed: () => setState(() => _ageRange = age),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          )
+                        : const SizedBox.shrink(),
                     ),
                   ],
                 ],

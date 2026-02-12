@@ -29,22 +29,28 @@ class ApiService {
   }
 
 
-  static String? _authToken;
   static String? _userId;
   
   static String? get userId => _userId;
 
   static void setAuthToken(String token) {
-    _authToken = token;
+    // No longer cached — we always fetch a fresh token from Firebase SDK.
+    // Kept for backward compatibility with call sites that set this.
   }
 
   static void setUserId(String id) {
     _userId = id;
   }
 
+  /// Build auth headers with a fresh Firebase ID token.
+  /// Previous bug: the token was cached in _authToken and never refreshed,
+  /// causing all API calls to return 401 after ~1 hour when it expired.
+  /// Fix: always call AuthService.getIdToken() which lets the Firebase SDK
+  /// manage token lifecycle (it auto-refreshes ~5 min before expiry).
   static Future<Map<String, String>> _buildHeaders(
     Map<String, String>? headers, {
     String? userId,
+    bool forceRefresh = false,
   }) async {
     final merged = <String, String>{...?(headers)};
 
@@ -53,21 +59,41 @@ class ApiService {
       merged.putIfAbsent('x-user-id', () => effectiveUserId);
     }
 
-    // Opportunistically attach a fresh Firebase ID token when available.
-    // This keeps backend identity checks passing even when only x-user-id
-    // was explicitly set by older call sites.
-    String? token = _authToken;
+    // Always get a fresh token from Firebase SDK on every request.
+    // The SDK caches internally and auto-refreshes ~5 min before expiry.
+    // forceRefresh=true bypasses the SDK cache (used on 401 retry).
     try {
-      token ??= await AuthService.getIdToken();
+      final token = await AuthService.getIdToken(forceRefresh: forceRefresh);
+      if (token != null && token.isNotEmpty) {
+        merged['Authorization'] = 'Bearer $token';
+      }
     } catch (_) {
-      // Ignore token refresh failures; unauthenticated requests will fail server-side.
-    }
-    if (token != null && token.isNotEmpty) {
-      _authToken = token;
-      merged.putIfAbsent('Authorization', () => 'Bearer $token');
+      // If token fetch fails, request proceeds without auth.
+      // Backend will return 401, which is better than crashing.
     }
 
     return merged;
+  }
+
+  /// Retry wrapper: if a request returns 401, force-refresh the token and retry once.
+  /// Only enabled for idempotent reads (GET) by default; mutating operations
+  /// skip retry to avoid duplicate side effects.
+  static Future<http.Response> _withRetryOn401(
+    Future<http.Response> Function(Map<String, String> headers) makeRequest, {
+    Map<String, String>? headers,
+    String? userId,
+    bool retryOnAuthFailure = true,
+  }) async {
+    final firstHeaders = await _buildHeaders(headers, userId: userId);
+    final response = await makeRequest(firstHeaders);
+    
+    if (response.statusCode == 401 && retryOnAuthFailure) {
+      // Token was rejected — force-refresh and retry once.
+      debugPrint('ApiService: 401 received, force-refreshing token and retrying...');
+      final retryHeaders = await _buildHeaders(headers, userId: userId, forceRefresh: true);
+      return makeRequest(retryHeaders);
+    }
+    return response;
   }
 
   static Future<http.Response> _authedGet(
@@ -75,7 +101,11 @@ class ApiService {
     Map<String, String>? headers,
     String? userId,
   }) async {
-    return http.get(uri, headers: await _buildHeaders(headers, userId: userId));
+    return _withRetryOn401(
+      (h) => http.get(uri, headers: h),
+      headers: headers,
+      userId: userId,
+    );
   }
 
   static Future<http.Response> _authedPost(
@@ -85,11 +115,13 @@ class ApiService {
     Encoding? encoding,
     String? userId,
   }) async {
-    return http.post(
-      uri,
-      headers: await _buildHeaders(headers, userId: userId),
-      body: body,
-      encoding: encoding,
+    // No auto-retry for POST: avoids duplicate writes if initial request succeeded
+    // but response was lost. If 401, caller handles re-auth explicitly.
+    return _withRetryOn401(
+      (h) => http.post(uri, headers: h, body: body, encoding: encoding),
+      headers: headers,
+      userId: userId,
+      retryOnAuthFailure: false,
     );
   }
 
@@ -100,11 +132,12 @@ class ApiService {
     Encoding? encoding,
     String? userId,
   }) async {
-    return http.put(
-      uri,
-      headers: await _buildHeaders(headers, userId: userId),
-      body: body,
-      encoding: encoding,
+    // No auto-retry for PUT: same write-safety rationale as POST.
+    return _withRetryOn401(
+      (h) => http.put(uri, headers: h, body: body, encoding: encoding),
+      headers: headers,
+      userId: userId,
+      retryOnAuthFailure: false,
     );
   }
 
@@ -115,11 +148,12 @@ class ApiService {
     Encoding? encoding,
     String? userId,
   }) async {
-    return http.delete(
-      uri,
-      headers: await _buildHeaders(headers, userId: userId),
-      body: body,
-      encoding: encoding,
+    // No auto-retry for DELETE: same write-safety rationale as POST.
+    return _withRetryOn401(
+      (h) => http.delete(uri, headers: h, body: body, encoding: encoding),
+      headers: headers,
+      userId: userId,
+      retryOnAuthFailure: false,
     );
   }
 
@@ -178,10 +212,6 @@ class ApiService {
     try {
       final response = await _authedGet(
         Uri.parse('$baseUrl$path'),
-        headers: {
-          if (_authToken != null) 'Authorization': 'Bearer $_authToken',
-          if (_userId != null) 'x-user-id': _userId!,
-        },
       );
       
       if (response.statusCode == 200) {
@@ -270,7 +300,7 @@ class ApiService {
   }
 
   static Future<void> updateProfile(String userId, Map<String, dynamic> data) async {
-    debugPrint('updateProfile: userId=$userId, _authToken=${_authToken != null}, _userId=$_userId');
+    debugPrint('updateProfile: userId=$userId, _userId=$_userId');
     
     // Don't require auth for profile setup - new users won't have tokens set yet
     // Just use the userId passed in directly
@@ -279,10 +309,9 @@ class ApiService {
       final response = await _authedPost(
         Uri.parse('$baseUrl/users/$userId/profile'),
         headers: {
-          if (_authToken != null) 'Authorization': 'Bearer $_authToken',
-          'x-user-id': userId,  // Use the passed userId directly
           'Content-Type': 'application/json',
         },
+        userId: userId,
         body: jsonEncode(data),
       ).timeout(const Duration(seconds: 30));
 
@@ -351,13 +380,11 @@ class ApiService {
     required String guestId,
     String? message,
   }) async {
-    if (_authToken == null && _userId == null) throw Exception('Not authenticated');
+    if (_userId == null) throw Exception('Not authenticated');
 
     final response = await _authedPost(
       Uri.parse('$baseUrl/api/v1/matches'),
       headers: {
-        'Authorization': 'Bearer $_authToken',
-        'x-user-id': _userId ?? '',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -377,13 +404,11 @@ class ApiService {
     required String toUserId,
     required String message,
   }) async {
-    if (_authToken == null && _userId == null) throw Exception('Not authenticated');
+    if (_userId == null) throw Exception('Not authenticated');
 
     final response = await _authedPost(
       Uri.parse('$baseUrl/challenges'),
       headers: {
-        'Authorization': 'Bearer $_authToken',
-        'x-user-id': _userId ?? '',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -540,10 +565,9 @@ class ApiService {
     final response = await _authedPost(
       Uri.parse('$baseUrl/users/me/fcm-token'),
       headers: {
-        'Authorization': 'Bearer $_authToken',
-        'x-user-id': userId,
         'Content-Type': 'application/json',
       },
+      userId: userId,
       body: jsonEncode({'token': token}),
     );
 

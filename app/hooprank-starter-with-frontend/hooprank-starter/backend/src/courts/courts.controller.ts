@@ -3,6 +3,7 @@ import { CourtsService } from './courts.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Court } from './court.entity';
 import { DataSource } from 'typeorm';
+import { Public } from '../auth/public.decorator';
 
 @Controller('courts')
 export class CourtsController {
@@ -26,6 +27,7 @@ export class CourtsController {
         return { success: true, migrations: results };
     }
 
+    @Public()
     @Get()
     async findAll(
         @Query('minLat') minLat?: string,
@@ -33,6 +35,7 @@ export class CourtsController {
         @Query('minLng') minLng?: string,
         @Query('maxLng') maxLng?: string,
     ): Promise<Court[]> {
+        // Public read-only endpoint: map bootstrapping needs courts before auth completes.
         // If bbox parameters provided, use geographic search
         if (minLat && maxLat && minLng && maxLng) {
             return this.courtsService.searchByLocation(
@@ -150,6 +153,39 @@ export class CourtsController {
         return this.courtsService.getFollowerCounts();
     }
 
+    /**
+     * Nearby courts by lat/lng/radius — convenience alias for bbox search.
+     */
+    @Public()
+    @Get('near')
+    async findNear(
+        @Query('lat') lat?: string,
+        @Query('lng') lng?: string,
+        @Query('radius') radius?: string,
+    ): Promise<Court[]> {
+        if (!lat || !lng) return this.courtsService.findAll();
+        const latN = parseFloat(lat);
+        const lngN = parseFloat(lng);
+        const radiusMiles = parseFloat(radius || '10');
+        const latDelta = radiusMiles / 69;
+        const lngDelta = radiusMiles / (69 * Math.cos(latN * Math.PI / 180));
+        return this.courtsService.searchByLocation(
+            latN - latDelta, latN + latDelta,
+            lngN - lngDelta, lngN + lngDelta,
+        );
+    }
+
+    /**
+     * Signature courts — top courts by follower count.
+     */
+    @Public()
+    @Get('signature')
+    async getSignatureCourts() {
+        const courts = await this.courtsService.findAll();
+        return courts.slice(0, 20);
+    }
+
+    @Public()
     @Get(':id')
     async findOne(@Param('id') id: string): Promise<Court | undefined> {
         return this.courtsService.findById(id);
@@ -163,6 +199,14 @@ export class CourtsController {
     @Get(':id/check-ins')
     async getActiveCheckIns(@Param('id') id: string) {
         return this.courtsService.getActiveCheckIns(id);
+    }
+
+    /**
+     * Kings of the court — top players. Stub returns empty array.
+     */
+    @Get(':id/kings')
+    async getKings(@Param('id') id: string) {
+        return [];
     }
 
     @Post(':id/check-in')

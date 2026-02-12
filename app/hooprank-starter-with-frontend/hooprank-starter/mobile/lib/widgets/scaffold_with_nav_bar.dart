@@ -91,11 +91,11 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
 
   @override
   Widget build(BuildContext context) {
-    // Check if current screen is Play (index 2) - Play has its own app bar
-    final isPlayScreen = widget.navigationShell.currentIndex == 2;
+    // Check if current screen is Feed (index 2) - Feed has its own app bar
+    final isFeedScreen = widget.navigationShell.currentIndex == 2;
     
     return Scaffold(
-      appBar: isPlayScreen ? null : const HoopRankAppBar(),
+      appBar: isFeedScreen ? null : const HoopRankAppBar(),
       body: widget.navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: widget.navigationShell.currentIndex,
@@ -126,7 +126,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
               ),
               child: const Icon(Icons.sports_basketball),
             ),
-            label: 'Play',
+            label: 'Feed',
           ),
           NavigationDestination(
             icon: Badge(

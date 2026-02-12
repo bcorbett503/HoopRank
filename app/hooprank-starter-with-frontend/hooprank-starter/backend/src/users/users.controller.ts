@@ -4,6 +4,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { User } from './user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DataSource } from 'typeorm';
+import { Public } from '../auth/public.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -85,6 +86,20 @@ export class UsersController {
   @Get()
   findAll() {
     return this.usersService.getAll();
+  }
+
+  // Public-safe endpoint returning only minimal profile fields for discovery.
+  @Public()
+  @Get('public')
+  async findAllPublic() {
+    const users = await this.usersService.getAll();
+    return (users || []).map((u: any) => ({
+      id: u.id,
+      name: u.name,
+      position: u.position,
+      photoUrl: u.photo_url ?? u.photoUrl,
+      hoopRank: parseFloat(u.hoop_rank ?? u.hoopRank) || 3.0,
+    }));
   }
 
   @Get('me')
@@ -284,6 +299,28 @@ export class UsersController {
     }
   }
 
+  /**
+   * Privacy settings stub — returns sensible defaults.
+   */
+  @Get('me/privacy')
+  async getPrivacy(@Headers('x-user-id') userId: string) {
+    return {
+      profileVisibility: 'public',
+      showLocation: true,
+      showActivity: true,
+      allowMessages: 'everyone',
+    };
+  }
+
+  @Put('me/privacy')
+  async updatePrivacy(
+    @Headers('x-user-id') userId: string,
+    @Body() body: any,
+  ) {
+    // Stub: accept the payload but don't persist yet
+    return { success: true, ...body };
+  }
+
   @Get('nearby')
   async getNearbyUsers(
     @Headers('x-user-id') userId: string,
@@ -352,9 +389,67 @@ export class UsersController {
     }
   }
 
+  // Public-safe single profile (sanitized fields only).
+  // Must be before :id route to avoid NestJS wildcard matching.
+  @Public()
+  @Get('public/:id')
+  async findOnePublic(@Param('id') id: string) {
+    const u: any = await this.usersService.findOne(id);
+    if (!u) return { error: 'User not found' };
+    return {
+      id: u.id,
+      name: u.name,
+      position: u.position,
+      photoUrl: u.photo_url ?? u.photoUrl,
+      hoopRank: parseFloat(u.hoop_rank ?? u.hoopRank) || 3.0,
+    };
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
+  }
+
+  /**
+   * Device token alias — saves FCM/APNs token for push notifications.
+   */
+  @Post(':id/device-token')
+  async saveDeviceToken(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId: string,
+    @Body() body: { token: string },
+  ) {
+    const resolvedId = userId || id;
+    if (!resolvedId || !body.token) {
+      return { success: false, error: 'User ID and token required' };
+    }
+    try {
+      await this.notificationsService.saveFcmToken(resolvedId, body.token);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Failed to save device token' };
+    }
+  }
+
+  /**
+   * FCM token alias (same as device-token)
+   */
+  @Post(':id/fcm-token')
+  async saveFcmTokenById(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId: string,
+    @Body() body: { token: string },
+  ) {
+    const resolvedId = userId || id;
+    if (!resolvedId || !body.token) {
+      return { success: false, error: 'User ID and token required' };
+    }
+    try {
+      await this.notificationsService.saveFcmToken(resolvedId, body.token);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Failed to save FCM token' };
+    }
   }
 
   @Post(':id/profile')

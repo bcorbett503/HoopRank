@@ -184,7 +184,7 @@ export class TeamsController {
     }
 
     /**
-     * Invite player to team
+     * Invite player to team (path-based)
      */
     @Post(':id/invite/:playerId')
     @HttpCode(200)
@@ -195,6 +195,36 @@ export class TeamsController {
     ) {
         await this.teamsService.invitePlayer(teamId, userId, playerId);
         return { success: true };
+    }
+
+    /**
+     * Invite player to team (body-based alias)
+     * Accepts { playerId: string } in the request body.
+     */
+    @Post(':id/invite')
+    @HttpCode(200)
+    async invitePlayerByBody(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+        @Body() body: { playerId: string },
+    ) {
+        if (!body.playerId) {
+            return { success: false, error: 'playerId is required' };
+        }
+        await this.teamsService.invitePlayer(teamId, userId, body.playerId);
+        return { success: true };
+    }
+
+    /**
+     * Get team members (alias returning detail.members)
+     */
+    @Get(':id/members')
+    async getTeamMembers(
+        @Param('id') teamId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        const detail = await this.teamsService.getTeamDetail(teamId, userId);
+        return (detail as any)?.members || [];
     }
 
     /**

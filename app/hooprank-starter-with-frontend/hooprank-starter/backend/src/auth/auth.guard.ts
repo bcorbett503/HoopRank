@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import * as admin from 'firebase-admin';
 import { IS_PUBLIC_KEY } from './public.decorator';
+import { IS_ADMIN_KEY } from './admin.decorator';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -39,7 +40,7 @@ export class AuthGuard implements CanActivate {
                 }
                 request.headers['x-user-id'] = String(fallbackUid);
                 request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
-                return this.enforceAdminForSensitiveRoutes(request, String(fallbackUid));
+                return this.enforceAdminForSensitiveRoutes(request, String(fallbackUid), context);
             }
             throw new UnauthorizedException('Missing authentication token');
         }
@@ -55,7 +56,7 @@ export class AuthGuard implements CanActivate {
             }
             request.headers['x-user-id'] = String(fallbackUid);
             request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
-            return this.enforceAdminForSensitiveRoutes(request, String(fallbackUid));
+            return this.enforceAdminForSensitiveRoutes(request, String(fallbackUid), context);
         }
 
         try {
@@ -64,15 +65,22 @@ export class AuthGuard implements CanActivate {
 
             // Never trust caller-supplied user identifiers that do not match token subject.
             const headerUid = this.normalizeHeaderValue(request.headers['x-user-id']);
+            const allowHeaderNormalization = this.configService.get<string>('ALLOW_HEADER_NORMALIZATION') === 'true';
             if (headerUid && headerUid !== uid) {
-                throw new UnauthorizedException('x-user-id does not match authenticated user');
+                if (allowHeaderNormalization) {
+                    // Compatibility mode: normalize to token uid and audit-log the mismatch.
+                    console.warn(`[AUTH_AUDIT] x-user-id mismatch: header=${headerUid} token=${uid} path=${request.path} — normalized to token uid`);
+                    request.headers['x-user-id'] = uid;
+                } else {
+                    throw new UnauthorizedException('x-user-id does not match authenticated user');
+                }
             }
             if (!headerUid) {
                 request.headers['x-user-id'] = uid;
             }
 
             request['user'] = decodedToken;
-            return this.enforceAdminForSensitiveRoutes(request, uid);
+            return this.enforceAdminForSensitiveRoutes(request, uid, context);
         } catch (error) {
             if (error instanceof UnauthorizedException || error instanceof ForbiddenException) {
                 throw error;
@@ -92,11 +100,22 @@ export class AuthGuard implements CanActivate {
         return String(value);
     }
 
-    private enforceAdminForSensitiveRoutes(request: any, uid: string): boolean {
+    private enforceAdminForSensitiveRoutes(request: any, uid: string, context?: ExecutionContext): boolean {
+        // Primary: check explicit @AdminOnly decorator metadata.
+        let isAdminRoute = false;
+        if (context) {
+            isAdminRoute = this.reflector.getAllAndOverride<boolean>(IS_ADMIN_KEY, [
+                context.getHandler(),
+                context.getClass(),
+            ]) ?? false;
+        }
+
+        // Fallback: path-prefix detection as a safety net for routes that may
+        // not yet carry explicit metadata.
         const rawPath = String(request.path || request.originalUrl || '').toLowerCase();
         const sensitivePrefixes = ['admin', 'debug', 'migrate', 'seed', 'cleanup'];
         const segments = rawPath.split('/').filter(Boolean);
-        const isSensitive = segments.some((segment) =>
+        const isSensitive = isAdminRoute || segments.some((segment) =>
             sensitivePrefixes.some((prefix) => segment === prefix || segment.startsWith(`${prefix}-`)),
         );
 
