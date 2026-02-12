@@ -294,11 +294,17 @@ export class UsersService {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
-      return await this.dataSource.query(`
-        SELECT u.* FROM users u
-        JOIN friendships f ON f.friend_id = u.id
-        WHERE f.user_id = $1
-      `, [userId]);
+      try {
+        return await this.dataSource.query(`
+          SELECT u.id, u.name, u.avatar_url, u.hoop_rank, u.position, u.city
+          FROM users u
+          JOIN friendships f ON f.friend_id = u.id
+          WHERE f.user_id = $1
+        `, [userId]);
+      } catch (error) {
+        console.warn(`getFriends: DB error for userId=${userId}:`, error.message);
+        return [];
+      }
     }
 
     const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });

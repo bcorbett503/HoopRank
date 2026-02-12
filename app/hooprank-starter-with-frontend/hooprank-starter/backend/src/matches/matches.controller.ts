@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Headers, Param, Post } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, HttpCode, Param, Post } from '@nestjs/common';
 import { MatchesService } from './matches.service';
 import { Match } from './match.entity';
 import { CreateMatchDto } from './dto/create-match.dto';
@@ -17,6 +17,9 @@ function mapMatchForIOS(match: any): any {
   if (!match || match.error) return match;
   return {
     ...match,
+    // TODO(contract): Keep backendStatus until all clients normalize both
+    // status vocabularies. /matches now emits mapped values, while some other
+    // endpoints (e.g. user match history) still expose raw backend statuses.
     // Map status directly to iOS enum values
     status: STATUS_MAP[match.status] || match.status,
     // Keep original status as a fallback
@@ -141,6 +144,7 @@ export class MatchesController {
   }
 
   @Post(':id/confirm')
+  @HttpCode(200)
   async confirmScore(
     @Param('id') id: string,
     @Headers('x-user-id') userId: string
@@ -151,6 +155,7 @@ export class MatchesController {
   }
 
   @Post(':id/contest')
+  @HttpCode(200)
   async contestScore(
     @Param('id') id: string,
     @Headers('x-user-id') userId: string
@@ -225,6 +230,7 @@ export class MatchesAliasController {
   }
 
   @Post(':id/confirm')
+  @HttpCode(200)
   async confirmScore(
     @Param('id') id: string,
     @Headers('x-user-id') userId: string
@@ -235,6 +241,7 @@ export class MatchesAliasController {
   }
 
   @Post(':id/contest')
+  @HttpCode(200)
   async contestScore(
     @Param('id') id: string,
     @Headers('x-user-id') userId: string
