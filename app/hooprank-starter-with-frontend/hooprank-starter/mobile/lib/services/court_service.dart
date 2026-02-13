@@ -201,13 +201,21 @@ class CourtService {
       });
   }
 
-  List<Court> getCourtsInBounds(double south, double west, double north, double east, {int limit = 100}) {
-    return _courts.where((court) {
+  /// Return courts within a bounding box.
+  ///
+  /// NOTE: `limit` is optional. CourtMapWidget applies filtering (indoor/outdoor,
+  /// followed, runs, etc) and then caps the result based on zoom level to avoid
+  /// rendering thousands of markers at once.
+  List<Court> getCourtsInBounds(double south, double west, double north, double east, {int? limit}) {
+    final results = _courts.where((court) {
       return court.lat >= south &&
              court.lat <= north &&
              court.lng >= west &&
              court.lng <= east;
-    }).take(limit).toList();
+    });
+
+    if (limit != null) return results.take(limit).toList();
+    return results.toList();
   }
 
   List<Court> searchCourts(String query) {

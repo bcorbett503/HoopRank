@@ -7,15 +7,17 @@ import 'auth_service.dart';
 
 class ApiService {
   // Production URL - Railway deployment
-  static const String _productionUrl = 'https://heartfelt-appreciation-production-65f1.up.railway.app';
-  
+  static const String _productionUrl =
+      'https://heartfelt-appreciation-production-65f1.up.railway.app';
+
   // Development URLs
-  static const String _emulatorUrl = 'http://10.0.2.2:3000';  // Android emulator
-  static const String _localUrl = 'http://localhost:3000';     // iOS simulator / web
-  
+  static const String _emulatorUrl = 'http://10.0.2.2:3000'; // Android emulator
+  static const String _localUrl =
+      'http://localhost:3000'; // iOS simulator / web
+
   // Set to true ONLY when running local backend server
   static const bool _useLocalServer = false;
-  
+
   // Automatically select URL based on environment
   static String get baseUrl {
     if (kReleaseMode || !_useLocalServer) {
@@ -28,9 +30,8 @@ class ApiService {
     return _localUrl;
   }
 
-
   static String? _userId;
-  
+
   static String? get userId => _userId;
 
   static void setAuthToken(String token) {
@@ -86,11 +87,13 @@ class ApiService {
   }) async {
     final firstHeaders = await _buildHeaders(headers, userId: userId);
     final response = await makeRequest(firstHeaders);
-    
+
     if (response.statusCode == 401 && retryOnAuthFailure) {
       // Token was rejected — force-refresh and retry once.
-      debugPrint('ApiService: 401 received, force-refreshing token and retrying...');
-      final retryHeaders = await _buildHeaders(headers, userId: userId, forceRefresh: true);
+      debugPrint(
+          'ApiService: 401 received, force-refreshing token and retrying...');
+      final retryHeaders =
+          await _buildHeaders(headers, userId: userId, forceRefresh: true);
       return makeRequest(retryHeaders);
     }
     return response;
@@ -157,7 +160,8 @@ class ApiService {
     );
   }
 
-  static Future<User> authenticate(String idToken, {
+  static Future<User> authenticate(
+    String idToken, {
     required String uid,
     String? email,
     String? name,
@@ -192,7 +196,7 @@ class ApiService {
   /// Get current user's data (for refreshing rating after match confirmation)
   static Future<User?> getMe() async {
     if (_userId == null || _userId!.isEmpty) return null;
-    
+
     final response = await _authedGet(
       Uri.parse('$baseUrl/users/me'),
       headers: {
@@ -213,7 +217,7 @@ class ApiService {
       final response = await _authedGet(
         Uri.parse('$baseUrl$path'),
       );
-      
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
@@ -267,7 +271,7 @@ class ApiService {
       if (lat != null && lng != null) {
         url += '&lat=$lat&lng=$lng';
       }
-      
+
       debugPrint('>>> getCourtsFromApi: calling $url');
       final response = await _authedGet(
         Uri.parse(url),
@@ -279,18 +283,21 @@ class ApiService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         debugPrint('>>> getCourtsFromApi: received ${data.length} courts');
-        
-        return data.map((json) => Court(
-          id: json['id'] as String,
-          name: json['name'] as String? ?? 'Court',
-          lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
-          lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
-          address: json['city'] as String?,
-          isSignature: json['signature'] == true,
-          isIndoor: json['indoor'] == true,
-        )).toList();
+
+        return data
+            .map((json) => Court(
+                  id: json['id'] as String,
+                  name: json['name'] as String? ?? 'Court',
+                  lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
+                  lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
+                  address: json['city'] as String?,
+                  isSignature: json['signature'] == true,
+                  isIndoor: json['indoor'] == true,
+                ))
+            .toList();
       } else {
-        debugPrint('>>> getCourtsFromApi: failed with status ${response.statusCode}');
+        debugPrint(
+            '>>> getCourtsFromApi: failed with status ${response.statusCode}');
         return [];
       }
     } catch (e) {
@@ -299,12 +306,13 @@ class ApiService {
     }
   }
 
-  static Future<void> updateProfile(String userId, Map<String, dynamic> data) async {
+  static Future<void> updateProfile(
+      String userId, Map<String, dynamic> data) async {
     debugPrint('updateProfile: userId=$userId, _userId=$_userId');
-    
+
     // Don't require auth for profile setup - new users won't have tokens set yet
     // Just use the userId passed in directly
-    
+
     try {
       final response = await _authedPost(
         Uri.parse('$baseUrl/users/$userId/profile'),
@@ -316,16 +324,16 @@ class ApiService {
       ).timeout(const Duration(seconds: 30));
 
       debugPrint('updateProfile: status=${response.statusCode}');
-      
+
       if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Failed to update profile: ${response.statusCode} - ${response.body}');
+        throw Exception(
+            'Failed to update profile: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       debugPrint('updateProfile error: $e');
       rethrow;
     }
   }
-
 
   /// Upload an image for profile or team
   /// [type] - 'profile' or 'team'
@@ -338,14 +346,17 @@ class ApiService {
     required File imageFile,
   }) async {
     try {
-      debugPrint('uploadImage: type=$type, targetId=$targetId, userId=$_userId');
+      debugPrint(
+          'uploadImage: type=$type, targetId=$targetId, userId=$_userId');
       final bytes = await imageFile.readAsBytes();
       debugPrint('uploadImage: Read ${bytes.length} bytes from image');
       final base64Image = base64Encode(bytes);
-      final mimeType = imageFile.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+      final mimeType = imageFile.path.toLowerCase().endsWith('.png')
+          ? 'image/png'
+          : 'image/jpeg';
       final dataUrl = 'data:$mimeType;base64,$base64Image';
       debugPrint('uploadImage: Base64 data URL length: ${dataUrl.length}');
-      
+
       final response = await _authedPost(
         Uri.parse('$baseUrl/upload'),
         headers: {
@@ -358,15 +369,16 @@ class ApiService {
           'imageData': dataUrl,
         }),
       );
-      
+
       debugPrint('uploadImage: Response status=${response.statusCode}');
       debugPrint('uploadImage: Response body=${response.body}');
-      
+
       if (response.statusCode == 200) {
         debugPrint('Image uploaded successfully for $type: $targetId');
         return null; // Success
       } else {
-        debugPrint('Upload failed: status=${response.statusCode}, body=${response.body}');
+        debugPrint(
+            'Upload failed: status=${response.statusCode}, body=${response.body}');
         return 'Status ${response.statusCode}: ${response.body}';
       }
     } catch (e) {
@@ -422,7 +434,9 @@ class ApiService {
       try {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
-          final serverMessage = (decoded['message'] ?? decoded['error'] ?? decoded['details'])?.toString();
+          final serverMessage =
+              (decoded['message'] ?? decoded['error'] ?? decoded['details'])
+                  ?.toString();
           if (serverMessage != null && serverMessage.isNotEmpty) {
             errorMessage = serverMessage;
           }
@@ -442,7 +456,7 @@ class ApiService {
   /// Get pending challenges for the current user
   static Future<List<Map<String, dynamic>>> getPendingChallenges() async {
     if (_userId == null || _userId!.isEmpty) return [];
-    
+
     try {
       final response = await _authedGet(
         Uri.parse('$baseUrl/challenges'),
@@ -464,7 +478,8 @@ class ApiService {
   }
 
   /// Get rankings (players for 1v1, teams for 3v3/5v5)
-  static Future<List<Map<String, dynamic>>> getRankings({required String mode}) async {
+  static Future<List<Map<String, dynamic>>> getRankings(
+      {required String mode}) async {
     final response = await _authedGet(
       Uri.parse('$baseUrl/rankings?mode=$mode'),
       headers: {'x-user-id': _userId ?? ''},
@@ -481,21 +496,23 @@ class ApiService {
   /// Get all players
   static Future<List<User>> getPlayers() async {
     debugPrint('>>> getPlayers() called, userId: $_userId');
-    
+
     try {
       final uri = Uri.parse('$baseUrl/users');
-      final response = await _authedGet(uri, headers: {'x-user-id': _userId ?? ''});
-      
-      debugPrint('>>> getPlayers() response: ${response.statusCode}, length: ${response.body.length}');
-      
+      final response =
+          await _authedGet(uri, headers: {'x-user-id': _userId ?? ''});
+
+      debugPrint(
+          '>>> getPlayers() response: ${response.statusCode}, length: ${response.body.length}');
+
       if (response.statusCode != 200) {
         debugPrint('>>> getPlayers() non-200: ${response.body}');
         return [];
       }
-      
+
       final List<dynamic> jsonList = jsonDecode(response.body);
       debugPrint('>>> getPlayers() parsed ${jsonList.length} items');
-      
+
       final List<User> users = [];
       for (var i = 0; i < jsonList.length; i++) {
         try {
@@ -504,7 +521,7 @@ class ApiService {
           debugPrint('>>> getPlayers() Failed to parse user $i: $e');
         }
       }
-      
+
       debugPrint('>>> getPlayers() returning ${users.length} users');
       return users;
     } catch (e) {
@@ -513,25 +530,27 @@ class ApiService {
     }
   }
 
-
   /// Get nearby players within specified radius
   static Future<List<User>> getNearbyPlayers({int radiusMiles = 25}) async {
-    debugPrint('>>> getNearbyPlayers() called, userId: $_userId, radius: $radiusMiles');
-    
+    debugPrint(
+        '>>> getNearbyPlayers() called, userId: $_userId, radius: $radiusMiles');
+
     try {
       final uri = Uri.parse('$baseUrl/users/nearby?radiusMiles=$radiusMiles');
-      final response = await _authedGet(uri, headers: {'x-user-id': _userId ?? ''});
-      
-      debugPrint('>>> getNearbyPlayers() response: ${response.statusCode}, length: ${response.body.length}');
-      
+      final response =
+          await _authedGet(uri, headers: {'x-user-id': _userId ?? ''});
+
+      debugPrint(
+          '>>> getNearbyPlayers() response: ${response.statusCode}, length: ${response.body.length}');
+
       if (response.statusCode != 200) {
         debugPrint('>>> getNearbyPlayers() non-200: ${response.body}');
         return [];
       }
-      
+
       final List<dynamic> jsonList = jsonDecode(response.body);
       debugPrint('>>> getNearbyPlayers() parsed ${jsonList.length} items');
-      
+
       final List<User> users = [];
       for (var i = 0; i < jsonList.length; i++) {
         try {
@@ -540,7 +559,7 @@ class ApiService {
           debugPrint('>>> getNearbyPlayers() Failed to parse user $i: $e');
         }
       }
-      
+
       debugPrint('>>> getNearbyPlayers() returning ${users.length} users');
       return users;
     } catch (e) {
@@ -561,7 +580,8 @@ class ApiService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getUserRankHistory(String userId) async {
+  static Future<List<Map<String, dynamic>>> getUserRankHistory(
+      String userId) async {
     final response = await _authedGet(
       Uri.parse('$baseUrl/users/$userId/rank-history'),
     );
@@ -587,7 +607,8 @@ class ApiService {
       body: jsonEncode({'token': token}),
     );
 
-    debugPrint('FCM: Response status=${response.statusCode}, body=${response.body}');
+    debugPrint(
+        'FCM: Response status=${response.statusCode}, body=${response.body}');
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Failed to register FCM token: ${response.statusCode}');
     }
@@ -608,7 +629,7 @@ class ApiService {
   /// Get count of unread messages for badge display
   static Future<int> getUnreadMessageCount() async {
     if (_userId == null || _userId!.isEmpty) return 0;
-    
+
     try {
       final response = await _authedGet(
         Uri.parse('$baseUrl/messages/unread-count'),
@@ -722,7 +743,22 @@ class ApiService {
   }
 
   /// Get user's match history
-  static Future<List<Map<String, dynamic>>> getUserMatchHistory(String userId) async {
+  static Future<List<Map<String, dynamic>>> getUserMatchHistory(
+      String userId) async {
+    List<Map<String, dynamic>> parseList(dynamic data) {
+      if (data is! List) return [];
+      return data
+          .whereType<Map>()
+          .map((m) => m.cast<String, dynamic>())
+          .toList();
+    }
+
+    bool isFinalizedStatus(dynamic rawStatus) {
+      final status = rawStatus?.toString().toLowerCase() ?? '';
+      return status == 'completed' || status == 'ended';
+    }
+
+    // Primary endpoint for profile history.
     final response = await _authedGet(
       Uri.parse('$baseUrl/users/$userId/recent-games'),
       headers: {
@@ -731,14 +767,28 @@ class ApiService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data is List) {
-        return data.cast<Map<String, dynamic>>();
-      }
-      return [];
-    } else {
-      return [];
+      final primary = parseList(jsonDecode(response.body));
+      if (primary.isNotEmpty) return primary;
     }
+
+    // Fallback: some backend deployments may not hydrate /recent-games
+    // consistently. Pull full matches and keep finalized rows so profile
+    // history still shows completed outcomes.
+    final fallbackResponse = await _authedGet(
+      Uri.parse('$baseUrl/users/$userId/matches'),
+      headers: {
+        'x-user-id': _userId ?? '',
+      },
+    );
+
+    if (fallbackResponse.statusCode == 200) {
+      final fallback = parseList(jsonDecode(fallbackResponse.body));
+      return fallback
+          .where((m) => isFinalizedStatus(m['status'] ?? m['backendStatus']))
+          .toList();
+    }
+
+    return [];
   }
 
   /// Get user's current rating info
@@ -772,9 +822,11 @@ class ApiService {
   }
 
   /// Get local activity feed (recent games from nearby players)
-  static Future<List<Map<String, dynamic>>> getLocalActivity({int limit = 20, int radiusMiles = 25}) async {
+  static Future<List<Map<String, dynamic>>> getLocalActivity(
+      {int limit = 20, int radiusMiles = 25}) async {
     final response = await _authedGet(
-      Uri.parse('$baseUrl/activity/local?limit=$limit&radiusMiles=$radiusMiles'),
+      Uri.parse(
+          '$baseUrl/activity/local?limit=$limit&radiusMiles=$radiusMiles'),
       headers: {
         'x-user-id': _userId ?? '',
       },
@@ -790,8 +842,10 @@ class ApiService {
   }
 
   /// Get global activity feed (most recent completed matches app-wide)
-  static Future<List<Map<String, dynamic>>> getGlobalActivity({int limit = 3}) async {
-    debugPrint('>>> getGlobalActivity: calling $baseUrl/activity/global?limit=$limit');
+  static Future<List<Map<String, dynamic>>> getGlobalActivity(
+      {int limit = 3}) async {
+    debugPrint(
+        '>>> getGlobalActivity: calling $baseUrl/activity/global?limit=$limit');
     final response = await _authedGet(
       Uri.parse('$baseUrl/activity/global?limit=$limit'),
       headers: {
@@ -799,7 +853,8 @@ class ApiService {
       },
     );
 
-    debugPrint('>>> getGlobalActivity: status=${response.statusCode}, body=${response.body}');
+    debugPrint(
+        '>>> getGlobalActivity: status=${response.statusCode}, body=${response.body}');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data is List) {
@@ -856,14 +911,15 @@ class ApiService {
     String? city,
     String? description,
   }) async {
-    debugPrint('>>> createTeam: name=$name, teamType=$teamType, ageGroup=$ageGroup, gender=$gender, skillLevel=$skillLevel');
+    debugPrint(
+        '>>> createTeam: name=$name, teamType=$teamType, ageGroup=$ageGroup, gender=$gender, skillLevel=$skillLevel');
     debugPrint('>>> createTeam: _userId=$_userId, baseUrl=$baseUrl');
-    
+
     if (_userId == null || _userId!.isEmpty) {
       debugPrint('>>> createTeam: ERROR - userId is null or empty!');
       throw Exception('Not authenticated - userId is missing');
     }
-    
+
     final body = <String, dynamic>{
       'name': name,
       'teamType': teamType,
@@ -884,8 +940,9 @@ class ApiService {
       body: jsonEncode(body),
     );
 
-    debugPrint('>>> createTeam: status=${response.statusCode}, body=${response.body}');
-    
+    debugPrint(
+        '>>> createTeam: status=${response.statusCode}, body=${response.body}');
+
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(response.body);
     }
@@ -942,7 +999,8 @@ class ApiService {
   }
 
   /// Update team details (owner only)
-  static Future<Map<String, dynamic>?> updateTeam(String teamId, Map<String, dynamic> updates) async {
+  static Future<Map<String, dynamic>?> updateTeam(
+      String teamId, Map<String, dynamic> updates) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/teams/$teamId'),
       headers: {
@@ -1257,7 +1315,8 @@ class ApiService {
   }
 
   /// Toggle attendance for a team event (IN / OUT)
-  static Future<bool> toggleEventAttendance(String teamId, String eventId, String status) async {
+  static Future<bool> toggleEventAttendance(
+      String teamId, String eventId, String status) async {
     final response = await _authedPost(
       Uri.parse('$baseUrl/teams/$teamId/events/$eventId/attendance'),
       headers: {
@@ -1296,8 +1355,10 @@ class ApiService {
     }
     // Sort by eventDate ascending
     allEvents.sort((a, b) {
-      final aDate = DateTime.tryParse(a['eventDate']?.toString() ?? '') ?? DateTime.now();
-      final bDate = DateTime.tryParse(b['eventDate']?.toString() ?? '') ?? DateTime.now();
+      final aDate =
+          DateTime.tryParse(a['eventDate']?.toString() ?? '') ?? DateTime.now();
+      final bDate =
+          DateTime.tryParse(b['eventDate']?.toString() ?? '') ?? DateTime.now();
       return aDate.compareTo(bDate);
     });
     return allEvents;
@@ -1320,7 +1381,8 @@ class ApiService {
   }
 
   /// Follow a court
-  static Future<bool> followCourt(String courtId, {bool alertsEnabled = false}) async {
+  static Future<bool> followCourt(String courtId,
+      {bool alertsEnabled = false}) async {
     final response = await _authedPost(
       Uri.parse('$baseUrl/users/me/follows/courts'),
       headers: {
@@ -1338,7 +1400,8 @@ class ApiService {
   /// Unfollow a court
   static Future<bool> unfollowCourt(String courtId) async {
     final response = await _authedDelete(
-      Uri.parse('$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}'),
+      Uri.parse(
+          '$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}'),
       headers: {'x-user-id': _userId ?? ''},
     );
     return response.statusCode == 200;
@@ -1347,7 +1410,8 @@ class ApiService {
   /// Set court alert preference
   static Future<bool> setCourtAlert(String courtId, bool enabled) async {
     final response = await _authedPut(
-      Uri.parse('$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}/alerts'),
+      Uri.parse(
+          '$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}/alerts'),
       headers: {
         'x-user-id': _userId ?? '',
         'Content-Type': 'application/json',
@@ -1427,7 +1491,8 @@ class ApiService {
   }
 
   /// Get activity for a specific court
-  static Future<List<Map<String, dynamic>>> getCourtActivity(String courtId) async {
+  static Future<List<Map<String, dynamic>>> getCourtActivity(
+      String courtId) async {
     final response = await _authedGet(
       Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/activity'),
       headers: {'x-user-id': _userId ?? ''},
@@ -1440,7 +1505,8 @@ class ApiService {
   }
 
   /// Get active check-ins for a court
-  static Future<List<Map<String, dynamic>>> getActiveCheckIns(String courtId) async {
+  static Future<List<Map<String, dynamic>>> getActiveCheckIns(
+      String courtId) async {
     final response = await _authedGet(
       Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/check-ins'),
       headers: {'x-user-id': _userId ?? ''},
@@ -1471,8 +1537,9 @@ class ApiService {
   /// Create a new status with optional image, video, scheduled time, and court tag
   static Future<Map<String, dynamic>?> createStatus(
     String content, {
-    String? imageUrl, 
-    DateTime? scheduledAt, 
+    String? imageUrl,
+    DateTime? scheduledAt,
+    bool? isRecurring,
     String? courtId,
     String? videoUrl,
     String? videoThumbnailUrl,
@@ -1483,11 +1550,14 @@ class ApiService {
     String? tagMode,
     List<String>? taggedPlayerIds,
   }) async {
-    debugPrint('API createStatus: content length=${content.length}, imageUrl=${imageUrl != null ? "${imageUrl.length} chars" : "null"}, videoUrl=${videoUrl != null ? "present" : "null"}, scheduledAt=$scheduledAt, courtId=$courtId');
+    debugPrint(
+        'API createStatus: content length=${content.length}, imageUrl=${imageUrl != null ? "${imageUrl.length} chars" : "null"}, videoUrl=${videoUrl != null ? "present" : "null"}, scheduledAt=$scheduledAt, courtId=$courtId');
     final body = {
       'content': content,
       if (imageUrl != null) 'imageUrl': imageUrl,
-      if (scheduledAt != null) 'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+      if (scheduledAt != null)
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+      if (isRecurring != null) 'isRecurring': isRecurring,
       if (courtId != null) 'courtId': courtId,
       if (videoUrl != null) 'videoUrl': videoUrl,
       if (videoThumbnailUrl != null) 'videoThumbnailUrl': videoThumbnailUrl,
@@ -1496,7 +1566,8 @@ class ApiService {
       if (courtType != null) 'courtType': courtType,
       if (ageRange != null) 'ageRange': ageRange,
       if (tagMode != null) 'tagMode': tagMode,
-      if (taggedPlayerIds != null && taggedPlayerIds.isNotEmpty) 'taggedPlayerIds': taggedPlayerIds,
+      if (taggedPlayerIds != null && taggedPlayerIds.isNotEmpty)
+        'taggedPlayerIds': taggedPlayerIds,
     };
     debugPrint('API createStatus: body keys=${body.keys.toList()}');
     final response = await _authedPost(
@@ -1546,7 +1617,8 @@ class ApiService {
       Uri.parse(url),
       headers: {'x-user-id': _userId ?? ''},
     );
-    debugPrint('UNIFIED_FEED: status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 500))}');
+    debugPrint(
+        'UNIFIED_FEED: status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 500))}');
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       debugPrint('UNIFIED_FEED: parsed ${data.length} items');
@@ -1554,7 +1626,6 @@ class ApiService {
     }
     return [];
   }
-
 
   /// Like a status
   static Future<bool> likeStatus(int statusId) async {
@@ -1588,7 +1659,8 @@ class ApiService {
   }
 
   /// Add a comment to a status
-  static Future<Map<String, dynamic>?> addStatusComment(int statusId, String content) async {
+  static Future<Map<String, dynamic>?> addStatusComment(
+      int statusId, String content) async {
     final response = await _authedPost(
       Uri.parse('$baseUrl/statuses/$statusId/comments'),
       headers: {
@@ -1604,7 +1676,8 @@ class ApiService {
   }
 
   /// Get comments for a status
-  static Future<List<Map<String, dynamic>>> getStatusComments(int statusId) async {
+  static Future<List<Map<String, dynamic>>> getStatusComments(
+      int statusId) async {
     final response = await _authedGet(
       Uri.parse('$baseUrl/statuses/$statusId/comments'),
       headers: {'x-user-id': _userId ?? ''},
@@ -1639,7 +1712,8 @@ class ApiService {
   }
 
   /// Get all posts by a specific user
-  static Future<List<Map<String, dynamic>>> getUserPosts(String targetUserId) async {
+  static Future<List<Map<String, dynamic>>> getUserPosts(
+      String targetUserId) async {
     final response = await _authedGet(
       Uri.parse('$baseUrl/statuses/user/$targetUserId'),
       headers: {'x-user-id': _userId ?? ''},
@@ -1702,7 +1776,8 @@ class ApiService {
   }
 
   /// Get runs near user's location (for discoverability)
-  static Future<List<ScheduledRun>> getNearbyRuns({int radiusMiles = 25}) async {
+  static Future<List<ScheduledRun>> getNearbyRuns(
+      {int radiusMiles = 25}) async {
     final response = await _authedGet(
       Uri.parse('$baseUrl/runs/nearby?radiusMiles=$radiusMiles'),
       headers: {'x-user-id': _userId ?? ''},
@@ -1717,7 +1792,7 @@ class ApiService {
   /// Get court IDs that have upcoming runs (for filter)
   /// If [today] is true, only returns courts with runs scheduled for today
   static Future<Set<String>> getCourtsWithRuns({bool today = false}) async {
-    final url = today 
+    final url = today
         ? '$baseUrl/runs/courts-with-runs?today=true'
         : '$baseUrl/runs/courts-with-runs';
     final response = await _authedGet(
@@ -1726,7 +1801,10 @@ class ApiService {
     );
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
-      return data.map((r) => (r['courtId'] ?? r['court_id'])?.toString() ?? '').where((id) => id.isNotEmpty).toSet();
+      return data
+          .map((r) => (r['courtId'] ?? r['court_id'])?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
     }
     return {};
   }
@@ -1761,7 +1839,8 @@ class ApiService {
         'durationMinutes': durationMinutes,
         'maxPlayers': maxPlayers,
         if (notes != null) 'notes': notes,
-        if (taggedPlayerIds != null && taggedPlayerIds.isNotEmpty) 'taggedPlayerIds': taggedPlayerIds,
+        if (taggedPlayerIds != null && taggedPlayerIds.isNotEmpty)
+          'taggedPlayerIds': taggedPlayerIds,
         if (tagMode != null) 'tagMode': tagMode,
       }),
     );

@@ -1,9 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 @Injectable()
-export class RunsService {
+export class RunsService implements OnModuleInit {
     constructor(private dataSource: DataSource) { }
+
+    async onModuleInit(): Promise<void> {
+        // Best-effort schema bootstrap so scheduled runs features work in prod without manual migrations.
+        await this.ensureTables();
+    }
 
     // ========== Create ==========
 
@@ -224,6 +229,7 @@ export class RunsService {
                     court_type VARCHAR(20),
                     age_range VARCHAR(20),
                     scheduled_at TIMESTAMP NOT NULL,
+                    status_id INTEGER,
                     duration_minutes INTEGER DEFAULT 120,
                     max_players INTEGER DEFAULT 10,
                     notes TEXT,
@@ -237,6 +243,7 @@ export class RunsService {
                 { name: 'game_mode', type: "VARCHAR(20) DEFAULT '5v5'" },
                 { name: 'court_type', type: "VARCHAR(20)" },
                 { name: 'age_range', type: "VARCHAR(20)" },
+                { name: 'status_id', type: "INTEGER" },
                 { name: 'duration_minutes', type: "INTEGER DEFAULT 120" },
                 { name: 'max_players', type: "INTEGER DEFAULT 10" },
                 { name: 'notes', type: "TEXT" },

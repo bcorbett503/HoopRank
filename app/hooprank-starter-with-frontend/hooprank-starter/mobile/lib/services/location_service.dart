@@ -1,6 +1,20 @@
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
+  /// Best-effort permission request used for first-login onboarding.
+  /// Returns the final permission state (may still be denied).
+  static Future<LocationPermission> requestPermissionIfNeeded() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      return permission;
+    } catch (_) {
+      return LocationPermission.denied;
+    }
+  }
+
   static Future<Position?> getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -9,7 +23,7 @@ class LocationService {
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       // Location services are not enabled don't continue
-      // accessing the position and request users of the 
+      // accessing the position and request users of the
       // App to enable the location services.
       return null;
     }
@@ -20,17 +34,17 @@ class LocationService {
       if (permission == LocationPermission.denied) {
         // Permissions are denied, next time you could try
         // requesting permissions again (this is also where
-        // Android's shouldShowRequestPermissionRationale 
+        // Android's shouldShowRequestPermissionRationale
         // returned true. According to Android guidelines
         // your App should show an explanatory UI now.
         return null;
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
-      // Permissions are denied forever, handle appropriately. 
+      // Permissions are denied forever, handle appropriately.
       return null;
-    } 
+    }
 
     // When we reach here, permissions are granted and we can
     // continue accessing the position of the device.

@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
-import '../services/mock_data.dart';
 import '../services/profile_service.dart';
 import '../services/api_service.dart';
 
@@ -30,7 +29,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String? _profilePictureUrl;
   File? _imageFile;
   bool _loading = true;
-  
+
   // Track if fields have been touched for validation UI
   bool _firstNameTouched = false;
   bool _lastNameTouched = false;
@@ -53,11 +52,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Future<void> _loadInitialData() async {
     final auth = context.read<AuthState>();
     final userId = auth.currentUser?.id;
-    final playerId = auth.currentUser?.id;
+    final isFirstTimeSetup =
+        auth.currentUser != null && !auth.currentUser!.isProfileComplete;
 
-    if (userId != null && playerId != null) {
+    if (userId != null) {
       final existing = await ProfileService.getProfile(userId);
-      if (existing != null) {
+      // For first-login/profile-creation we intentionally do NOT prefill the
+      // text fields. The user should see hint/placeholder text (so they don't
+      // have to delete random values), while still benefiting from their
+      // provider avatar if available.
+      if (existing != null && !isFirstTimeSetup) {
         setState(() {
           _firstNameCtrl.text = existing.firstName;
           _lastNameCtrl.text = existing.lastName;
@@ -73,27 +77,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         return;
       }
 
-      // Fallback to mock player data
-      try {
-        final p = mockPlayers.firstWhere((p) => p.id == playerId);
-        final nameParts = p.name.split(' ');
-        setState(() {
-          _firstNameCtrl.text = nameParts.isNotEmpty ? nameParts[0] : '';
-          _lastNameCtrl.text = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-          // Calculate birthdate from age if available
-          final age = p.age.clamp(13, 65);
-          _birthdate = DateTime(DateTime.now().year - age, 1, 1);
-          _zipCtrl.text = p.zip ?? '';
-          // Parse height "6'4""
-          final parts = p.height.split("'");
-          if (parts.length > 0) _ft = (int.tryParse(parts[0]) ?? 6).clamp(4, 7);
-          if (parts.length > 1) _inch = (int.tryParse(parts[1].replaceAll('"', '')) ?? 0).clamp(0, 11);
-          _pos = p.position;
-          _loading = false;
-        });
-      } catch (e) {
-        setState(() => _loading = false);
-      }
+      // First-time setup defaults: keep inputs empty so hintText appears.
+      setState(() {
+        _firstNameCtrl.text = '';
+        _lastNameCtrl.text = '';
+        _birthdate = null;
+        _zipCtrl.text = '';
+        _ft = 6;
+        _inch = 0;
+        _pos = 'G';
+        _profilePictureUrl =
+            auth.currentUser?.photoUrl ?? existing?.profilePictureUrl;
+        _loading = false;
+      });
     } else {
       setState(() => _loading = false);
     }
@@ -112,7 +108,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Color(0xFFFF6B35)),
+              leading:
+                  const Icon(Icons.photo_library, color: Color(0xFFFF6B35)),
               title: const Text('Choose from Gallery'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -135,9 +132,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (pickedFile != null) {
       setState(() {
         _imageFile = File(pickedFile.path);
-        // For now, we'll just use the local path as the URL. 
+        // For now, we'll just use the local path as the URL.
         // In a real app, you'd upload this to storage and get a URL.
-        _profilePictureUrl = pickedFile.path; 
+        _profilePictureUrl = pickedFile.path;
       });
     }
   }
@@ -146,9 +143,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _save() async {
     if (_saving) return;
-    
+
     setState(() => _saving = true);
-    
+
     try {
       final auth = context.read<AuthState>();
       final userId = auth.currentUser?.id;
@@ -161,17 +158,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           try {
             final bytes = await _imageFile!.readAsBytes();
             final base64Image = base64Encode(bytes);
-            final mimeType = _imageFile!.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+            final mimeType = _imageFile!.path.toLowerCase().endsWith('.png')
+                ? 'image/png'
+                : 'image/jpeg';
             avatarUrl = 'data:$mimeType;base64,$base64Image';
             debugPrint('Profile photo encoded: ${avatarUrl.length} chars');
           } catch (e) {
             debugPrint('Failed to encode profile photo: $e');
           }
-        } else if (_profilePictureUrl != null && !_profilePictureUrl!.startsWith('/')) {
+        } else if (_profilePictureUrl != null &&
+            !_profilePictureUrl!.startsWith('/')) {
           // Keep existing network URL
           avatarUrl = _profilePictureUrl;
         }
-        
+
         // Save profile data including avatar via API
         final profileUpdates = <String, dynamic>{
           'name': '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}',
@@ -181,7 +181,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         if (avatarUrl != null) {
           profileUpdates['avatarUrl'] = avatarUrl;
         }
-        
+
         try {
           await ApiService.updateProfile(userId, profileUpdates);
           debugPrint('Profile updated successfully');
@@ -189,13 +189,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           debugPrint('Profile update failed: $e');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to save profile: $e'), backgroundColor: Colors.red),
+              SnackBar(
+                  content: Text('Failed to save profile: $e'),
+                  backgroundColor: Colors.red),
             );
             setState(() => _saving = false);
             return;
           }
         }
-        
+
         final data = ProfileData(
           firstName: _firstNameCtrl.text.trim(),
           lastName: _lastNameCtrl.text.trim(),
@@ -209,19 +211,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         );
         await ProfileService.saveProfile(userId, data);
         ProfileService.applyProfileToPlayer(playerId, data);
-        
+
         // Refresh user data from API to update the app state
         try {
           await auth.refreshUser();
         } catch (e) {
           debugPrint('Refresh user failed (continuing anyway): $e');
         }
-        
+
         // CRITICAL: Update local user position to ensure isProfileComplete returns true
         // This is needed because refreshUser might fail but we know the profile was saved
         await auth.updateUserPosition(_pos);
         debugPrint('Local user position updated to: $_pos');
-        
+
         if (mounted) context.go('/play');
       }
     } catch (e) {
@@ -236,11 +238,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
-
   int _calculateAge(DateTime birthdate) {
     final now = DateTime.now();
     int age = now.year - birthdate.year;
-    if (now.month < birthdate.month || 
+    if (now.month < birthdate.month ||
         (now.month == birthdate.month && now.day < birthdate.day)) {
       age--;
     }
@@ -248,9 +249,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   /// Builds a field label with optional red/green validation indicator
-  Widget _buildFieldLabel(String label, bool isValid, bool isTouched, {bool required = false, bool optional = false}) {
+  Widget _buildFieldLabel(String label, bool isValid, bool isTouched,
+      {bool required = false, bool optional = false}) {
     Widget? indicator;
-    
+
     if (required && isTouched) {
       // Required field: show indicator once touched
       indicator = Icon(
@@ -266,7 +268,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         size: 16,
       );
     }
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -278,7 +280,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           if (optional)
             const Text(
               ' (optional)',
-              style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
+              style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic),
             ),
           if (indicator != null) ...[
             const SizedBox(width: 6),
@@ -291,12 +296,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_loading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     // Trim and strip any invisible chars iPad keyboard may insert
     final zipText = _zipCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
     final zipValid = zipText.isEmpty || RegExp(r'^[0-9]{5}$').hasMatch(zipText);
-    final nameValid = _firstNameCtrl.text.trim().isNotEmpty && _lastNameCtrl.text.trim().isNotEmpty;
+    final nameValid = _firstNameCtrl.text.trim().isNotEmpty &&
+        _lastNameCtrl.text.trim().isNotEmpty;
     // Only name is required — ZIP is optional (GPS provides location)
     final canSave = nameValid && zipValid;
 
@@ -344,15 +351,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       ),
                       child: ClipOval(
                         child: _imageFile != null
-                            ? Image.file(_imageFile!, fit: BoxFit.cover, width: 110, height: 110)
-                            : (_profilePictureUrl != null && !_profilePictureUrl!.startsWith('/'))
-                                ? Image.network(_profilePictureUrl!, fit: BoxFit.cover, width: 110, height: 110)
+                            ? Image.file(_imageFile!,
+                                fit: BoxFit.cover, width: 110, height: 110)
+                            : (_profilePictureUrl != null &&
+                                    !_profilePictureUrl!.startsWith('/'))
+                                ? Image.network(_profilePictureUrl!,
+                                    fit: BoxFit.cover, width: 110, height: 110)
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.person, color: Colors.grey.shade600, size: 40),
+                                      Icon(Icons.person,
+                                          color: Colors.grey.shade600,
+                                          size: 40),
                                       const SizedBox(height: 4),
-                                      Text('Add Photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+                                      Text('Add Photo',
+                                          style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 11)),
                                     ],
                                   ),
                       ),
@@ -366,9 +381,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF6B35),
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1A252F), width: 2),
+                          border: Border.all(
+                              color: const Color(0xFF1A252F), width: 2),
                         ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                        child: const Icon(Icons.camera_alt,
+                            color: Colors.white, size: 18),
                       ),
                     ),
                   ],
@@ -378,7 +395,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const SizedBox(height: 24),
 
             // First Name
-            _buildFieldLabel('First Name', _firstNameCtrl.text.trim().isNotEmpty, _firstNameTouched, required: true),
+            _buildFieldLabel('First Name',
+                _firstNameCtrl.text.trim().isNotEmpty, _firstNameTouched,
+                required: true),
             TextField(
               controller: _firstNameCtrl,
               decoration: const InputDecoration(
@@ -391,7 +410,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const SizedBox(height: 16),
 
             // Last Name
-            _buildFieldLabel('Last Name', _lastNameCtrl.text.trim().isNotEmpty, _lastNameTouched, required: true),
+            _buildFieldLabel('Last Name', _lastNameCtrl.text.trim().isNotEmpty,
+                _lastNameTouched,
+                required: true),
             TextField(
               controller: _lastNameCtrl,
               decoration: const InputDecoration(
@@ -405,19 +426,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
             const Divider(),
             const SizedBox(height: 16),
-            const Text('Player Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Player Details',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
 
             // Birthdate (Optional per App Store Guideline 5.1.1)
-            _buildFieldLabel('Birthday', _birthdate != null, true, required: false, optional: true),
+            _buildFieldLabel('Birthday', _birthdate != null, true,
+                required: false, optional: true),
             const SizedBox(height: 8),
             InkWell(
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,
-                  initialDate: _birthdate ?? DateTime(DateTime.now().year - 25, 1, 1),
+                  initialDate:
+                      _birthdate ?? DateTime(DateTime.now().year - 25, 1, 1),
                   firstDate: DateTime(1940),
-                  lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)),
+                  lastDate:
+                      DateTime.now().subtract(const Duration(days: 365 * 13)),
                   helpText: 'Select your birthday',
                   initialEntryMode: DatePickerEntryMode.input,
                 );
@@ -426,7 +451,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 }
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey.shade400),
                   borderRadius: BorderRadius.circular(4),
@@ -435,7 +461,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _birthdate != null 
+                      _birthdate != null
                           ? DateFormat('MMMM d, yyyy').format(_birthdate!)
                           : 'Select your birthday',
                       style: TextStyle(
@@ -458,14 +484,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const SizedBox(height: 16),
 
             // ZIP - Optional, GPS handles location (App Store Guidelines 5.1.1 & 2.1)
-            _buildFieldLabel('ZIP Code', zipText.length == 5, _zipTouched, required: false, optional: true),
+            _buildFieldLabel('ZIP Code', zipText.length == 5, _zipTouched,
+                required: false, optional: true),
             TextField(
               controller: _zipCtrl,
               decoration: InputDecoration(
                 hintText: 'e.g. 94103',
                 helperText: 'Optional — we can use your GPS location instead',
                 helperStyle: const TextStyle(color: Colors.grey, fontSize: 11),
-                errorText: _zipTouched && zipText.isNotEmpty && zipText.length != 5 ? 'ZIP code must be 5 digits' : null,
+                errorText:
+                    _zipTouched && zipText.isNotEmpty && zipText.length != 5
+                        ? 'ZIP code must be 5 digits'
+                        : null,
                 border: const OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
@@ -484,12 +514,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Height (ft)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Text('Height (ft)',
+                          style: TextStyle(color: Colors.grey, fontSize: 12)),
                       DropdownButtonFormField<int>(
                         value: _ft,
-                        items: [4, 5, 6, 7].map((h) => DropdownMenuItem(value: h, child: Text('$h ft'))).toList(),
+                        items: [4, 5, 6, 7]
+                            .map((h) => DropdownMenuItem(
+                                value: h, child: Text('$h ft')))
+                            .toList(),
                         onChanged: (val) => setState(() => _ft = val!),
-                        decoration: const InputDecoration(border: OutlineInputBorder()),
+                        decoration:
+                            const InputDecoration(border: OutlineInputBorder()),
                       ),
                     ],
                   ),
@@ -499,12 +534,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Height (in)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Text('Height (in)',
+                          style: TextStyle(color: Colors.grey, fontSize: 12)),
                       DropdownButtonFormField<int>(
                         value: _inch,
-                        items: List.generate(12, (i) => i).map((h) => DropdownMenuItem(value: h, child: Text('$h in'))).toList(),
+                        items: List.generate(12, (i) => i)
+                            .map((h) => DropdownMenuItem(
+                                value: h, child: Text('$h in')))
+                            .toList(),
                         onChanged: (val) => setState(() => _inch = val!),
-                        decoration: const InputDecoration(border: OutlineInputBorder()),
+                        decoration:
+                            const InputDecoration(border: OutlineInputBorder()),
                       ),
                     ],
                   ),
@@ -514,7 +554,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const SizedBox(height: 16),
 
             // Position
-            const Text('Position', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const Text('Position',
+                style: TextStyle(color: Colors.grey, fontSize: 12)),
             const SizedBox(height: 8),
             Row(
               children: ['G', 'F', 'C'].map((p) {
@@ -549,7 +590,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text('Save & Continue'),

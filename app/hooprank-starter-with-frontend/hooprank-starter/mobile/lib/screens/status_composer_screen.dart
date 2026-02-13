@@ -670,6 +670,18 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
     final text = _textController.text.trim();
     // Allow posting with just a scheduled time + court (text is optional for runs)
     if (text.isEmpty && _selectedImage == null && _selectedVideo == null && _scheduledTime == null) return;
+
+    // Scheduled runs must be associated with a court so they can be discovered
+    // in Courts -> Runs and in the court details "Upcoming Runs" list.
+    if (_scheduledTime != null && _taggedCourt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please tag a court to schedule a run.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     
     setState(() => _isSubmitting = true);
     
@@ -721,6 +733,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
         text,
         imageUrl: imageUrl,
         scheduledAt: _scheduledTime,
+        isRecurring: _scheduledTime != null ? _isRecurring : null,
         courtId: _taggedCourt?.id,
         videoUrl: videoUrl,
         videoThumbnailUrl: videoThumbnailUrl,
@@ -974,29 +987,116 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                   
                   // Scheduled time badge
                   if (_scheduledTime != null)
-                    GestureDetector(
-                      onTap: () => setState(() => _scheduledTime = null),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.deepOrange.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.event, size: 16, color: Colors.deepOrange),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatTime(_scheduledTime!),
-                              style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w500),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          // Date/time chip (tap to edit; X clears)
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _showScheduleSheet,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.deepOrange.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.event, size: 16, color: Colors.deepOrange),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _formatTime(_scheduledTime!),
+                                      style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w500),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    SizedBox(
+                                      width: 28,
+                                      height: 28,
+                                      child: IconButton(
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        icon: const Icon(Icons.close, size: 16, color: Colors.deepOrange),
+                                        tooltip: 'Clear scheduled time',
+                                        onPressed: () {
+                                          setState(() {
+                                            _scheduledTime = null;
+                                            _isRecurring = false;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.close, size: 16, color: Colors.deepOrange),
-                          ],
-                        ),
+                          ),
+
+                          // Recurring toggle (weekly for 1 year)
+                          GestureDetector(
+                            onTap: () => setState(() => _isRecurring = !_isRecurring),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _isRecurring
+                                    ? Colors.green.withOpacity(0.15)
+                                    : Colors.white.withOpacity(0.06),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _isRecurring
+                                      ? Colors.green.withOpacity(0.45)
+                                      : Colors.white.withOpacity(0.12),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 18,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: _isRecurring ? Colors.green : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: _isRecurring ? Colors.green : Colors.white24,
+                                      ),
+                                    ),
+                                    child: _isRecurring
+                                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Recurring',
+                                    style: TextStyle(
+                                      color: _isRecurring ? Colors.green : Colors.white54,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (_isRecurring) ...[
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '1y',
+                                      style: TextStyle(
+                                        color: Colors.green.withOpacity(0.9),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   

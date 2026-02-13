@@ -32,6 +32,7 @@ export class StatusesService {
         content: string,
         imageUrl?: string,
         scheduledAt?: string,
+        isRecurring?: boolean,
         courtId?: string,
         videoUrl?: string,
         videoThumbnailUrl?: string,
@@ -43,7 +44,7 @@ export class StatusesService {
         tagMode?: string,
     ): Promise<PlayerStatus> {
         try {
-            console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, courtId, videoUrl, videoDurationMs, gameMode, courtType, ageRange });
+            console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, isRecurring, courtId, videoUrl, videoDurationMs, gameMode, courtType, ageRange });
 
             // Use raw SQL to insert status (bypasses TypeORM entity schema issues)
             const result = await this.dataSource.query(`
@@ -58,19 +59,85 @@ export class StatusesService {
             // Bridge: also write to scheduled_runs so Courts→Runs filter works
             if (scheduledAt && courtId) {
                 try {
-                    await this.dataSource.query(`
-                        INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, created_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-                    `, [
-                        courtId,
-                        userId,
-                        content || null,
-                        gameMode || '5v5',
-                        courtType || null,
-                        ageRange || null,
-                        new Date(scheduledAt),
-                    ]);
-                    console.log('createStatus: bridged to scheduled_runs for court', courtId);
+                    // scheduled_runs is created/migrated by RunsService on startup, but keep this defensive
+                    // so status posting doesn't break if the table/column is missing in some environment.
+                    await this.dataSource
+                        .query(`ALTER TABLE scheduled_runs ADD COLUMN IF NOT EXISTS status_id INTEGER`)
+                        .catch(() => { });
+
+                    const scheduledDate = new Date(scheduledAt);
+                    if (!isNaN(scheduledDate.getTime())) {
+                        let insertedRuns: any[] = [];
+                        const statusId = createdStatus?.id ?? null;
+
+                        if (isRecurring) {
+                            // Weekly recurring for one year from the scheduled date/time.
+                            // We intentionally materialize the recurrence into scheduled_runs
+                            // so existing queries (Courts->Runs, court details) work without
+                            // schema changes.
+                            // NOTE: scheduled_runs.title is VARCHAR(255); LEFT(...) prevents inserts
+                            // from failing if the status content is longer than 255 chars.
+                            const until = new Date(scheduledDate);
+                            until.setFullYear(until.getFullYear() + 1);
+
+                            insertedRuns = await this.dataSource.query(`
+                                INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, created_at, status_id)
+                                SELECT $1, $2, LEFT($3, 255), $4, $5, $6, gs.scheduled_at, NOW(), $9
+                                FROM generate_series($7::timestamp, $8::timestamp, interval '1 week') AS gs(scheduled_at)
+                                RETURNING id
+                            `, [
+                                courtId,
+                                userId,
+                                content || null,
+                                gameMode || '5v5',
+                                courtType || null,
+                                ageRange || null,
+                                scheduledDate,
+                                until,
+                                statusId,
+                            ]);
+                            console.log(
+                                `createStatus: bridged to scheduled_runs (recurring) for court ${courtId}, instances=${insertedRuns.length}`
+                            );
+                        } else {
+                            // NOTE: scheduled_runs.title is VARCHAR(255); LEFT(...) prevents inserts
+                            // from failing if the status content is longer than 255 chars.
+                            insertedRuns = await this.dataSource.query(`
+                                INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, created_at, status_id)
+                                VALUES ($1, $2, LEFT($3, 255), $4, $5, $6, $7, NOW(), $8)
+                                RETURNING id
+                            `, [
+                                courtId,
+                                userId,
+                                content || null,
+                                gameMode || '5v5',
+                                courtType || null,
+                                ageRange || null,
+                                scheduledDate,
+                                statusId,
+                            ]);
+                            console.log('createStatus: bridged to scheduled_runs for court', courtId);
+                        }
+
+                        // Best-effort: also add the creator to run_attendees so the
+                        // court details UI shows a correct attendeeCount/isAttending.
+                        try {
+                            const runIds = (insertedRuns || [])
+                                .map((r: any) => r?.id)
+                                .filter((id: any) => !!id);
+                            if (runIds.length > 0) {
+                                await this.dataSource.query(`
+                                    INSERT INTO run_attendees (run_id, user_id, status, created_at)
+                                    SELECT unnest($1::uuid[]), $2, 'going', NOW()
+                                    ON CONFLICT DO NOTHING
+                                `, [runIds, userId]);
+                            }
+                        } catch (attendBridgeErr) {
+                            console.warn('createStatus: run_attendees bridge failed (non-fatal):', attendBridgeErr.message);
+                        }
+                    } else {
+                        console.warn('createStatus: invalid scheduledAt, skipping scheduled_runs bridge');
+                    }
                 } catch (bridgeErr) {
                     console.warn('createStatus: scheduled_runs bridge failed (non-fatal):', bridgeErr.message);
                 }
@@ -249,7 +316,28 @@ export class StatusesService {
 
     async deleteStatus(userId: string, statusId: number): Promise<boolean> {
         const result = await this.statusRepo.delete({ id: statusId, userId });
-        return (result.affected ?? 0) > 0;
+        const deleted = (result.affected ?? 0) > 0;
+
+        if (deleted) {
+            // If this status represents a scheduled run (or recurring series), clean up
+            // the scheduled_runs instances so Courts -> Runs doesn't show orphan data.
+            try {
+                await this.dataSource.query(`
+                    DELETE FROM run_attendees
+                    WHERE run_id IN (
+                        SELECT id FROM scheduled_runs WHERE status_id = $1 AND created_by = $2
+                    )
+                `, [statusId, userId]);
+                await this.dataSource.query(
+                    `DELETE FROM scheduled_runs WHERE status_id = $1 AND created_by = $2`,
+                    [statusId, userId],
+                );
+            } catch (e) {
+                console.warn('deleteStatus: scheduled_runs cleanup failed (non-fatal):', e.message);
+            }
+        }
+
+        return deleted;
     }
 
     // ========== Feed ==========
@@ -502,7 +590,14 @@ export class StatusesService {
                     ps.video_url as "videoUrl",
                     ps.video_thumbnail_url as "videoThumbnailUrl",
                     ps.video_duration_ms as "videoDurationMs",
-                    ps.scheduled_at as "scheduledAt",
+                    -- For recurring scheduled runs, always expose the *next* upcoming instance so the feed
+                    -- doesn't disappear after the first occurrence.
+                    COALESCE((
+                        SELECT MIN(sr.scheduled_at)
+                        FROM scheduled_runs sr
+                        WHERE sr.status_id = ps.id
+                          AND sr.scheduled_at >= NOW()
+                    ), ps.scheduled_at) as "scheduledAt",
                     ps.court_id::TEXT as "courtId",
                     c.name as "courtName",
                     ST_Y(c.geog::geometry) as "courtLat",

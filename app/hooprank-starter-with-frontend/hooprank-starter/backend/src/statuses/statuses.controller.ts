@@ -13,6 +13,7 @@ export class StatusesController {
             content: string;
             imageUrl?: string;
             scheduledAt?: string;
+            isRecurring?: boolean;
             courtId?: string;
             videoUrl?: string;
             videoThumbnailUrl?: string;
@@ -32,6 +33,7 @@ export class StatusesController {
             body.content,
             body.imageUrl,
             body.scheduledAt,
+            body.isRecurring,
             body.courtId,
             body.videoUrl,
             body.videoThumbnailUrl,

@@ -76,7 +76,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadMyTeams(); // Load user's teams for ratings
     _loadTeamInvites(); // Load pending team invites
     _loadTeamChallenges(); // Load pending team challenges
-    _updateLocation();
     _statusController
         .addListener(_onStatusTextChanged); // Court tagging listener
   }

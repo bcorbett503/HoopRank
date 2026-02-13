@@ -42,10 +42,12 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
   List<Court> _courts = [];
+  int? _courtsTotalBeforeCap; // Used to show "zoom in" hint when we cap results
+  int? _courtsCapLimit;
   bool _isLoading = true;
   LatLng _initialCenter = const LatLng(38.0194, -122.5376); // Default to San Rafael
   double _currentZoom = 14.0;
-  bool _showFollowedOnly = false; // Filter for courts with followers
+  bool _showFollowedOnly = false; // Filter for courts the current user follows
   bool? _filterIndoor = true; // null=all, true=indoor only, false=outdoor only
   String? _filterAccess; // null=all, 'public', 'private'
   String? _runsFilter; // null=off, 'today'=runs today, 'all'=all upcoming runs
@@ -271,11 +273,22 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   }
 
   void _onSearchChanged(String query) {
-    List<Court> filteredCourts = CourtService().searchCourts(query);
+    final trimmed = query.trim();
+
+    // Empty search means "browse the map". Never render the entire court set at once.
+    // This prevents crashes when toggling filters (e.g., Indoor -> Outdoor) while zoomed out.
+    if (trimmed.isEmpty) {
+      _updateCourtsForMapCenter();
+      return;
+    }
+
+    List<Court> filteredCourts = CourtService().searchCourts(trimmed);
     filteredCourts = _applyFilters(filteredCourts);
-    
+
+    final capped = _capCourtsForPerformance(filteredCourts, isSearchMode: true);
+    if (!mounted) return;
     setState(() {
-      _courts = filteredCourts;
+      _courts = capped;
     });
   }
   
@@ -322,10 +335,10 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   List<Court> _applyFilters(List<Court> courts) {
     var filtered = courts;
     
-    // Followed filter - courts that have followers
+    // Followed filter - only courts the current user follows.
     if (_showFollowedOnly) {
       final checkInState = Provider.of<CheckInState>(context, listen: false);
-      filtered = filtered.where((court) => checkInState.getFollowerCount(court.id) > 0).toList();
+      filtered = filtered.where((court) => checkInState.isFollowing(court.id)).toList();
     }
     
     // Indoor/Outdoor filter
@@ -363,12 +376,53 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     
     // Apply filters to map view as well
     courtsInView = _applyFilters(courtsInView);
+
+    final capped = _capCourtsForPerformance(courtsInView, isSearchMode: false);
     
     if (mounted) {
       setState(() {
-        _courts = courtsInView;
+        _courts = capped;
       });
     }
+  }
+
+  int _maxCourtsForZoom(double zoom) {
+    // Rendering thousands of markers will crash/jank on iOS.
+    // At low zoom levels, granularity doesn't matter anyway, so we cap aggressively.
+    if (zoom >= 15) return 400;
+    if (zoom >= 13) return 250;
+    if (zoom >= 11) return 150;
+    return 80;
+  }
+
+  List<Court> _capCourtsForPerformance(List<Court> courts, {required bool isSearchMode}) {
+    final max = _maxCourtsForZoom(_currentZoom);
+    _courtsTotalBeforeCap = null;
+    _courtsCapLimit = null;
+
+    if (courts.length <= max) return courts;
+
+    _courtsTotalBeforeCap = courts.length;
+    _courtsCapLimit = max;
+
+    // In browse mode, prioritize courts closest to the map center so the map stays useful.
+    // In search mode, we avoid distance sorting (it can hide far-away matches); just cap
+    // deterministically and rely on the list + selection to navigate.
+    if (!isSearchMode) {
+      final center = _mapController.camera.center;
+      const distance = Distance();
+      final withDistance = courts
+          .map((c) => MapEntry(
+                c,
+                distance.as(LengthUnit.Meter, center, LatLng(c.lat, c.lng)),
+              ))
+          .toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      return withDistance.take(max).map((e) => e.key).toList();
+    }
+
+    final sortedByName = [...courts]..sort((a, b) => a.name.compareTo(b.name));
+    return sortedByName.take(max).toList();
   }
 
   // Keep this for backwards compatibility with initial load
@@ -720,7 +774,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          _runsFilter == 'today' ? 'Today' : (_runsFilter == 'all' ? 'All Runs' : 'Runs'),
+                                          _runsFilter == 'today' ? 'Today' : (_runsFilter == 'all' ? 'All Runs' : 'Find Runs'),
                                           style: TextStyle(
                                             color: _runsFilter != null ? Colors.white : Colors.grey[400],
                                             fontWeight: FontWeight.w600,
@@ -757,65 +811,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              // Followed chip (primary)
-                              Expanded(
-                                child: Consumer<CheckInState>(
-                                  builder: (context, checkInState, _) {
-                                    final followedCount = checkInState.followedCourts.length;
-                                    return GestureDetector(
-                                      onTap: _toggleFollowedFilter,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 10),
-                                        decoration: BoxDecoration(
-                                          color: _showFollowedOnly 
-                                              ? Colors.red 
-                                              : Colors.grey[800],
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              _showFollowedOnly ? Icons.favorite : Icons.favorite_border,
-                                              size: 16,
-                                              color: _showFollowedOnly ? Colors.white : Colors.grey[400],
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'Followed',
-                                              style: TextStyle(
-                                                color: _showFollowedOnly ? Colors.white : Colors.grey[400],
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                            if (followedCount > 0) ...[
-                                              const SizedBox(width: 4),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: Text(
-                                                  '$followedCount',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // All + More filters dropdown
+                              // Indoor/Outdoor filter dropdown
                               PopupMenuButton<String>(
                                 onSelected: (value) {
                                   switch (value) {
@@ -834,12 +830,6 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                       break;
                                     case 'outdoor':
                                       _toggleIndoorFilter(_filterIndoor == false ? null : false);
-                                      break;
-                                    case 'public':
-                                      _setAccessFilter(_filterAccess == 'public' ? null : 'public');
-                                      break;
-                                    case 'private':
-                                      _setAccessFilter(_filterAccess == 'private' ? null : 'private');
                                       break;
                                   }
                                 },
@@ -879,36 +869,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                       ],
                                     ),
                                   ),
-                                  const PopupMenuDivider(),
-                                  PopupMenuItem(
-                                    value: 'public',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.lock_open, size: 18, color: _filterAccess == 'public' ? Colors.green : null),
-                                        const SizedBox(width: 8),
-                                        Text('Public', style: TextStyle(color: _filterAccess == 'public' ? Colors.green : null)),
-                                        if (_filterAccess == 'public') const Spacer(),
-                                        if (_filterAccess == 'public') const Icon(Icons.check, size: 16, color: Colors.green),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'private',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.lock, size: 18, color: _filterAccess == 'private' ? Colors.orange : null),
-                                        const SizedBox(width: 8),
-                                        Text('Private', style: TextStyle(color: _filterAccess == 'private' ? Colors.orange : null)),
-                                        if (_filterAccess == 'private') const Spacer(),
-                                        if (_filterAccess == 'private') const Icon(Icons.check, size: 16, color: Colors.orange),
-                                      ],
-                                    ),
-                                  ),
                                 ],
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                   decoration: BoxDecoration(
-                                    color: (_filterIndoor != null || _filterAccess != null) 
+                                    color: _filterIndoor != null 
                                         ? const Color(0xFF00C853) 
                                         : Colors.grey[800],
                                     borderRadius: BorderRadius.circular(10),
@@ -917,9 +882,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        'All',
+                                        _filterIndoor == true ? 'Indoor' : (_filterIndoor == false ? 'Outdoor' : 'All'),
                                         style: TextStyle(
-                                          color: (_filterIndoor != null || _filterAccess != null) 
+                                          color: _filterIndoor != null 
                                               ? Colors.white 
                                               : Colors.grey[400],
                                           fontWeight: FontWeight.w600,
@@ -930,7 +895,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                       Icon(
                                         Icons.arrow_drop_down,
                                         size: 18,
-                                        color: (_filterIndoor != null || _filterAccess != null) 
+                                        color: _filterIndoor != null 
                                             ? Colors.white 
                                             : Colors.grey[400],
                                       ),
@@ -938,8 +903,86 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
+                              // Followed chip (heart icon only) — last
+                              Consumer<CheckInState>(
+                                  builder: (context, checkInState, _) {
+                                    final followedCount = checkInState.followedCourts.length;
+                                    return GestureDetector(
+                                      onTap: _toggleFollowedFilter,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: _showFollowedOnly 
+                                              ? Colors.red 
+                                              : Colors.grey[800],
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              _showFollowedOnly ? Icons.favorite : Icons.favorite_border,
+                                              size: 18,
+                                              color: _showFollowedOnly ? Colors.white : Colors.grey[400],
+                                            ),
+                                            if (followedCount > 0) ...[
+                                              const SizedBox(width: 4),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.2),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  '$followedCount',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                             ],
                           ),
+                          if (_courtsTotalBeforeCap != null &&
+                              _courtsCapLimit != null &&
+                              _courtsTotalBeforeCap! > _courtsCapLimit!) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.55),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.zoom_in, size: 16, color: Colors.white70),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Showing $_courtsCapLimit of $_courtsTotalBeforeCap courts. Zoom in to see more.',
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

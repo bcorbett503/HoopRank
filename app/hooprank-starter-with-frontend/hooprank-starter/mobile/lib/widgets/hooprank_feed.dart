@@ -10,6 +10,7 @@ import '../services/messages_service.dart';
 import '../models.dart';
 import 'feed_video_player.dart';
 import 'player_profile_sheet.dart';
+import 'dart:async';
 import 'dart:math' as math;
 
 /// Unified HoopRank Feed with For You/Following tabs
@@ -20,33 +21,45 @@ class HoopRankFeed extends StatefulWidget {
   State<HoopRankFeed> createState() => _HoopRankFeedState();
 }
 
-class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderStateMixin {
+class _HoopRankFeedState extends State<HoopRankFeed>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final MessagesService _messagesService = MessagesService();
   List<Map<String, dynamic>> _forYouPosts = [];
   List<Map<String, dynamic>> _followingPosts = [];
   List<ChallengeRequest> _pendingChallenges = []; // Pinned 1v1 challenges
-  List<TeamChallengeRequest> _pendingTeamChallenges = []; // Pinned team challenges
+  List<TeamChallengeRequest> _pendingTeamChallenges =
+      []; // Pinned team challenges
   bool _isLoadingForYou = true;
   bool _isLoadingFollowing = true;
   Position? _userLocation;
+  int _forYouLoadSeq = 0;
+  int _followingLoadSeq = 0;
 
   // Local state for optimistic UI updates
   final Map<int, bool> _likeStates = {}; // statusId -> isLiked
   final Map<int, int> _likeCounts = {}; // statusId -> count
   final Map<int, bool> _expandedComments = {}; // statusId -> isExpanded
-  final Map<int, List<Map<String, dynamic>>> _comments = {}; // statusId -> comments
+  final Map<int, List<Map<String, dynamic>>> _comments =
+      {}; // statusId -> comments
   final Map<int, bool> _attendingStates = {}; // statusId -> isAttending
   final Map<int, int> _attendeeCounts = {}; // statusId -> count
-  final Map<int, bool> _expandedAttendees = {}; // statusId -> show attendee list
-  final Map<int, List<Map<String, dynamic>>> _attendeeDetails = {}; // statusId -> attendee list
+  final Map<int, bool> _expandedAttendees =
+      {}; // statusId -> show attendee list
+  final Map<int, List<Map<String, dynamic>>> _attendeeDetails =
+      {}; // statusId -> attendee list
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
-    _initLocation();
+    // Permission prompts (location) are more reliable if triggered after the
+    // first frame is rendered, not during initState.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _initLocation();
+    });
   }
 
   @override
@@ -65,21 +78,27 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     }
   }
 
-  /// Initialize feeds immediately, then fetch location in background
+  /// Initialize feed data and attempt to fetch location for the initial For You
+  /// load (best-effort). Avoids loading For You twice (no-location then
+  /// location) which can cause flicker or an empty response to overwrite a
+  /// location-based response.
   Future<void> _initLocation() async {
-    // Load feeds and challenges immediately without waiting for location
-    _loadForYouFeed();
+    // Load non-location-dependent data immediately.
     _loadFollowingFeed();
     _loadPendingChallenges();
     _loadPendingTeamChallenges();
-    
-    // Fetch location asynchronously in background
-    _fetchLocationAndRefresh();
+
+    // Best-effort: fetch location (may trigger a system permission prompt),
+    // then load For You once using whatever location is available.
+    await _fetchLocation();
+    if (!mounted) return;
+    await _loadForYouFeed();
   }
 
   /// Load pending 1v1 challenges to pin at top of feed
   Future<void> _loadPendingChallenges() async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     debugPrint('FEED: Loading challenges for userId=$userId');
     if (userId == null) {
       debugPrint('FEED: userId is null, skipping challenge load');
@@ -90,7 +109,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       final challenges = await _messagesService.getPendingChallenges(userId);
       debugPrint('FEED: Got ${challenges.length} total challenges from API');
       for (var c in challenges) {
-        debugPrint('FEED: Challenge from ${c.otherUser.name}, direction=${c.direction}, status=${c.message.challengeStatus}');
+        debugPrint(
+            'FEED: Challenge from ${c.otherUser.name}, direction=${c.direction}, status=${c.message.challengeStatus}');
       }
       // Show only still-pending 1v1 challenges, with incoming first so actions are obvious.
       final pendingChallenges = challenges.where((c) {
@@ -101,10 +121,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
           if (a.isReceived == b.isReceived) return 0;
           return a.isReceived ? -1 : 1;
         });
-      debugPrint('FEED: ${pendingChallenges.length} pending challenges after filter');
+      debugPrint(
+          'FEED: ${pendingChallenges.length} pending challenges after filter');
       if (mounted) {
         setState(() => _pendingChallenges = pendingChallenges);
-        debugPrint('FEED: setState complete, _pendingChallenges.length=${_pendingChallenges.length}');
+        debugPrint(
+            'FEED: setState complete, _pendingChallenges.length=${_pendingChallenges.length}');
       }
     } catch (e, stack) {
       debugPrint('Error loading pending challenges: $e');
@@ -114,18 +136,23 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Load pending team challenges to pin at top of feed
   Future<void> _loadPendingTeamChallenges() async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
       // Get user's teams first
       final teams = await ApiService.getMyTeams();
-      final teamIds = teams.map((t) => t['id']?.toString() ?? '').where((id) => id.isNotEmpty).toList();
+      final teamIds = teams
+          .map((t) => t['id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList();
       debugPrint('FEED: Loading team challenges for ${teamIds.length} teams');
 
       if (teamIds.isEmpty) return;
 
-      final teamChallenges = await _messagesService.getPendingTeamChallenges(userId, teamIds);
+      final teamChallenges =
+          await _messagesService.getPendingTeamChallenges(userId, teamIds);
       debugPrint('FEED: Got ${teamChallenges.length} team challenges');
 
       if (mounted) {
@@ -135,32 +162,87 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       debugPrint('Error loading team challenges: $e');
     }
   }
-  
-  /// Fetch location in background and refresh For You feed when available
-  Future<void> _fetchLocationAndRefresh() async {
+
+  /// Best-effort attempt to acquire a position for local feed discovery.
+  /// Returns true if a position was obtained.
+  Future<bool> _fetchLocation({bool requestPermission = true}) async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.low,
-        );
-        _userLocation = position;
-        debugPrint('FEED: Got location: ${position.latitude}, ${position.longitude}');
-        
-        // Refresh For You feed with location for better results
-        if (mounted) {
-          _loadForYouFeed();
+        if (requestPermission) {
+          permission = await Geolocator.requestPermission();
         }
       }
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        // Even with permission granted, location services can be toggled off at
+        // the OS level. In that case we cannot obtain a fix and should fall
+        // back to non-location feed behavior + CTA.
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) return false;
+
+        // Prefer a fresh fix, but fall back to last-known so the feed isn't
+        // blocked by a transient GPS delay.
+        Position? position;
+        try {
+          position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low,
+          ).timeout(const Duration(seconds: 8));
+        } catch (_) {
+          position = await Geolocator.getLastKnownPosition();
+        }
+        if (position == null) return false;
+        final Position pos = position;
+        _userLocation = pos;
+        debugPrint(
+            'FEED: Got location: ${pos.latitude}, ${pos.longitude}');
+
+        // Persist location in the backend so "local" queries (nearby players,
+        // local rankings, etc.) can work even when they don't send lat/lng.
+        final userId =
+            Provider.of<AuthState>(context, listen: false).currentUser?.id;
+        if (userId != null && userId.isNotEmpty) {
+          unawaited(() async {
+            try {
+              await ApiService.updateProfile(userId, {
+                'lat': pos.latitude,
+                'lng': pos.longitude,
+                'locEnabled': true,
+              });
+            } catch (e) {
+              debugPrint('FEED: Failed to update profile location: $e');
+            }
+          }());
+        }
+
+        return true;
+      }
+      return false;
     } catch (e) {
       debugPrint('FEED: Location error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _enableLocationAndRefresh() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.deniedForever) {
+        // iOS/Android: user must enable location in Settings once it's denied forever.
+        await Geolocator.openAppSettings();
+        return;
+      }
+
+      await _fetchLocation(requestPermission: true);
+      if (!mounted) return;
+      await _loadForYouFeed();
+    } catch (e) {
+      debugPrint('FEED: Enable location error: $e');
     }
   }
 
   Future<void> _loadForYouFeed() async {
+    final seq = ++_forYouLoadSeq;
     setState(() => _isLoadingForYou = true);
     try {
       final feed = await ApiService.getUnifiedFeed(
@@ -169,36 +251,38 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         lng: _userLocation?.longitude,
       );
       debugPrint('FEED: For You received ${feed.length} items');
-      
+
       final dedupedFeed = _deduplicateFeed(feed);
-      if (mounted) {
-        setState(() {
-          _forYouPosts = dedupedFeed;
-          _isLoadingForYou = false;
-        });
-      }
+      if (!mounted || seq != _forYouLoadSeq) return; // Ignore stale responses.
+      setState(() {
+        _forYouPosts = dedupedFeed;
+        _isLoadingForYou = false;
+      });
     } catch (e) {
       debugPrint('FEED: Error loading For You feed: $e');
-      if (mounted) setState(() => _isLoadingForYou = false);
+      if (!mounted || seq != _forYouLoadSeq) return;
+      setState(() => _isLoadingForYou = false);
     }
   }
 
   Future<void> _loadFollowingFeed() async {
+    final seq = ++_followingLoadSeq;
     setState(() => _isLoadingFollowing = true);
     try {
       final feed = await ApiService.getUnifiedFeed(filter: 'following');
       debugPrint('FEED: Following received ${feed.length} items');
-      
+
       final dedupedFeed = _deduplicateFeed(feed);
-      if (mounted) {
-        setState(() {
-          _followingPosts = dedupedFeed;
-          _isLoadingFollowing = false;
-        });
-      }
+      if (!mounted || seq != _followingLoadSeq)
+        return; // Ignore stale responses.
+      setState(() {
+        _followingPosts = dedupedFeed;
+        _isLoadingFollowing = false;
+      });
     } catch (e) {
       debugPrint('FEED: Error loading Following feed: $e');
-      if (mounted) setState(() => _isLoadingFollowing = false);
+      if (!mounted || seq != _followingLoadSeq) return;
+      setState(() => _isLoadingFollowing = false);
     }
   }
 
@@ -222,8 +306,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   // Legacy getter for _statusPosts - uses current tab's posts
-  List<Map<String, dynamic>> get _statusPosts => 
-    _tabController.index == 0 ? _forYouPosts : _followingPosts;
+  List<Map<String, dynamic>> get _statusPosts =>
+      _tabController.index == 0 ? _forYouPosts : _followingPosts;
 
   @override
   Widget build(BuildContext context) {
@@ -245,7 +329,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             indicatorSize: TabBarIndicatorSize.tab,
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white54,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            labelStyle:
+                const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             dividerColor: Colors.transparent,
             labelPadding: const EdgeInsets.symmetric(horizontal: 8),
             tabs: const [
@@ -269,38 +354,57 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   Widget _buildForYouFeed() {
-    debugPrint('FEED: _buildForYouFeed called - _isLoadingForYou=$_isLoadingForYou, _forYouPosts.length=${_forYouPosts.length}, _pendingChallenges.length=${_pendingChallenges.length}, _pendingTeamChallenges.length=${_pendingTeamChallenges.length}');
+    debugPrint(
+        'FEED: _buildForYouFeed called - _isLoadingForYou=$_isLoadingForYou, _forYouPosts.length=${_forYouPosts.length}, _pendingChallenges.length=${_pendingChallenges.length}, _pendingTeamChallenges.length=${_pendingTeamChallenges.length}');
     if (_isLoadingForYou) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_forYouPosts.isEmpty && _pendingChallenges.isEmpty && _pendingTeamChallenges.isEmpty) {
+    if (_forYouPosts.isEmpty &&
+        _pendingChallenges.isEmpty &&
+        _pendingTeamChallenges.isEmpty) {
       debugPrint('FEED: Showing empty state - no posts and no challenges');
       return _buildEmptyState(
         'No local activity yet',
         'Be the first to post at a court near you!',
-        extraContent: _userLocation == null 
-          ? Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                'Enable location to see activity within 50 miles',
-                style: TextStyle(color: Colors.orange.shade300, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            )
-          : null,
+        extraContent: _userLocation == null
+            ? Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Enable location to see activity within 50 miles',
+                      style: TextStyle(
+                          color: Colors.orange.shade300, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: _enableLocationAndRefresh,
+                      child: const Text('Enable Location'),
+                    ),
+                  ],
+                ),
+              )
+            : null,
       );
     }
 
     // Pin scheduled runs to top
     final sortedPosts = _sortPostsWithScheduledFirst(_forYouPosts);
     // Total items = team challenges + 1v1 challenges + posts
-    final totalChallenges = _pendingTeamChallenges.length + _pendingChallenges.length;
+    final totalChallenges =
+        _pendingTeamChallenges.length + _pendingChallenges.length;
     final totalItems = totalChallenges + sortedPosts.length;
 
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.wait([_loadForYouFeed(), _loadPendingChallenges(), _loadPendingTeamChallenges()]);
+        await Future.wait([
+          _loadForYouFeed(),
+          _loadPendingChallenges(),
+          _loadPendingTeamChallenges()
+        ]);
       },
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
@@ -323,7 +427,6 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     );
   }
 
-
   Widget _buildFollowingFeed() {
     if (_isLoadingFollowing) {
       return const Center(child: CircularProgressIndicator());
@@ -345,28 +448,43 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
             ...(_pendingChallenges.map((c) => _buildChallengeCard(c)).toList()),
             // Then show empty state to encourage following
             Padding(
-              padding: EdgeInsets.only(top: _pendingChallenges.isEmpty ? 40 : 16, left: 32, right: 32, bottom: 32),
+              padding: EdgeInsets.only(
+                  top: _pendingChallenges.isEmpty ? 40 : 16,
+                  left: 32,
+                  right: 32,
+                  bottom: 32),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Icon(Icons.feed_outlined, size: 48, color: Colors.white.withValues(alpha: 0.2)),
+                  Icon(Icons.feed_outlined,
+                      size: 48, color: Colors.white.withValues(alpha: 0.2)),
                   const SizedBox(height: 16),
-                  const Text('Not following anyone yet', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
+                  const Text('Not following anyone yet',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500)),
                   const SizedBox(height: 8),
-                  const Text('Follow courts and players to see their updates here.', style: TextStyle(color: Colors.white38, fontSize: 13), textAlign: TextAlign.center),
+                  const Text(
+                      'Follow courts and players to see their updates here.',
+                      style: TextStyle(color: Colors.white38, fontSize: 13),
+                      textAlign: TextAlign.center),
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () => context.go('/rankings?region=local'),
+                            onPressed: () =>
+                                context.go('/rankings?region=local'),
                             icon: const Icon(Icons.person, size: 16),
-                            label: const Text('Players', style: TextStyle(fontSize: 12)),
+                            label: const Text('Players',
+                                style: TextStyle(fontSize: 12)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 4),
                             ),
                           ),
                         ),
@@ -375,24 +493,29 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           child: ElevatedButton.icon(
                             onPressed: () => context.go('/courts'),
                             icon: const Icon(Icons.location_on, size: 16),
-                            label: const Text('Courts', style: TextStyle(fontSize: 12)),
+                            label: const Text('Courts',
+                                style: TextStyle(fontSize: 12)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 4),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () => context.go('/rankings?tab=teams&teamType=5v5&region=local'),
+                            onPressed: () => context.go(
+                                '/rankings?tab=teams&teamType=5v5&region=local'),
                             icon: const Icon(Icons.groups, size: 16),
-                            label: const Text('Teams', style: TextStyle(fontSize: 12)),
+                            label: const Text('Teams',
+                                style: TextStyle(fontSize: 12)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 4),
                             ),
                           ),
                         ),
@@ -414,7 +537,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         children: [
           const Icon(Icons.rss_feed, color: Colors.white54, size: 16),
           const SizedBox(width: 8),
-          const Text('Following ', style: TextStyle(color: Colors.white54, fontSize: 13)),
+          const Text('Following ',
+              style: TextStyle(color: Colors.white54, fontSize: 13)),
           // Players count - show modal if following, navigate if 0
           GestureDetector(
             onTap: () {
@@ -431,11 +555,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 decoration: TextDecoration.underline,
-                decorationColor: playerCount > 0 ? Colors.green : Colors.white38,
+                decorationColor:
+                    playerCount > 0 ? Colors.green : Colors.white38,
               ),
             ),
           ),
-          const Text(' • ', style: TextStyle(color: Colors.white38, fontSize: 13)),
+          const Text(' • ',
+              style: TextStyle(color: Colors.white38, fontSize: 13)),
           // Courts count - show modal if following, navigate if 0
           GestureDetector(
             onTap: () {
@@ -456,7 +582,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               ),
             ),
           ),
-          const Text(' • ', style: TextStyle(color: Colors.white38, fontSize: 13)),
+          const Text(' • ',
+              style: TextStyle(color: Colors.white38, fontSize: 13)),
           // Teams count - deep link to Rankings > Teams > 5v5 Local to discover teams
           GestureDetector(
             onTap: () {
@@ -488,11 +615,15 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               padding: const EdgeInsets.all(32),
               child: Column(
                 children: [
-                  Icon(Icons.hourglass_empty, size: 40, color: Colors.white.withValues(alpha: 0.15)),
+                  Icon(Icons.hourglass_empty,
+                      size: 40, color: Colors.white.withValues(alpha: 0.15)),
                   const SizedBox(height: 12),
                   const Text(
                     'No activity yet',
-                    style: TextStyle(color: Colors.white54, fontSize: 15, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 6),
                   const Text(
@@ -536,9 +667,10 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   /// Sort posts with scheduled runs at the top (soonest first), then regular posts by createdAt
-  List<Map<String, dynamic>> _sortPostsWithScheduledFirst(List<Map<String, dynamic>> posts) {
+  List<Map<String, dynamic>> _sortPostsWithScheduledFirst(
+      List<Map<String, dynamic>> posts) {
     final now = DateTime.now();
-    
+
     // Filter out expired scheduled runs
     final activePosts = posts.where((post) {
       final scheduledAt = post['scheduledAt'];
@@ -554,8 +686,10 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     }).toList();
 
     // Separate scheduled runs from regular posts
-    final scheduledRuns = activePosts.where((post) => post['scheduledAt'] != null).toList();
-    final regularPosts = activePosts.where((post) => post['scheduledAt'] == null).toList();
+    final scheduledRuns =
+        activePosts.where((post) => post['scheduledAt'] != null).toList();
+    final regularPosts =
+        activePosts.where((post) => post['scheduledAt'] == null).toList();
 
     // Sort scheduled runs by time (soonest first)
     scheduledRuns.sort((a, b) {
@@ -582,7 +716,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   /// Show modal with list of followed players
-  void _showFollowedPlayersModal(BuildContext context, CheckInState checkInState) async {
+  void _showFollowedPlayersModal(
+      BuildContext context, CheckInState checkInState) async {
     final players = await checkInState.getFollowedPlayersInfo();
     if (!context.mounted) return;
 
@@ -619,7 +754,10 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   const SizedBox(width: 8),
                   Text(
                     'Following ${players.length} Player${players.length == 1 ? '' : 's'}',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -631,7 +769,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   ? Center(
                       child: Text(
                         'No players followed yet',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5)),
                       ),
                     )
                   : ListView.builder(
@@ -641,36 +780,45 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         final player = players[index];
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: Colors.green.withValues(alpha: 0.2),
+                            backgroundColor:
+                                Colors.green.withValues(alpha: 0.2),
                             backgroundImage: player.photoUrl != null
                                 ? NetworkImage(player.photoUrl!)
                                 : null,
                             child: player.photoUrl == null
                                 ? Text(
-                                    player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
+                                    player.name.isNotEmpty
+                                        ? player.name[0].toUpperCase()
+                                        : '?',
                                     style: const TextStyle(color: Colors.green),
                                   )
                                 : null,
                           ),
                           title: Text(
                             player.name,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600),
                           ),
                           subtitle: Text(
                             'Rating: ${player.rating.toStringAsFixed(1)}',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.5),
+                                fontSize: 12),
                           ),
                           trailing: IconButton(
                             icon: const Icon(Icons.favorite, color: Colors.red),
                             onPressed: () async {
-                              await checkInState.unfollowPlayer(player.playerId);
+                              await checkInState
+                                  .unfollowPlayer(player.playerId);
                               if (context.mounted) Navigator.pop(context);
                             },
                             tooltip: 'Unfollow',
                           ),
                           onTap: () {
                             Navigator.pop(context);
-                            PlayerProfileSheet.showById(context, player.playerId);
+                            PlayerProfileSheet.showById(
+                                context, player.playerId);
                           },
                         );
                       },
@@ -683,7 +831,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   }
 
   /// Show modal with list of followed courts
-  void _showFollowedCourtsModal(BuildContext context, CheckInState checkInState) async {
+  void _showFollowedCourtsModal(
+      BuildContext context, CheckInState checkInState) async {
     final courts = await checkInState.getFollowedCourtsWithActivity();
     if (!context.mounted) return;
 
@@ -720,7 +869,10 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   const SizedBox(width: 8),
                   Text(
                     'Following ${courts.length} Court${courts.length == 1 ? '' : 's'}',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -732,7 +884,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   ? Center(
                       child: Text(
                         'No courts followed yet',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5)),
                       ),
                     )
                   : ListView.builder(
@@ -748,16 +901,22 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               color: Colors.blue.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.sports_basketball, color: Colors.blue, size: 24),
+                            child: const Icon(Icons.sports_basketball,
+                                color: Colors.blue, size: 24),
                           ),
                           title: Text(
                             court.courtName,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600),
                           ),
                           subtitle: court.address != null
                               ? Text(
                                   court.address!,
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                                  style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.5),
+                                      fontSize: 12),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 )
@@ -784,17 +943,25 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildEmptyState(String title, String subtitle, {Widget? extraContent}) {
+  Widget _buildEmptyState(String title, String subtitle,
+      {Widget? extraContent}) {
     return Padding(
       padding: const EdgeInsets.only(top: 40, left: 32, right: 32, bottom: 32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Icon(Icons.feed_outlined, size: 48, color: Colors.white.withValues(alpha: 0.2)),
+          Icon(Icons.feed_outlined,
+              size: 48, color: Colors.white.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
-          Text(title, style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
+          Text(title,
+              style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),
-          Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 13), textAlign: TextAlign.center),
+          Text(subtitle,
+              style: const TextStyle(color: Colors.white38, fontSize: 13),
+              textAlign: TextAlign.center),
           if (extraContent != null) extraContent,
         ],
       ),
@@ -808,7 +975,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       case 'checkin':
         return _buildCheckinCard(item);
       case 'match':
-      case 'team_match':  // Team matches use the same card format as 1v1 matches
+      case 'team_match': // Team matches use the same card format as 1v1 matches
         return _buildMatchCard(item);
       case 'new_player':
         return _buildNewPlayerCard(item);
@@ -830,12 +997,17 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       margin: const EdgeInsets.only(bottom: 8), // Reduced from 12
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.orange.shade900.withOpacity(0.3), Colors.deepOrange.withOpacity(0.15)],
+          colors: [
+            Colors.orange.shade900.withOpacity(0.3),
+            Colors.deepOrange.withOpacity(0.15)
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(12), // Reduced radius slightly
-        border: Border.all(color: Colors.orange.withOpacity(0.4), width: 1.5), // Thinner border
+        border: Border.all(
+            color: Colors.orange.withOpacity(0.4),
+            width: 1.5), // Thinner border
         boxShadow: [
           BoxShadow(
             color: Colors.orange.withOpacity(0.1),
@@ -845,7 +1017,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), // Compact padding
+        padding: const EdgeInsets.symmetric(
+            horizontal: 12, vertical: 10), // Compact padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min, // Hug content
@@ -861,7 +1034,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     color: Colors.orange.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.sports_basketball, color: Colors.orange, size: 18), // Reduced size
+                  child: const Icon(Icons.sports_basketball,
+                      color: Colors.orange, size: 18), // Reduced size
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -871,7 +1045,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.bolt, size: 12, color: Colors.orange), // Smaller bolt
+                          const Icon(Icons.bolt,
+                              size: 12, color: Colors.orange), // Smaller bolt
                           const SizedBox(width: 4),
                           Text(
                             isIncoming ? 'CHALLENGE' : 'CHALLENGE SENT',
@@ -886,8 +1061,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 2),
                       Row(
-                         children: [
-                           Text(
+                        children: [
+                          Text(
                             opponent.name,
                             style: const TextStyle(
                               color: Colors.white,
@@ -896,36 +1071,46 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                             ),
                           ),
                           // Maybe add rating here if we had it easily available, but name is fine
-                         ],
+                        ],
                       ),
                     ],
                   ),
                 ),
                 // Opponent avatar - smaller
                 GestureDetector(
-                  onTap: () => PlayerProfileSheet.showById(context, opponent.id),
+                  onTap: () =>
+                      PlayerProfileSheet.showById(context, opponent.id),
                   child: CircleAvatar(
                     radius: 18, // Reduced from 22
                     backgroundColor: Colors.orange.withOpacity(0.3),
-                    backgroundImage: opponent.photoUrl != null ? NetworkImage(opponent.photoUrl!) : null,
+                    backgroundImage: opponent.photoUrl != null
+                        ? NetworkImage(opponent.photoUrl!)
+                        : null,
                     child: opponent.photoUrl == null
                         ? Text(
-                            opponent.name.isNotEmpty ? opponent.name[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            opponent.name.isNotEmpty
+                                ? opponent.name[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12),
                           )
                         : null,
                   ),
                 ),
               ],
             ),
-            
+
             // Challenge message - leaner container
             if (message.content.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 8), // Tighter spacing
+                padding:
+                    const EdgeInsets.only(top: 8, bottom: 8), // Tighter spacing
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(6),
@@ -943,8 +1128,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   ),
                 ),
               )
-            else 
-               const SizedBox(height: 8),
+            else
+              const SizedBox(height: 8),
 
             if (isIncoming)
               // Incoming challenge: actionable accept/decline/reply.
@@ -960,9 +1145,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           foregroundColor: Colors.white70,
                           side: const BorderSide(color: Colors.white24),
                           padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
                         ),
-                        child: const Text('Decline', style: TextStyle(fontSize: 12)),
+                        child: const Text('Decline',
+                            style: TextStyle(fontSize: 12)),
                       ),
                     ),
                   ),
@@ -974,12 +1161,15 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       child: OutlinedButton.icon(
                         onPressed: () => _replyToChallenge(challenge),
                         icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                        label: const Text('Reply', style: TextStyle(fontSize: 12)),
+                        label:
+                            const Text('Reply', style: TextStyle(fontSize: 12)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
-                          side: BorderSide(color: Colors.orange.withOpacity(0.5)),
+                          side:
+                              BorderSide(color: Colors.orange.withOpacity(0.5)),
                           padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
                         ),
                       ),
                     ),
@@ -992,13 +1182,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       child: ElevatedButton.icon(
                         onPressed: () => _acceptChallenge(challenge),
                         icon: const Icon(Icons.sports_basketball, size: 14),
-                        label: const Text('Start Match', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        label: const Text('Start Match',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.zero,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
                         ),
                       ),
                     ),
@@ -1020,7 +1213,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.hourglass_empty, size: 14, color: Colors.orange),
+                        Icon(Icons.hourglass_empty,
+                            size: 14, color: Colors.orange),
                         SizedBox(width: 6),
                         Text(
                           'Waiting for response',
@@ -1037,13 +1231,17 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           height: 32,
                           child: OutlinedButton.icon(
                             onPressed: () => _replyToChallenge(challenge),
-                            icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                            label: const Text('Reply', style: TextStyle(fontSize: 12)),
+                            icon:
+                                const Icon(Icons.chat_bubble_outline, size: 14),
+                            label: const Text('Reply',
+                                style: TextStyle(fontSize: 12)),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white,
-                              side: BorderSide(color: Colors.orange.withOpacity(0.5)),
+                              side: BorderSide(
+                                  color: Colors.orange.withOpacity(0.5)),
                               padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6)),
                             ),
                           ),
                         ),
@@ -1058,9 +1256,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                               foregroundColor: Colors.white70,
                               side: const BorderSide(color: Colors.white24),
                               padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6)),
                             ),
-                            child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                            child: const Text('Cancel',
+                                style: TextStyle(fontSize: 12)),
                           ),
                         ),
                       ),
@@ -1076,7 +1276,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Build team challenge card (similar to 1v1 but for team vs team)
   Widget _buildTeamChallengeCard(TeamChallengeRequest challenge) {
-    debugPrint('FEED: Building team challenge card: ${challenge.fromTeamName} vs ${challenge.toTeamName}');
+    debugPrint(
+        'FEED: Building team challenge card: ${challenge.fromTeamName} vs ${challenge.toTeamName}');
 
     final isIncoming = challenge.isIncoming;
     final opponentTeamName = challenge.opponentTeamName;
@@ -1085,7 +1286,10 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.purple.shade900.withOpacity(0.3), Colors.deepPurple.withOpacity(0.15)],
+          colors: [
+            Colors.purple.shade900.withOpacity(0.3),
+            Colors.deepPurple.withOpacity(0.15)
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1116,7 +1320,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     color: Colors.purple.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.groups, color: Colors.purple, size: 18),
+                  child:
+                      const Icon(Icons.groups, color: Colors.purple, size: 18),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1126,7 +1331,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.bolt, size: 12, color: Colors.purple),
+                          const Icon(Icons.bolt,
+                              size: 12, color: Colors.purple),
                           const SizedBox(width: 4),
                           Text(
                             isIncoming ? 'TEAM CHALLENGE' : 'CHALLENGE SENT',
@@ -1139,21 +1345,27 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.purple.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               challenge.teamType,
-                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        isIncoming ? 'From: $opponentTeamName' : 'To: $opponentTeamName',
+                        isIncoming
+                            ? 'From: $opponentTeamName'
+                            : 'To: $opponentTeamName',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1169,19 +1381,23 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   backgroundColor: Colors.purple.withOpacity(0.3),
                   child: Text(
                     challenge.teamType,
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
             ),
-            
+
             // Challenge message
             if (challenge.message.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 8),
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(6),
@@ -1199,8 +1415,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   ),
                 ),
               )
-            else 
-               const SizedBox(height: 8),
+            else
+              const SizedBox(height: 8),
 
             // Buttons: Decline / Accept (only for incoming)
             if (isIncoming)
@@ -1208,7 +1424,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 children: [
                   // Decline button
                   Expanded(
-                    flex: 2, 
+                    flex: 2,
                     child: SizedBox(
                       height: 32,
                       child: OutlinedButton(
@@ -1217,9 +1433,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           foregroundColor: Colors.white70,
                           side: const BorderSide(color: Colors.white24),
                           padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
                         ),
-                        child: const Text('Decline', style: TextStyle(fontSize: 12)),
+                        child: const Text('Decline',
+                            style: TextStyle(fontSize: 12)),
                       ),
                     ),
                   ),
@@ -1232,13 +1450,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       child: ElevatedButton.icon(
                         onPressed: () => _acceptTeamChallenge(challenge),
                         icon: const Icon(Icons.groups, size: 14),
-                        label: const Text('Accept', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        label: const Text('Accept',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.purple,
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.zero,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
                         ),
                       ),
                     ),
@@ -1257,11 +1478,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.hourglass_empty, size: 14, color: Colors.purple.shade200),
+                    Icon(Icons.hourglass_empty,
+                        size: 14, color: Colors.purple.shade200),
                     const SizedBox(width: 6),
                     Text(
                       'Waiting for ${challenge.toTeamName} to respond',
-                      style: TextStyle(color: Colors.purple.shade200, fontSize: 12),
+                      style: TextStyle(
+                          color: Colors.purple.shade200, fontSize: 12),
                     ),
                   ],
                 ),
@@ -1274,32 +1497,37 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Accept a team challenge and navigate to match setup (mirrors 1v1 flow)
   Future<void> _acceptTeamChallenge(TeamChallengeRequest challenge) async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
-      final result = await _messagesService.acceptTeamChallenge(userId, challenge.myTeamId, challenge.id);
-      
+      final result = await _messagesService.acceptTeamChallenge(
+          userId, challenge.myTeamId, challenge.id);
+
       if (mounted) {
         _loadPendingTeamChallenges(); // Refresh
-        
+
         // Set MatchState for team match (mirrors 1v1 _acceptChallenge flow)
         final matchState = Provider.of<MatchState>(context, listen: false);
         matchState.reset(); // Clear any previous match state
-        
+
         // Set team match mode
         matchState.mode = challenge.teamType; // '3v3' or '5v5'
-        matchState.myTeamId = challenge.myTeamId; // Store team ID for score submission
-        
+        matchState.myTeamId =
+            challenge.myTeamId; // Store team ID for score submission
+
         // Set team names for display
-        matchState.myTeamName = challenge.isIncoming ? challenge.toTeamName : challenge.fromTeamName;
+        matchState.myTeamName = challenge.isIncoming
+            ? challenge.toTeamName
+            : challenge.fromTeamName;
         matchState.opponentTeamName = challenge.opponentTeamName;
-        
+
         // Set matchId from backend response
         if (result['match'] != null && result['match']['id'] != null) {
           matchState.setMatchId(result['match']['id'].toString());
         }
-        
+
         // Navigate to match setup (same as 1v1)
         context.go('/match/setup');
       }
@@ -1314,12 +1542,14 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Decline a team challenge
   Future<void> _declineTeamChallenge(TeamChallengeRequest challenge) async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
-      await _messagesService.declineTeamChallenge(userId, challenge.myTeamId, challenge.id);
-      
+      await _messagesService.declineTeamChallenge(
+          userId, challenge.myTeamId, challenge.id);
+
       if (mounted) {
         _loadPendingTeamChallenges(); // Refresh
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1335,28 +1565,29 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     }
   }
 
-
   /// Accept a challenge and start a match
   Future<void> _acceptChallenge(ChallengeRequest challenge) async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
       // Accept on backend (updates challenge status)
-      final result = await _messagesService.acceptChallenge(userId, challenge.message.id);
-      
+      final result =
+          await _messagesService.acceptChallenge(userId, challenge.message.id);
+
       if (mounted) {
         _loadPendingChallenges(); // Refresh challenges
-        
+
         // CRITICAL: Set opponent in MatchState from challenge data BEFORE navigating
         final matchState = Provider.of<MatchState>(context, listen: false);
         matchState.setOpponent(challenge.otherUser.toPlayer());
-        
+
         // Set matchId if backend returned one
         if (result['matchId'] != null) {
           matchState.setMatchId(result['matchId'].toString());
         }
-        
+
         // Set court if challenge had one
         if (challenge.court != null) {
           final court = Court(
@@ -1366,14 +1597,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
           );
           matchState.setCourt(court);
         }
-        
+
         // Navigate to match setup (opponent will be pre-populated)
         context.go('/match/setup');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to accept: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Failed to accept: $e'),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -1387,21 +1620,26 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Cancel an outgoing challenge
   Future<void> _cancelChallenge(ChallengeRequest challenge) async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
       await _messagesService.cancelChallenge(userId, challenge.message.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Challenge cancelled'), backgroundColor: Colors.grey),
+          const SnackBar(
+              content: Text('Challenge cancelled'),
+              backgroundColor: Colors.grey),
         );
         _loadPendingChallenges(); // Refresh challenges
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to cancel: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Failed to cancel: $e'),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -1409,21 +1647,26 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
   /// Decline a challenge
   Future<void> _declineChallenge(ChallengeRequest challenge) async {
-    final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
     try {
       await _messagesService.declineChallenge(userId, challenge.message.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Challenge declined'), backgroundColor: Colors.grey),
+          const SnackBar(
+              content: Text('Challenge declined'),
+              backgroundColor: Colors.grey),
         );
         _loadPendingChallenges(); // Refresh challenges
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to decline: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Failed to decline: $e'),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -1471,14 +1714,20 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   child: CircleAvatar(
                     radius: 20,
                     backgroundColor: Colors.grey[900],
-                    backgroundImage: userPhotoUrl != null 
-                      ? (userPhotoUrl.startsWith('data:') 
-                          ? MemoryImage(Uri.parse(userPhotoUrl).data!.contentAsBytes()) 
-                          : NetworkImage(userPhotoUrl) as ImageProvider)
-                      : null,
+                    backgroundImage: userPhotoUrl != null
+                        ? (userPhotoUrl.startsWith('data:')
+                            ? MemoryImage(
+                                Uri.parse(userPhotoUrl).data!.contentAsBytes())
+                            : NetworkImage(userPhotoUrl) as ImageProvider)
+                        : null,
                     child: userPhotoUrl == null
-                        ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                        ? Text(
+                            userName.isNotEmpty
+                                ? userName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold))
                         : null,
                   ),
                 ),
@@ -1489,15 +1738,23 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     children: [
                       RichText(
                         text: TextSpan(
-                          style: const TextStyle(fontSize: 15, color: Colors.white, height: 1.3),
+                          style: const TextStyle(
+                              fontSize: 15, color: Colors.white, height: 1.3),
                           children: [
-                            TextSpan(text: userName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            const TextSpan(text: ' checked in', style: TextStyle(color: Colors.white70)),
+                            TextSpan(
+                                text: userName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                            const TextSpan(
+                                text: ' checked in',
+                                style: TextStyle(color: Colors.white70)),
                           ],
                         ),
                       ),
                       if (timeAgo.isNotEmpty)
-                        Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                        Text(timeAgo,
+                            style: TextStyle(
+                                color: Colors.grey[500], fontSize: 12)),
                     ],
                   ),
                 ),
@@ -1507,7 +1764,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     color: Colors.blue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                  child: const Icon(Icons.location_on,
+                      color: Colors.blue, size: 20),
                 ),
               ],
             ),
@@ -1521,12 +1779,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.sports_basketball, size: 16, color: Colors.blue),
+                  const Icon(Icons.sports_basketball,
+                      size: 16, color: Colors.blue),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      courtName, 
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                      courtName,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14),
                     ),
                   ),
                 ],
@@ -1547,48 +1809,64 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final matchScore = item['matchScore']?.toString(); // e.g. "21-18" or null
     final itemType = item['type']?.toString() ?? 'match';
     final isTeamMatch = itemType == 'team_match';
-    
+
     // statusId links to player_statuses for likes/comments
-    final statusId = item['statusId'] is int ? item['statusId'] as int : int.tryParse(item['statusId']?.toString() ?? '');
-    final serverLikeCount = item['likeCount'] is int ? item['likeCount'] as int : int.tryParse(item['likeCount']?.toString() ?? '0') ?? 0;
-    final likeCount = statusId != null ? (_likeCounts[statusId] ?? serverLikeCount) : serverLikeCount;
-    final isLiked = statusId != null ? (_likeStates[statusId] ?? (item['isLikedByMe'] == true)) : false;
-    final commentCount = item['commentCount'] is int ? item['commentCount'] as int : int.tryParse(item['commentCount']?.toString() ?? '0') ?? 0;
-    final isCommentsExpanded = statusId != null && (_expandedComments[statusId] == true);
-    
+    final statusId = item['statusId'] is int
+        ? item['statusId'] as int
+        : int.tryParse(item['statusId']?.toString() ?? '');
+    final serverLikeCount = item['likeCount'] is int
+        ? item['likeCount'] as int
+        : int.tryParse(item['likeCount']?.toString() ?? '0') ?? 0;
+    final likeCount = statusId != null
+        ? (_likeCounts[statusId] ?? serverLikeCount)
+        : serverLikeCount;
+    final isLiked = statusId != null
+        ? (_likeStates[statusId] ?? (item['isLikedByMe'] == true))
+        : false;
+    final commentCount = item['commentCount'] is int
+        ? item['commentCount'] as int
+        : int.tryParse(item['commentCount']?.toString() ?? '0') ?? 0;
+    final isCommentsExpanded =
+        statusId != null && (_expandedComments[statusId] == true);
+
     // Get both winner and loser names for proper display
     final winnerName = item['winnerName']?.toString() ?? userName;
     final loserName = item['loserName']?.toString();
-    
+
     // Get ratings for team matches
-    final winnerRating = item['winnerRating'] != null 
-        ? double.tryParse(item['winnerRating'].toString()) 
+    final winnerRating = item['winnerRating'] != null
+        ? double.tryParse(item['winnerRating'].toString())
         : null;
-    final loserRating = item['loserRating'] != null 
-        ? double.tryParse(item['loserRating'].toString()) 
+    final loserRating = item['loserRating'] != null
+        ? double.tryParse(item['loserRating'].toString())
         : null;
-    final winnerOldRating = item['winnerOldRating'] != null 
-        ? double.tryParse(item['winnerOldRating'].toString()) 
+    final winnerOldRating = item['winnerOldRating'] != null
+        ? double.tryParse(item['winnerOldRating'].toString())
         : null;
-    final loserOldRating = item['loserOldRating'] != null 
-        ? double.tryParse(item['loserOldRating'].toString()) 
+    final loserOldRating = item['loserOldRating'] != null
+        ? double.tryParse(item['loserOldRating'].toString())
         : null;
-    
+
     // Display text: "Winner vs Loser" if both available, else just winner
-    final displayName = loserName != null && loserName.isNotEmpty 
-        ? '$winnerName vs $loserName' 
+    final displayName = loserName != null && loserName.isNotEmpty
+        ? '$winnerName vs $loserName'
         : winnerName;
-    
+
     // Show appropriate label when no court is tagged
-    final displayCourtName = (courtName == null || courtName == 'Unknown Court' || courtName.isEmpty)
-        ? (isTeamMatch ? 'Team Game' : 'Pickup Game')
-        : courtName;
+    final displayCourtName =
+        (courtName == null || courtName == 'Unknown Court' || courtName.isEmpty)
+            ? (isTeamMatch ? 'Team Game' : 'Pickup Game')
+            : courtName;
 
     String timeAgo = _formatTimeAgo(createdAt);
 
     // Use purple for team matches, green for 1v1
-    final statusColor = isTeamMatch ? Colors.purple : (matchStatus == 'ended' ? Colors.green : Colors.orange);
-    final statusText = matchStatus == 'ended' ? 'Final Score' : (matchStatus == 'live' ? 'Live Game' : 'Upcoming');
+    final statusColor = isTeamMatch
+        ? Colors.purple
+        : (matchStatus == 'ended' ? Colors.green : Colors.orange);
+    final statusText = matchStatus == 'ended'
+        ? 'Final Score'
+        : (matchStatus == 'live' ? 'Live Game' : 'Upcoming');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1614,14 +1892,19 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: statusColor,
-                  backgroundImage: userPhotoUrl != null 
-                    ? (userPhotoUrl.startsWith('data:') 
-                        ? MemoryImage(Uri.parse(userPhotoUrl).data!.contentAsBytes()) 
-                        : NetworkImage(userPhotoUrl) as ImageProvider)
-                    : null,
+                  backgroundImage: userPhotoUrl != null
+                      ? (userPhotoUrl.startsWith('data:')
+                          ? MemoryImage(
+                              Uri.parse(userPhotoUrl).data!.contentAsBytes())
+                          : NetworkImage(userPhotoUrl) as ImageProvider)
+                      : null,
                   child: userPhotoUrl == null
-                      ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))
+                      ? Text(
+                          userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12))
                       : null,
                 ),
                 const SizedBox(width: 10),
@@ -1632,17 +1915,26 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                       Row(
                         children: [
                           if (isTeamMatch) ...[
-                            Icon(Icons.groups, size: 14, color: Colors.purple.shade300),
+                            Icon(Icons.groups,
+                                size: 14, color: Colors.purple.shade300),
                             const SizedBox(width: 4),
                           ],
-                          Flexible(child: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis)),
+                          Flexible(
+                              child: Text(displayName,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14),
+                                  overflow: TextOverflow.ellipsis)),
                         ],
                       ),
-                      Text('played at $displayCourtName', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                      Text('played at $displayCourtName',
+                          style:
+                              TextStyle(color: Colors.grey[400], fontSize: 12)),
                     ],
                   ),
                 ),
-                Text(timeAgo, style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                Text(timeAgo,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 11)),
               ],
             ),
             const SizedBox(height: 12),
@@ -1651,7 +1943,10 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [statusColor.withOpacity(0.2), statusColor.withOpacity(0.05)],
+                  colors: [
+                    statusColor.withOpacity(0.2),
+                    statusColor.withOpacity(0.05)
+                  ],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
@@ -1664,14 +1959,22 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(statusText.toUpperCase(), 
-                          style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                      Text(statusText.toUpperCase(),
+                          style: TextStyle(
+                              color: statusColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1)),
                       const SizedBox(height: 4),
-                      Text(matchScore ?? 'Game Score', 
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(matchScore ?? 'Game Score',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  Icon(isTeamMatch ? Icons.groups : Icons.emoji_events_outlined, color: statusColor.withOpacity(0.8), size: 28),
+                  Icon(isTeamMatch ? Icons.groups : Icons.emoji_events_outlined,
+                      color: statusColor.withOpacity(0.8), size: 28),
                 ],
               ),
             ),
@@ -1690,7 +1993,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         Flexible(
                           child: Text(
                             '${winnerName ?? 'Winner'}: ${winnerOldRating != null ? '${winnerOldRating.toStringAsFixed(2)} → ' : ''}${winnerRating.toStringAsFixed(2)}',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 11),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -1703,12 +2007,14 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.trending_down, size: 14, color: Colors.red.shade300),
+                        Icon(Icons.trending_down,
+                            size: 14, color: Colors.red.shade300),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             '${loserName ?? 'Loser'}: ${loserOldRating != null ? '${loserOldRating.toStringAsFixed(2)} → ' : ''}${loserRating.toStringAsFixed(2)}',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 11),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -1732,19 +2038,26 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(20),
                         onTap: () => _toggleLike(statusId, isLiked, likeCount),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 6),
                           child: Row(
                             children: [
                               Icon(
-                                isLiked ? Icons.favorite : Icons.favorite_border_rounded,
+                                isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border_rounded,
                                 size: 20,
-                                color: isLiked ? Colors.redAccent : Colors.grey[500],
+                                color: isLiked
+                                    ? Colors.redAccent
+                                    : Colors.grey[500],
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 '$likeCount',
                                 style: TextStyle(
-                                  color: isLiked ? Colors.redAccent : Colors.grey[500],
+                                  color: isLiked
+                                      ? Colors.redAccent
+                                      : Colors.grey[500],
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1762,19 +2075,24 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         borderRadius: BorderRadius.circular(20),
                         onTap: () => _toggleComments(statusId),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 6),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.chat_bubble_outline_rounded,
                                 size: 20,
-                                color: isCommentsExpanded ? Colors.blue : Colors.grey[500],
+                                color: isCommentsExpanded
+                                    ? Colors.blue
+                                    : Colors.grey[500],
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 '$commentCount',
                                 style: TextStyle(
-                                  color: isCommentsExpanded ? Colors.blue : Colors.grey[500],
+                                  color: isCommentsExpanded
+                                      ? Colors.blue
+                                      : Colors.grey[500],
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1788,10 +2106,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     // Share Button
                     GestureDetector(
                       onTap: () {
-                        final shareText = '${displayName} - ${matchScore ?? 'Game'} on HoopRank! 🏀';
+                        final shareText =
+                            '${displayName} - ${matchScore ?? 'Game'} on HoopRank! 🏀';
                         Share.share(shareText);
                       },
-                      child: Icon(Icons.share_outlined, color: Colors.grey[600], size: 20),
+                      child: Icon(Icons.share_outlined,
+                          color: Colors.grey[600], size: 20),
                     ),
                   ],
                 ),
@@ -1803,13 +2123,15 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     );
   }
 
-
   /// Build a card for new player registration activity
   Widget _buildNewPlayerCard(Map<String, dynamic> item) {
     final player = item['player'] ?? {};
     final playerName = player['name'] ?? 'New Player';
     final photoUrl = player['photoUrl'];
-    final rating = (player['rating'] is num ? player['rating'].toDouble() : double.tryParse(player['rating']?.toString() ?? '3.0')) ?? 3.0;
+    final rating = (player['rating'] is num
+            ? player['rating'].toDouble()
+            : double.tryParse(player['rating']?.toString() ?? '3.0')) ??
+        3.0;
     final position = player['position'] ?? '';
     final city = player['city'] ?? '';
     final playerId = player['id'] ?? '';
@@ -1849,15 +2171,22 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     CircleAvatar(
                       radius: 28,
                       backgroundColor: Colors.green.withOpacity(0.3),
-                      backgroundImage: photoUrl != null && photoUrl.toString().isNotEmpty
+                      backgroundImage: photoUrl != null &&
+                              photoUrl.toString().isNotEmpty
                           ? (photoUrl.toString().startsWith('data:')
-                              ? MemoryImage(Uri.parse(photoUrl).data!.contentAsBytes())
+                              ? MemoryImage(
+                                  Uri.parse(photoUrl).data!.contentAsBytes())
                               : NetworkImage(photoUrl) as ImageProvider)
                           : null,
                       child: (photoUrl == null || photoUrl.toString().isEmpty)
                           ? Text(
-                              playerName.isNotEmpty ? playerName[0].toUpperCase() : '?',
-                              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                              playerName.isNotEmpty
+                                  ? playerName[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold),
                             )
                           : null,
                     ),
@@ -1869,9 +2198,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         decoration: BoxDecoration(
                           color: Colors.green,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.grey[900]!, width: 2),
+                          border:
+                              Border.all(color: Colors.grey[900]!, width: 2),
                         ),
-                        child: const Icon(Icons.person_add, color: Colors.white, size: 12),
+                        child: const Icon(Icons.person_add,
+                            color: Colors.white, size: 12),
                       ),
                     ),
                   ],
@@ -1884,47 +2215,64 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.celebration, color: Colors.green, size: 16),
+                          const Icon(Icons.celebration,
+                              color: Colors.green, size: 16),
                           const SizedBox(width: 6),
                           const Text(
                             'New Player Joined!',
-                            style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: Colors.green,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold),
                           ),
                           const Spacer(),
-                          Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                          Text(timeAgo,
+                              style: TextStyle(
+                                  color: Colors.grey[500], fontSize: 11)),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         playerName,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 2),
                       Row(
                         children: [
                           if (position.isNotEmpty) ...[
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.blue.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text(position, style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold)),
+                              child: Text(position,
+                                  style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold)),
                             ),
                             const SizedBox(width: 8),
                           ],
                           Text(
                             '⭐ ${rating.toStringAsFixed(2)}',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 12),
                           ),
                           if (city.isNotEmpty) ...[
                             const SizedBox(width: 8),
-                            Icon(Icons.location_on, color: Colors.grey[500], size: 12),
+                            Icon(Icons.location_on,
+                                color: Colors.grey[500], size: 12),
                             const SizedBox(width: 2),
                             Flexible(
                               child: Text(
                                 city,
-                                style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                                style: TextStyle(
+                                    color: Colors.grey[500], fontSize: 11),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -1964,14 +2312,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   // ========== Interactive Handlers ==========
 
   void _toggleLike(int statusId, bool currentlyLiked, int currentCount) async {
-    debugPrint('LIKE: Toggle like for statusId=$statusId, currentlyLiked=$currentlyLiked');
+    debugPrint(
+        'LIKE: Toggle like for statusId=$statusId, currentlyLiked=$currentlyLiked');
     // Optimistic update
     setState(() {
       _likeStates[statusId] = !currentlyLiked;
-      _likeCounts[statusId] = currentlyLiked ? currentCount - 1 : currentCount + 1;
+      _likeCounts[statusId] =
+          currentlyLiked ? currentCount - 1 : currentCount + 1;
     });
     // API call
-    final success = currentlyLiked 
+    final success = currentlyLiked
         ? await ApiService.unlikeStatus(statusId)
         : await ApiService.likeStatus(statusId);
     debugPrint('LIKE: API response success=$success');
@@ -1991,8 +2341,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E2128),
         title: const Text('Delete Post', style: TextStyle(color: Colors.white)),
-        content: const Text('Are you sure you want to delete this post? This cannot be undone.', 
-          style: TextStyle(color: Colors.white70)),
+        content: const Text(
+            'Are you sure you want to delete this post? This cannot be undone.',
+            style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -2000,12 +2351,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            child:
+                const Text('Delete', style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
     );
-    
+
     if (confirmed == true) {
       final success = await ApiService.deleteStatus(statusId);
       if (success && mounted) {
@@ -2013,16 +2365,21 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         setState(() {
           _statusPosts.removeWhere((post) {
             final rawId = post['id'];
-            final postId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
+            final postId = rawId is int
+                ? rawId
+                : int.tryParse(rawId?.toString() ?? '') ?? 0;
             return postId == statusId;
           });
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post deleted'), backgroundColor: Colors.green),
+          const SnackBar(
+              content: Text('Post deleted'), backgroundColor: Colors.green),
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete post'), backgroundColor: Colors.red),
+          const SnackBar(
+              content: Text('Failed to delete post'),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -2057,12 +2414,15 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     }
   }
 
-  void _toggleAttending(int statusId, bool currentlyAttending, int currentCount) async {
-    debugPrint('ATTEND: Toggle attending for statusId=$statusId, currentlyAttending=$currentlyAttending');
+  void _toggleAttending(
+      int statusId, bool currentlyAttending, int currentCount) async {
+    debugPrint(
+        'ATTEND: Toggle attending for statusId=$statusId, currentlyAttending=$currentlyAttending');
     // Optimistic update
     setState(() {
       _attendingStates[statusId] = !currentlyAttending;
-      _attendeeCounts[statusId] = currentlyAttending ? currentCount - 1 : currentCount + 1;
+      _attendeeCounts[statusId] =
+          currentlyAttending ? currentCount - 1 : currentCount + 1;
     });
     // API call
     final success = currentlyAttending
@@ -2100,7 +2460,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final userName = post['userName']?.toString() ?? 'Someone';
     final content = post['content']?.toString() ?? '';
     final courtName = post['courtName']?.toString() ??
-        (content.trim().startsWith('@') ? content.trim().substring(1).trim() : null);
+        (content.trim().startsWith('@')
+            ? content.trim().substring(1).trim()
+            : null);
     final scheduledAt = post['scheduledAt'];
     final isScheduledEvent = scheduledAt != null;
 
@@ -2111,13 +2473,15 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       buffer.write('🏀 $userName is hosting a pickup run on HoopRank!');
       try {
         final dt = DateTime.parse(scheduledAt.toString()).toLocal();
-        final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+        final hour =
+            dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
         final amPm = dt.hour >= 12 ? 'PM' : 'AM';
         final timeStr = dt.minute == 0
             ? '$hour$amPm'
             : '$hour:${dt.minute.toString().padLeft(2, '0')}$amPm';
         const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        buffer.write('\n📅 ${weekdays[dt.weekday - 1]} ${dt.month}/${dt.day} at $timeStr');
+        buffer.write(
+            '\n📅 ${weekdays[dt.weekday - 1]} ${dt.month}/${dt.day} at $timeStr');
       } catch (_) {}
       if (courtName != null && courtName.isNotEmpty) {
         buffer.write('\n📍 $courtName');
@@ -2137,10 +2501,12 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       }
     }
 
-    buffer.write('\n\nDownload HoopRank: https://apps.apple.com/app/hooprank/id6741466657');
+    buffer.write(
+        '\n\nDownload HoopRank: https://apps.apple.com/app/hooprank/id6741466657');
 
     SharePlus.instance.share(ShareParams(text: buffer.toString()));
   }
+
   Widget _buildAttendeeRow(int statusId, int attendeeCount) {
     final isExpanded = _expandedAttendees[statusId] ?? false;
     final attendees = _attendeeDetails[statusId] ?? [];
@@ -2180,15 +2546,35 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                             child: CircleAvatar(
                               radius: 14,
                               backgroundColor: Colors.grey[700],
-                              backgroundImage: (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']) != null
-                                  ? ((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString().startsWith('data:')
-                                      ? MemoryImage(Uri.parse((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()).data!.contentAsBytes()) as ImageProvider
-                                      : NetworkImage((attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()))
+                              backgroundImage: (attendees[i]['userPhotoUrl'] ??
+                                          attendees[i]['photoUrl']) !=
+                                      null
+                                  ? ((attendees[i]['userPhotoUrl'] ??
+                                              attendees[i]['photoUrl'])
+                                          .toString()
+                                          .startsWith('data:')
+                                      ? MemoryImage(Uri.parse((attendees[i]
+                                                      ['userPhotoUrl'] ??
+                                                  attendees[i]['photoUrl'])
+                                              .toString())
+                                          .data!
+                                          .contentAsBytes()) as ImageProvider
+                                      : NetworkImage(
+                                          (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()))
                                   : null,
-                              child: (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']) == null
+                              child: (attendees[i]['userPhotoUrl'] ??
+                                          attendees[i]['photoUrl']) ==
+                                      null
                                   ? Text(
-                                      ((attendees[i]['userName'] ?? attendees[i]['name'])?.toString() ?? '?')[0].toUpperCase(),
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+                                      ((attendees[i]['userName'] ??
+                                                      attendees[i]['name'])
+                                                  ?.toString() ??
+                                              '?')[0]
+                                          .toUpperCase(),
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white70),
                                     )
                                   : null,
                             ),
@@ -2197,18 +2583,25 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     ),
                   )
                 else
-                  const Icon(Icons.people_outline, size: 18, color: Color(0xFF00C853)),
+                  const Icon(Icons.people_outline,
+                      size: 18, color: Color(0xFF00C853)),
                 const SizedBox(width: 8),
                 RichText(
                   text: TextSpan(
                     children: [
                       TextSpan(
                         text: '$attendeeCount ',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00C853), fontSize: 13),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF00C853),
+                            fontSize: 13),
                       ),
                       TextSpan(
-                        text: attendeeCount == 1 ? 'player going' : 'players going',
-                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                        text: attendeeCount == 1
+                            ? 'player going'
+                            : 'players going',
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.6), fontSize: 13),
                       ),
                     ],
                   ),
@@ -2226,11 +2619,16 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               Divider(height: 1, color: Colors.white.withOpacity(0.08)),
               const SizedBox(height: 8),
               ...attendees.map((a) {
-                final name = a['userName']?.toString() ?? a['name']?.toString() ?? 'Unknown';
-                final photo = a['userPhotoUrl']?.toString() ?? a['photoUrl']?.toString();
+                final name = a['userName']?.toString() ??
+                    a['name']?.toString() ??
+                    'Unknown';
+                final photo =
+                    a['userPhotoUrl']?.toString() ?? a['photoUrl']?.toString();
                 final odId = a['userId']?.toString();
                 return GestureDetector(
-                  onTap: odId != null ? () => PlayerProfileSheet.showById(context, odId) : null,
+                  onTap: odId != null
+                      ? () => PlayerProfileSheet.showById(context, odId)
+                      : null,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
@@ -2240,13 +2638,18 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                           backgroundColor: Colors.grey[700],
                           backgroundImage: photo != null
                               ? (photo.startsWith('data:')
-                                  ? MemoryImage(Uri.parse(photo).data!.contentAsBytes()) as ImageProvider
+                                  ? MemoryImage(Uri.parse(photo)
+                                      .data!
+                                      .contentAsBytes()) as ImageProvider
                                   : NetworkImage(photo))
                               : null,
                           child: photo == null
                               ? Text(
                                   name[0].toUpperCase(),
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white70),
                                 )
                               : null,
                         ),
@@ -2254,11 +2657,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                         Expanded(
                           child: Text(
                             name,
-                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 13),
                           ),
                         ),
                         if (odId != null)
-                          Icon(Icons.chevron_right, size: 16, color: Colors.white.withOpacity(0.3)),
+                          Icon(Icons.chevron_right,
+                              size: 16, color: Colors.white.withOpacity(0.3)),
                       ],
                     ),
                   ),
@@ -2302,9 +2707,11 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
   Widget _buildPostCard(Map<String, dynamic> post) {
     // Ensure statusId is an int - it might come as a string or int from the API
     final rawId = post['id'];
-    final statusId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
+    final statusId =
+        rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
     if (statusId == 0) {
-      debugPrint('FEED: Warning - invalid statusId for post: ${post['content']?.toString().substring(0, 20)}...');
+      debugPrint(
+          'FEED: Warning - invalid statusId for post: ${post['content']?.toString().substring(0, 20)}...');
     }
     final postUserId = post['userId']?.toString() ?? '';
     final isOwnPost = postUserId == ApiService.userId;
@@ -2315,27 +2722,33 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
     final scheduledAt = post['scheduledAt'];
     // Improved extraction logic for court info
     final rawContent = content.trim();
-    final courtName = post['courtName']?.toString() ?? 
-                     (rawContent.startsWith('@') ? rawContent.substring(1).trim() : null);
+    final courtName = post['courtName']?.toString() ??
+        (rawContent.startsWith('@') ? rawContent.substring(1).trim() : null);
     final courtId = post['courtId']?.toString(); // For deep linking to court
-    
+
     // Use local state if available, otherwise use from API
-    final serverLikeCount = post['likeCount'] is int ? post['likeCount'] : int.tryParse(post['likeCount']?.toString() ?? '0') ?? 0;
+    final serverLikeCount = post['likeCount'] is int
+        ? post['likeCount']
+        : int.tryParse(post['likeCount']?.toString() ?? '0') ?? 0;
     final serverIsLiked = post['isLikedByMe'] == true;
     final likeCount = _likeCounts[statusId] ?? serverLikeCount;
     final isLiked = _likeStates[statusId] ?? serverIsLiked;
-    
-    final commentCount = post['commentCount'] is int ? post['commentCount'] : int.tryParse(post['commentCount']?.toString() ?? '0') ?? 0;
+
+    final commentCount = post['commentCount'] is int
+        ? post['commentCount']
+        : int.tryParse(post['commentCount']?.toString() ?? '0') ?? 0;
     final createdAt = post['createdAt'];
-    
+
     // Attendance state for scheduled events
-    final serverAttendeeCount = post['attendeeCount'] is int ? post['attendeeCount'] : int.tryParse(post['attendeeCount']?.toString() ?? '0') ?? 0;
+    final serverAttendeeCount = post['attendeeCount'] is int
+        ? post['attendeeCount']
+        : int.tryParse(post['attendeeCount']?.toString() ?? '0') ?? 0;
     final serverIsAttending = post['isAttendingByMe'] == true;
     final attendeeCount = _attendeeCounts[statusId] ?? serverAttendeeCount;
     final isAttending = _attendingStates[statusId] ?? serverIsAttending;
-    
+
     final isScheduledEvent = scheduledAt != null;
-    
+
     // Hide expired scheduled runs (real-time check)
     if (isScheduledEvent) {
       try {
@@ -2345,7 +2758,7 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         }
       } catch (_) {}
     }
-    
+
     final isExpanded = _expandedComments[statusId] ?? false;
     final comments = _comments[statusId] ?? [];
 
@@ -2368,9 +2781,9 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
 
     // Format scheduled time
     DateTime? scheduledDate;
-    String scheduledDayStr = ''; 
+    String scheduledDayStr = '';
     String scheduledTimeStr = '';
-    
+
     if (isScheduledEvent) {
       try {
         // Parse UTC time and convert to local for display
@@ -2379,10 +2792,13 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         final todayStart = DateTime(now.year, now.month, now.day);
         final tomorrowStart = todayStart.add(const Duration(days: 1));
         final dayAfterTomorrow = todayStart.add(const Duration(days: 2));
-        
-        final isToday = scheduledDate!.isAfter(todayStart) && scheduledDate!.isBefore(tomorrowStart);
-        final isTomorrow = scheduledDate!.isAfter(tomorrowStart.subtract(const Duration(seconds: 1))) && scheduledDate!.isBefore(dayAfterTomorrow);
-        
+
+        final isToday = scheduledDate!.isAfter(todayStart) &&
+            scheduledDate!.isBefore(tomorrowStart);
+        final isTomorrow = scheduledDate!
+                .isAfter(tomorrowStart.subtract(const Duration(seconds: 1))) &&
+            scheduledDate!.isBefore(dayAfterTomorrow);
+
         // Time of day descriptor
         final hour = scheduledDate!.hour;
         String timeOfDay;
@@ -2393,35 +2809,45 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
         } else {
           timeOfDay = 'evening';
         }
-        
+
         // Day of week names
-        const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const weekdays = [
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+          'Sunday'
+        ];
         final dayOfWeek = weekdays[scheduledDate!.weekday - 1];
-        
+
         // Format hour for display
         final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
         final amPm = hour >= 12 ? 'pm' : 'am';
-        
+
         if (isToday) {
           scheduledDayStr = 'This $timeOfDay';
         } else if (isTomorrow) {
           scheduledDayStr = 'Tomorrow $timeOfDay';
         } else {
           // Show day of week + date (e.g., "Friday 1/31")
-          scheduledDayStr = '$dayOfWeek ${scheduledDate!.month}/${scheduledDate!.day}';
+          scheduledDayStr =
+              '$dayOfWeek ${scheduledDate!.month}/${scheduledDate!.day}';
         }
-        
+
         if (scheduledDate!.minute == 0) {
           scheduledTimeStr = '$displayHour$amPm';
         } else {
-          scheduledTimeStr = '$displayHour:${scheduledDate!.minute.toString().padLeft(2, '0')}$amPm';
+          scheduledTimeStr =
+              '$displayHour:${scheduledDate!.minute.toString().padLeft(2, '0')}$amPm';
         }
       } catch (_) {}
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12), // Slightly more spacing
-      decoration: isScheduledEvent 
+      decoration: isScheduledEvent
           ? BoxDecoration(
               // Distinct modern look for Scheduled Runs
               gradient: LinearGradient(
@@ -2434,19 +2860,21 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: const Color(0xFF00C853).withOpacity(0.3), // Subtle green border
+                color: const Color(0xFF00C853)
+                    .withOpacity(0.3), // Subtle green border
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF00C853).withOpacity(0.05), // Very faint green glow
+                  color: const Color(0xFF00C853)
+                      .withOpacity(0.05), // Very faint green glow
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
             )
           : BoxDecoration(
-              color: const Color(0xFF1E1E1E), 
+              color: const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white.withOpacity(0.05)),
               boxShadow: [
@@ -2460,571 +2888,710 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(
-        children: [
-          // Background accent graphic for scheduled runs (Abstract/Modern)
-          if (isScheduledEvent)
-            Positioned(
-              right: -20,
-              top: -20,
-              child: Opacity(
-                opacity: 0.05,
-                child: Icon(Icons.sports_basketball, size: 150, color: const Color(0xFF00C853)),
-              ),
-            ),
-
-          Padding(
-            padding: const EdgeInsets.all(16), // More breathing room
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with avatar and name
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(1.5), // Thinner border
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: isScheduledEvent 
-                          ? [const Color(0xFF00C853), const Color(0xFF00C853).withOpacity(0.5)] // Green border for scheduled
-                          : [Colors.deepOrange, Colors.deepOrange.withOpacity(0.5)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: CircleAvatar(
-                    radius: 20, 
-                    backgroundColor: Colors.grey[900],
-                    backgroundImage: userPhotoUrl != null 
-                      ? (userPhotoUrl.startsWith('data:') 
-                          ? MemoryImage(Uri.parse(userPhotoUrl).data!.contentAsBytes()) 
-                          : NetworkImage(userPhotoUrl) as ImageProvider)
-                      : null,
-                    child: userPhotoUrl == null
-                        ? Text(userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              userName, 
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 15, 
-                                color: Colors.white,
-                              ), 
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (isScheduledEvent) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF00C853).withOpacity(0.15), 
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFF00C853).withOpacity(0.3)),
-                              ),
-                              child: const Text(
-                                'SCHEDULED RUN', 
-                                style: TextStyle(
-                                  fontSize: 9, 
-                                  fontWeight: FontWeight.w700, 
-                                  color: Color(0xFF00C853), // Green text
-                                  letterSpacing: 0.5,
-                                )
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        timeAgo, 
-                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                // Compact "IN" Button for Scheduled Events (Top Right)
-                if (isScheduledEvent)
-                  GestureDetector(
-                    onTap: () => _toggleAttending(statusId, isAttending, attendeeCount),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isAttending ? const Color(0xFF00C853).withOpacity(0.15) : const Color(0xFF00C853), 
-                        borderRadius: BorderRadius.circular(20),
-                        border: isAttending ? Border.all(color: const Color(0xFF00C853)) : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isAttending ? Icons.check : Icons.add_rounded, 
-                            color: isAttending ? const Color(0xFF00C853) : Colors.black, 
-                            size: 16, 
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isAttending ? "IN ($attendeeCount)" : "JOIN ($attendeeCount)",
-                            style: TextStyle(
-                              color: isAttending ? const Color(0xFF00C853) : Colors.black, 
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.2), size: 20),
-              ],
-            ),
-            
-            // Scheduled Run Details - Modern Card
+            // Background accent graphic for scheduled runs (Abstract/Modern)
             if (isScheduledEvent)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(top: 16, bottom: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2), 
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+              Positioned(
+                right: -20,
+                top: -20,
+                child: Opacity(
+                  opacity: 0.05,
+                  child: Icon(Icons.sports_basketball,
+                      size: 150, color: const Color(0xFF00C853)),
                 ),
-                child: Column(
-                  children: [
-                    // Time Section
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                      child: Row(
-                        children: [
-                           Container(
-                             padding: const EdgeInsets.all(8),
-                             decoration: BoxDecoration(
-                               color: Colors.white.withOpacity(0.08),
-                               borderRadius: BorderRadius.circular(8),
-                             ),
-                             child: const Icon(Icons.calendar_today_rounded, size: 18, color: Colors.white),
-                           ),
-                           const SizedBox(width: 12),
-                           Column(
-                             crossAxisAlignment: CrossAxisAlignment.start,
-                             children: [
-                               Text(
-                                scheduledDayStr,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                scheduledTimeStr,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                             ],
-                           ),
-                        ],
+              ),
+
+            Padding(
+              padding: const EdgeInsets.all(16), // More breathing room
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with avatar and name
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(1.5), // Thinner border
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: isScheduledEvent
+                                ? [
+                                    const Color(0xFF00C853),
+                                    const Color(0xFF00C853).withOpacity(0.5)
+                                  ] // Green border for scheduled
+                                : [
+                                    Colors.deepOrange,
+                                    Colors.deepOrange.withOpacity(0.5)
+                                  ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey[900],
+                          backgroundImage: userPhotoUrl != null
+                              ? (userPhotoUrl.startsWith('data:')
+                                  ? MemoryImage(Uri.parse(userPhotoUrl)
+                                      .data!
+                                      .contentAsBytes())
+                                  : NetworkImage(userPhotoUrl) as ImageProvider)
+                              : null,
+                          child: userPhotoUrl == null
+                              ? Text(
+                                  userName.isNotEmpty
+                                      ? userName[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13))
+                              : null,
+                        ),
                       ),
-                    ),
-                    
-                    // Run Attribute Badges
-                    if (post['gameMode'] != null || post['courtType'] != null || post['ageRange'] != null) ...[
-                      Divider(height: 1, color: Colors.white.withOpacity(0.08)),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                        child: Wrap(
-                          alignment: WrapAlignment.start,
-                          spacing: 6,
-                          runSpacing: 6,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (post['gameMode'] != null)
-                              _buildAttributeBadge(
-                                post['gameMode'].toString(),
-                                post['gameMode'] == '3v3' ? Icons.people : Icons.groups,
-                                post['gameMode'] == '3v3' ? Colors.blue : Colors.purple,
-                              ),
-                            if (post['courtType'] != null)
-                              _buildAttributeBadge(
-                                post['courtType'] == 'full' ? 'Full Court' : 'Half Court',
-                                post['courtType'] == 'full' ? Icons.rectangle_outlined : Icons.crop_square,
-                                Colors.teal,
-                              ),
-                            if (post['ageRange'] != null)
-                              _buildAttributeBadge(
-                                post['ageRange'].toString(),
-                                Icons.people_outline,
-                                Colors.amber,
-                              ),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    userName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: Colors.white,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (isScheduledEvent) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF00C853)
+                                          .withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                          color: const Color(0xFF00C853)
+                                              .withOpacity(0.3)),
+                                    ),
+                                    child: const Text('SCHEDULED RUN',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color:
+                                              Color(0xFF00C853), // Green text
+                                          letterSpacing: 0.5,
+                                        )),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              timeAgo,
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.4),
+                                  fontSize: 12),
+                            ),
                           ],
                         ),
                       ),
-                    ],
-
-                    if (courtName != null) ...[
-                      // Divider
-                      Divider(height: 1, color: Colors.white.withOpacity(0.08)),
-                      
-                      // Court Location Button
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: (courtId != null || courtName != null) ? () {
-                            final params = <String, String>{};
-                            if (courtId != null) params['courtId'] = courtId;
-                            if (courtName != null) params['courtName'] = Uri.encodeComponent(courtName);
-                            final queryString = params.entries.map((e) => '${e.key}=${e.value}').join('&');
-                            context.go('/courts?$queryString');
-                          } : null,
-                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
+                      // Compact "IN" Button for Scheduled Events (Top Right)
+                      if (isScheduledEvent)
+                        GestureDetector(
+                          onTap: () => _toggleAttending(
+                              statusId, isAttending, attendeeCount),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isAttending
+                                  ? const Color(0xFF00C853).withOpacity(0.15)
+                                  : const Color(0xFF00C853),
+                              borderRadius: BorderRadius.circular(20),
+                              border: isAttending
+                                  ? Border.all(color: const Color(0xFF00C853))
+                                  : null,
+                            ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                 Container(
-                                   padding: const EdgeInsets.all(6),
-                                   decoration: BoxDecoration(
-                                     color: const Color(0xFF00C853).withOpacity(0.15),
-                                     shape: BoxShape.circle,
-                                   ),
-                                   child: const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF00C853)),
-                                 ),
-                                 const SizedBox(width: 12),
-                                 Expanded(
-                                   child: Column(
-                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                     children: [
-                                       if (courtId != null) // Only show label if it's a real linked court
-                                         Text(
-                                          "LOCATION",
-                                           style: TextStyle(
-                                            fontSize: 9,
-                                            color: const Color(0xFF00C853).withOpacity(0.8),
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: 0.5,
-                                           ),
-                                         ),
-                                       Text(
-                                        courtName,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white.withOpacity(0.95),
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                     ],
-                                   ),
-                                 ),
-                                 Icon(Icons.chevron_right, size: 20, color: Colors.white.withOpacity(0.3)),
+                                Icon(
+                                  isAttending ? Icons.check : Icons.add_rounded,
+                                  color: isAttending
+                                      ? const Color(0xFF00C853)
+                                      : Colors.black,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isAttending
+                                      ? "IN ($attendeeCount)"
+                                      : "JOIN ($attendeeCount)",
+                                  style: TextStyle(
+                                    color: isAttending
+                                        ? const Color(0xFF00C853)
+                                        : Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                        ),
+                        )
+                      else
+                        Icon(Icons.more_horiz,
+                            color: Colors.white.withOpacity(0.2), size: 20),
+                    ],
+                  ),
+
+                  // Scheduled Run Details - Modern Card
+                  if (isScheduledEvent)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(top: 16, bottom: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.08)),
                       ),
-                    ]
-                  ],
-                ),
-              ),
-
-            // Attendee Visibility Row (for scheduled runs)
-            if (isScheduledEvent && isAttending) ...[
-              const SizedBox(height: 8),
-              _buildAttendeeRow(statusId, attendeeCount),
-            ],
-            
-            // Regular Content (for non-scheduled events)
-            if (content.isNotEmpty && !isScheduledEvent)
-              Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 4), 
-                child: Text(
-                  content, 
-                  style: TextStyle(fontSize: 15, height: 1.4, color: Colors.white.withOpacity(0.9)), 
-                ),
-              ),
-
-            // Location Chip for Regular Posts
-            if (courtName != null && !isScheduledEvent)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: GestureDetector(
-                  onTap: (courtId != null || courtName != null) ? () {
-                    final params = <String, String>{};
-                    if (courtId != null) params['courtId'] = courtId;
-                    if (courtName != null) params['courtName'] = Uri.encodeComponent(courtName);
-                    final queryString = params.entries.map((e) => '${e.key}=${e.value}').join('&');
-                    context.go('/courts?$queryString');
-                  } : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00C853).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF00C853).withOpacity(0.2)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.location_on, size: 14, color: Color(0xFF00C853)),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            courtName,
-                            style: const TextStyle(
-                              color: Color(0xFF00C853),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
+                      child: Column(
+                        children: [
+                          // Time Section
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                      Icons.calendar_today_rounded,
+                                      size: 18,
+                                      color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      scheduledDayStr,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      scheduledTimeStr,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          // Run Attribute Badges
+                          if (post['gameMode'] != null ||
+                              post['courtType'] != null ||
+                              post['ageRange'] != null) ...[
+                            Divider(
+                                height: 1,
+                                color: Colors.white.withOpacity(0.08)),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                              child: Wrap(
+                                alignment: WrapAlignment.start,
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  if (post['gameMode'] != null)
+                                    _buildAttributeBadge(
+                                      post['gameMode'].toString(),
+                                      post['gameMode'] == '3v3'
+                                          ? Icons.people
+                                          : Icons.groups,
+                                      post['gameMode'] == '3v3'
+                                          ? Colors.blue
+                                          : Colors.purple,
+                                    ),
+                                  if (post['courtType'] != null)
+                                    _buildAttributeBadge(
+                                      post['courtType'] == 'full'
+                                          ? 'Full Court'
+                                          : 'Half Court',
+                                      post['courtType'] == 'full'
+                                          ? Icons.rectangle_outlined
+                                          : Icons.crop_square,
+                                      Colors.teal,
+                                    ),
+                                  if (post['ageRange'] != null)
+                                    _buildAttributeBadge(
+                                      post['ageRange'].toString(),
+                                      Icons.people_outline,
+                                      Colors.amber,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          if (courtName != null) ...[
+                            // Divider
+                            Divider(
+                                height: 1,
+                                color: Colors.white.withOpacity(0.08)),
+
+                            // Court Location Button
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: (courtId != null || courtName != null)
+                                    ? () {
+                                        final params = <String, String>{};
+                                        if (courtId != null)
+                                          params['courtId'] = courtId;
+                                        if (courtName != null)
+                                          params['courtName'] =
+                                              Uri.encodeComponent(courtName);
+                                        final queryString = params.entries
+                                            .map((e) => '${e.key}=${e.value}')
+                                            .join('&');
+                                        context.go('/courts?$queryString');
+                                      }
+                                    : null,
+                                borderRadius: const BorderRadius.vertical(
+                                    bottom: Radius.circular(12)),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF00C853)
+                                              .withOpacity(0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                            Icons.location_on_rounded,
+                                            size: 16,
+                                            color: Color(0xFF00C853)),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (courtId !=
+                                                null) // Only show label if it's a real linked court
+                                              Text(
+                                                "LOCATION",
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  color: const Color(0xFF00C853)
+                                                      .withOpacity(0.8),
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                            Text(
+                                              courtName,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white
+                                                    .withOpacity(0.95),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(Icons.chevron_right,
+                                          size: 20,
+                                          color: Colors.white.withOpacity(0.3)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ]
+                        ],
+                      ),
+                    ),
+
+                  // Attendee Visibility Row (for scheduled runs)
+                  if (isScheduledEvent && isAttending) ...[
+                    const SizedBox(height: 8),
+                    _buildAttendeeRow(statusId, attendeeCount),
+                  ],
+
+                  // Regular Content (for non-scheduled events)
+                  if (content.isNotEmpty && !isScheduledEvent)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12, bottom: 4),
+                      child: Text(
+                        content,
+                        style: TextStyle(
+                            fontSize: 15,
+                            height: 1.4,
+                            color: Colors.white.withOpacity(0.9)),
+                      ),
+                    ),
+
+                  // Location Chip for Regular Posts
+                  if (courtName != null && !isScheduledEvent)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: GestureDetector(
+                        onTap: (courtId != null || courtName != null)
+                            ? () {
+                                final params = <String, String>{};
+                                if (courtId != null)
+                                  params['courtId'] = courtId;
+                                if (courtName != null)
+                                  params['courtName'] =
+                                      Uri.encodeComponent(courtName);
+                                final queryString = params.entries
+                                    .map((e) => '${e.key}=${e.value}')
+                                    .join('&');
+                                context.go('/courts?$queryString');
+                              }
+                            : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00C853).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color:
+                                    const Color(0xFF00C853).withOpacity(0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.location_on,
+                                  size: 14, color: Color(0xFF00C853)),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  courtName,
+                                  style: const TextStyle(
+                                    color: Color(0xFF00C853),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                      ),
+                    ),
+
+                  // Video / Image Logic Same As Before
+                  if (post['videoUrl'] != null &&
+                      post['videoUrl'].toString().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: FeedVideoPlayer(
+                        videoUrl: post['videoUrl'].toString(),
+                        thumbnailUrl: post['videoThumbnailUrl']?.toString(),
+                        durationMs: post['videoDurationMs'] is int
+                            ? post['videoDurationMs']
+                            : int.tryParse(
+                                post['videoDurationMs']?.toString() ?? ''),
+                        autoPlay: true,
+                        startMuted: true,
+                      ),
+                    )
+                  else if (imageUrl != null && imageUrl.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxHeight: 500, // Allow tall portrait images
+                          ),
+                          child: imageUrl.startsWith('data:')
+                              ? Image.memory(
+                                  Uri.parse(imageUrl).data!.contentAsBytes(),
+                                  fit: BoxFit
+                                      .contain, // Preserve original aspect ratio
+                                  width: double.infinity,
+                                  errorBuilder: (_, __, ___) =>
+                                      const SizedBox.shrink(),
+                                )
+                              : Image.network(
+                                  imageUrl,
+                                  fit: BoxFit
+                                      .contain, // Preserve original aspect ratio
+                                  width: double.infinity,
+                                  errorBuilder: (_, __, ___) =>
+                                      const SizedBox.shrink(),
+                                ),
+                        ),
+                      ),
+                    ),
+
+                  // Interaction Bar
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      children: [
+                        // Like Button
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () =>
+                                _toggleLike(statusId, isLiked, likeCount),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isLiked
+                                        ? Icons.favorite
+                                        : Icons.favorite_border_rounded,
+                                    size: 20,
+                                    color: isLiked
+                                        ? Colors.redAccent
+                                        : Colors.grey[500],
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '$likeCount',
+                                    style: TextStyle(
+                                      color: isLiked
+                                          ? Colors.redAccent
+                                          : Colors.grey[500],
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        // Comment Button
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => _toggleComments(statusId),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.chat_bubble_outline_rounded,
+                                    size: 20,
+                                    color: isExpanded
+                                        ? Colors.blue
+                                        : Colors.grey[500],
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '$commentCount',
+                                    style: TextStyle(
+                                      color: isExpanded
+                                          ? Colors.blue
+                                          : Colors.grey[500],
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const Spacer(),
+                        // Share Button
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => _sharePost(post),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              child: Icon(Icons.share_outlined,
+                                  color: Colors.grey[600], size: 20),
+                            ),
+                          ),
+                        ),
+
+                        // Delete Button
+                        if (isOwnPost) ...[
+                          const SizedBox(width: 16),
+                          GestureDetector(
+                            onTap: () => _confirmDeletePost(statusId),
+                            child: Icon(
+                              Icons.delete_outline,
+                              color: Colors.grey[600],
+                              size: 20,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                ),
-              ),
-              
-            // Video / Image Logic Same As Before
-            if (post['videoUrl'] != null && post['videoUrl'].toString().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: FeedVideoPlayer(
-                  videoUrl: post['videoUrl'].toString(),
-                  thumbnailUrl: post['videoThumbnailUrl']?.toString(),
-                  durationMs: post['videoDurationMs'] is int 
-                    ? post['videoDurationMs'] 
-                    : int.tryParse(post['videoDurationMs']?.toString() ?? ''),
-                  autoPlay: true,
-                  startMuted: true,
-                ),
-              )
-            else if (imageUrl != null && imageUrl.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxHeight: 500, // Allow tall portrait images
-                    ),
-                    child: imageUrl.startsWith('data:')
-                      ? Image.memory(
-                          Uri.parse(imageUrl).data!.contentAsBytes(),
-                          fit: BoxFit.contain, // Preserve original aspect ratio
-                          width: double.infinity,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        )
-                      : Image.network(
-                          imageUrl,
-                          fit: BoxFit.contain, // Preserve original aspect ratio
-                          width: double.infinity,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                  ),
-                ),
-              ),
-            
-            // Interaction Bar
-            const SizedBox(height: 14), 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                children: [
-                  // Like Button
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => _toggleLike(statusId, isLiked, likeCount),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isLiked ? Icons.favorite : Icons.favorite_border_rounded,
-                              size: 20, 
-                              color: isLiked ? Colors.redAccent : Colors.grey[500],
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '$likeCount',
-                              style: TextStyle(
-                                color: isLiked ? Colors.redAccent : Colors.grey[500],
-                                fontSize: 13, 
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+
+                  // Expanded comments section matches existing logic, just keeping it here
+                  if (isExpanded) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black
+                            .withOpacity(0.2), // Darker inset background
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  
-                  // Comment Button
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => _toggleComments(statusId),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              size: 20,
-                              color: isExpanded ? Colors.blue : Colors.grey[500],
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '$commentCount',
-                              style: TextStyle(
-                                color: isExpanded ? Colors.blue : Colors.grey[500],
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  const Spacer(),
-                  // Share Button
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => _sharePost(post),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        child: Icon(Icons.share_outlined, color: Colors.grey[600], size: 20),
-                      ),
-                    ),
-                  ),
-                  
-                  // Delete Button
-                  if (isOwnPost) ...[
-                    const SizedBox(width: 16),
-                    GestureDetector(
-                      onTap: () => _confirmDeletePost(statusId),
-                      child: Icon(
-                        Icons.delete_outline, 
-                        color: Colors.grey[600], 
-                        size: 20,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Existing comments
+                          if (comments.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text('No comments yet. Be the first!',
+                                  style: TextStyle(
+                                      color: Colors.grey[600], fontSize: 13)),
+                            )
+                          else
+                            ...comments
+                                .map((comment) => Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 12),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 14,
+                                            backgroundColor: Colors.deepOrange
+                                                .withOpacity(0.3),
+                                            backgroundImage: comment[
+                                                        'userPhotoUrl'] !=
+                                                    null
+                                                ? (comment['userPhotoUrl']
+                                                        .toString()
+                                                        .startsWith('data:')
+                                                    ? MemoryImage(Uri.parse(
+                                                            comment[
+                                                                'userPhotoUrl'])
+                                                        .data!
+                                                        .contentAsBytes())
+                                                    : NetworkImage(comment[
+                                                            'userPhotoUrl'])
+                                                        as ImageProvider)
+                                                : null,
+                                            child: comment['userPhotoUrl'] ==
+                                                    null
+                                                ? Text(
+                                                    (comment['userName'] ??
+                                                            '?')[0]
+                                                        .toUpperCase(),
+                                                    style: const TextStyle(
+                                                        fontSize: 10,
+                                                        color: Colors.white),
+                                                  )
+                                                : null,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      comment['userName'] ??
+                                                          'User',
+                                                      style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 13,
+                                                          color: Colors.white),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      '· now', // Simplified for demo
+                                                      style: TextStyle(
+                                                          fontSize: 11,
+                                                          color:
+                                                              Colors.grey[600]),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  comment['content'] ?? '',
+                                                  style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Colors.white
+                                                          .withOpacity(0.8)),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ))
+                                .toList(),
+                          const SizedBox(height: 8),
+                          // Add comment input
+                          _CommentInput(
+                            onSubmit: (text) => _addComment(statusId, text),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-            
-            // Expanded comments section matches existing logic, just keeping it here
-            if (isExpanded) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2), // Darker inset background
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Existing comments
-                    if (comments.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text('No comments yet. Be the first!', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                      )
-                    else
-                      ...comments.map((comment) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CircleAvatar(
-                              radius: 14,
-                              backgroundColor: Colors.deepOrange.withOpacity(0.3),
-                              backgroundImage: comment['userPhotoUrl'] != null 
-                                  ? (comment['userPhotoUrl'].toString().startsWith('data:') 
-                                      ? MemoryImage(Uri.parse(comment['userPhotoUrl']).data!.contentAsBytes()) 
-                                      : NetworkImage(comment['userPhotoUrl']) as ImageProvider)
-                                  : null,
-                              child: comment['userPhotoUrl'] == null
-                                  ? Text(
-                                      (comment['userName'] ?? '?')[0].toUpperCase(),
-                                      style: const TextStyle(fontSize: 10, color: Colors.white),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        comment['userName'] ?? 'User',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '· now', // Simplified for demo
-                                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    comment['content'] ?? '',
-                                    style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.8)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )).toList(),
-                    const SizedBox(height: 8),
-                    // Add comment input
-                    _CommentInput(
-                      onSubmit: (text) => _addComment(statusId, text),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
-        ),
-        ],
-      ),
       ),
     );
   }
-
 
   Widget _buildCourtActivityCard(CourtActivity activity) {
     final playerName = activity.playerName;
@@ -3057,7 +3624,8 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                 color: Colors.green.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.location_on, size: 16, color: Colors.green),
+              child:
+                  const Icon(Icons.location_on, size: 16, color: Colors.green),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -3068,13 +3636,20 @@ class _HoopRankFeedState extends State<HoopRankFeed> with SingleTickerProviderSt
                     text: TextSpan(
                       style: const TextStyle(fontSize: 13, color: Colors.white),
                       children: [
-                        TextSpan(text: playerName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        TextSpan(
+                            text: playerName,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
                         const TextSpan(text: ' checked in at '),
-                        TextSpan(text: courtName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        TextSpan(
+                            text: courtName,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
-                  Text(timeAgo, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                  Text(timeAgo,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 11)),
                 ],
               ),
             ),
@@ -3124,7 +3699,8 @@ class _CommentInputState extends State<_CommentInput> {
               hintText: 'Add a comment...',
               hintStyle: TextStyle(color: Colors.grey[500], fontSize: 12),
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               fillColor: Colors.white.withOpacity(0.05),
               filled: true,
               border: OutlineInputBorder(
@@ -3152,17 +3728,16 @@ class _CommentInputState extends State<_CommentInput> {
   }
 }
 
-
 class BasketballCourtPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(16));
-    
+
     // Clip to rounded rect prevents drawing outside corners
     canvas.save();
     canvas.clipRRect(rrect);
-    
+
     // Parquet Wood Colors (Light Maple/Blonde)
     final woodColors = [
       const Color(0xFFEACC94), // Light Maple
@@ -3173,59 +3748,60 @@ class BasketballCourtPainter extends CustomPainter {
     ];
 
     const plankWidth = 16.0; // Narrower planks similar to reference
-    
+
     // Iterate columns (Planks)
     for (double x = 0; x < size.width; x += plankWidth) {
       final colIndex = (x / plankWidth).floor();
       // Stagger rows
       double y = (colIndex % 2 == 0) ? -20.0 : -60.0;
-      
+
       // Deterministic random for this column to prevent flickering
-      final random = math.Random(colIndex * 1337 + 42); 
-      
+      final random = math.Random(colIndex * 1337 + 42);
+
       while (y < size.height) {
         final plankLen = 80.0 + random.nextInt(100); // Shorter planks
         final plankRect = Rect.fromLTWH(x, y, plankWidth, plankLen);
-        
+
         // 1. Draw Plank with random wood shade
         final color = woodColors[random.nextInt(woodColors.length)];
         canvas.drawRect(plankRect, Paint()..color = color);
-        
+
         // 2. Plank Joints/Grain (Very subtle)
-        canvas.drawRect(plankRect, Paint()
-          ..color = Colors.black.withOpacity(0.04)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.5
-        );
+        canvas.drawRect(
+            plankRect,
+            Paint()
+              ..color = Colors.black.withOpacity(0.04)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 0.5);
 
         y += plankLen;
       }
     }
-    
+
     // 3. Gloss/Varnish Effect (Stronger gloss)
     final glossGradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-         Colors.white.withOpacity(0.35), // Strong glare
-         Colors.white.withOpacity(0.1),
-         Colors.transparent,
+        Colors.white.withOpacity(0.35), // Strong glare
+        Colors.white.withOpacity(0.1),
+        Colors.transparent,
       ],
       stops: const [0.0, 0.25, 0.7],
     );
     canvas.drawRect(rect, Paint()..shader = glossGradient.createShader(rect));
-    
+
     canvas.restore(); // End Clip
-    
+
     // 4. Court Lines (White Border)
     final linePaint = Paint()
       ..color = Colors.white.withOpacity(0.95) // White lines
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0; 
-      
+      ..strokeWidth = 3.0;
+
     // Draw outer court line (inset)
     canvas.drawRRect(rrect.deflate(2.0), linePaint);
-    
+
     // Optional: Draw a curved 3-point line hint?
     // Let's keep it simple with just the border for now, but black.
   }

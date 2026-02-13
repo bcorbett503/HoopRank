@@ -41,27 +41,15 @@ class NotificationService with WidgetsBindingObserver {
 
   /// Initialize notification service - call once on app start
   Future<void> initialize() async {
-    // Request permission
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      debugPrint('Push notifications authorized');
-    } else {
-      debugPrint('Push notifications denied');
-      return;
-    }
-
     // Initialize local notifications for foreground display
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
+      // Do NOT request permissions at app start. We prompt on first login
+      // so it feels contextual and not like a cold-start pop-up.
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
     );
     const initSettings = InitializationSettings(
       android: androidSettings,
@@ -79,15 +67,31 @@ class NotificationService with WidgetsBindingObserver {
       sound: true,
     );
 
-    // Get FCM token
-    _fcmToken = await _messaging.getToken();
-    debugPrint('FCM Token: $_fcmToken');
-
     // Listen for token refresh
     _messaging.onTokenRefresh.listen((token) {
       _fcmToken = token;
       _registerTokenWithBackend();
     });
+
+    // If the user previously granted notification permission (e.g. returning
+    // install), grab the token now. If not authorized yet, we'll request on
+    // first login and then fetch/register the token.
+    try {
+      final settings = await _messaging.getNotificationSettings();
+      final status = settings.authorizationStatus;
+      final isAuthorized = status == AuthorizationStatus.authorized ||
+          status == AuthorizationStatus.provisional;
+      if (isAuthorized) {
+        _fcmToken = await _messaging.getToken();
+        debugPrint('FCM Token (pre-authorized): $_fcmToken');
+      } else {
+        debugPrint(
+          'Push notifications not authorized yet (will prompt on first login)',
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to read notification settings: $e');
+    }
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -106,6 +110,40 @@ class NotificationService with WidgetsBindingObserver {
 
     // Listen for app lifecycle changes to clear badge when app comes to foreground
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Request system notification permissions (intended for first-login prompt).
+  /// Returns true if notifications are authorized (or provisional), false otherwise.
+  Future<bool> requestPermissions() async {
+    try {
+      final settings = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      final status = settings.authorizationStatus;
+      final isAuthorized = status == AuthorizationStatus.authorized ||
+          status == AuthorizationStatus.provisional;
+
+      if (!isAuthorized) {
+        debugPrint('Push notifications denied');
+        return false;
+      }
+
+      // Request local-notification permissions too (foreground presentation uses
+      // flutter_local_notifications). This is the same underlying iOS permission,
+      // but calling it here ensures the plugin is unblocked.
+      final ios = _localNotifications.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
+      await ios?.requestPermissions(alert: true, badge: true, sound: true);
+
+      _fcmToken = await _messaging.getToken();
+      debugPrint('FCM Token (post-authorize): $_fcmToken');
+      return true;
+    } catch (e) {
+      debugPrint('Failed to request notification permissions: $e');
+      return false;
+    }
   }
 
   /// Clear the iOS app icon badge count
