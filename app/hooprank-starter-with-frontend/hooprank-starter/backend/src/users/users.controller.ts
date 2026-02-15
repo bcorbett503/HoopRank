@@ -483,6 +483,9 @@ export class UsersController {
     const user = await this.usersService.findOne(id);
     if (!user) return user;
     const stats = await this.usersService.getUserStats(id).catch(() => null);
+    const kingCourtsCount = await this.usersService
+      .getKingCourtsCount(id)
+      .catch(() => 0);
     // Return both native camelCase and iOS-expected aliases
     const u = user as any;
     const matchesPlayed = stats?.matchesPlayed ?? u.gamesPlayed ?? u.games_played ?? 0;
@@ -497,6 +500,8 @@ export class UsersController {
       games_played: matchesPlayed,
       wins,
       losses,
+      kingCourtsCount,
+      king_courts_count: kingCourtsCount,
       photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
       avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
       photo_url: u.avatarUrl ?? u.avatar_url ?? null,

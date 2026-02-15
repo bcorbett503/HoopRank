@@ -405,6 +405,65 @@ export class UsersService {
     return { wins: 0, losses: 0, matchesPlayed: 0, winRate: 0, hoopRank: 3.0 };
   }
 
+  /**
+   * Count how many courts this user is the "King" of, defined as:
+   * among all followers (hearts) of a court, the follower with the highest
+   * global HoopRank (users.hoop_rank) is the King.
+   *
+   * This is computed on demand from user_followed_courts + users.hoop_rank.
+   */
+  async getKingCourtsCount(userId: string): Promise<number> {
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      const r = await this.dataSource.query(
+        `
+        WITH ranked AS (
+          SELECT
+            ufc.court_id,
+            ufc.user_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY ufc.court_id
+              ORDER BY u.hoop_rank DESC NULLS LAST, u.id
+            ) AS rn
+          FROM user_followed_courts ufc
+          JOIN users u ON u.id = ufc.user_id
+        )
+        SELECT COUNT(*)::int AS count
+        FROM ranked
+        WHERE rn = 1 AND user_id = $1
+      `,
+        [userId],
+      );
+
+      return parseInt(r?.[0]?.count, 10) || 0;
+    }
+
+    // SQLite fallback (window functions supported). "NULLS LAST" not supported,
+    // so order by (is null) first, then rank desc.
+    const r = await this.dataSource.query(
+      `
+        WITH ranked AS (
+          SELECT
+            ufc.court_id,
+            ufc.user_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY ufc.court_id
+              ORDER BY (u.hoop_rank IS NULL) ASC, u.hoop_rank DESC, u.id
+            ) AS rn
+          FROM user_followed_courts ufc
+          JOIN users u ON u.id = ufc.user_id
+        )
+        SELECT COUNT(*) AS count
+        FROM ranked
+        WHERE rn = 1 AND user_id = ?
+      `,
+      [userId],
+    );
+
+    return parseInt(r?.[0]?.count, 10) || 0;
+  }
+
   // ==================== FOLLOW METHODS ====================
 
   async followCourt(userId: string, courtId: string): Promise<void> {

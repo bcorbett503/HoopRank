@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../state/check_in_state.dart';
+import '../screens/chat_screen.dart';
 
 /// A clickable player name that shows their profile when tapped
 class ClickablePlayerName extends StatelessWidget {
@@ -87,6 +88,7 @@ class PlayerProfileSheet extends StatefulWidget {
   }) {
     return showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => PlayerProfileSheet(
@@ -109,6 +111,7 @@ class PlayerProfileSheet extends StatefulWidget {
     // Show bottom sheet immediately with loading state, then fetch data
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => _LoadingProfileSheet(
@@ -256,6 +259,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   int _matchesPlayed = 0;
   int _wins = 0;
   int _losses = 0;
+  int _kingCourtsCount = 0;
   String? _height;
   String? _city;
   String? _zip;
@@ -291,6 +295,10 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                 profileData['matchesPlayed'] ?? profileData['matches_played']);
             _wins = _parseInt(profileData['wins']);
             _losses = _parseInt(profileData['losses']);
+            _kingCourtsCount = _parseInt(
+              profileData['kingCourtsCount'] ??
+                  profileData['king_courts_count'],
+            );
             _height = profileData['height']?.toString();
             _city = profileData['city']?.toString();
             _zip = profileData['zip']?.toString() ??
@@ -341,6 +349,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   @override
   Widget build(BuildContext context) {
     final player = widget.player;
+    final isSelf = ApiService.userId != null && ApiService.userId == player.id;
 
     // Use fresh data if available, fallback to User object
     final matchesPlayed =
@@ -455,10 +464,27 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            widget.onMessage?.call();
-                          },
+                          onPressed: isSelf
+                              ? null
+                              : () {
+                                  final nav =
+                                      Navigator.of(context, rootNavigator: true);
+                                  nav.pop();
+
+                                  // Prefer injected behavior (Rankings), otherwise default to ChatScreen.
+                                  final handler = widget.onMessage;
+                                  if (handler != null) {
+                                    handler();
+                                    return;
+                                  }
+
+                                  nav.push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          ChatScreen(userId: player.id),
+                                    ),
+                                  );
+                                },
                           icon: const Icon(Icons.message),
                           label: const Text('Message'),
                           style: ElevatedButton.styleFrom(
@@ -473,10 +499,23 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            widget.onChallenge?.call();
-                          },
+                          onPressed: isSelf
+                              ? null
+                              : () {
+                                  final nav =
+                                      Navigator.of(context, rootNavigator: true);
+                                  final rootContext = nav.context;
+                                  nav.pop();
+
+                                  // Prefer injected behavior (Rankings), otherwise show a default dialog.
+                                  final handler = widget.onChallenge;
+                                  if (handler != null) {
+                                    handler();
+                                    return;
+                                  }
+
+                                  _showDefaultChallengeDialog(rootContext, player);
+                                },
                           icon: const Icon(Icons.sports_basketball),
                           label: const Text('Challenge'),
                           style: ElevatedButton.styleFrom(
@@ -525,19 +564,47 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       ? const Center(
                           child: CircularProgressIndicator(
                               color: Colors.deepOrange))
-                      : Row(
+                      : Column(
                           children: [
-                            Expanded(
-                                child: _buildStatCard(
-                                    'Matches', '$matchesPlayed', Icons.sports)),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: _buildStatCard(
-                                    'Wins', '$wins', Icons.emoji_events)),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: _buildStatCard('Win Rate', '$winRate%',
-                                    Icons.trending_up)),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Matches',
+                                    '$matchesPlayed',
+                                    Icons.sports,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Wins',
+                                    '$wins',
+                                    Icons.emoji_events,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'Win Rate',
+                                    '$winRate%',
+                                    Icons.trending_up,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildStatCard(
+                                    'King Courts',
+                                    '$_kingCourtsCount',
+                                    Icons.workspace_premium,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
 
@@ -610,6 +677,74 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _showDefaultChallengeDialog(BuildContext context, User player) {
+    final playerId = player.id;
+    final playerName = player.name;
+
+    final messageController = TextEditingController(text: 'Want to play?');
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.sports_basketball, color: Colors.deepOrange),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Challenge $playerName')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: messageController,
+              decoration: InputDecoration(
+                labelText: 'Your message',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              maxLines: 2,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final message = messageController.text.trim();
+              if (message.isEmpty) return;
+              Navigator.pop(dialogContext);
+
+              try {
+                await ApiService.createChallenge(
+                    toUserId: playerId, message: message);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Challenge sent to $playerName!')),
+                );
+              } catch (e) {
+                final errorText = e.toString().replaceFirst('Exception: ', '');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed: $errorText')),
+                );
+              }
+            },
+            icon: const Icon(Icons.sports_basketball),
+            label: const Text('Send Challenge'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }
