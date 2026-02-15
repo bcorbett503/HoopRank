@@ -82,14 +82,14 @@ export class CourtsService implements OnModuleInit {
             // Use PostGIS spatial query for production
             const courts = await this.dataSource.query(`
                 SELECT 
-                    id, name, city, indoor, rims, source, signature, access, venue_type, address,
-                    ST_Y(geog::geometry) as lat,
-                    ST_X(geog::geometry) as lng,
-                    (SELECT COUNT(*) FROM user_court_alerts WHERE court_id = courts.id::text) as follower_count
-                FROM courts
-                WHERE geog && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-                ORDER BY name ASC
-                LIMIT 100
+	                    id, name, city, indoor, rims, source, signature, access, venue_type, address,
+	                    ST_Y(geog::geometry) as lat,
+	                    ST_X(geog::geometry) as lng,
+	                    (SELECT COUNT(*) FROM user_followed_courts WHERE court_id = courts.id::text) as follower_count
+	                FROM courts
+	                WHERE geog && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+	                ORDER BY name ASC
+	                LIMIT 100
             `, [minLng, minLat, maxLng, maxLat]);
             return courts;
         }
@@ -182,9 +182,9 @@ export class CourtsService implements OnModuleInit {
         return this.dataSource.query(query, [courtId]);
     }
 
-    async getActiveCheckIns(courtId: string): Promise<any[]> {
-        const d = this.dialect.reset();
-        const query = `
+	async getActiveCheckIns(courtId: string): Promise<any[]> {
+		const d = this.dialect.reset();
+		const query = `
             SELECT 
                 ci.id,
                 ci.user_id as "userId",
@@ -196,20 +196,64 @@ export class CourtsService implements OnModuleInit {
             WHERE ${d.cast('ci.court_id', 'TEXT')} = ${d.param()} AND ci.checked_out_at IS NULL
             ORDER BY ci.checked_in_at DESC
         `;
-        return this.dataSource.query(query, [courtId]);
-    }
+		return this.dataSource.query(query, [courtId]);
+	}
 
-    // ==================== FOLLOWER COUNTS ====================
+	// ==================== FOLLOWERS ("Hearts") ====================
 
-    async getFollowerCounts(): Promise<{ courtId: string; count: number }[]> {
-        const d = this.dialect.reset();
-        const query = d.isPostgres
-            ? `SELECT court_id as "courtId", COUNT(*) as count FROM user_court_alerts GROUP BY court_id`
-            : `SELECT court_id as "courtId", COUNT(*) as count FROM user_court_alerts GROUP BY court_id`;
+	/**
+	 * Get users that follow (heart) a court, sorted by global 1v1 rank (best first).
+	 * Rank is computed from users.hoop_rank via a window function so we can return
+	 * a HoopRank # even for users outside the top-100 /rankings endpoint.
+	 */
+	async getCourtFollowers(courtId: string, limit: number = 50): Promise<any[]> {
+		const d = this.dialect.reset();
+		const safeLimit = Math.max(1, Math.min(limit || 50, 200));
 
-        const results = await this.dataSource.query(query);
-        return results.map((r: any) => ({
-            courtId: r.courtId,
+		// SQLite doesn't support "NULLS LAST" but does support window functions.
+		const rankOrder = d.isPostgres
+			? 'hoop_rank DESC NULLS LAST'
+			: '(hoop_rank IS NULL) ASC, hoop_rank DESC';
+
+		const query = `
+			WITH ranked_users AS (
+				SELECT
+					id,
+					name,
+					avatar_url as "photoUrl",
+					hoop_rank as "rating",
+					ROW_NUMBER() OVER (ORDER BY ${rankOrder}) as "rank"
+				FROM users
+				WHERE name IS NOT NULL
+			)
+			SELECT
+				ru.id,
+				ru.name,
+				ru."photoUrl",
+				ru."rating",
+				ru."rank"
+			FROM ranked_users ru
+			JOIN user_followed_courts ufc
+				ON ${d.cast('ufc.user_id', 'TEXT')} = ${d.cast('ru.id', 'TEXT')}
+			WHERE ${d.cast('ufc.court_id', 'TEXT')} = ${d.param()}
+			ORDER BY ru."rank" ASC
+			LIMIT ${d.param()}
+		`;
+
+		return this.dataSource.query(query, [courtId, safeLimit]);
+	}
+
+	// ==================== FOLLOWER COUNTS ====================
+
+	async getFollowerCounts(): Promise<{ courtId: string; count: number }[]> {
+		const d = this.dialect.reset();
+		const query = d.isPostgres
+			? `SELECT court_id as "courtId", COUNT(*) as count FROM user_followed_courts GROUP BY court_id`
+			: `SELECT court_id as "courtId", COUNT(*) as count FROM user_followed_courts GROUP BY court_id`;
+
+		const results = await this.dataSource.query(query);
+		return results.map((r: any) => ({
+			courtId: r.courtId,
             count: parseInt(r.count, 10),
         }));
     }

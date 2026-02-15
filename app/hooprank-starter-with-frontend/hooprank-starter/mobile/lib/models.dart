@@ -377,6 +377,42 @@ class Court {
   }
 }
 
+/// Represents a user who follows ("hearts") a court.
+/// Includes their global 1v1 HoopRank # when available.
+class CourtFollower {
+  final String id;
+  final String name;
+  final String? photoUrl;
+  final double rating;
+  final int? rank;
+
+  CourtFollower({
+    required this.id,
+    required this.name,
+    this.photoUrl,
+    required this.rating,
+    this.rank,
+  });
+
+  factory CourtFollower.fromJson(Map<String, dynamic> json) {
+    final rawRank = json['rank'];
+    int? rank;
+    if (rawRank is num) {
+      rank = rawRank.toInt();
+    } else if (rawRank is String) {
+      rank = int.tryParse(rawRank);
+    }
+
+    return CourtFollower(
+      id: json['id']?.toString() ?? json['userId']?.toString() ?? '',
+      name: json['name']?.toString() ?? json['userName']?.toString() ?? 'Unknown',
+      photoUrl: json['photoUrl']?.toString() ?? json['avatar_url']?.toString() ?? json['userPhotoUrl']?.toString(),
+      rating: _parseDouble(json['rating'] ?? json['hoop_rank'], fallback: 0.0),
+      rank: rank,
+    );
+  }
+}
+
 /// Represents a user attending a scheduled run
 class RunAttendee {
   final String id;
@@ -447,19 +483,27 @@ class ScheduledRun {
   });
 
   /// Get relative time string for display
+  /// Note: scheduledAt stores local display times as UTC values,
+  /// so we compare using UTC date components for calendar accuracy.
   String get timeString {
     final now = DateTime.now();
     final diff = scheduledAt.difference(now);
     
     if (diff.isNegative) return 'Past';
     
-    if (diff.inDays == 0) {
-      if (diff.inHours < 1) return 'In ${diff.inMinutes}m';
+    // Compare calendar dates using the stored UTC values as display dates
+    // and the user's local date for "today"
+    final todayDate = DateTime(now.year, now.month, now.day);
+    final runDate = DateTime(scheduledAt.year, scheduledAt.month, scheduledAt.day);
+    final calendarDiff = runDate.difference(todayDate).inDays;
+    
+    if (calendarDiff == 0) {
+      if (diff.inHours < 1 && diff.inMinutes >= 0) return 'In ${diff.inMinutes}m';
       return 'Today ${_formatTime(scheduledAt)}';
-    } else if (diff.inDays == 1) {
+    } else if (calendarDiff == 1) {
       return 'Tomorrow ${_formatTime(scheduledAt)}';
-    } else if (diff.inDays < 7) {
-      final dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][scheduledAt.weekday % 7];
+    } else if (calendarDiff < 7) {
+      final dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][scheduledAt.weekday - 1];
       return '$dayName ${_formatTime(scheduledAt)}';
     } else {
       return '${scheduledAt.month}/${scheduledAt.day} ${_formatTime(scheduledAt)}';
@@ -511,4 +555,3 @@ class ScheduledRun {
     );
   }
 }
-

@@ -134,60 +134,60 @@ class FollowedPlayerInfo {
 class CheckInState extends ChangeNotifier {
   // Map of courtId -> list of checked-in players
   final Map<String, List<CheckedInPlayer>> _courtCheckIns = {};
-  
+
   // Set of court IDs the current user has checked into
   final Set<String> _userCheckedInCourts = {};
-  
+
   // Set of court IDs the current user follows
   final Set<String> _followedCourts = {};
-  
+
   // Set of court IDs the current user has alerts enabled for (push notifications)
   final Set<String> _alertCourts = {};
-  
+
   // Set of player IDs the current user follows
   final Set<String> _followedPlayers = {};
-  
+
   // Set of team IDs the current user follows
   final Set<String> _followedTeams = {};
-  
+
   // Cached team names for followed teams (teamId -> teamName)
   final Map<String, String> _followedTeamNames = {};
-  
+
   // Map of player ID -> their current status (what they're up to)
   final Map<String, PlayerStatus> _playerStatuses = {};
-  
+
   // Map of court ID -> follower count (from backend API)
   final Map<String, int> _courtFollowerCounts = {};
-  
+
   // Current user ID (set on login)
   String? _currentUserId;
-  
+
   /// Get follower count for a court
   int getFollowerCount(String courtId) => _courtFollowerCounts[courtId] ?? 0;
-  
+
   /// Initialize with mock data for demo purposes
   Future<void> initialize(String? userId) async {
     _currentUserId = userId;
-    
+
     // Load user's persisted data from local cache first
     await _loadUserCheckIns();
     await _loadFollowedCourts();
     await _loadAlertCourts();
     await _loadFollowedPlayers();
     await _loadFollowedTeams();
-    
+
     // Then sync with backend API (will overwrite local data if successful)
     await _syncFollowsFromApi();
-    
+
     // Fetch court follower counts from API
     await _fetchCourtFollowerCounts();
-    
+
     // Add mock check-in data for popular courts
     _addMockCheckIns();
-    
+
     notifyListeners();
   }
-  
+
   /// Fetch court follower counts from backend API
   Future<void> _fetchCourtFollowerCounts() async {
     try {
@@ -195,25 +195,33 @@ class CheckInState extends ChangeNotifier {
       if (response != null && response is List) {
         _courtFollowerCounts.clear();
         for (final item in response) {
-          final courtId = item['courtId'] as String?;
-          final count = item['count'];
-          if (courtId != null && count != null) {
-            _courtFollowerCounts[courtId] = count is int ? count : int.tryParse(count.toString()) ?? 0;
+          if (item is! Map) continue;
+          final map = Map<String, dynamic>.from(item as Map);
+          final courtId =
+              (map['courtId'] ?? map['court_id'] ?? map['id'])?.toString();
+          final rawCount =
+              map['count'] ?? map['followerCount'] ?? map['follower_count'];
+          if (courtId != null && courtId.isNotEmpty && rawCount != null) {
+            final parsedCount = rawCount is int
+                ? rawCount
+                : int.tryParse(rawCount.toString()) ?? 0;
+            _courtFollowerCounts[courtId] = parsedCount;
           }
         }
-        debugPrint('Fetched follower counts for ${_courtFollowerCounts.length} courts');
+        debugPrint(
+            'Fetched follower counts for ${_courtFollowerCounts.length} courts');
       }
     } catch (e) {
       debugPrint('Error fetching court follower counts: $e');
     }
   }
-  
+
   /// Sync follows from backend API (overwrites local cache on success)
   Future<void> _syncFollowsFromApi() async {
     if (_currentUserId == null) return;
     try {
       final data = await ApiService.getFollows();
-      
+
       // Update courts
       final courts = data['courts'] as List? ?? [];
       _followedCourts.clear();
@@ -226,7 +234,7 @@ class CheckInState extends ChangeNotifier {
           if (alertsEnabled) _alertCourts.add(courtId);
         }
       }
-      
+
       // Update players
       final players = data['players'] as List? ?? [];
       _followedPlayers.clear();
@@ -236,7 +244,7 @@ class CheckInState extends ChangeNotifier {
           _followedPlayers.add(playerId);
         }
       }
-      
+
       // Update teams
       final teams = data['teams'] as List? ?? [];
       _followedTeams.clear();
@@ -249,19 +257,20 @@ class CheckInState extends ChangeNotifier {
           if (teamName != null) _followedTeamNames[teamId] = teamName;
         }
       }
-      
+
       // Save to local cache
       await _saveFollowedCourts();
       await _saveAlertCourts();
       await _saveFollowedPlayers();
       await _saveFollowedTeams();
-      
-      debugPrint('Synced follows from API: ${_followedCourts.length} courts, ${_followedPlayers.length} players, ${_followedTeams.length} teams');
+
+      debugPrint(
+          'Synced follows from API: ${_followedCourts.length} courts, ${_followedPlayers.length} players, ${_followedTeams.length} teams');
     } catch (e) {
       debugPrint('Error syncing follows from API (using local cache): $e');
     }
   }
-  
+
   /// Load user's check-ins from SharedPreferences
   Future<void> _loadUserCheckIns() async {
     if (_currentUserId == null) return;
@@ -274,7 +283,7 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error loading check-ins: $e');
     }
   }
-  
+
   /// Save user's check-ins to SharedPreferences
   Future<void> _saveUserCheckIns() async {
     if (_currentUserId == null) return;
@@ -286,7 +295,7 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error saving check-ins: $e');
     }
   }
-  
+
   /// Load followed courts from SharedPreferences
   Future<void> _loadFollowedCourts() async {
     if (_currentUserId == null) return;
@@ -299,7 +308,7 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error loading followed courts: $e');
     }
   }
-  
+
   /// Save followed courts to SharedPreferences
   Future<void> _saveFollowedCourts() async {
     if (_currentUserId == null) return;
@@ -311,7 +320,7 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error saving followed courts: $e');
     }
   }
-  
+
   /// Load alert courts from SharedPreferences
   Future<void> _loadAlertCourts() async {
     if (_currentUserId == null) return;
@@ -324,7 +333,7 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error loading alert courts: $e');
     }
   }
-  
+
   /// Save alert courts to SharedPreferences
   Future<void> _saveAlertCourts() async {
     if (_currentUserId == null) return;
@@ -336,11 +345,11 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error saving alert courts: $e');
     }
   }
-  
+
   /// Add mock check-in data for demo
   void _addMockCheckIns() {
     final now = DateTime.now();
-    
+
     // Olympic Club - several demo players
     _courtCheckIns['olympic_club_sf'] = [
       CheckedInPlayer(
@@ -372,7 +381,7 @@ class CheckInState extends ChangeNotifier {
         checkedInAt: now.subtract(const Duration(days: 2)),
       ),
     ];
-    
+
     // Add a few more courts with demo check-ins
     _courtCheckIns['node/123456789'] = [
       CheckedInPlayer(
@@ -391,50 +400,50 @@ class CheckInState extends ChangeNotifier {
       ),
     ];
   }
-  
+
   // ==================== CHECK-IN METHODS ====================
-  
+
   /// Check if a court has any check-ins (for green border)
   /// Check if a court has any check-ins (for green border)
   bool hasCheckIns(String courtId) {
     final players = _courtCheckIns[courtId];
     return players != null && players.isNotEmpty;
   }
-  
+
   /// Get all court IDs that currently have check-ins (for Active filter)
   Set<String> get activeCourts => _courtCheckIns.keys.where((courtId) {
-    final players = _courtCheckIns[courtId];
-    return players != null && players.isNotEmpty;
-  }).toSet();
-  
+        final players = _courtCheckIns[courtId];
+        return players != null && players.isNotEmpty;
+      }).toSet();
+
   /// Get number of players checked in at a court
   int getCheckInCount(String courtId) {
     return _courtCheckIns[courtId]?.length ?? 0;
   }
-  
+
   /// Get list of players checked in at a court, sorted by rating (descending)
   List<CheckedInPlayer> getCheckedInPlayers(String courtId) {
     final players = _courtCheckIns[courtId] ?? [];
-    return List.from(players)
-      ..sort((a, b) => b.rating.compareTo(a.rating));
+    return List.from(players)..sort((a, b) => b.rating.compareTo(a.rating));
   }
-  
+
   /// Check if current user is checked in at a court
   bool isUserCheckedIn(String courtId) {
     return _userCheckedInCourts.contains(courtId);
   }
-  
+
   /// Check in current user at a court
-  Future<void> checkIn(String courtId, {
+  Future<void> checkIn(
+    String courtId, {
     required String userName,
     required double userRating,
     String? userPhotoUrl,
   }) async {
     if (_currentUserId == null) return;
     if (_userCheckedInCourts.contains(courtId)) return;
-    
+
     _userCheckedInCourts.add(courtId);
-    
+
     final player = CheckedInPlayer(
       id: _currentUserId!,
       name: userName,
@@ -442,70 +451,71 @@ class CheckInState extends ChangeNotifier {
       photoUrl: userPhotoUrl,
       checkedInAt: DateTime.now(),
     );
-    
+
     if (_courtCheckIns.containsKey(courtId)) {
       _courtCheckIns[courtId]!.add(player);
     } else {
       _courtCheckIns[courtId] = [player];
     }
-    
+
     await _saveUserCheckIns();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.checkInToCourt(courtId);
   }
-  
+
   /// Check out current user from a court
   Future<void> checkOut(String courtId) async {
     if (_currentUserId == null) return;
-    
+
     _userCheckedInCourts.remove(courtId);
     _courtCheckIns[courtId]?.removeWhere((p) => p.id == _currentUserId);
-    
+
     if (_courtCheckIns[courtId]?.isEmpty ?? false) {
       _courtCheckIns.remove(courtId);
     }
-    
+
     await _saveUserCheckIns();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.checkOutFromCourt(courtId);
   }
-  
+
   /// Get all courts the current user is checked into
   Set<String> get userCheckedInCourts => Set.unmodifiable(_userCheckedInCourts);
-  
+
   // ==================== FOLLOW METHODS ====================
-  
+
   /// Check if current user follows a court
   bool isFollowing(String courtId) {
     return _followedCourts.contains(courtId);
   }
-  
+
   /// Follow a court
   Future<void> followCourt(String courtId) async {
     if (_followedCourts.contains(courtId)) return;
-    
+
     _followedCourts.add(courtId);
     await _saveFollowedCourts();
     notifyListeners();
-    
+
     // Sync to backend
-    ApiService.followCourt(courtId, alertsEnabled: _alertCourts.contains(courtId));
+    ApiService.followCourt(courtId,
+        alertsEnabled: _alertCourts.contains(courtId));
   }
-  
+
   /// Unfollow a court
   Future<void> unfollowCourt(String courtId) async {
     _followedCourts.remove(courtId);
     await _saveFollowedCourts();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.unfollowCourt(courtId);
   }
-  
+
   /// Toggle follow status for a court
   Future<void> toggleFollow(String courtId) async {
     if (isFollowing(courtId)) {
@@ -514,42 +524,42 @@ class CheckInState extends ChangeNotifier {
       await followCourt(courtId);
     }
   }
-  
+
   /// Get all followed courts
   Set<String> get followedCourts => Set.unmodifiable(_followedCourts);
-  
+
   /// Get number of followed courts
   int get followedCourtCount => _followedCourts.length;
-  
+
   // ==================== ALERT METHODS ====================
-  
+
   /// Check if current user has alerts enabled for a court
   bool isAlertEnabled(String courtId) {
     return _alertCourts.contains(courtId);
   }
-  
+
   /// Enable alerts for a court (get push notifications on check-ins/games)
   Future<void> enableAlert(String courtId) async {
     if (_alertCourts.contains(courtId)) return;
-    
+
     _alertCourts.add(courtId);
     await _saveAlertCourts();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.setCourtAlert(courtId, true);
   }
-  
+
   /// Disable alerts for a court
   Future<void> disableAlert(String courtId) async {
     _alertCourts.remove(courtId);
     await _saveAlertCourts();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.setCourtAlert(courtId, false);
   }
-  
+
   /// Toggle alert status for a court
   Future<void> toggleAlert(String courtId) async {
     if (isAlertEnabled(courtId)) {
@@ -558,11 +568,10 @@ class CheckInState extends ChangeNotifier {
       await enableAlert(courtId);
     }
   }
-  
+
   /// Get all courts with alerts enabled
   Set<String> get alertCourts => Set.unmodifiable(_alertCourts);
-  
-  
+
   /// Get names of followed courts for display
   List<String> getFollowedCourtNames() {
     final courtService = CourtService();
@@ -571,17 +580,17 @@ class CheckInState extends ChangeNotifier {
       return court?.name ?? 'Unknown Court';
     }).toList();
   }
-  
+
   /// Get activity feed for followed courts (check-ins and matches)
   List<CourtActivity> getFollowedCourtActivity() {
     final activities = <CourtActivity>[];
     final courtService = CourtService();
-    
+
     for (final courtId in _followedCourts) {
       // Get court name
       final court = courtService.getCourtById(courtId);
       final courtName = court?.name ?? 'Unknown Court';
-      
+
       // Add check-in activities
       final checkIns = _courtCheckIns[courtId] ?? [];
       for (final player in checkIns) {
@@ -597,26 +606,26 @@ class CheckInState extends ChangeNotifier {
         ));
       }
     }
-    
+
     // Sort by timestamp (most recent first)
     activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    
+
     // Limit to most recent 20 activities
     return activities.take(20).toList();
   }
-  
+
   /// Get followed courts with their activity, sorted by most recent activity
   Future<List<FollowedCourtInfo>> getFollowedCourtsWithActivity() async {
     final courtService = CourtService();
     await courtService.loadCourts(); // Ensure courts are loaded before lookup
     final courts = <FollowedCourtInfo>[];
-    
+
     for (final courtId in _followedCourts) {
       final court = courtService.getCourtById(courtId);
       final courtName = court?.name ?? 'Unknown Court';
 
       final checkIns = _courtCheckIns[courtId] ?? [];
-      
+
       // Build activity list for this court
       final activity = <CourtActivity>[];
       for (final player in checkIns) {
@@ -631,23 +640,25 @@ class CheckInState extends ChangeNotifier {
           playerPhotoUrl: player.photoUrl,
         ));
       }
-      
+
       // Sort activity by most recent
       activity.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      
+
       // Get most recent activity time
-      final lastActivity = activity.isNotEmpty ? activity.first.timestamp : null;
-      
+      final lastActivity =
+          activity.isNotEmpty ? activity.first.timestamp : null;
+
       courts.add(FollowedCourtInfo(
         courtId: courtId,
         courtName: courtName,
         address: court?.address,
         checkInCount: checkIns.length,
-        recentActivity: activity.take(3).toList(), // Show up to 3 recent activities
+        recentActivity:
+            activity.take(3).toList(), // Show up to 3 recent activities
         lastActivityTime: lastActivity,
       ));
     }
-    
+
     // Sort by most recent activity (courts with activity first, then by time)
     courts.sort((a, b) {
       if (a.lastActivityTime == null && b.lastActivityTime == null) return 0;
@@ -655,12 +666,12 @@ class CheckInState extends ChangeNotifier {
       if (b.lastActivityTime == null) return -1;
       return b.lastActivityTime!.compareTo(a.lastActivityTime!);
     });
-    
+
     return courts;
   }
-  
+
   // ==================== FOLLOW PLAYER METHODS ====================
-  
+
   /// Load followed players from SharedPreferences
   Future<void> _loadFollowedPlayers() async {
     if (_currentUserId == null) return;
@@ -673,7 +684,7 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error loading followed players: $e');
     }
   }
-  
+
   /// Save followed players to SharedPreferences
   Future<void> _saveFollowedPlayers() async {
     if (_currentUserId == null) return;
@@ -685,37 +696,37 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error saving followed players: $e');
     }
   }
-  
+
   /// Check if current user follows a player
   bool isFollowingPlayer(String playerId) {
     return _followedPlayers.contains(playerId);
   }
-  
+
   /// Follow a player
   Future<void> followPlayer(String playerId) async {
     if (playerId == _currentUserId) return; // Can't follow yourself
     if (_followedPlayers.contains(playerId)) return;
-    
+
     _followedPlayers.add(playerId);
     await _saveFollowedPlayers();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.followPlayer(playerId);
   }
-  
+
   /// Unfollow a player
   Future<void> unfollowPlayer(String playerId) async {
     if (!_followedPlayers.contains(playerId)) return;
-    
+
     _followedPlayers.remove(playerId);
     await _saveFollowedPlayers();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.unfollowPlayer(playerId);
   }
-  
+
   /// Toggle follow status for a player
   Future<void> toggleFollowPlayer(String playerId) async {
     if (isFollowingPlayer(playerId)) {
@@ -724,15 +735,15 @@ class CheckInState extends ChangeNotifier {
       await followPlayer(playerId);
     }
   }
-  
+
   /// Get all followed players
   Set<String> get followedPlayers => Set.unmodifiable(_followedPlayers);
-  
+
   /// Get number of followed players
   int get followedPlayerCount => _followedPlayers.length;
-  
+
   // ==================== FOLLOW TEAM METHODS ====================
-  
+
   /// Load followed teams from SharedPreferences
   Future<void> _loadFollowedTeams() async {
     if (_currentUserId == null) return;
@@ -741,7 +752,7 @@ class CheckInState extends ChangeNotifier {
       final key = 'user_${_currentUserId}_followed_teams';
       final followed = prefs.getStringList(key) ?? [];
       _followedTeams.addAll(followed);
-      
+
       // Load cached team names
       final namesKey = 'user_${_currentUserId}_followed_team_names';
       final namesJson = prefs.getString(namesKey);
@@ -755,7 +766,7 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error loading followed teams: $e');
     }
   }
-  
+
   /// Save followed teams to SharedPreferences
   Future<void> _saveFollowedTeams() async {
     if (_currentUserId == null) return;
@@ -763,7 +774,7 @@ class CheckInState extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final key = 'user_${_currentUserId}_followed_teams';
       await prefs.setStringList(key, _followedTeams.toList());
-      
+
       // Save team names cache
       final namesKey = 'user_${_currentUserId}_followed_team_names';
       await prefs.setString(namesKey, jsonEncode(_followedTeamNames));
@@ -771,38 +782,38 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error saving followed teams: $e');
     }
   }
-  
+
   /// Check if current user follows a team
   bool isFollowingTeam(String teamId) {
     return _followedTeams.contains(teamId);
   }
-  
+
   /// Follow a team
   Future<void> followTeam(String teamId, {String? teamName}) async {
     if (_followedTeams.contains(teamId)) return;
-    
+
     _followedTeams.add(teamId);
     if (teamName != null) _followedTeamNames[teamId] = teamName;
     await _saveFollowedTeams();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.followTeam(teamId);
   }
-  
+
   /// Unfollow a team
   Future<void> unfollowTeam(String teamId) async {
     if (!_followedTeams.contains(teamId)) return;
-    
+
     _followedTeams.remove(teamId);
     _followedTeamNames.remove(teamId);
     await _saveFollowedTeams();
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.unfollowTeam(teamId);
   }
-  
+
   /// Toggle follow status for a team
   Future<void> toggleFollowTeam(String teamId, {String? teamName}) async {
     if (isFollowingTeam(teamId)) {
@@ -811,19 +822,20 @@ class CheckInState extends ChangeNotifier {
       await followTeam(teamId, teamName: teamName);
     }
   }
-  
+
   /// Get all followed teams
   Set<String> get followedTeams => Set.unmodifiable(_followedTeams);
-  
+
   /// Get number of followed teams
   int get followedTeamCount => _followedTeams.length;
-  
+
   /// Get cached team name for a followed team
   String? getFollowedTeamName(String teamId) => _followedTeamNames[teamId];
-  
+
   /// Get all followed team names as a map
-  Map<String, String> get followedTeamNames => Map.unmodifiable(_followedTeamNames);
-  
+  Map<String, String> get followedTeamNames =>
+      Map.unmodifiable(_followedTeamNames);
+
   /// Get a player's name by ID (from any available source)
   String getPlayerName(String playerId) {
     // Check if there's a status with this player
@@ -835,7 +847,10 @@ class CheckInState extends ChangeNotifier {
       final player = players.firstWhere(
         (p) => p.id == playerId,
         orElse: () => CheckedInPlayer(
-          id: '', name: '', rating: 0, checkedInAt: DateTime.now(),
+          id: '',
+          name: '',
+          rating: 0,
+          checkedInAt: DateTime.now(),
         ),
       );
       if (player.id.isNotEmpty) {
@@ -844,11 +859,12 @@ class CheckInState extends ChangeNotifier {
     }
     return 'Unknown Player';
   }
-  
+
   /// Set current user's status
-  Future<void> setMyStatus(String status, {required String userName, String? photoUrl}) async {
+  Future<void> setMyStatus(String status,
+      {required String userName, String? photoUrl}) async {
     if (_currentUserId == null) return;
-    
+
     _playerStatuses[_currentUserId!] = PlayerStatus(
       playerId: _currentUserId!,
       playerName: userName,
@@ -856,28 +872,29 @@ class CheckInState extends ChangeNotifier {
       status: status,
       updatedAt: DateTime.now(),
     );
-    
+
     // Save status to prefs
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_${_currentUserId}_status', status);
-      await prefs.setString('user_${_currentUserId}_status_time', DateTime.now().toIso8601String());
+      await prefs.setString('user_${_currentUserId}_status_time',
+          DateTime.now().toIso8601String());
     } catch (e) {
       debugPrint('Error saving status: $e');
     }
-    
+
     notifyListeners();
-    
+
     // Sync to backend
     ApiService.createStatus(status);
   }
-  
+
   /// Clear current user's status
   Future<void> clearMyStatus() async {
     if (_currentUserId == null) return;
-    
+
     _playerStatuses.remove(_currentUserId);
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user_${_currentUserId}_status');
@@ -885,53 +902,54 @@ class CheckInState extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error clearing status: $e');
     }
-    
+
     notifyListeners();
   }
-  
+
   /// Get the current user's status
   String? getMyStatus() {
     if (_currentUserId == null) return null;
     return _playerStatuses[_currentUserId]?.status;
   }
-  
+
   /// Get all followed players with their statuses for display
   List<PlayerStatus> getFollowedPlayerStatuses() {
     final statuses = <PlayerStatus>[];
-    
+
     for (final playerId in _followedPlayers) {
       final status = _playerStatuses[playerId];
       if (status != null) {
         statuses.add(status);
       }
     }
-    
+
     // Sort by most recent update
     statuses.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    
+
     return statuses;
   }
-  
+
   /// Get all followed players with their recent activities (status, check-ins, matches)
   /// Returns a list of FollowedPlayerInfo objects ready for display
   Future<List<FollowedPlayerInfo>> getFollowedPlayersInfo() async {
     final List<FollowedPlayerInfo> players = [];
-    
+
     for (final playerId in _followedPlayers) {
       try {
         // Fetch player profile from API
         final profile = await ApiService.getProfile(playerId);
         if (profile == null) continue;
-        
+
         final name = profile['name']?.toString() ?? 'Unknown';
-        final photoUrl = profile['photoUrl']?.toString() ?? profile['avatar_url']?.toString();
+        final photoUrl = profile['photoUrl']?.toString() ??
+            profile['avatar_url']?.toString();
         final rating = (profile['rating'] is num)
             ? (profile['rating'] as num).toDouble()
             : double.tryParse(profile['rating']?.toString() ?? '') ?? 3.0;
-        
+
         // Build activity list
         final List<PlayerActivity> activities = [];
-        
+
         // 1. Check for status update
         final status = _playerStatuses[playerId];
         if (status != null) {
@@ -943,7 +961,7 @@ class CheckInState extends ChangeNotifier {
             icon: '💬',
           ));
         }
-        
+
         // 2. Check for court check-ins (find courts where this player is checked in)
         for (final entry in _courtCheckIns.entries) {
           final courtId = entry.key;
@@ -962,13 +980,14 @@ class CheckInState extends ChangeNotifier {
             }
           }
         }
-        
+
         // 3. Get recent matches from profile (if available)
         final recentMatches = profile['recentMatches'] as List<dynamic>? ?? [];
         for (final match in recentMatches.take(3)) {
           if (match is Map<String, dynamic>) {
             final createdAt = match['createdAt'] != null
-                ? DateTime.tryParse(match['createdAt'].toString()) ?? DateTime.now()
+                ? DateTime.tryParse(match['createdAt'].toString()) ??
+                    DateTime.now()
                 : DateTime.now();
             final opponentName = _extractOpponentName(match, playerId);
             final score = _formatMatchScore(match, playerId);
@@ -982,13 +1001,14 @@ class CheckInState extends ChangeNotifier {
             ));
           }
         }
-        
+
         // Sort activities by timestamp (most recent first)
         activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-        
+
         // Get most recent activity time
-        final lastActivity = activities.isNotEmpty ? activities.first.timestamp : null;
-        
+        final lastActivity =
+            activities.isNotEmpty ? activities.first.timestamp : null;
+
         players.add(FollowedPlayerInfo(
           playerId: playerId,
           name: name,
@@ -1002,7 +1022,7 @@ class CheckInState extends ChangeNotifier {
         debugPrint('Error fetching player info for $playerId: $e');
       }
     }
-    
+
     // Sort by most recent activity (players with activity first)
     players.sort((a, b) {
       if (a.lastActivityTime == null && b.lastActivityTime == null) return 0;
@@ -1010,33 +1030,33 @@ class CheckInState extends ChangeNotifier {
       if (b.lastActivityTime == null) return -1;
       return b.lastActivityTime!.compareTo(a.lastActivityTime!);
     });
-    
+
     return players;
   }
-  
+
   /// Helper to extract opponent name from match data
   String _extractOpponentName(Map<String, dynamic> match, String playerId) {
     final player1 = match['player1'] as Map<String, dynamic>?;
     final player2 = match['player2'] as Map<String, dynamic>?;
-    
+
     if (player1?['id'] == playerId) {
       return player2?['name']?.toString() ?? 'opponent';
     } else {
       return player1?['name']?.toString() ?? 'opponent';
     }
   }
-  
+
   /// Helper to format match score from match data
   String _formatMatchScore(Map<String, dynamic> match, String playerId) {
     final score = match['score'] as Map<String, dynamic>?;
     if (score == null) return '';
-    
+
     final player1Score = score['player1'] ?? 0;
     final player2Score = score['player2'] ?? 0;
     final winnerId = match['winnerId']?.toString();
-    
+
     final player1 = match['player1'] as Map<String, dynamic>?;
-    
+
     if (player1?['id'] == playerId) {
       final result = winnerId == playerId ? 'W' : 'L';
       return '($player1Score-$player2Score) $result';

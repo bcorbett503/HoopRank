@@ -202,6 +202,19 @@ export class CourtsController {
     }
 
     /**
+     * Followers ("hearts") of a court, sorted by global HoopRank (1v1 rank).
+     */
+    @Get(':id/followers')
+    async getFollowers(
+        @Param('id') id: string,
+        @Query('limit') limit?: string,
+    ) {
+        const parsed = parseInt(limit || '50', 10);
+        const safeLimit = Number.isFinite(parsed) ? Math.max(1, Math.min(parsed, 200)) : 50;
+        return this.courtsService.getCourtFollowers(id, safeLimit);
+    }
+
+    /**
      * Kings of the court — top players. Stub returns empty array.
      */
     @Get(':id/kings')

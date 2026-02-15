@@ -1518,6 +1518,30 @@ class ApiService {
     return [];
   }
 
+  /// Get followers ("hearts") for a court, sorted by global 1v1 HoopRank # (best first).
+  static Future<List<CourtFollower>> getCourtFollowers(
+    String courtId, {
+    int limit = 50,
+  }) async {
+    final response = await _authedGet(
+      Uri.parse(
+          '$baseUrl/courts/${Uri.encodeComponent(courtId)}/followers?limit=$limit'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data is List) {
+        return data
+            .map((e) =>
+                CourtFollower.fromJson((e as Map).cast<String, dynamic>()))
+            .toList();
+      }
+      throw Exception('Unexpected followers response shape');
+    }
+    throw Exception(
+        'Failed to load court followers (HTTP ${response.statusCode})');
+  }
+
   /// Get activity from all followed courts and players
   static Future<Map<String, dynamic>> getFollowedActivity() async {
     final response = await _authedGet(

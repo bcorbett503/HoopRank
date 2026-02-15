@@ -1831,306 +1831,229 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Consumer<AuthState>(
-                builder: (context, auth, _) {
-                  final rating =
-                      _currentRating ?? auth.currentUser?.rating ?? 0.0;
-                  // Take up to 2 teams to show alongside individual rating
-                  final teamsToShow = _myTeams.take(2).toList();
-
-                  return Column(
-                    children: [
-                      // === Status Section Header (Single Line) ===
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4, bottom: 8),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Static header: STATUS composer ──
+            const SizedBox(height: 16),
+            Consumer<AuthState>(
+              builder: (context, auth, _) {
+                return Column(
+                  children: [
+                    // === Status Section Header (Single Line) ===
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.edit_note,
+                                size: 14, color: Colors.blue),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'STATUS',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.0,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Status Update Bar - Tappable with User Avatar
+                    GestureDetector(
+                      onTap: () async {
+                        final result = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const StatusComposerScreen(),
+                            fullscreenDialog: true,
+                          ),
+                        );
+                        if (result == true) {
+                          setState(() {}); // Refresh feed
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
                         child: Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.edit_note,
-                                  size: 14, color: Colors.blue),
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'STATUS',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
-                                color: Colors.white70,
+                            // User Avatar
+                            Consumer<AuthState>(
+                                builder: (context, authState, _) {
+                              final user = authState.currentUser;
+                              final photoUrl = user?.photoUrl;
+                              final name = user?.name ?? '?';
+
+                              return CircleAvatar(
+                                radius: 18,
+                                backgroundColor: Colors.deepOrange,
+                                backgroundImage: photoUrl != null
+                                    ? (photoUrl.startsWith('data:')
+                                        ? MemoryImage(Uri.parse(photoUrl)
+                                            .data!
+                                            .contentAsBytes())
+                                        : NetworkImage(photoUrl)
+                                            as ImageProvider)
+                                    : null,
+                                child: photoUrl == null
+                                    ? Text(
+                                        name.isNotEmpty
+                                            ? name[0].toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold),
+                                      )
+                                    : null,
+                              );
+                            }),
+                            const SizedBox(width: 12),
+                            // Placeholder Text
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'What\'s on your mind?',
+                                    style: TextStyle(
+                                        color: Colors.grey.shade800,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Share a status, schedule a run, or post a highlight',
+                                    style: TextStyle(
+                                        color: Colors.grey.shade500,
+                                        fontSize: 11),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                      // Status Update Bar - Tappable with User Avatar
-                      GestureDetector(
-                        onTap: () async {
-                          final result = await Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const StatusComposerScreen(),
-                              fullscreenDialog: true,
-                            ),
-                          );
-                          if (result == true) {
-                            setState(() {}); // Refresh feed
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              // User Avatar
-                              Consumer<AuthState>(
-                                  builder: (context, authState, _) {
-                                final user = authState.currentUser;
-                                final photoUrl = user?.photoUrl;
-                                final name = user?.name ?? '?';
+                    ),
+                  ],
+                );
+              },
+            ),
 
-                                return CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: Colors.deepOrange,
-                                  backgroundImage: photoUrl != null
-                                      ? (photoUrl.startsWith('data:')
-                                          ? MemoryImage(Uri.parse(photoUrl)
-                                              .data!
-                                              .contentAsBytes())
-                                          : NetworkImage(photoUrl)
-                                              as ImageProvider)
-                                      : null,
-                                  child: photoUrl == null
-                                      ? Text(
-                                          name.isNotEmpty
-                                              ? name[0].toUpperCase()
-                                              : '?',
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold),
-                                        )
-                                      : null,
-                                );
-                              }),
-                              const SizedBox(width: 12),
-                              // Placeholder Text
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'What\'s on your mind?',
-                                      style: TextStyle(
-                                          color: Colors.grey.shade800,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Share a status, schedule a run, or post a highlight',
-                                      style: TextStyle(
-                                          color: Colors.grey.shade500,
-                                          fontSize: 11),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+            if (_pendingConfirmations.isNotEmpty) ...[
+              _buildPendingConfirmationsSection(),
               const SizedBox(height: 12),
+            ],
 
-              if (_pendingConfirmations.isNotEmpty) ...[
-                _buildPendingConfirmationsSection(),
-                const SizedBox(height: 12),
-              ],
-
-              // === HoopRank Feed Section ===
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.deepOrange.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.dynamic_feed,
-                          size: 16, color: Colors.deepOrange),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'FEED',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Feed with tabs (All / Courts)
+            // Team Invites (compact, above feed)
+            if (_teamInvites.isNotEmpty) ...[
               SizedBox(
-                height: 500, // Fixed height for feed section
-                child: HoopRankFeed(
-                    key: ValueKey('hooprank-feed-$_feedReloadVersion')),
-              ),
-              const SizedBox(height: 24),
-
-              // Team Invites Section
-              if (_teamInvites.isNotEmpty) ...[
-                Row(
-                  children: [
-                    Icon(Icons.group_add, color: Colors.blue, size: 24),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Team Invites',
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
+                height: 48,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _teamInvites.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final invite = _teamInvites[index];
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.blue,
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
                       ),
-                      child: Text(
-                        '${_teamInvites.length}',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ...(_teamInvites.map((invite) {
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    color: Colors.blue.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.blue.withOpacity(0.3)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: invite['teamType'] == '3v3'
-                                  ? Colors.blue
-                                  : Colors.purple,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              invite['teamType'] ?? '3v3',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11),
-                            ),
+                          Icon(Icons.group_add, color: Colors.blue, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            invite['name'] ?? 'Team',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  invite['name'] ?? 'Team',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16),
-                                ),
-                                Text(
-                                  'Invited by ${invite['ownerName'] ?? 'Unknown'}',
-                                  style: TextStyle(
-                                      color: Colors.grey[400], fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.red),
-                            tooltip: 'Decline',
-                            onPressed: () async {
-                              try {
-                                await ApiService.declineTeamInvite(
-                                    invite['id']);
-                                _loadTeamInvites();
-                              } catch (e) {
-                                debugPrint('Error declining invite: $e');
-                              }
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () async {
+                              try { await ApiService.declineTeamInvite(invite['id']); _loadTeamInvites(); } catch (_) {}
                             },
+                            child: const Icon(Icons.close, color: Colors.red, size: 18),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.check, color: Colors.green),
-                            tooltip: 'Accept',
-                            onPressed: () async {
-                              try {
-                                await ApiService.acceptTeamInvite(invite['id']);
-                                _loadTeamInvites();
-                                _loadMyTeams();
-                              } catch (e) {
-                                debugPrint('Error accepting invite: $e');
-                              }
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () async {
+                              try { await ApiService.acceptTeamInvite(invite['id']); _loadTeamInvites(); _loadMyTeams(); } catch (_) {}
                             },
+                            child: const Icon(Icons.check, color: Colors.green, size: 18),
                           ),
                         ],
                       ),
-                    ),
-                  );
-                }).toList()),
-              ],
-
-              const SizedBox(height: 24),
-
-              // [OLD FOLLOWED SECTIONS REMOVED]
-              // Followed Courts and Followed Players are now in HoopRank Feed above
-              // Keeping final SizedBox for spacing
-              const SizedBox(height: 32),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
-          ),
+
+            // ── Static header: FEED label ──
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.deepOrange.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.dynamic_feed,
+                        size: 16, color: Colors.deepOrange),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'FEED',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Scrollable: Feed fills remaining space ──
+            Expanded(
+              child: HoopRankFeed(
+                  key: ValueKey('hooprank-feed-$_feedReloadVersion')),
+            ),
+          ],
         ),
       ),
     );
