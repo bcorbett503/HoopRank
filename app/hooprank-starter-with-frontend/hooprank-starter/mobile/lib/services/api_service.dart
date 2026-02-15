@@ -1394,7 +1394,8 @@ class ApiService {
         'alertsEnabled': alertsEnabled,
       }),
     );
-    return response.statusCode == 200;
+    // NestJS default for POST is 201; accept both.
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 
   /// Unfollow a court
@@ -1404,7 +1405,7 @@ class ApiService {
           '$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}'),
       headers: {'x-user-id': _userId ?? ''},
     );
-    return response.statusCode == 200;
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 
   /// Set court alert preference
@@ -1418,7 +1419,7 @@ class ApiService {
       },
       body: jsonEncode({'enabled': enabled}),
     );
-    return response.statusCode == 200;
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 
   /// Follow a player
@@ -1431,7 +1432,8 @@ class ApiService {
       },
       body: jsonEncode({'playerId': playerId}),
     );
-    return response.statusCode == 200;
+    // NestJS default for POST is 201; accept both.
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 
   /// Unfollow a player
@@ -1440,7 +1442,7 @@ class ApiService {
       Uri.parse('$baseUrl/users/me/follows/players/$playerId'),
       headers: {'x-user-id': _userId ?? ''},
     );
-    return response.statusCode == 200;
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 
   /// Follow a team
@@ -1453,7 +1455,8 @@ class ApiService {
       },
       body: jsonEncode({'teamId': teamId}),
     );
-    return response.statusCode == 200;
+    // NestJS default for POST is 201; accept both.
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 
   /// Unfollow a team
@@ -1462,7 +1465,7 @@ class ApiService {
       Uri.parse('$baseUrl/users/me/follows/teams/$teamId'),
       headers: {'x-user-id': _userId ?? ''},
     );
-    return response.statusCode == 200;
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 
   // ===================
