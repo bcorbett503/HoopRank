@@ -1982,7 +1982,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   itemBuilder: (context, index) {
                     final invite = _teamInvites[index];
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
@@ -1995,21 +1996,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           const SizedBox(width: 6),
                           Text(
                             invite['name'] ?? 'Team',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(width: 8),
                           GestureDetector(
                             onTap: () async {
-                              try { await ApiService.declineTeamInvite(invite['id']); _loadTeamInvites(); } catch (_) {}
+                              try {
+                                await ApiService.declineTeamInvite(
+                                    invite['id']);
+                                _loadTeamInvites();
+                              } catch (_) {}
                             },
-                            child: const Icon(Icons.close, color: Colors.red, size: 18),
+                            child: const Icon(Icons.close,
+                                color: Colors.red, size: 18),
                           ),
                           const SizedBox(width: 4),
                           GestureDetector(
                             onTap: () async {
-                              try { await ApiService.acceptTeamInvite(invite['id']); _loadTeamInvites(); _loadMyTeams(); } catch (_) {}
+                              try {
+                                await ApiService.acceptTeamInvite(invite['id']);
+                                _loadTeamInvites();
+                                _loadMyTeams();
+                              } catch (_) {}
                             },
-                            child: const Icon(Icons.check, color: Colors.green, size: 18),
+                            child: const Icon(Icons.check,
+                                color: Colors.green, size: 18),
                           ),
                         ],
                       ),
@@ -2173,20 +2187,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                                 Text('Quiet right now', style: TextStyle(color: Colors.white30, fontSize: 12)),
                                             ],
                                           ),
-                                        ),
-                                        Consumer<CheckInState>(
-                                          builder: (context, checkInState, _) {
-                                            final hasAlert = checkInState.isAlertEnabled(courtInfo.courtId);
-                                            return IconButton(
-                                              onPressed: () => checkInState.toggleAlert(courtInfo.courtId),
-                                              icon: Icon(
-                                                hasAlert ? Icons.notifications_active : Icons.notifications_none,
-                                                color: hasAlert ? Colors.orange : Colors.white30,
-                                                size: 20,
-                                              ),
-                                              tooltip: 'Get notified when players check in',
-                                            );
-                                          },
                                         ),
                                         Icon(Icons.chevron_right, color: Colors.white30, size: 18),
                                       ],

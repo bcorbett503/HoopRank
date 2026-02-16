@@ -44,13 +44,13 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  
+
   // Set up background message handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  
+
   // Initialize notification service
   await NotificationService().initialize();
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -66,12 +66,17 @@ void main() async {
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
-final _shellNavigatorHomeKey = GlobalKey<NavigatorState>(debugLabel: 'shellHome');
-final _shellNavigatorTeamsKey = GlobalKey<NavigatorState>(debugLabel: 'shellTeams');
-final _shellNavigatorRankingsKey = GlobalKey<NavigatorState>(debugLabel: 'shellRankings');
+final _shellNavigatorHomeKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellHome');
+final _shellNavigatorTeamsKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellTeams');
+final _shellNavigatorRankingsKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellRankings');
 
-final _shellNavigatorMessagesKey = GlobalKey<NavigatorState>(debugLabel: 'shellMessages');
-final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(debugLabel: 'shellProfile');
+final _shellNavigatorMessagesKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellMessages');
+final _shellNavigatorProfileKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellProfile');
 
 class HoopRankApp extends StatefulWidget {
   const HoopRankApp({super.key});
@@ -87,17 +92,17 @@ class _HoopRankAppState extends State<HoopRankApp> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     if (!_initialized) {
       _initialized = true;
-      
+
       final authState = context.read<AuthState>();
       final checkInState = context.read<CheckInState>();
       final tutorialState = context.read<TutorialState>();
-      
+
       // Initialize states
       tutorialState.initialize();
-      
+
       // Initialize CheckInState when user changes
       authState.addListener(() {
         final user = authState.currentUser;
@@ -105,12 +110,12 @@ class _HoopRankAppState extends State<HoopRankApp> {
           checkInState.initialize(user.id);
         }
       });
-      
+
       // Initialize now if user already logged in
       if (authState.currentUser != null) {
         checkInState.initialize(authState.currentUser!.id);
       }
-      
+
       _router = _createRouter(authState, tutorialState);
     }
   }
@@ -119,42 +124,56 @@ class _HoopRankAppState extends State<HoopRankApp> {
     return GoRouter(
       navigatorKey: _rootNavigatorKey,
       initialLocation: '/play',
-      refreshListenable: authState,
+      // Re-run redirects when auth OR tutorial state changes (tutorial loads prefs async).
+      refreshListenable: Listenable.merge([authState, tutorialState]),
       redirect: (context, state) {
         final user = authState.currentUser;
         final loggedIn = user != null;
         final isLoggingIn = state.uri.toString() == '/login';
         final isProfileSetup = state.uri.toString() == '/profile/setup';
+        final isPlay = state.uri.path == '/play';
 
-        debugPrint('ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}');
+        debugPrint(
+            'ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}');
 
         // Not logged in - redirect to login (unless already there)
         if (!loggedIn && !isLoggingIn) {
           debugPrint('ROUTER: -> /login (not logged in)');
           return '/login';
         }
-        
+
         // Logged in but profile not complete - force profile setup (except if already on setup or login)
-        if (loggedIn && !user.isProfileComplete && !isProfileSetup && !isLoggingIn) {
+        if (loggedIn &&
+            !user.isProfileComplete &&
+            !isProfileSetup &&
+            !isLoggingIn) {
           debugPrint('ROUTER: -> /profile/setup (profile incomplete)');
           return '/profile/setup';
         }
-        
-        // Tutorial auto-start disabled — user can trigger via (?) button instead
-        // if (loggedIn && user.isProfileComplete && !tutorialState.tutorialComplete && !tutorialState.isActive && !isProfileSetup) {
-        //   debugPrint('ROUTER: Starting interactive tutorial');
-        //   WidgetsBinding.instance.addPostFrameCallback((_) {
-        //     tutorialState.startTutorial();
-        //   });
-        //   return '/courts';
-        // }
-        
+
+        // Auto-start tutorial for first login (after profile setup), landing on Feed -> Following.
+        if (loggedIn &&
+            user.isProfileComplete &&
+            tutorialState.initialized &&
+            !tutorialState.tutorialComplete &&
+            !tutorialState.isActive &&
+            !isProfileSetup &&
+            !isLoggingIn) {
+          debugPrint('ROUTER: Starting interactive tutorial');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            tutorialState.startTutorial();
+          });
+
+          // Force tutorial to start on Feed (step 1 highlights the Courts CTA button).
+          if (!isPlay) return '/play';
+        }
+
         // Profile complete and on login screen - go to home
         if (loggedIn && user.isProfileComplete && isLoggingIn) {
           debugPrint('ROUTER: -> /play (profile complete, leaving login)');
           return '/play';
         }
-        
+
         debugPrint('ROUTER: -> null (no redirect)');
         return null;
       },
@@ -208,7 +227,8 @@ class _HoopRankAppState extends State<HoopRankApp> {
                       path: 'team-chat/:teamId',
                       builder: (context, state) {
                         final teamId = state.pathParameters['teamId'] ?? '';
-                        final extra = state.extra as Map<String, dynamic>? ?? {};
+                        final extra =
+                            state.extra as Map<String, dynamic>? ?? {};
                         return TeamChatScreen(
                           teamId: teamId,
                           teamName: extra['teamName'] ?? 'Team',
@@ -272,8 +292,10 @@ class _HoopRankAppState extends State<HoopRankApp> {
                   builder: (context, state) {
                     // Support deep linking to a specific court via multiple methods
                     final courtId = state.uri.queryParameters['courtId'];
-                    final lat = double.tryParse(state.uri.queryParameters['lat'] ?? '');
-                    final lng = double.tryParse(state.uri.queryParameters['lng'] ?? '');
+                    final lat =
+                        double.tryParse(state.uri.queryParameters['lat'] ?? '');
+                    final lng =
+                        double.tryParse(state.uri.queryParameters['lng'] ?? '');
                     final courtName = state.uri.queryParameters['courtName'];
                     return MapScreen(
                       initialCourtId: courtId,
@@ -336,7 +358,7 @@ class _HoopRankAppState extends State<HoopRankApp> {
         ),
       );
     }
-    
+
     return MaterialApp.router(
       title: 'HoopRank',
       debugShowCheckedModeBanner: false,
@@ -364,18 +386,21 @@ class _HoopRankAppState extends State<HoopRankApp> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFFF6B35),
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
         cardTheme: const CardThemeData(
           color: Color(0xFF2C3E50),
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12))),
         ),
       ),
       routerConfig: _router!,
       // Wrap all routes with TutorialOverlay inside MaterialApp for proper Directionality
-      builder: (context, child) => TutorialOverlay(child: child ?? const SizedBox()),
+      builder: (context, child) =>
+          TutorialOverlay(child: child ?? const SizedBox()),
     );
   }
 }

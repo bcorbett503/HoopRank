@@ -36,7 +36,6 @@ class CourtMapWidget extends StatefulWidget {
   State<CourtMapWidget> createState() => _CourtMapWidgetState();
 }
 
-
 class _CourtMapWidgetState extends State<CourtMapWidget> {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
@@ -45,7 +44,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   int? _courtsTotalBeforeCap; // Used to show "zoom in" hint when we cap results
   int? _courtsCapLimit;
   bool _isLoading = true;
-  LatLng _initialCenter = const LatLng(38.0194, -122.5376); // Default to San Rafael
+  LatLng _initialCenter =
+      const LatLng(38.0194, -122.5376); // Default to San Rafael
   double _currentZoom = 14.0;
   bool _showFollowedOnly = false; // Filter for courts the current user follows
   bool? _filterIndoor = true; // null=all, true=indoor only, false=outdoor only
@@ -54,6 +54,198 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   Set<String> _courtsWithRuns = {}; // Court IDs with runs (based on filter)
 
   bool _noCourtsFound = false;
+  bool _didInitialZoomOutToFindCourts = false;
+
+  bool _courtMatchesActiveFilters(Court court, CheckInState checkInState) {
+    // Followed filter - only courts the current user follows.
+    if (_showFollowedOnly && !checkInState.isFollowing(court.id)) {
+      return false;
+    }
+
+    // Indoor/Outdoor filter
+    if (_filterIndoor != null && court.isIndoor != _filterIndoor) {
+      return false;
+    }
+
+    // Access filter
+    if (_filterAccess != null) {
+      if (_filterAccess == 'private') {
+        final isPrivate = court.access == 'members' || court.access == 'paid';
+        if (!isPrivate) return false;
+      } else {
+        if (court.access != _filterAccess) return false;
+      }
+    }
+
+    // Runs filter (today or all upcoming)
+    if (_runsFilter != null && !_courtsWithRuns.contains(court.id)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<void> _zoomOutUntilAtLeastOneCourtVisible() async {
+    // "Landing" behavior: avoid empty maps when default filters exclude nearby courts.
+    if (_didInitialZoomOutToFindCourts) return;
+
+    // If this map is being used in a limited-radius context, zooming out is
+    // misleading (we should only show courts within the limit).
+    if (widget.limitDistanceKm != null) return;
+
+    final hasDeepLink = widget.initialCourtId != null ||
+        widget.initialCourtName != null ||
+        (widget.initialLat != null && widget.initialLng != null);
+    if (hasDeepLink) return;
+
+    // Only do this in browse mode (empty query). If the user is searching,
+    // they expect the map to stay put.
+    if (_searchController.text.trim().isNotEmpty) return;
+
+    _didInitialZoomOutToFindCourts = true;
+
+    // Ensure the initial viewport is reflected in the marker list.
+    _updateCourtsForMapCenter();
+
+    // Zoom out in steps until at least one court passes filters in view.
+    const minZoom = 6.0;
+    const step = 1.0;
+    const maxSteps = 12;
+
+    var steps = 0;
+    while (mounted &&
+        _courts.isEmpty &&
+        _currentZoom > minZoom &&
+        steps < maxSteps) {
+      final nextZoom = (_currentZoom - step).clamp(minZoom, 18.0).toDouble();
+      if (nextZoom == _currentZoom) break;
+
+      _mapController.move(_mapController.camera.center, nextZoom);
+      setState(() => _currentZoom = nextZoom);
+      _updateCourtsForMapCenter();
+
+      // Give the map a moment to rebuild markers if needed.
+      await Future.delayed(const Duration(milliseconds: 60));
+      steps++;
+    }
+
+    if (!mounted) return;
+    if (_courts.isEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(
+              'No courts found nearby. Try searching or changing filters.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  double _suggestedZoomForRunDistanceMeters(double meters) {
+    // Heuristic zoom-out levels so "Find Runs" jumps show context.
+    // (Lower zoom = more zoomed out.)
+    final double baseZoom;
+    if (meters >= 300000) {
+      baseZoom = 7.5; // 300km+
+    } else if (meters >= 150000) {
+      baseZoom = 8.5; // 150km+
+    } else if (meters >= 50000) {
+      baseZoom = 9.5; // 50km+
+    } else if (meters >= 15000) {
+      baseZoom = 11.0; // 15km+
+    } else if (meters >= 5000) {
+      baseZoom = 12.5; // 5km+
+    } else if (meters >= 1500) {
+      baseZoom = 13.5; // 1.5km+
+    } else {
+      baseZoom = 14.5;
+    }
+
+    // One extra notch out for better context on "Find Runs" jumps.
+    return (baseZoom - 1.0).clamp(3.0, 18.0).toDouble();
+  }
+
+  void _maybePanToNearestCourtWithRun() {
+    if (_runsFilter == null) return;
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    if (_courtsWithRuns.isEmpty) {
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('No scheduled runs found.')),
+      );
+      return;
+    }
+
+    final checkInState = Provider.of<CheckInState>(context, listen: false);
+    final bounds = _mapController.camera.visibleBounds;
+    final courtsInView = CourtService().getCourtsInBounds(
+      bounds.south,
+      bounds.west,
+      bounds.north,
+      bounds.east,
+    );
+
+    // If there are any courts with runs in the current viewport, keep the
+    // camera where it is (no surprise jump).
+    if (courtsInView.any((c) => _courtMatchesActiveFilters(c, checkInState))) {
+      return;
+    }
+
+    final from = _mapController.camera.center;
+    const distance = Distance();
+
+    Court? nearest;
+    double nearestMeters = double.infinity;
+
+    for (final court in CourtService().getCourts()) {
+      if (!_courtMatchesActiveFilters(court, checkInState)) continue;
+
+      // If this widget is being used in a limited-radius context, don't jump
+      // outside the allowed area.
+      if (widget.limitDistanceKm != null) {
+        final metersFromOrigin = distance.as(
+          LengthUnit.Meter,
+          _initialCenter,
+          LatLng(court.lat, court.lng),
+        );
+        if (metersFromOrigin > widget.limitDistanceKm! * 1000) continue;
+      }
+
+      final meters =
+          distance.as(LengthUnit.Meter, from, LatLng(court.lat, court.lng));
+      if (meters < nearestMeters) {
+        nearestMeters = meters;
+        nearest = court;
+      }
+    }
+
+    if (nearest == null) {
+      messenger?.showSnackBar(
+        const SnackBar(
+            content: Text('No courts with runs match your filters.')),
+      );
+      return;
+    }
+
+    final target = LatLng(nearest.lat, nearest.lng);
+    final zoom = _suggestedZoomForRunDistanceMeters(nearestMeters);
+    _mapController.move(target, zoom);
+    setState(() => _currentZoom = zoom);
+
+    // Update markers immediately instead of waiting for the debounce.
+    _updateCourtsForMapCenter();
+
+    final miles = nearestMeters / 1609.344;
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(
+          'No runs in view. Nearest run: ${nearest.name} (${miles.toStringAsFixed(1)} mi)',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -65,33 +257,38 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   void didUpdateWidget(covariant CourtMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Handle navigation to a new court
-    if (widget.initialCourtId != null && widget.initialCourtId != oldWidget.initialCourtId) {
+    if (widget.initialCourtId != null &&
+        widget.initialCourtId != oldWidget.initialCourtId) {
       _navigateToCourt(widget.initialCourtId!);
     }
   }
-  
+
   void _navigateToCourt(String courtId) {
     debugPrint('MAP: _navigateToCourt called with courtId: $courtId');
-    
+
     // First try direct ID lookup
     Court? targetCourt = CourtService().getCourtById(courtId);
-    
+
     // If not found, try the enhanced findCourt method
     if (targetCourt == null) {
       debugPrint('MAP: Court not found by ID, trying findCourt...');
       targetCourt = CourtService().findCourt(id: courtId);
     }
-    
+
     if (targetCourt != null) {
       _zoomToCourtAndSelect(targetCourt);
     } else {
       debugPrint('MAP: Court not found for ID: $courtId');
     }
   }
-  
+
   /// Zoom to a court's location and show its details
   void _zoomToCourtAndSelect(Court court) {
-    debugPrint('MAP: Zooming to court: ${court.name} at (${court.lat}, ${court.lng})');
+    debugPrint(
+        'MAP: Zooming to court: ${court.name} at (${court.lat}, ${court.lng})');
+    final tutorial = context.read<TutorialState>();
+    tutorial.completeStep('courts_select_court');
+    tutorial.completeStep('courts_open_run_court');
     final target = LatLng(court.lat, court.lng);
     _mapController.move(target, 16.0);
     // Show court details sheet after a brief delay to allow map animation
@@ -112,29 +309,28 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
 
   Future<void> _initializeMap() async {
     // Check if we have deep link parameters BEFORE doing async work
-    final hasDeepLink = widget.initialCourtId != null || 
-                        widget.initialCourtName != null ||
-                        (widget.initialLat != null && widget.initialLng != null);
-    
+    final hasDeepLink = widget.initialCourtId != null ||
+        widget.initialCourtName != null ||
+        (widget.initialLat != null && widget.initialLng != null);
+
     await CourtService().loadCourts();
-    
+
     bool locationObtained = false;
-    
+
     // First, try to get the user's GPS location
     try {
       Position position = await _determinePosition();
       _initialCenter = LatLng(position.latitude, position.longitude);
       _currentZoom = 14.0;
       locationObtained = true;
-      debugPrint('MAP: Using GPS location: ${position.latitude}, ${position.longitude}');
-      
+      debugPrint(
+          'MAP: Using GPS location: ${position.latitude}, ${position.longitude}');
+
       if (widget.limitDistanceKm != null) {
         final nearbyCourts = CourtService().getCourtsNear(
-          position.latitude, 
-          position.longitude, 
-          radiusKm: widget.limitDistanceKm!
-        );
-        
+            position.latitude, position.longitude,
+            radiusKm: widget.limitDistanceKm!);
+
         if (mounted) {
           setState(() {
             _courts = nearbyCourts;
@@ -148,29 +344,31 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     } catch (e) {
       debugPrint('MAP: GPS location failed: $e');
     }
-    
+
     // If GPS failed, try to use the user's registered zipcode
     if (!locationObtained) {
       try {
         final authState = Provider.of<AuthState>(context, listen: false);
         final userId = authState.currentUser?.id;
-        
+
         if (userId != null) {
           final profile = await ProfileService.getProfile(userId);
-          
+
           if (profile != null && profile.zip.isNotEmpty) {
             final coords = ZipcodeService.getCoordinatesForZipcode(profile.zip);
             _initialCenter = LatLng(coords.latitude, coords.longitude);
-            _currentZoom = 12.0; // Slightly zoomed out for zipcode-based centering
+            _currentZoom =
+                12.0; // Slightly zoomed out for zipcode-based centering
             locationObtained = true;
-            debugPrint('MAP: Using zipcode location for ${profile.zip}: ${coords.latitude}, ${coords.longitude}');
+            debugPrint(
+                'MAP: Using zipcode location for ${profile.zip}: ${coords.latitude}, ${coords.longitude}');
           }
         }
       } catch (e) {
         debugPrint('MAP: Zipcode fallback failed: $e');
       }
     }
-    
+
     // Log if using default location
     if (!locationObtained) {
       debugPrint('MAP: Using default location (San Rafael)');
@@ -182,7 +380,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
         _courts = courts;
         _isLoading = false;
       });
-      
+
       // Handle initial court selection from query params or direct coords
       // Use post-frame callback to ensure map is ready
       if (hasDeepLink) {
@@ -192,11 +390,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
       }
     }
   }
-  
+
   /// Handle deep link navigation after map is ready
   void _handleDeepLinkNavigation() {
     Court? targetCourt;
-    
+
     // First try by court ID
     if (widget.initialCourtId != null) {
       debugPrint('MAP: Deep link court ID: ${widget.initialCourtId}');
@@ -211,16 +409,20 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
         );
       }
     }
-    
+
     // If still not found, try by name
     if (targetCourt == null && widget.initialCourtName != null) {
-      debugPrint('MAP: Trying to find court by name: ${widget.initialCourtName}');
+      debugPrint(
+          'MAP: Trying to find court by name: ${widget.initialCourtName}');
       targetCourt = CourtService().getCourtByName(widget.initialCourtName!);
     }
-    
+
     // If still not found but we have coordinates, navigate to that location anyway
-    if (targetCourt == null && widget.initialLat != null && widget.initialLng != null) {
-      debugPrint('MAP: Court not found, but navigating to coordinates: ${widget.initialLat}, ${widget.initialLng}');
+    if (targetCourt == null &&
+        widget.initialLat != null &&
+        widget.initialLng != null) {
+      debugPrint(
+          'MAP: Court not found, but navigating to coordinates: ${widget.initialLat}, ${widget.initialLng}');
       final target = LatLng(widget.initialLat!, widget.initialLng!);
       _mapController.move(target, 16.0);
     } else if (targetCourt != null) {
@@ -230,7 +432,6 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
       debugPrint('MAP: Court not found for ID: ${widget.initialCourtId}');
     }
   }
-
 
   Future<Position> _determinePosition() async {
     bool serviceEnabled;
@@ -248,14 +449,14 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
         return Future.error('Location permissions are denied');
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
       return Future.error('Location permissions are permanently denied.');
-    } 
+    }
 
     return await Geolocator.getCurrentPosition(
-    desiredAccuracy: LocationAccuracy.bestForNavigation,
-  );
+      desiredAccuracy: LocationAccuracy.bestForNavigation,
+    );
   }
 
   Future<void> _moveToUserLocation() async {
@@ -291,7 +492,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
       _courts = capped;
     });
   }
-  
+
   void _toggleFollowedFilter() {
     setState(() {
       _showFollowedOnly = !_showFollowedOnly;
@@ -299,22 +500,22 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     // Re-run search with current query
     _onSearchChanged(_searchController.text);
   }
-  
+
   void _toggleIndoorFilter(bool? value) {
     setState(() {
       _filterIndoor = value;
     });
     _onSearchChanged(_searchController.text);
   }
-  
+
   void _setAccessFilter(String? access) {
     setState(() {
       _filterAccess = access;
     });
     _onSearchChanged(_searchController.text);
   }
-  
-  void _setRunsFilter(String? filter) async {
+
+  Future<void> _setRunsFilter(String? filter) async {
     if (filter == null) {
       // Clear runs filter
       setState(() {
@@ -322,63 +523,90 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
         _courtsWithRuns = {};
       });
     } else {
-      // Load court IDs with runs from API
-      final courtsWithRuns = await ApiService.getCourtsWithRuns(today: filter == 'today');
-      setState(() {
-        _runsFilter = filter;
-        _courtsWithRuns = courtsWithRuns;
-      });
+      try {
+        // Load court IDs with runs from API
+        final courtsWithRuns =
+            await ApiService.getCourtsWithRuns(today: filter == 'today');
+        if (!mounted) return;
+        setState(() {
+          _runsFilter = filter;
+          _courtsWithRuns = courtsWithRuns;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('Could not load scheduled runs: $e')),
+        );
+      }
     }
     _onSearchChanged(_searchController.text);
+
+    // If the "Find Runs" filter results in an empty viewport, jump to the
+    // nearest court with a run and zoom out for context.
+    if (filter != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _maybePanToNearestCourtWithRun();
+      });
+    }
   }
-  
+
   List<Court> _applyFilters(List<Court> courts) {
     var filtered = courts;
-    
+
     // Followed filter - only courts the current user follows.
     if (_showFollowedOnly) {
       final checkInState = Provider.of<CheckInState>(context, listen: false);
-      filtered = filtered.where((court) => checkInState.isFollowing(court.id)).toList();
+      filtered = filtered
+          .where((court) => checkInState.isFollowing(court.id))
+          .toList();
     }
-    
+
     // Indoor/Outdoor filter
     if (_filterIndoor != null) {
-      filtered = filtered.where((court) => court.isIndoor == _filterIndoor).toList();
+      filtered =
+          filtered.where((court) => court.isIndoor == _filterIndoor).toList();
     }
-    
+
     // Access filter
     if (_filterAccess != null) {
       if (_filterAccess == 'private') {
-        filtered = filtered.where((court) => court.access == 'members' || court.access == 'paid').toList();
+        filtered = filtered
+            .where(
+                (court) => court.access == 'members' || court.access == 'paid')
+            .toList();
       } else {
-        filtered = filtered.where((court) => court.access == _filterAccess).toList();
+        filtered =
+            filtered.where((court) => court.access == _filterAccess).toList();
       }
     }
-    
+
     // Runs filter (today or all upcoming)
     if (_runsFilter != null) {
-      filtered = filtered.where((court) => _courtsWithRuns.contains(court.id)).toList();
+      filtered = filtered
+          .where((court) => _courtsWithRuns.contains(court.id))
+          .toList();
     }
-    
+
     return filtered;
   }
 
   void _updateCourtsForMapCenter() {
     // Use visible bounds to filter courts - only show courts actually visible on map
     final bounds = _mapController.camera.visibleBounds;
-    
+
     var courtsInView = CourtService().getCourtsInBounds(
       bounds.south,
       bounds.west,
       bounds.north,
       bounds.east,
     );
-    
+
     // Apply filters to map view as well
     courtsInView = _applyFilters(courtsInView);
 
     final capped = _capCourtsForPerformance(courtsInView, isSearchMode: false);
-    
+
     if (mounted) {
       setState(() {
         _courts = capped;
@@ -395,7 +623,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     return 80;
   }
 
-  List<Court> _capCourtsForPerformance(List<Court> courts, {required bool isSearchMode}) {
+  List<Court> _capCourtsForPerformance(List<Court> courts,
+      {required bool isSearchMode}) {
     final max = _maxCourtsForZoom(_currentZoom);
     _courtsTotalBeforeCap = null;
     _courtsCapLimit = null;
@@ -429,11 +658,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   double _calculateRadiusFromZoom(double zoom) {
     // Approximate radius based on zoom level
     // Higher zoom = smaller radius (more zoomed in)
-    if (zoom >= 15) return 2.0;   // 2km
-    if (zoom >= 13) return 5.0;   // 5km
-    if (zoom >= 11) return 15.0;  // 15km
-    if (zoom >= 9) return 50.0;   // 50km
-    return 100.0;                 // 100km
+    if (zoom >= 15) return 2.0; // 2km
+    if (zoom >= 13) return 5.0; // 5km
+    if (zoom >= 11) return 15.0; // 15km
+    if (zoom >= 9) return 50.0; // 50km
+    return 100.0; // 100km
   }
 
   void _zoomIn() {
@@ -459,10 +688,12 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.withOpacity(0.5)),
       ),
-      child: Text(mode, style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold)),
+      child: Text(mode,
+          style: TextStyle(
+              fontSize: 9, color: color, fontWeight: FontWeight.bold)),
     );
   }
-  
+
   /// Filter chip widget for search bar
   Widget _buildFilterChip({
     required IconData icon,
@@ -483,7 +714,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: isSelected ? Colors.white : Colors.grey[700]),
+            Icon(icon,
+                size: 14, color: isSelected ? Colors.white : Colors.grey[700]),
             const SizedBox(width: 4),
             Text(
               label,
@@ -516,16 +748,16 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
       ),
     );
   }
-  
+
   /// Badge widget for court type (indoor/outdoor, access)
   Widget _buildCourtTypeBadge(Court court) {
     // Indoor/Outdoor badge with distinct colors
-    final indoorColor = court.isIndoor 
+    final indoorColor = court.isIndoor
         ? const Color(0xFF2196F3) // Blue for indoor
         : const Color(0xFF424242); // Dark grey/asphalt for outdoor
     final indoorIcon = court.isIndoor ? Icons.home : Icons.wb_sunny;
     final indoorLabel = court.isIndoor ? 'Indoor' : 'Outdoor';
-    
+
     // Access badge colors — 'members' and 'paid' both show as "Private"
     Color accessColor;
     IconData accessIcon;
@@ -537,7 +769,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
       accessColor = const Color(0xFF4CAF50); // Green for public
       accessIcon = Icons.lock_open;
     }
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -556,7 +788,10 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
               const SizedBox(width: 3),
               Text(
                 indoorLabel,
-                style: TextStyle(fontSize: 9, color: indoorColor, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    fontSize: 9,
+                    color: indoorColor,
+                    fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -610,652 +845,761 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
     }
 
     return Column(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Stack(
             children: [
-              Expanded(
-                flex: 2,
-                child: Stack(
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: _initialCenter,
+                  initialZoom: _currentZoom,
+                  onMapReady: () {
+                    // Filter courts after map is ready and we can get bounds
+                    _updateCourtsForMapCenter();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      _zoomOutUntilAtLeastOneCourtVisible();
+                    });
+                  },
+                  onPositionChanged: (position, hasGesture) {
+                    _currentZoom = position.zoom ?? 10.0;
+                    // Debounce court updates to avoid rebuilding on every frame
+                    _debounceTimer?.cancel();
+                    _debounceTimer =
+                        Timer(const Duration(milliseconds: 150), () {
+                      _updateCourtsForMapCenter();
+                    });
+                  },
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.bcorbett.hooprank',
+                  ),
+                  MarkerLayer(
+                    markers: _courts.map((court) {
+                      // Signature courts get the crown marker and are larger
+                      final isSignature = court.isSignature;
+                      final hasKings = court.hasKings;
+                      // Check if court has active check-ins
+                      final checkInState =
+                          Provider.of<CheckInState>(context, listen: false);
+                      final hasCheckIns = checkInState.hasCheckIns(court.id);
+
+                      // Determine marker size - slightly larger for the pin design
+                      double markerSize;
+
+                      if (isSignature) {
+                        markerSize = 50;
+                      } else if (court.isIndoor) {
+                        markerSize = 42;
+                      } else if (hasKings) {
+                        markerSize = 46;
+                      } else {
+                        markerSize = 40;
+                      }
+
+                      // Scale up selected court slightly
+                      // (If we had selected court state easily accessible here)
+
+                      return Marker(
+                        point: LatLng(court.lat, court.lng),
+                        width: markerSize,
+                        height: markerSize,
+                        alignment: Alignment.topCenter,
+                        child: BasketballMarker(
+                          size: markerSize,
+                          isLegendary: isSignature,
+                          hasKing: hasKings,
+                          isIndoor: court.isIndoor,
+                          hasActivity: hasCheckIns,
+                          onTap: () => _zoomToCourtAndSelect(court),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+              Positioned(
+                top: 16,
+                left: 16,
+                right: 16,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                      FlutterMap(
-                        mapController: _mapController,
-                        options: MapOptions(
-                          initialCenter: _initialCenter,
-                          initialZoom: _currentZoom,
-                          onMapReady: () {
-                            // Filter courts after map is ready and we can get bounds
-                            _updateCourtsForMapCenter();
-                          },
-                          onPositionChanged: (position, hasGesture) {
-                            _currentZoom = position.zoom ?? 10.0;
-                            // Debounce court updates to avoid rebuilding on every frame
-                            _debounceTimer?.cancel();
-                            _debounceTimer = Timer(const Duration(milliseconds: 150), () {
-                              _updateCourtsForMapCenter();
-                            });
-                          },
+                    // Search bar
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: const InputDecoration(
+                          hintText: 'Search courts...',
+                          prefixIcon: Icon(Icons.search),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
                         ),
-                      children: [
-                        TileLayer(
-                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.bcorbett.hooprank',
-                        ),
-                        MarkerLayer(
-                          markers: _courts.map((court) {
-                            // Signature courts get the crown marker and are larger
-                            final isSignature = court.isSignature;
-                            final hasKings = court.hasKings;
-                            // Check if court has active check-ins
-                            final checkInState = Provider.of<CheckInState>(context, listen: false);
-                            final hasCheckIns = checkInState.hasCheckIns(court.id);
-                            
-                            // Determine marker size - slightly larger for the pin design
-                            double markerSize;
-                            
-                            if (isSignature) {
-                              markerSize = 50;
-                            } else if (court.isIndoor) {
-                              markerSize = 42;
-                            } else if (hasKings) {
-                              markerSize = 46;
-                            } else {
-                              markerSize = 40;
-                            }
-                            
-                            // Scale up selected court slightly
-                            // (If we had selected court state easily accessible here)
-                            
-                            return Marker(
-                              point: LatLng(court.lat, court.lng),
-                              width: markerSize,
-                              height: markerSize,
-                              alignment: Alignment.topCenter,
-                              child: BasketballMarker(
-                                size: markerSize,
-                                isLegendary: isSignature,
-                                hasKing: hasKings,
-                                isIndoor: court.isIndoor,
-                                hasActivity: hasCheckIns,
-                                onTap: () => _zoomToCourtAndSelect(court),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
+                        onChanged: _onSearchChanged,
+                      ),
                     ),
-                    Positioned(
-                      top: 16,
-                      left: 16,
-                      right: 16,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Search bar
-                          Card(
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: const InputDecoration(
-                                hintText: 'Search courts...',
-                                prefixIcon: Icon(Icons.search),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              ),
-                              onChanged: _onSearchChanged,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // Simplified filter row
-                          Row(
-                            children: [
-                              // Scheduled Runs dropdown (primary)
-                              Expanded(
-                                child: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'off') {
-                                      _setRunsFilter(null);
-                                    } else {
-                                      _setRunsFilter(value);
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'today',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.today, size: 18, color: _runsFilter == 'today' ? Colors.deepOrange : null),
-                                          const SizedBox(width: 8),
-                                          Text('Today', style: TextStyle(color: _runsFilter == 'today' ? Colors.deepOrange : null)),
-                                          if (_runsFilter == 'today') const Spacer(),
-                                          if (_runsFilter == 'today') const Icon(Icons.check, size: 16, color: Colors.deepOrange),
-                                        ],
-                                      ),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'all',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.calendar_month, size: 18, color: _runsFilter == 'all' ? Colors.deepOrange : null),
-                                          const SizedBox(width: 8),
-                                          Text('All Upcoming', style: TextStyle(color: _runsFilter == 'all' ? Colors.deepOrange : null)),
-                                          if (_runsFilter == 'all') const Spacer(),
-                                          if (_runsFilter == 'all') const Icon(Icons.check, size: 16, color: Colors.deepOrange),
-                                        ],
-                                      ),
-                                    ),
-                                    if (_runsFilter != null) ...[
-                                      const PopupMenuDivider(),
-                                      const PopupMenuItem(
-                                        value: 'off',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.close, size: 18, color: Colors.grey),
-                                            SizedBox(width: 8),
-                                            Text('Clear Filter', style: TextStyle(color: Colors.grey)),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: _runsFilter != null 
-                                          ? const Color(0xFFFF5722) 
-                                          : Colors.grey[800],
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.calendar_today,
-                                          size: 16,
-                                          color: _runsFilter != null ? Colors.white : Colors.grey[400],
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          _runsFilter == 'today' ? 'Today' : (_runsFilter == 'all' ? 'All Runs' : 'Find Runs'),
-                                          style: TextStyle(
-                                            color: _runsFilter != null ? Colors.white : Colors.grey[400],
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Icon(
-                                          Icons.arrow_drop_down,
-                                          size: 16,
-                                          color: _runsFilter != null ? Colors.white : Colors.grey[400],
-                                        ),
-                                        if (_courtsWithRuns.isNotEmpty) ...[
-                                          const SizedBox(width: 2),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(0.2),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              '${_courtsWithRuns.length}',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Indoor/Outdoor filter dropdown
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'all':
-                                      setState(() {
-                                        _filterIndoor = null;
-                                        _filterAccess = null;
-                                        _runsFilter = null;
-                                        _showFollowedOnly = false;
-                                        _courtsWithRuns = {};
-                                      });
-                                      _onSearchChanged(_searchController.text);
-                                      break;
-                                    case 'indoor':
-                                      _toggleIndoorFilter(_filterIndoor == true ? null : true);
-                                      break;
-                                    case 'outdoor':
-                                      _toggleIndoorFilter(_filterIndoor == false ? null : false);
-                                      break;
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'all',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.clear_all, size: 18),
-                                        SizedBox(width: 8),
-                                        Text('Show All'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuDivider(),
-                                  PopupMenuItem(
-                                    value: 'indoor',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.home, size: 18, color: _filterIndoor == true ? Colors.blue : null),
-                                        const SizedBox(width: 8),
-                                        Text('Indoor', style: TextStyle(color: _filterIndoor == true ? Colors.blue : null)),
-                                        if (_filterIndoor == true) const Spacer(),
-                                        if (_filterIndoor == true) const Icon(Icons.check, size: 16, color: Colors.blue),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'outdoor',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.wb_sunny, size: 18, color: _filterIndoor == false ? Colors.grey[700] : null),
-                                        const SizedBox(width: 8),
-                                        Text('Outdoor', style: TextStyle(color: _filterIndoor == false ? Colors.grey[700] : null)),
-                                        if (_filterIndoor == false) const Spacer(),
-                                        if (_filterIndoor == false) Icon(Icons.check, size: 16, color: Colors.grey[700]),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _filterIndoor != null 
-                                        ? const Color(0xFF00C853) 
-                                        : Colors.grey[800],
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        _filterIndoor == true ? 'Indoor' : (_filterIndoor == false ? 'Outdoor' : 'All'),
-                                        style: TextStyle(
-                                          color: _filterIndoor != null 
-                                              ? Colors.white 
-                                              : Colors.grey[400],
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Icon(
-                                        Icons.arrow_drop_down,
+                    const SizedBox(height: 8),
+                    // Simplified filter row
+                    Row(
+                      children: [
+                        // Scheduled Runs dropdown (primary)
+                        Expanded(
+                          child: PopupMenuButton<String>(
+                            onOpened: () {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted) return;
+                                context
+                                    .read<TutorialState>()
+                                    .completeStep('courts_open_find_runs');
+                              });
+                            },
+                            onSelected: (value) async {
+                              if (value == 'off') {
+                                await _setRunsFilter(null);
+                                return;
+                              }
+
+                              if (value == 'all') {
+                                // Complete immediately so the tutorial can advance even while
+                                // we fetch run data (the popup closes before the async call completes).
+                                context
+                                    .read<TutorialState>()
+                                    .completeStep('courts_select_all_upcoming');
+                              }
+
+                              await _setRunsFilter(value);
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'today',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.today,
                                         size: 18,
-                                        color: _filterIndoor != null 
-                                            ? Colors.white 
-                                            : Colors.grey[400],
-                                      ),
+                                        color: _runsFilter == 'today'
+                                            ? Colors.deepOrange
+                                            : null),
+                                    const SizedBox(width: 8),
+                                    Text('Today',
+                                        style: TextStyle(
+                                            color: _runsFilter == 'today'
+                                                ? Colors.deepOrange
+                                                : null)),
+                                    if (_runsFilter == 'today') const Spacer(),
+                                    if (_runsFilter == 'today')
+                                      const Icon(Icons.check,
+                                          size: 16, color: Colors.deepOrange),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'all',
+                                child: Container(
+                                  key: TutorialKeys.getKey(
+                                      TutorialKeys.courtsAllUpcomingMenuItem),
+                                  width: double.infinity,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.calendar_month,
+                                          size: 18,
+                                          color: _runsFilter == 'all'
+                                              ? Colors.deepOrange
+                                              : null),
+                                      const SizedBox(width: 8),
+                                      Text('All Upcoming',
+                                          style: TextStyle(
+                                              color: _runsFilter == 'all'
+                                                  ? Colors.deepOrange
+                                                  : null)),
+                                      if (_runsFilter == 'all') const Spacer(),
+                                      if (_runsFilter == 'all')
+                                        const Icon(Icons.check,
+                                            size: 16, color: Colors.deepOrange),
                                     ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              // Followed chip (heart icon only) — last
-                              Consumer<CheckInState>(
-                                  builder: (context, checkInState, _) {
-                                    final followedCount = checkInState.followedCourts.length;
-                                    return GestureDetector(
-                                      onTap: _toggleFollowedFilter,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                        decoration: BoxDecoration(
-                                          color: _showFollowedOnly 
-                                              ? Colors.red 
-                                              : Colors.grey[800],
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              _showFollowedOnly ? Icons.favorite : Icons.favorite_border,
-                                              size: 18,
-                                              color: _showFollowedOnly ? Colors.white : Colors.grey[400],
-                                            ),
-                                            if (followedCount > 0) ...[
-                                              const SizedBox(width: 4),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: Text(
-                                                  '$followedCount',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
+                              if (_runsFilter != null) ...[
+                                const PopupMenuDivider(),
+                                const PopupMenuItem(
+                                  value: 'off',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.close,
+                                          size: 18, color: Colors.grey),
+                                      SizedBox(width: 8),
+                                      Text('Clear Filter',
+                                          style: TextStyle(color: Colors.grey)),
+                                    ],
+                                  ),
                                 ),
+                              ],
                             ],
-                          ),
-                          if (_courtsTotalBeforeCap != null &&
-                              _courtsCapLimit != null &&
-                              _courtsTotalBeforeCap! > _courtsCapLimit!) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            child: Container(
+                              key: TutorialKeys.getKey(
+                                  TutorialKeys.courtsFindRunsButton),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.55),
+                                color: _runsFilter != null
+                                    ? const Color(0xFFFF5722)
+                                    : Colors.grey[800],
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.white.withOpacity(0.08)),
                               ),
                               child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.zoom_in, size: 16, color: Colors.white70),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Showing $_courtsCapLimit of $_courtsTotalBeforeCap courts. Zoom in to see more.',
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 16,
+                                    color: _runsFilter != null
+                                        ? Colors.white
+                                        : Colors.grey[400],
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _runsFilter == 'today'
+                                        ? 'Today'
+                                        : (_runsFilter == 'all'
+                                            ? 'All Runs'
+                                            : 'Find Runs'),
+                                    style: TextStyle(
+                                      color: _runsFilter != null
+                                          ? Colors.white
+                                          : Colors.grey[400],
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
                                     ),
                                   ),
+                                  const SizedBox(width: 2),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    size: 16,
+                                    color: _runsFilter != null
+                                        ? Colors.white
+                                        : Colors.grey[400],
+                                  ),
+                                  if (_courtsWithRuns.isNotEmpty) ...[
+                                    const SizedBox(width: 2),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '${_courtsWithRuns.length}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Indoor/Outdoor filter dropdown
+                        PopupMenuButton<String>(
+                          onSelected: (value) {
+                            switch (value) {
+                              case 'all':
+                                setState(() {
+                                  _filterIndoor = null;
+                                  _filterAccess = null;
+                                  _runsFilter = null;
+                                  _showFollowedOnly = false;
+                                  _courtsWithRuns = {};
+                                });
+                                _onSearchChanged(_searchController.text);
+                                break;
+                              case 'indoor':
+                                _toggleIndoorFilter(
+                                    _filterIndoor == true ? null : true);
+                                break;
+                              case 'outdoor':
+                                _toggleIndoorFilter(
+                                    _filterIndoor == false ? null : false);
+                                break;
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'all',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.clear_all, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Show All'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuDivider(),
+                            PopupMenuItem(
+                              value: 'indoor',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.home,
+                                      size: 18,
+                                      color: _filterIndoor == true
+                                          ? Colors.blue
+                                          : null),
+                                  const SizedBox(width: 8),
+                                  Text('Indoor',
+                                      style: TextStyle(
+                                          color: _filterIndoor == true
+                                              ? Colors.blue
+                                              : null)),
+                                  if (_filterIndoor == true) const Spacer(),
+                                  if (_filterIndoor == true)
+                                    const Icon(Icons.check,
+                                        size: 16, color: Colors.blue),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'outdoor',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.wb_sunny,
+                                      size: 18,
+                                      color: _filterIndoor == false
+                                          ? Colors.grey[700]
+                                          : null),
+                                  const SizedBox(width: 8),
+                                  Text('Outdoor',
+                                      style: TextStyle(
+                                          color: _filterIndoor == false
+                                              ? Colors.grey[700]
+                                              : null)),
+                                  if (_filterIndoor == false) const Spacer(),
+                                  if (_filterIndoor == false)
+                                    Icon(Icons.check,
+                                        size: 16, color: Colors.grey[700]),
                                 ],
                               ),
                             ),
                           ],
-                        ],
-                      ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _filterIndoor != null
+                                  ? const Color(0xFF00C853)
+                                  : Colors.grey[800],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _filterIndoor == true
+                                      ? 'Indoor'
+                                      : (_filterIndoor == false
+                                          ? 'Outdoor'
+                                          : 'All'),
+                                  style: TextStyle(
+                                    color: _filterIndoor != null
+                                        ? Colors.white
+                                        : Colors.grey[400],
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 18,
+                                  color: _filterIndoor != null
+                                      ? Colors.white
+                                      : Colors.grey[400],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Followed chip (heart icon only) — last
+                        Consumer<CheckInState>(
+                          builder: (context, checkInState, _) {
+                            final followedCount =
+                                checkInState.followedCourts.length;
+                            return GestureDetector(
+                              onTap: _toggleFollowedFilter,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 10, horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: _showFollowedOnly
+                                      ? Colors.red
+                                      : Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _showFollowedOnly
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      size: 18,
+                                      color: _showFollowedOnly
+                                          ? Colors.white
+                                          : Colors.grey[400],
+                                    ),
+                                    if (followedCount > 0) ...[
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          '$followedCount',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          FloatingActionButton(
-                            heroTag: 'zoom_in',
-                            mini: true,
-                            onPressed: _zoomIn,
-                            child: const Icon(Icons.add),
-                          ),
-                          const SizedBox(height: 8),
-                          FloatingActionButton(
-                            heroTag: 'zoom_out',
-                            mini: true,
-                            onPressed: _zoomOut,
-                            child: const Icon(Icons.remove),
-                          ),
-                          const SizedBox(height: 16),
-                          FloatingActionButton(
-                            heroTag: 'my_location',
-                            onPressed: _moveToUserLocation,
-                            child: const Icon(Icons.my_location),
-                          ),
-                        ],
+                    if (_courtsTotalBeforeCap != null &&
+                        _courtsCapLimit != null &&
+                        _courtsTotalBeforeCap! > _courtsCapLimit!) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.55),
+                          borderRadius: BorderRadius.circular(10),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.08)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.zoom_in,
+                                size: 16, color: Colors.white70),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Showing $_courtsCapLimit of $_courtsTotalBeforeCap courts. Zoom in to see more.',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ],
+                  ],
+                ),
+              ),
+              Positioned(
+                bottom: 16,
+                right: 16,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FloatingActionButton(
+                      heroTag: 'zoom_in',
+                      mini: true,
+                      onPressed: _zoomIn,
+                      child: const Icon(Icons.add),
+                    ),
+                    const SizedBox(height: 8),
+                    FloatingActionButton(
+                      heroTag: 'zoom_out',
+                      mini: true,
+                      onPressed: _zoomOut,
+                      child: const Icon(Icons.remove),
+                    ),
+                    const SizedBox(height: 16),
+                    FloatingActionButton(
+                      heroTag: 'my_location',
+                      onPressed: _moveToUserLocation,
+                      child: const Icon(Icons.my_location),
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                flex: 1,
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  itemCount: _courts.length,
-                  itemBuilder: (context, index) {
-                    final court = _courts[index];
-                    
-                    // Determine assets and styling
-                    String listMarkerAsset;
-                    Color accentColor;
-                    
-                    if (court.isSignature) {
-                      listMarkerAsset = 'assets/court_marker_signature_crown.jpg';
-                      accentColor = Colors.amber;
-                    } else if (court.hasKings) {
-                      listMarkerAsset = 'assets/court_marker_king.jpg';
-                      accentColor = Colors.orange;
-                    } else {
-                      listMarkerAsset = 'assets/court_marker.jpg';
-                      accentColor = const Color(0xFF00C853); // HoopRank Green default
-                    }
-                    
-                    return Consumer<CheckInState>(
-                      builder: (context, checkInState, _) {
-                        final isFollowing = checkInState.isFollowing(court.id);
-                        final hasAlert = checkInState.isAlertEnabled(court.id);
-                        final followerCount = checkInState.getFollowerCount(court.id);
-                        final checkInCount = checkInState.getCheckInCount(court.id);
-                        final hasActivity = checkInCount > 0;
-                        
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: hasActivity 
-                                  ? const Color(0xFF00C853).withOpacity(0.3) 
-                                  : Colors.white.withOpacity(0.05)
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
+            ],
+          ),
+        ),
+        Expanded(
+          flex: 1,
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            itemCount: _courts.length,
+            itemBuilder: (context, index) {
+              final court = _courts[index];
+
+              // Determine assets and styling
+              String listMarkerAsset;
+              Color accentColor;
+
+              if (court.isSignature) {
+                listMarkerAsset = 'assets/court_marker_signature_crown.jpg';
+                accentColor = Colors.amber;
+              } else if (court.hasKings) {
+                listMarkerAsset = 'assets/court_marker_king.jpg';
+                accentColor = Colors.orange;
+              } else {
+                listMarkerAsset = 'assets/court_marker.jpg';
+                accentColor = const Color(0xFF00C853); // HoopRank Green default
+              }
+
+              return Consumer<CheckInState>(
+                builder: (context, checkInState, _) {
+                  final isFollowing = checkInState.isFollowing(court.id);
+                  final followerCount = checkInState.getFollowerCount(court.id);
+                  final checkInCount = checkInState.getCheckInCount(court.id);
+                  final hasActivity = checkInCount > 0;
+
+                  return Container(
+                    key: index == 0
+                        ? TutorialKeys.getKey(TutorialKeys.courtsTopCourtCard)
+                        : null,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E1E),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: hasActivity
+                              ? const Color(0xFF00C853).withOpacity(0.3)
+                              : Colors.white.withOpacity(0.05)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _zoomToCourtAndSelect(court),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              // Court Image/Icon
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: hasActivity
+                                          ? const Color(0xFF00C853)
+                                          : accentColor.withOpacity(0.5),
+                                      width: 2),
+                                  image: DecorationImage(
+                                    image: AssetImage(listMarkerAsset),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
                               ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () => _zoomToCourtAndSelect(court),
-                              borderRadius: BorderRadius.circular(16),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
+                              const SizedBox(width: 16),
+
+                              // Main Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Court Image/Icon
-                                    Container(
-                                      width: 56,
-                                      height: 56,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: hasActivity ? const Color(0xFF00C853) : accentColor.withOpacity(0.5), 
-                                          width: 2
-                                        ),
-                                        image: DecorationImage(
-                                          image: AssetImage(listMarkerAsset),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    
-                                    // Main Details
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          // Court Name & Badges
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  court.name, 
-                                                  maxLines: 1, 
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (hasActivity) ...[
-                                                const SizedBox(width: 8),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFF00C853),
-                                                    borderRadius: BorderRadius.circular(4),
-                                                  ),
-                                                  child: Text(
-                                                    'LIVE: $checkInCount',
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w900,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
+                                    // Court Name & Badges
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            court.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          
-                                          // Address line
-                                          if (court.address != null && court.address!.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 2),
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.location_on, size: 12, color: Colors.grey[500]),
-                                                  const SizedBox(width: 3),
-                                                  Expanded(
-                                                    child: Text(
-                                                      court.address!, 
-                                                      maxLines: 2, 
-                                                      overflow: TextOverflow.ellipsis,
-                                                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                                                    ),
-                                                  ),
-                                                ],
+                                        ),
+                                        if (hasActivity) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF00C853),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              'LIVE: $checkInCount',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w900,
                                               ),
                                             ),
-                                            
-                                          // Bottom Row: Kings & Followers
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              // Kings Badges
-                                              if (court.hasKings) ...[
-                                                Icon(Icons.emoji_events_rounded, size: 14, color: Colors.amber[700]),
-                                                const SizedBox(width: 4),
-                                                if (court.king1v1 != null) _kingBadge('1v1', Colors.deepOrange),
-                                                if (court.king3v3 != null) _kingBadge('3v3', Colors.blue),
-                                                if (court.king5v5 != null) _kingBadge('5v5', Colors.purple),
-                                                if (!court.isSignature) const SizedBox(width: 8), // Spacer if we have more stuff
-                                              ],
-                                              
-                                              // Signature Badge (if space allows or instead of kings if it's simpler)
-                                              if (court.isSignature)
-                                                 Container(
-                                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                   decoration: BoxDecoration(
-                                                     gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA500)]),
-                                                     borderRadius: BorderRadius.circular(4),
-                                                   ),
-                                                   child: const Text('LEGENDARY', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black)),
-                                                 ),
-                                              
-                                              // Court type badges (Indoor/Outdoor, Access)
-                                              if (!court.isSignature) ...[
-                                                const Spacer(),
-                                                _buildCourtTypeBadge(court),
-                                              ],
-                                            ],
                                           ),
                                         ],
-                                      ),
+                                      ],
                                     ),
-                                    
-                                    // Action Buttons Column
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                    const SizedBox(height: 4),
+
+                                    // Address line
+                                    if (court.address != null &&
+                                        court.address!.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.location_on,
+                                                size: 12,
+                                                color: Colors.grey[500]),
+                                            const SizedBox(width: 3),
+                                            Expanded(
+                                              child: Text(
+                                                court.address!,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                    color: Colors.grey[500],
+                                                    fontSize: 12),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                    // Bottom Row: Kings & Followers
+                                    const SizedBox(height: 8),
+                                    Row(
                                       children: [
-                                        // Follow Heart
-                                        GestureDetector(
-                                          key: index == 0 ? TutorialKeys.getKey(TutorialKeys.courtFollowButton) : null,
-                                          onTap: () {
-                                            checkInState.toggleFollow(court.id);
-                                            final tutorial = context.read<TutorialState>();
-                                            if (tutorial.isActive && tutorial.currentStep?.id == 'follow_court') {
-                                              tutorial.completeStep('follow_court');
-                                            }
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(8),
+                                        // Kings Badges
+                                        if (court.hasKings) ...[
+                                          Icon(Icons.emoji_events_rounded,
+                                              size: 14,
+                                              color: Colors.amber[700]),
+                                          const SizedBox(width: 4),
+                                          if (court.king1v1 != null)
+                                            _kingBadge(
+                                                '1v1', Colors.deepOrange),
+                                          if (court.king3v3 != null)
+                                            _kingBadge('3v3', Colors.blue),
+                                          if (court.king5v5 != null)
+                                            _kingBadge('5v5', Colors.purple),
+                                          if (!court.isSignature)
+                                            const SizedBox(
+                                                width:
+                                                    8), // Spacer if we have more stuff
+                                        ],
+
+                                        // Signature Badge (if space allows or instead of kings if it's simpler)
+                                        if (court.isSignature)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: isFollowing ? Colors.red.withOpacity(0.15) : Colors.transparent,
-                                              shape: BoxShape.circle,
+                                              gradient: const LinearGradient(
+                                                  colors: [
+                                                    Color(0xFFFFD700),
+                                                    Color(0xFFFFA500)
+                                                  ]),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
                                             ),
-                                            child: Icon(
-                                              isFollowing ? Icons.favorite : Icons.favorite_border_rounded,
-                                              size: 20,
-                                              color: isFollowing ? Colors.redAccent : Colors.grey[600],
-                                            ),
+                                            child: const Text('LEGENDARY',
+                                                style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black)),
                                           ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        // Alert Bell
-                                        GestureDetector(
-                                          key: index == 0 ? TutorialKeys.getKey(TutorialKeys.courtAlertBell) : null,
-                                          onTap: () {
-                                            checkInState.toggleAlert(court.id);
-                                            final tutorial = context.read<TutorialState>();
-                                            if (tutorial.isActive && tutorial.currentStep?.id == 'enable_notifications') {
-                                              tutorial.completeStep('enable_notifications');
-                                            }
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: hasAlert ? Colors.orange.withOpacity(0.15) : Colors.transparent,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Icon(
-                                              hasAlert ? Icons.notifications_active : Icons.notifications_none_rounded,
-                                              size: 20,
-                                              color: hasAlert ? Colors.orange : Colors.grey[600],
-                                            ),
-                                          ),
-                                        ),
+
+                                        // Court type badges (Indoor/Outdoor, Access)
+                                        if (!court.isSignature) ...[
+                                          const Spacer(),
+                                          _buildCourtTypeBadge(court),
+                                        ],
                                       ],
                                     ),
                                   ],
                                 ),
                               ),
-                            ),
+
+                              // Action Buttons Column
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Follow Heart
+                                  GestureDetector(
+                                    onTap: () {
+                                      checkInState.toggleFollow(court.id);
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: isFollowing
+                                            ? Colors.red.withOpacity(0.15)
+                                            : Colors.transparent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        isFollowing
+                                            ? Icons.favorite
+                                            : Icons.favorite_border_rounded,
+                                        size: 20,
+                                        color: isFollowing
+                                            ? Colors.redAccent
+                                            : Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -5,7 +5,7 @@
  * │  CONTEXT FOR FUTURE SESSIONS:                                         │
  * │  If you're reading this for the first time, here's what you need      │
  * │  to know. This file was created after a full audit of every backend   │
- * │  controller. It tests 60+ endpoints across 12 modules.               │
+ * │  controller. It tests 85+ endpoints across 16 modules.               │
  * │                                                                       │
  * │  THE AUTH PROBLEM (already solved, don't re-investigate):             │
  * │  The x-user-id header does NOT work on production. Every endpoint    │
@@ -218,6 +218,7 @@ const GET = (path) => request('GET', path);
 const POST = (path, body) => request('POST', path, body);
 const PUT = (path, body) => request('PUT', path, body);
 const DEL = (path) => request('DELETE', path);
+const PATCH = (path, body) => request('PATCH', path, body);
 
 function pass(name, detail = '') {
     passed++;
@@ -810,6 +811,169 @@ async function testRankings() {
         if (r.status === 200) pass('GET /rankings', `${Array.isArray(r.body) ? r.body.length : '?'} ranked`);
         else fail('GET /rankings', `status ${r.status}`);
     } catch (e) { fail('GET /rankings', e.message); }
+
+    // Team rankings (3v3 mode)
+    try {
+        const r = await GET('/rankings?mode=3v3');
+        if (r.status === 200 && r.body.rankings) pass('GET /rankings?mode=3v3', `${r.body.rankings.length} teams`);
+        else fail('GET /rankings?mode=3v3', `status ${r.status}`);
+    } catch (e) { fail('GET /rankings?mode=3v3', e.message); }
+
+    // Dedicated team rankings endpoint
+    try {
+        const r = await GET('/rankings/teams');
+        if (r.status === 200 && Array.isArray(r.body)) pass('GET /rankings/teams', `${r.body.length} teams`);
+        else fail('GET /rankings/teams', `status ${r.status}`);
+    } catch (e) { fail('GET /rankings/teams', e.message); }
+}
+
+async function testCourtsExtended() {
+    // New court endpoints not in original suite
+    console.log('\n═══ 13. COURTS EXTENDED ═══');
+
+    // Nearby courts
+    try {
+        const r = await GET('/courts/near?lat=33.78&lng=-118.19&radius=10');
+        if (r.status === 200 && Array.isArray(r.body)) pass('GET /courts/near', `${r.body.length} courts`);
+        else fail('GET /courts/near', `status ${r.status}`);
+    } catch (e) { fail('GET /courts/near', e.message); }
+
+    // Signature courts
+    try {
+        const r = await GET('/courts/signature');
+        if (r.status === 200 && Array.isArray(r.body)) pass('GET /courts/signature', `${r.body.length} courts`);
+        else fail('GET /courts/signature', `status ${r.status}`);
+    } catch (e) { fail('GET /courts/signature', e.message); }
+
+    // Court followers
+    try {
+        const r = await GET(`/courts/${TEST_COURT_ID}/followers`);
+        if (r.status === 200 && Array.isArray(r.body)) pass('GET /courts/:id/followers', `${r.body.length} followers`);
+        else fail('GET /courts/:id/followers', `status ${r.status}`);
+    } catch (e) { fail('GET /courts/:id/followers', e.message); }
+
+    // Court kings
+    try {
+        const r = await GET(`/courts/${TEST_COURT_ID}/kings`);
+        if (r.status === 200) pass('GET /courts/:id/kings', Array.isArray(r.body) ? `${r.body.length} kings` : 'ok');
+        else fail('GET /courts/:id/kings', `status ${r.status}`);
+    } catch (e) { fail('GET /courts/:id/kings', e.message); }
+}
+
+async function testUsersExtended() {
+    // New user endpoints not in original suite
+    console.log('\n═══ 14. USERS EXTENDED ═══');
+
+    // Update own profile (PUT /users/me)
+    try {
+        const r = await PUT('/users/me', { bio: '[E2E] test bio' });
+        if (r.status === 200) pass('PUT /users/me', 'updated bio');
+        else fail('PUT /users/me', `status ${r.status}`);
+    } catch (e) { fail('PUT /users/me', e.message); }
+
+    // Followed activity
+    try {
+        const r = await GET('/users/me/follows/activity');
+        if (r.status === 200) pass('GET /users/me/follows/activity', Array.isArray(r.body) ? `${r.body.length} items` : 'ok');
+        else fail('GET /users/me/follows/activity', `status ${r.status}`);
+    } catch (e) { fail('GET /users/me/follows/activity', e.message); }
+
+    // Follow/unfollow team (if a team exists)
+    try {
+        const teamsR = await GET('/teams');
+        if (teamsR.status === 200 && Array.isArray(teamsR.body) && teamsR.body.length > 0) {
+            const teamId = teamsR.body[0].id;
+            const fr = await POST('/users/me/follows/teams', { teamId });
+            if (fr.status === 200 || fr.status === 201) pass('POST follow team', `followed ${teamId.slice(0, 8)}`);
+            else fail('POST follow team', `status ${fr.status}`);
+
+            const ur = await DEL(`/users/me/follows/teams/${teamId}`);
+            if (ur.status === 200) pass('DELETE unfollow team', 'unfollowed');
+            else fail('DELETE unfollow team', `status ${ur.status}`);
+        } else {
+            skip('POST/DELETE follow team', 'no teams found');
+        }
+    } catch (e) { fail('follow team', e.message); }
+
+    // User rank history
+    try {
+        const r = await GET(`/users/${TEST_USER_ID}/rank-history`);
+        if (r.status === 200) pass('GET /users/:id/rank-history', Array.isArray(r.body) ? `${r.body.length} entries` : 'ok');
+        else fail('GET /users/:id/rank-history', `status ${r.status}`);
+    } catch (e) { fail('GET /users/:id/rank-history', e.message); }
+
+    // User teams
+    try {
+        const r = await GET(`/users/${TEST_USER_ID}/teams`);
+        if (r.status === 200) pass('GET /users/:id/teams', Array.isArray(r.body) ? `${r.body.length} teams` : 'ok');
+        else fail('GET /users/:id/teams', `status ${r.status}`);
+    } catch (e) { fail('GET /users/:id/teams', e.message); }
+
+    // User recent games
+    try {
+        const r = await GET(`/users/${TEST_USER_ID}/recent-games`);
+        if (r.status === 200) pass('GET /users/:id/recent-games', Array.isArray(r.body) ? `${r.body.length} games` : 'ok');
+        else fail('GET /users/:id/recent-games', `status ${r.status}`);
+    } catch (e) { fail('GET /users/:id/recent-games', e.message); }
+}
+
+async function testStubs() {
+    // Stub controllers: MeController, InvitesController, ThreadsController
+    console.log('\n═══ 15. STUBS (me/invites/threads) ═══');
+
+    // GET /me/privacy
+    try {
+        const r = await GET('/me/privacy');
+        if (r.status === 200 && r.body.profileVisibility) pass('GET /me/privacy', `visibility=${r.body.profileVisibility}`);
+        else fail('GET /me/privacy', `status ${r.status}`);
+    } catch (e) { fail('GET /me/privacy', e.message); }
+
+    // PUT /me/privacy
+    try {
+        const r = await PUT('/me/privacy', { showLocation: false });
+        if (r.status === 200 && r.body.success) pass('PUT /me/privacy', 'updated');
+        else fail('PUT /me/privacy', `status ${r.status}`);
+    } catch (e) { fail('PUT /me/privacy', e.message); }
+
+    // GET /invites (list)
+    try {
+        const r = await GET('/invites');
+        if (r.status === 200 && Array.isArray(r.body)) pass('GET /invites', `${r.body.length} invites`);
+        else fail('GET /invites', `status ${r.status}`);
+    } catch (e) { fail('GET /invites', e.message); }
+
+    // POST /invites (create)
+    try {
+        const r = await POST('/invites', { type: 'team', teamId: 'test-team' });
+        if (r.status === 200 && r.body.token) pass('POST /invites', `token=${r.body.token.slice(0, 16)}...`);
+        else fail('POST /invites', `status ${r.status}`);
+    } catch (e) { fail('POST /invites', e.message); }
+
+    // GET /threads/:id
+    try {
+        const r = await GET('/threads/test-thread-id');
+        if (r.status === 200 && r.body.id) pass('GET /threads/:id', `id=${r.body.id}`);
+        else fail('GET /threads/:id', `status ${r.status}`);
+    } catch (e) { fail('GET /threads/:id', e.message); }
+}
+
+async function testUpload() {
+    // Upload controller — POST /upload
+    console.log('\n═══ 16. UPLOAD ═══');
+
+    // Minimal 1x1 PNG base64 payload
+    const TINY_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+    try {
+        const r = await POST('/upload', {
+            type: 'avatar',
+            targetId: TEST_USER_ID,
+            imageData: TINY_PNG,
+        });
+        if (r.status === 201 && r.body.success) pass('POST /upload (avatar)', r.body.message);
+        else if (r.status === 200 && r.body.success) pass('POST /upload (avatar)', r.body.message);
+        else fail('POST /upload (avatar)', `status ${r.status}: ${JSON.stringify(r.body).slice(0, 100)}`);
+    } catch (e) { fail('POST /upload (avatar)', e.message); }
 }
 
 // ── Cleanup ─────────────────────────────────────────────────────────────────
@@ -860,6 +1024,10 @@ async function main() {
     await testActivity();
     await testFollows();
     await testRankings();
+    await testCourtsExtended();
+    await testUsersExtended();
+    await testStubs();
+    await testUpload();
 
     await cleanup(matchId);
 

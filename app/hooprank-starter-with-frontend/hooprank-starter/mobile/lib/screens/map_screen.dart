@@ -9,6 +9,7 @@ import '../widgets/rating_widgets.dart';
 import '../services/messages_service.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
+import '../state/tutorial_state.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'status_composer_screen.dart';
 
@@ -20,7 +21,14 @@ class CourtDetailsSheet {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _CourtDetailsSheet(court: court),
-    );
+    ).whenComplete(() {
+      if (!context.mounted) return;
+      final tutorial = context.read<TutorialState>();
+      // If the user closes the sheet early, make sure the tutorial can still
+      // progress past the King + swipe-down steps.
+      tutorial.completeStep('court_king');
+      tutorial.completeStep('court_swipe_down');
+    });
   }
 }
 
@@ -50,6 +58,7 @@ class _CourtDetailsSheet extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: Container(
+                  key: TutorialKeys.getKey(TutorialKeys.courtDragHandle),
                   width: 76,
                   height: 6,
                   decoration: BoxDecoration(
@@ -110,62 +119,46 @@ class _CourtDetailsSheet extends StatelessWidget {
                             builder: (context, checkInState, _) {
                               final isFollowing =
                                   checkInState.isFollowing(court.id);
-                              final hasAlert =
-                                  checkInState.isAlertEnabled(court.id);
                               return Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  IconButton(
-                                    onPressed: () async {
-                                      if (isFollowing) {
-                                        await checkInState
-                                            .unfollowCourt(court.id);
-                                      } else {
-                                        await checkInState
-                                            .followCourt(court.id);
-                                      }
-                                    },
-                                    icon: Icon(
-                                      isFollowing
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      color: isFollowing
-                                          ? Colors.red
-                                          : Colors.grey[400],
-                                      size: 28,
+                                  SizedBox(
+                                    key: TutorialKeys.getKey(
+                                        TutorialKeys.courtFollowButton),
+                                    width: 48,
+                                    height: 48,
+                                    child: IconButton(
+                                      onPressed: () async {
+                                        final tutorial =
+                                            context.read<TutorialState>();
+                                        if (isFollowing) {
+                                          await checkInState
+                                              .unfollowCourt(court.id);
+                                        } else {
+                                          await checkInState
+                                              .followCourt(court.id);
+                                          tutorial.completeStep('court_follow');
+                                          // Give the user a moment to see the followers list and
+                                          // King designation, then advance to the swipe-down step.
+                                          Future.delayed(
+                                              const Duration(
+                                                  milliseconds: 2600), () {
+                                            tutorial.completeStep('court_king');
+                                          });
+                                        }
+                                      },
+                                      icon: Icon(
+                                        isFollowing
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        color: isFollowing
+                                            ? Colors.red
+                                            : Colors.grey[400],
+                                        size: 28,
+                                      ),
+                                      tooltip:
+                                          isFollowing ? 'Unfollow' : 'Follow',
                                     ),
-                                    tooltip:
-                                        isFollowing ? 'Unfollow' : 'Follow',
-                                  ),
-                                  IconButton(
-                                    onPressed: () async {
-                                      await checkInState.toggleAlert(court.id);
-                                      if (checkInState
-                                          .isAlertEnabled(court.id)) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              '🔔 You\'ll be notified when players check in at ${court.name}',
-                                            ),
-                                            duration:
-                                                const Duration(seconds: 2),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: Icon(
-                                      hasAlert
-                                          ? Icons.notifications_active
-                                          : Icons.notifications_none,
-                                      color: hasAlert
-                                          ? Colors.orange
-                                          : Colors.grey[400],
-                                      size: 26,
-                                    ),
-                                    tooltip: hasAlert
-                                        ? 'Disable alerts'
-                                        : 'Get alerts',
                                   ),
                                 ],
                               );
@@ -208,18 +201,26 @@ class _CourtDetailsSheet extends StatelessWidget {
                             },
                             child: isFollowing
                                 ? _CourtFollowersCard(
-                                    key: const ValueKey('court_followers'),
+                                    key: TutorialKeys.getKey(
+                                        TutorialKeys.courtFollowersCard),
                                     courtId: court.id,
                                   )
                                 : Padding(
                                     key: const ValueKey('follow_prompt'),
                                     padding: const EdgeInsets.only(
-                                        left: 2, bottom: 2),
-                                    child: Text(
-                                      'Follow court to see King',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[500]),
+                                        right: 2, bottom: 2),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          'Follow court to see who else plays here',
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[500],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                           );
@@ -637,6 +638,18 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // If the user reaches Courts via any path (CTA button, bottom nav, etc.)
+    // while the tutorial is on the "Find Courts" step, advance automatically
+    // so the tutorial can't get stuck on a missing CTA state.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<TutorialState>().completeStep('feed_find_courts');
+    });
+  }
+
   void _showCourtDetails(Court court) {
     CourtDetailsSheet.show(context, court);
   }
