@@ -1,9 +1,14 @@
-import { Controller, Get, Post, Delete, Body, Param, Headers, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Headers, Query, BadRequestException } from '@nestjs/common';
 import { StatusesService } from './statuses.service';
+import { UsersService } from '../users/users.service';
+import { filterContent } from '../common/content_filter';
 
 @Controller('statuses')
 export class StatusesController {
-    constructor(private readonly statusesService: StatusesService) { }
+    constructor(
+        private readonly statusesService: StatusesService,
+        private readonly usersService: UsersService,
+    ) { }
 
     // Create a new status
     @Post()
@@ -27,6 +32,11 @@ export class StatusesController {
     ) {
         if (!userId) {
             return { success: false, error: 'User ID required' };
+        }
+        // Content filter (Guideline 1.2)
+        const filterResult = filterContent(body.content || '');
+        if (!filterResult.clean) {
+            return { success: false, error: 'Your post contains inappropriate language. Please revise and try again.' };
         }
         const status = await this.statusesService.createStatus(
             userId,
@@ -197,6 +207,11 @@ export class StatusesController {
         if (!userId || isNaN(statusId)) {
             return { success: false, error: 'Invalid ID' };
         }
+        // Content filter (Guideline 1.2)
+        const commentFilter = filterContent(body.content || '');
+        if (!commentFilter.clean) {
+            return { success: false, error: 'Your comment contains inappropriate language. Please revise and try again.' };
+        }
         const comment = await this.statusesService.addComment(userId, statusId, body.content);
         return { success: true, comment };
     }
@@ -223,6 +238,21 @@ export class StatusesController {
         }
         const deleted = await this.statusesService.deleteComment(userId, commentIdNum);
         return { success: deleted };
+    }
+
+    // ========== Content Reporting (Guideline 1.2) ==========
+
+    @Post(':id/report')
+    async reportStatus(
+        @Headers('x-user-id') userId: string,
+        @Param('id') id: string,
+        @Body() body: { reason: string },
+    ) {
+        const statusId = parseInt(id, 10);
+        if (!userId || isNaN(statusId) || !body.reason) {
+            return { success: false, error: 'userId, statusId, and reason required' };
+        }
+        return this.usersService.reportStatus(userId, statusId, body.reason);
     }
 
     // ========== Event Attendance (I'm IN) ==========

@@ -394,6 +394,57 @@ export class UsersController {
     return { success: true, ...body };
   }
 
+  // ==================== REPORT & BLOCK (Guideline 1.2) ====================
+
+  @Post('me/report')
+  async reportUser(
+    @Headers('x-user-id') userId: string,
+    @Body() body: { reportedUserId: string; reason: string },
+  ) {
+    if (!userId || !body.reportedUserId || !body.reason) {
+      return { success: false, error: 'userId, reportedUserId, and reason required' };
+    }
+    return this.usersService.reportUser(userId, body.reportedUserId, body.reason);
+  }
+
+  @Post('me/blocked/:targetId')
+  async blockUser(
+    @Headers('x-user-id') userId: string,
+    @Param('targetId') targetId: string,
+  ) {
+    if (!userId || !targetId) {
+      return { success: false, error: 'User ID and target ID required' };
+    }
+    return this.usersService.blockUser(userId, targetId);
+  }
+
+  @Delete('me/blocked/:targetId')
+  async unblockUser(
+    @Headers('x-user-id') userId: string,
+    @Param('targetId') targetId: string,
+  ) {
+    if (!userId || !targetId) {
+      return { success: false, error: 'User ID and target ID required' };
+    }
+    return this.usersService.unblockUser(userId, targetId);
+  }
+
+  @Get('me/blocked')
+  async getBlockedUsers(@Headers('x-user-id') userId: string) {
+    if (!userId) return [];
+    return this.usersService.getBlockedUsers(userId);
+  }
+
+  // ==================== ACCOUNT DELETION (Guideline 5.1.1(v)) ====================
+
+  @Delete('me')
+  async deleteMyAccount(@Headers('x-user-id') userId: string) {
+    if (!userId) {
+      return { success: false, error: 'User ID required' };
+    }
+    return this.usersService.deleteMyAccount(userId);
+  }
+
   @Get('nearby')
   async getNearbyUsers(
     @Headers('x-user-id') userId: string,

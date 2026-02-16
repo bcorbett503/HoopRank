@@ -1396,4 +1396,114 @@ export class UsersService {
       return [];
     }
   }
+
+  // ==================== REPORT & BLOCK (Guideline 1.2) ====================
+
+  private async ensureReportTables(): Promise<void> {
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS user_reports (
+        id SERIAL PRIMARY KEY,
+        reporter_id VARCHAR(255) NOT NULL,
+        reported_user_id VARCHAR(255) NOT NULL,
+        reason TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS content_reports (
+        id SERIAL PRIMARY KEY,
+        reporter_id VARCHAR(255) NOT NULL,
+        status_id INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS blocked_users (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        blocked_user_id VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, blocked_user_id)
+      )
+    `);
+  }
+
+  async reportUser(reporterId: string, reportedUserId: string, reason: string): Promise<{ success: boolean }> {
+    await this.ensureReportTables();
+    await this.dataSource.query(
+      `INSERT INTO user_reports (reporter_id, reported_user_id, reason) VALUES ($1, $2, $3)`,
+      [reporterId, reportedUserId, reason],
+    );
+    console.log(`[REPORT] User ${reporterId} reported user ${reportedUserId}: ${reason}`);
+    return { success: true };
+  }
+
+  async reportStatus(reporterId: string, statusId: number, reason: string): Promise<{ success: boolean }> {
+    await this.ensureReportTables();
+    await this.dataSource.query(
+      `INSERT INTO content_reports (reporter_id, status_id, reason) VALUES ($1, $2, $3)`,
+      [reporterId, statusId, reason],
+    );
+    console.log(`[REPORT] User ${reporterId} reported status ${statusId}: ${reason}`);
+    return { success: true };
+  }
+
+  async blockUser(userId: string, targetId: string): Promise<{ success: boolean }> {
+    await this.ensureReportTables();
+    await this.dataSource.query(
+      `INSERT INTO blocked_users (user_id, blocked_user_id) VALUES ($1, $2) ON CONFLICT (user_id, blocked_user_id) DO NOTHING`,
+      [userId, targetId],
+    );
+    console.log(`[BLOCK] User ${userId} blocked user ${targetId}`);
+    return { success: true };
+  }
+
+  async unblockUser(userId: string, targetId: string): Promise<{ success: boolean }> {
+    await this.ensureReportTables();
+    await this.dataSource.query(
+      `DELETE FROM blocked_users WHERE user_id = $1 AND blocked_user_id = $2`,
+      [userId, targetId],
+    );
+    return { success: true };
+  }
+
+  async getBlockedUsers(userId: string): Promise<string[]> {
+    await this.ensureReportTables();
+    const rows = await this.dataSource.query(
+      `SELECT blocked_user_id FROM blocked_users WHERE user_id = $1`,
+      [userId],
+    );
+    return rows.map((r: any) => r.blocked_user_id);
+  }
+
+  async isBlocked(userId: string, targetId: string): Promise<boolean> {
+    await this.ensureReportTables();
+    const rows = await this.dataSource.query(
+      `SELECT 1 FROM blocked_users WHERE user_id = $1 AND blocked_user_id = $2 LIMIT 1`,
+      [userId, targetId],
+    );
+    return rows.length > 0;
+  }
+
+  /**
+   * Delete the authenticated user's own account and all related data.
+   * Also deletes the Firebase Auth record.
+   */
+  async deleteMyAccount(userId: string): Promise<{ success: boolean; deletedFrom: string[] }> {
+    const result = await this.deleteUser(userId);
+
+    // Also delete from Firebase Auth
+    try {
+      const admin = require('firebase-admin');
+      if (admin.apps.length > 0) {
+        await admin.auth().deleteUser(userId);
+        result.deletedFrom.push('firebase-auth');
+      }
+    } catch (e) {
+      console.warn('[DELETE_ACCOUNT] Firebase Auth deletion failed:', e.message);
+    }
+
+    return result;
+  }
 }
