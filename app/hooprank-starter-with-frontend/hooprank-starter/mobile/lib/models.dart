@@ -72,8 +72,9 @@ class User {
 
     final gamesPlayed = _parseInt(json['gamesPlayed'] ?? json['games_played']);
     final gamesContested = _parseInt(json['gamesContested'] ?? json['games_contested']);
-    final contestRate = json['contestRate'] ?? json['contest_rate'] != null 
-        ? _parseDouble(json['contestRate'] ?? json['contest_rate']) 
+    final rawContestRate = json['contestRate'] ?? json['contest_rate'];
+    final contestRate = rawContestRate != null
+        ? _parseDouble(rawContestRate)
         : (gamesPlayed > 0 ? gamesContested / gamesPlayed : 0.0);
 
     // Handle both camelCase (app) and snake_case (production backend) field names

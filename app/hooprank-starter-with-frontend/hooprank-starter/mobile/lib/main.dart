@@ -17,7 +17,6 @@ import 'widgets/tutorial_overlay.dart';
 import 'screens/home_screen.dart';
 import 'screens/rankings_screen.dart';
 
-import 'screens/matches_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/profile_setup_screen.dart';
@@ -330,10 +329,7 @@ class _HoopRankAppState extends State<HoopRankApp> {
             ),
           ],
         ),
-        GoRoute(
-          path: '/matches',
-          builder: (context, state) => const MatchesScreen(),
-        ),
+
         // Player profile - navigate to chat which shows profile and allows messaging
         GoRoute(
           path: '/players/:id',

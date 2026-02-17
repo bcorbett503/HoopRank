@@ -69,6 +69,36 @@ void main() {
           throwsFormatException,
         );
       });
+
+      test('handles non-null contestRate without crash', () {
+        final user = User.fromJson({
+          'id': 'user123',
+          'name': 'Test',
+          'contestRate': 0.75,
+          'gamesPlayed': 10,
+          'gamesContested': 5,
+        });
+        expect(user.contestRate, 0.75);
+      });
+
+      test('computes contestRate when field is absent', () {
+        final user = User.fromJson({
+          'id': 'user123',
+          'name': 'Test',
+          'gamesPlayed': 10,
+          'gamesContested': 5,
+        });
+        expect(user.contestRate, 0.5);
+      });
+
+      test('handles snake_case contest_rate from backend', () {
+        final user = User.fromJson({
+          'id': 'user123',
+          'name': 'Test',
+          'contest_rate': 0.33,
+        });
+        expect(user.contestRate, 0.33);
+      });
     });
 
     test('toPlayer creates valid Player', () {

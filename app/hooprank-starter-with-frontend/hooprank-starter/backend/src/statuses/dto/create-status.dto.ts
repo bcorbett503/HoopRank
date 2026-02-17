@@ -4,10 +4,10 @@ import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
  * DTO for POST /statuses — create a new status post.
  */
 export class CreateStatusDto {
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
     @MaxLength(2000)
-    content: string;
+    content: string = '';
 
     @IsOptional()
     @IsString()

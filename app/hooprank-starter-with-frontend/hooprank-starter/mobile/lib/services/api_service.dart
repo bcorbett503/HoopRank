@@ -160,6 +160,22 @@ class ApiService {
     );
   }
 
+  static Future<http.Response> authedPatch(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+    Encoding? encoding,
+    String? userId,
+  }) async {
+    // No auto-retry for PATCH: same write-safety rationale as POST.
+    return _withRetryOn401(
+      (h) => http.patch(uri, headers: h, body: body, encoding: encoding),
+      headers: headers,
+      userId: userId,
+      retryOnAuthFailure: false,
+    );
+  }
+
   static Future<User> authenticate(
     String idToken, {
     required String uid,
@@ -1001,7 +1017,7 @@ class ApiService {
   /// Update team details (owner only)
   static Future<Map<String, dynamic>?> updateTeam(
       String teamId, Map<String, dynamic> updates) async {
-    final response = await http.patch(
+    final response = await authedPatch(
       Uri.parse('$baseUrl/teams/$teamId'),
       headers: {
         'x-user-id': _userId ?? '',

@@ -166,8 +166,20 @@ class CheckInState extends ChangeNotifier {
   /// Get follower count for a court
   int getFollowerCount(String courtId) => _courtFollowerCounts[courtId] ?? 0;
 
-  /// Initialize with mock data for demo purposes
+  /// Initialize state for the given user session.
+  /// Clears all prior state first to prevent cross-account data leakage.
   Future<void> initialize(String? userId) async {
+    // Clear previous session data to prevent cross-account leakage
+    _courtCheckIns.clear();
+    _userCheckedInCourts.clear();
+    _followedCourts.clear();
+    _alertCourts.clear();
+    _followedPlayers.clear();
+    _followedTeams.clear();
+    _followedTeamNames.clear();
+    _playerStatuses.clear();
+    _courtFollowerCounts.clear();
+
     _currentUserId = userId;
 
     // Load user's persisted data from local cache first
@@ -182,9 +194,6 @@ class CheckInState extends ChangeNotifier {
 
     // Fetch court follower counts from API
     await _fetchCourtFollowerCounts();
-
-    // Add mock check-in data for popular courts
-    _addMockCheckIns();
 
     notifyListeners();
   }
@@ -347,60 +356,7 @@ class CheckInState extends ChangeNotifier {
     }
   }
 
-  /// Add mock check-in data for demo
-  void _addMockCheckIns() {
-    final now = DateTime.now();
 
-    // Olympic Club - several demo players
-    _courtCheckIns['olympic_club_sf'] = [
-      CheckedInPlayer(
-        id: 'demo_player_1',
-        name: 'Marcus Johnson',
-        rating: 4.85,
-        photoUrl: null,
-        checkedInAt: now.subtract(const Duration(hours: 2)),
-      ),
-      CheckedInPlayer(
-        id: 'demo_player_2',
-        name: 'DeShawn Williams',
-        rating: 4.72,
-        photoUrl: null,
-        checkedInAt: now.subtract(const Duration(hours: 5)),
-      ),
-      CheckedInPlayer(
-        id: 'demo_player_3',
-        name: 'Anthony Davis',
-        rating: 4.68,
-        photoUrl: null,
-        checkedInAt: now.subtract(const Duration(days: 1)),
-      ),
-      CheckedInPlayer(
-        id: 'demo_player_4',
-        name: 'Jordan Mitchell',
-        rating: 4.45,
-        photoUrl: null,
-        checkedInAt: now.subtract(const Duration(days: 2)),
-      ),
-    ];
-
-    // Add a few more courts with demo check-ins
-    _courtCheckIns['node/123456789'] = [
-      CheckedInPlayer(
-        id: 'demo_player_5',
-        name: 'Chris Thompson',
-        rating: 4.52,
-        photoUrl: null,
-        checkedInAt: now.subtract(const Duration(hours: 8)),
-      ),
-      CheckedInPlayer(
-        id: 'demo_player_6',
-        name: 'Kevin Park',
-        rating: 4.31,
-        photoUrl: null,
-        checkedInAt: now.subtract(const Duration(days: 1)),
-      ),
-    ];
-  }
 
   // ==================== CHECK-IN METHODS ====================
 

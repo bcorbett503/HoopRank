@@ -35,7 +35,12 @@ async function bootstrap() {
   app.use(bodyParser.json({ limit: '5mb' }));
   app.use(bodyParser.urlencoded({ limit: '5mb', extended: true }));
 
-  app.enableCors(); // allow web app to call API from localhost origins
+  app.enableCors({
+    origin: process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',')
+      : ['http://localhost:3000', 'http://localhost:8080'],
+    credentials: true,
+  });
   const config = new DocumentBuilder()
     .setTitle('HoopRank API')
     .setDescription('MVP endpoints for HoopRank (matches, users, ratings)')
@@ -48,7 +53,3 @@ async function bootstrap() {
   console.log(`HoopRank API running on http://localhost:${port}`);
 }
 bootstrap();
-
-
-// Force rebuild Wed Jan 29 12:20:00 PST 2026
-

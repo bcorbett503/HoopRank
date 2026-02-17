@@ -61,8 +61,8 @@ class CourtService {
         debugPrint('CourtService: Loaded ${_courts.length} courts from local assets (fallback)');
       }
 
-      // Always include The Olympic Club as a featured court
-      const brettUserId = '3zIDc7PjlYYksXxZp6nH6EbILeh1';
+      // The Olympic Club – signature court not yet in the production DB.
+      // No hardcoded king/user data; kings come from the API when available.
       final olympicClub = Court(
         id: '44444444-4444-4444-4444-444444444444',
         name: 'The Olympic Club',
@@ -72,12 +72,7 @@ class CourtService {
         isSignature: true,
         isIndoor: true,
         access: 'members',
-        king1v1: 'Brett Corbett',
-        king1v1Id: brettUserId,
-        king1v1Rating: 4.95,
       );
-      
-      // Insert at beginning if not already present
       if (!_courts.any((c) => c.id == olympicClub.id)) {
         _courts.insert(0, olympicClub);
       }

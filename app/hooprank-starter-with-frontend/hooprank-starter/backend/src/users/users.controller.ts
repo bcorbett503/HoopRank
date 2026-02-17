@@ -76,50 +76,8 @@ export class UsersController {
     };
   }
 
-  // Debug endpoint to check user_followed_courts table
-  @Get('admin/debug-follows')
-  async debugFollows() {
-    return this.usersService.debugFollowedCourts();
-  }
 
-  // Cleanup endpoint to delete all users except specified ones
-  @Post('admin/cleanup-users')
-  async cleanupUsers() {
-    return this.usersService.cleanupUsers();
-  }
 
-  // Purge all feed/social data, keeping user profiles and courts
-  @Post('admin/purge-feed')
-  async purgeFeed() {
-    const results: string[] = [];
-    const tables = [
-      'status_likes',
-      'status_comments',
-      'event_attendees',
-      'player_statuses',
-      'check_ins',
-      'user_followed_courts',
-      'user_followed_players',
-      'user_followed_teams',
-      'user_court_alerts',
-      'team_messages',
-      'team_members',
-      'teams',
-      'challenges',
-      'messages',
-      'matches',
-      'friendships',
-    ];
-    for (const table of tables) {
-      try {
-        const result = await this.dataSource.query(`DELETE FROM ${table}`);
-        results.push(`${table}: deleted ${result?.[1] ?? 'all'} rows`);
-      } catch (e) {
-        results.push(`${table}: ${e.message}`);
-      }
-    }
-    return { success: true, results };
-  }
 
   // Delete a specific user and all their data (for testing)
   @Delete('admin/user/:userId')
