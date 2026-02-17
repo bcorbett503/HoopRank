@@ -40,7 +40,6 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
         });
       }
     } catch (e) {
-      print('Error loading team: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }

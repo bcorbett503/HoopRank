@@ -33,7 +33,7 @@ import { SeedingController } from './admin/seeding.controller';
 import { DebugController } from './admin/debug.controller';
 import { AdminController } from './admin/admin.controller';
 import { UploadController } from './upload.controller';
-import { MeController, InvitesController, ThreadsController } from './stubs.controller';
+import { MeController, ThreadsController } from './stubs.controller';
 import { SnakeNamingStrategy } from './snake-naming.strategy';
 
 @Module({
@@ -84,7 +84,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     // Global rate limit: 100 requests per 60 seconds per IP
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
   ],
-  controllers: [HealthController, SeedingController, DebugController, AdminController, UploadController, MeController, InvitesController, ThreadsController],
+  controllers: [HealthController, SeedingController, DebugController, AdminController, UploadController, MeController, ThreadsController],
   providers: [
     {
       provide: APP_GUARD,

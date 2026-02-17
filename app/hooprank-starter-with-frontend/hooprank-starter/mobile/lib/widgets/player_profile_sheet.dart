@@ -331,7 +331,6 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
         });
       }
     } catch (e) {
-      print('Error loading player data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }

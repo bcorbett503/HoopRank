@@ -27,10 +27,8 @@ class AuthService {
       // Sign in to Firebase with the Google Credential
       return await _auth.signInWithCredential(credential);
     } on PlatformException catch (e) {
-      print('Google Sign-In Platform Error: ${e.message}');
       rethrow;
     } catch (e) {
-      print('Error signing in with Google: $e');
       rethrow;
     }
   }
@@ -43,7 +41,6 @@ class AuthService {
         password: password,
       );
     } catch (e) {
-      print('Error signing in with email: $e');
       rethrow;
     }
   }
@@ -85,13 +82,10 @@ class AuthService {
       if (e.code == AuthorizationErrorCode.canceled) {
         return null; // User canceled
       }
-      print('Apple Sign-In Authorization Error: ${e.message}');
       rethrow;
     } on PlatformException catch (e) {
-      print('Apple Sign-In Platform Error: ${e.message}');
       rethrow;
     } catch (e) {
-      print('Error signing in with Apple: $e');
       rethrow;
     }
   }
@@ -113,14 +107,11 @@ class AuthService {
         // Sign in to Firebase with the Facebook Credential
         return await _auth.signInWithCredential(credential);
       } else {
-        print('Facebook login status: ${result.status}');
         return null; // User canceled or failed
       }
     } on PlatformException catch (e) {
-      print('Facebook Sign-In Platform Error: ${e.message}');
       throw Exception('Facebook Sign-In not configured. Please use Google Sign-In.');
     } catch (e) {
-      print('Error signing in with Facebook: $e');
       rethrow;
     }
   }

@@ -358,7 +358,6 @@ export class ChallengesService {
                 SET status = 'completed', updated_at = NOW()
                 WHERE match_id = $1
             `, [matchId]);
-            console.log(`[ChallengesService] Marked challenge completed for match ${matchId}`);
         } else {
             await this.challengesRepository.update({ matchId }, { status: 'completed' });
         }

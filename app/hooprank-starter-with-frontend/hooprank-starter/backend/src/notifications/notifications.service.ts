@@ -16,7 +16,6 @@ export class NotificationsService {
         // Use dataSource.options.type for reliable driver detection
         const dbType = (this.dataSource.options as any).type;
         const result = dbType === 'postgres';
-        console.log(`[NotificationsService] isPostgres check: dbType=${dbType}, result=${result}`);
         return result;
     }
 
@@ -40,12 +39,9 @@ export class NotificationsService {
                JOIN user_followed_courts f ON u.id = f.user_id
                WHERE f.court_id = ? AND f.alerts_enabled = 1 AND u."fcmToken" IS NOT NULL`;
 
-        console.log(`[CourtNotification] Querying users with alerts for court ${courtId}`);
         const result = await this.dataSource.query(query, [courtId]);
-        console.log(`[CourtNotification] Found ${result.length} users with alerts enabled`);
 
         if (result.length === 0) {
-            console.log(`[CourtNotification] No users to notify for court ${courtId}`);
             return;
         }
 
@@ -98,7 +94,6 @@ export class NotificationsService {
                         await this.dataSource.query(`
                             UPDATE users SET fcm_token = NULL WHERE fcm_token = ANY($1)
                         `, [invalidTokens]);
-                        console.log(`Removed ${invalidTokens.length} invalid tokens`);
                     }
                 }
             }
@@ -111,7 +106,6 @@ export class NotificationsService {
      * Save FCM token for a user
      */
     async saveFcmToken(userId: string, token: string): Promise<void> {
-        console.log('saveFcmToken: userId=', userId, 'token=', token.substring(0, 20) + '...');
         try {
             // Ensure one token maps to one user (prevents cross-account push delivery on shared devices)
             if (this.isPostgres) {
@@ -125,7 +119,6 @@ export class NotificationsService {
                     UPDATE users SET fcm_token = $1, updated_at = NOW()
                     WHERE id = $2
                 `, [token, userId]);
-                console.log('saveFcmToken: update result=', result);
             } else {
                 await this.dataSource.query(`
                     UPDATE users SET fcm_token = ?, updated_at = datetime('now')
@@ -166,7 +159,6 @@ export class NotificationsService {
      * Enable court alert for a user - updates alerts_enabled in user_followed_courts
      */
     async enableCourtAlert(userId: string, courtId: string): Promise<void> {
-        console.log(`[Alerts] Enabling alert for user=${userId}, court=${courtId}`);
         if (this.isPostgres) {
             await this.dataSource.query(`
                 UPDATE user_followed_courts 
@@ -186,7 +178,6 @@ export class NotificationsService {
      * Disable court alert for a user - updates alerts_enabled in user_followed_courts
      */
     async disableCourtAlert(userId: string, courtId: string): Promise<void> {
-        console.log(`[Alerts] Disabling alert for user=${userId}, court=${courtId}`);
         const query = this.isPostgres
             ? `UPDATE user_followed_courts SET alerts_enabled = false WHERE user_id = $1 AND court_id = $2`
             : `UPDATE user_followed_courts SET alerts_enabled = 0 WHERE user_id = ? AND court_id = ?`;
@@ -214,19 +205,15 @@ export class NotificationsService {
         data: Record<string, string> = {},
     ): Promise<boolean> {
         try {
-            console.log(`[Notifications] sendToUser called for userId=${userId}, isPostgres=${this.isPostgres}`);
 
             // Get user's FCM token - cast id to TEXT for safe comparison
             const query = this.isPostgres
                 ? `SELECT fcm_token FROM users WHERE id::TEXT = $1 AND fcm_token IS NOT NULL`
                 : `SELECT "fcmToken" as fcm_token FROM users WHERE id = ? AND "fcmToken" IS NOT NULL`;
 
-            console.log(`[Notifications] Executing query: ${query} with userId=${userId}`);
             const result = await this.dataSource.query(query, [userId]);
-            console.log(`[Notifications] Query result: ${JSON.stringify(result)}`);
 
             if (result.length === 0 || !result[0].fcm_token) {
-                console.log(`[Notifications] No FCM token for user ${userId} - result was empty or token null`);
                 return false;
             }
 

@@ -113,7 +113,6 @@ export class MatchesController {
     @Headers('x-user-id') userId: string
   ): Promise<{ match: Match }> {
     try {
-      console.log(`[submitScore] Starting for match ${id}, user ${userId}, scores: me=${body.me}, opponent=${body.opponent}, courtId=${body.courtId || 'none'}`);
 
       // Get match to determine who is who
       const match = await this.matches.get(id);
@@ -130,7 +129,6 @@ export class MatchesController {
       // Phase 1: Store scores without updating ratings — opponent must confirm
       const updatedMatch = await this.matches.submitScoreOnly(id, userId, scoreCreator, scoreOpponent, body.courtId);
 
-      console.log(`[submitScore] Score submitted — awaiting opponent confirmation`);
       return { match: mapMatchForIOS(updatedMatch) };
     } catch (error) {
       console.error(`[submitScore] Error for match ${id}:`, error);

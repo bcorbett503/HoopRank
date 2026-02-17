@@ -672,7 +672,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('Error loading challenges: $e');
       if (mounted) {
         setState(() => _isLoadingChallenges = false);
       }
@@ -686,7 +685,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         setState(() => _pendingConfirmations = confirmations);
       }
     } catch (e) {
-      print('Error loading pending confirmations: $e');
     }
   }
 
@@ -694,7 +692,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       // Use global activity feed (3 most recent matches app-wide)
       final activity = await ApiService.getGlobalActivity(limit: 3);
-      print('>>> Activity feed returned ${activity.length} items: $activity');
       if (mounted) {
         setState(() {
           _localActivity = activity;
@@ -702,7 +699,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('Error loading activity: $e');
       if (mounted) {
         setState(() => _isLoadingActivity = false);
       }
@@ -984,10 +980,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           'lng': position.longitude,
           'locEnabled': true,
         });
-        print('Location updated: ${position.latitude}, ${position.longitude}');
       }
     } catch (e) {
-      print('Error updating location: $e');
     }
   }
 

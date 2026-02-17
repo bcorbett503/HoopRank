@@ -180,18 +180,14 @@ class MessagesService {
   String get baseUrl => ApiService.baseUrl;
 
   Future<List<ChallengeRequest>> getPendingChallenges(String userId) async {
-    print('Getting challenges for userId: $userId');
     final response = await ApiService.authedGet(
       Uri.parse('$baseUrl/challenges'),
       userId: userId,
     );
 
-    print('Challenges response status: ${response.statusCode}');
-    print('Challenges response body: ${response.body}');
     
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
-      print('Parsed ${data.length} challenges');
       return data.map((raw) {
         final c = raw as Map<String, dynamic>;
 
@@ -257,14 +253,11 @@ class MessagesService {
 
   /// Accept a challenge and get the created matchId
   Future<Map<String, dynamic>> acceptChallenge(String userId, String challengeId) async {
-    print('Accepting challenge: $challengeId for user: $userId');
     final response = await ApiService.authedPut(
       Uri.parse('$baseUrl/challenges/$challengeId/accept'),
       userId: userId,
     );
 
-    print('Accept response status: ${response.statusCode}');
-    print('Accept response body: ${response.body}');
     
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body);
@@ -276,14 +269,11 @@ class MessagesService {
 
   /// Decline a challenge
   Future<void> declineChallenge(String userId, String challengeId) async {
-    print('Declining challenge: $challengeId for user: $userId');
     final response = await ApiService.authedPut(
       Uri.parse('$baseUrl/challenges/$challengeId/decline'),
       userId: userId,
     );
 
-    print('Decline response status: ${response.statusCode}');
-    print('Decline response body: ${response.body}');
 
     if (response.statusCode != 200 && response.statusCode != 201) {
       final body = json.decode(response.body);
@@ -339,15 +329,10 @@ class MessagesService {
         userId: userId,
       );
     } catch (e) {
-      print('Error marking conversation as read: $e');
     }
   }
 
   Future<Message> sendMessage(String senderId, String receiverId, String content, {String? matchId, String? imageUrl}) async {
-    print('=== SENDING MESSAGE ===');
-    print('senderId: $senderId');
-    print('receiverId: $receiverId');
-    print('content: $content');
     
     final body = <String, dynamic>{
       'senderId': senderId,
@@ -368,8 +353,6 @@ class MessagesService {
       userId: senderId,
     );
 
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
 
     if (response.statusCode == 201) {
       return Message.fromJson(json.decode(response.body));
@@ -381,11 +364,6 @@ class MessagesService {
   /// Send a challenge to another player
   /// Optionally tag a court where the game will be played
   Future<void> sendChallenge(String senderId, String receiverId, String message, {String? courtId}) async {
-    print('=== SENDING CHALLENGE ===');
-    print('senderId: $senderId');
-    print('receiverId: $receiverId');
-    print('message: $message');
-    print('courtId: $courtId');
     
     final body = <String, dynamic>{
       'toUserId': receiverId,
@@ -402,8 +380,6 @@ class MessagesService {
       userId: senderId,
     );
 
-    print('Challenge response status: ${response.statusCode}');
-    print('Challenge response body: ${response.body}');
 
     if (response.statusCode != 201) {
       final errorBody = json.decode(response.body);
@@ -483,7 +459,6 @@ class MessagesService {
           }
         }
       } catch (e) {
-        print('Error fetching challenges for team $teamId: $e');
       }
     }
 

@@ -44,7 +44,6 @@ export class StatusesService {
         tagMode?: string,
     ): Promise<PlayerStatus> {
         try {
-            console.log('createStatus called:', { userId, content, imageUrl, scheduledAt, isRecurring, courtId, videoUrl, videoDurationMs, gameMode, courtType, ageRange });
 
             // Use raw SQL to insert status (bypasses TypeORM entity schema issues)
             const result = await this.dataSource.query(`
@@ -54,7 +53,6 @@ export class StatusesService {
             `, [userId, content, imageUrl || null, scheduledAt ? new Date(scheduledAt) : null, courtId || null, videoUrl || null, videoThumbnailUrl || null, videoDurationMs || null, gameMode || null, courtType || null, ageRange || null]);
 
             const createdStatus = result[0];
-            console.log('createStatus success:', createdStatus);
 
             // Bridge: also write to scheduled_runs so Courts→Runs filter works
             if (scheduledAt && courtId) {
@@ -96,9 +94,6 @@ export class StatusesService {
                                 until,
                                 statusId,
                             ]);
-                            console.log(
-                                `createStatus: bridged to scheduled_runs (recurring) for court ${courtId}, instances=${insertedRuns.length}`
-                            );
                         } else {
                             // NOTE: scheduled_runs.title is VARCHAR(255); LEFT(...) prevents inserts
                             // from failing if the status content is longer than 255 chars.
@@ -116,7 +111,6 @@ export class StatusesService {
                                 scheduledDate,
                                 statusId,
                             ]);
-                            console.log('createStatus: bridged to scheduled_runs for court', courtId);
                         }
 
                         // Best-effort: also add the creator to run_attendees so the
@@ -147,7 +141,6 @@ export class StatusesService {
             if (scheduledAt && createdStatus.id) {
                 try {
                     await this.markAttending(userId, createdStatus.id);
-                    console.log('Auto-marked creator as attending for scheduled run:', createdStatus.id);
                 } catch (attendError) {
                     console.error('Failed to auto-mark creator as attending:', attendError.message);
                 }
@@ -210,11 +203,9 @@ export class StatusesService {
             `, [courtId, userId]);
 
             if (followers.length === 0) {
-                console.log('No followers to notify for scheduled run at', courtName);
                 return;
             }
 
-            console.log(`Sending scheduled run notification to ${followers.length} followers of ${courtName}`);
 
             // Send notification to each follower
             for (const follower of followers) {
@@ -273,12 +264,10 @@ export class StatusesService {
             }
 
             if (playerIdsToNotify.length === 0) {
-                console.log('No tagged players to notify');
                 return;
             }
 
             const locationStr = courtName ? ` at ${courtName}` : '';
-            console.log(`Sending run invite notification to ${playerIdsToNotify.length} tagged players`);
 
             for (const playerId of playerIdsToNotify) {
                 this.notificationsService.sendToUser(
@@ -582,7 +571,6 @@ export class StatusesService {
                 this.statusIdMigrated = true;
             }
 
-            console.log('getUnifiedFeed: filter=', filter, 'userId=', userId, 'lat=', lat, 'lng=', lng);
 
             // Status SELECT clause with additional fields for scoring
             const statusSelectClause = `
@@ -755,7 +743,6 @@ export class StatusesService {
 
             if (filter === 'foryou') {
                 // FOR YOU: Smart algorithm with scoring
-                console.log('getUnifiedFeed: FOR YOU mode with smart scoring');
 
                 // Fetch more items than needed so we can score and rank them
                 const fetchLimit = Math.min(limit * 3, 150);
@@ -781,7 +768,6 @@ export class StatusesService {
                     `;
                     const tier1Results = await this.dataSource.query(tier1Query, [userId, userId, fetchLimit]);
                     allItems.push(...tier1Results);
-                    console.log(`getUnifiedFeed: Tier 1 (followed) = ${tier1Results.length} items`);
 
                     // TIER 2: Discovery - Nearby courts user doesn't follow (within 50mi / 80km)
                     const discoveryRadius = 80467; // 50 miles in meters
@@ -807,7 +793,6 @@ export class StatusesService {
                     // Mark these as discovery items
                     discoveryResults.forEach((item: any) => item._isDiscovery = true);
                     allItems.push(...discoveryResults);
-                    console.log(`getUnifiedFeed: Tier 2 (discovery) = ${discoveryResults.length} items within 50mi`);
 
                     // TIER 3: Expanding radius if still not enough content
                     if (allItems.length < limit) {
@@ -832,7 +817,6 @@ export class StatusesService {
                             const newItems = expandedResults.filter((item: any) => !existingIds.has(item.id));
                             allItems.push(...newItems);
 
-                            console.log(`getUnifiedFeed: Expanded to ${Math.round(radius / 1609)}mi, added ${newItems.length} items`);
 
                             if (allItems.length >= limit) break;
                         }
@@ -922,7 +906,6 @@ export class StatusesService {
                     delete item._isDiscovery;
                 });
 
-                console.log(`getUnifiedFeed: FOR YOU returning ${finalFeed.length} scored items`);
                 return finalFeed.slice(0, limit);
 
             } else if (filter === 'following') {
@@ -963,7 +946,6 @@ export class StatusesService {
                 merged.sort((a, b) => b._score - a._score);
                 merged.forEach(item => delete item._score);
 
-                console.log('getUnifiedFeed: FOLLOWING merged', statusResults.length, 'statuses +', matchResults.length, 'matches +', teamMatchResults.length, 'team matches');
                 return merged.slice(0, limit);
 
             } else {
@@ -1004,7 +986,6 @@ export class StatusesService {
                 merged.sort((a, b) => b._score - a._score);
                 merged.forEach(item => delete item._score);
 
-                console.log('getUnifiedFeed: ALL merged', statusResults.length, 'statuses +', matchResults.length, 'matches +', teamMatchResults.length, 'team matches');
                 return merged.slice(0, limit);
             }
         } catch (error) {

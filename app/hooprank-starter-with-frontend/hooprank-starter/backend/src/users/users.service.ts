@@ -31,7 +31,6 @@ export class UsersService {
 
       // Create new user with correct production column names
       // Production table has: id, email, name, avatar_url, hoop_rank, created_at, updated_at, fcm_token
-      console.log('findOrCreate: creating new user with id=', authToken);
       const result = await this.dataSource.query(`
         INSERT INTO users (id, email, name, hoop_rank, created_at, updated_at)
         VALUES ($1, $2, 'New Player', 3.0, NOW(), NOW())
@@ -145,7 +144,6 @@ export class UsersService {
       if (city) return city;
       return null;
     } catch (e) {
-      console.log('reverseGeocode failed (non-critical):', e.message);
       return null;
     }
   }
@@ -181,7 +179,6 @@ export class UsersService {
           const city = await this.reverseGeocode(lat, lng);
           if (city) {
             data.city = city;
-            console.log(`updateProfile: inferred city="${city}" from coords (${lat}, ${lng})`);
           }
         }
       }
@@ -468,7 +465,6 @@ export class UsersService {
 
   async followCourt(userId: string, courtId: string): Promise<void> {
     const isPostgres = !!process.env.DATABASE_URL;
-    console.log(`followCourt: userId=${userId}, courtId=${courtId}, isPostgres=${isPostgres}`);
     try {
       if (isPostgres) {
         await this.dataSource.query(`
@@ -482,7 +478,6 @@ export class UsersService {
           VALUES (?, ?)
         `, [userId, courtId]);
       }
-      console.log('followCourt: success');
     } catch (error) {
       console.error('followCourt service error:', error);
       throw error;
@@ -546,7 +541,6 @@ export class UsersService {
   }
 
   async getFollows(userId: string): Promise<{ courts: any[]; players: any[]; teams: any[] }> {
-    console.log('getFollows called, userId:', userId);
 
     // Query courts
     let courts: any[] = [];
@@ -555,7 +549,6 @@ export class UsersService {
         `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`,
         [userId]
       );
-      console.log('getFollows courts SUCCESS:', JSON.stringify(courts));
     } catch (courtError) {
       console.error('getFollows courts ERROR:', courtError.message);
       return { courts: [], players: [], teams: [], courtsError: courtError.message } as any;
@@ -568,7 +561,6 @@ export class UsersService {
         `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = $1`,
         [userId]
       );
-      console.log('getFollows players SUCCESS:', JSON.stringify(players));
     } catch (playerError) {
       console.error('getFollows players ERROR:', playerError.message);
       return { courts, players: [], teams: [], playersError: playerError.message } as any;
@@ -584,7 +576,6 @@ export class UsersService {
          WHERE uft.user_id = $1`,
         [userId]
       );
-      console.log('getFollows teams SUCCESS:', JSON.stringify(teams));
     } catch (teamError) {
       console.error('getFollows teams ERROR:', teamError.message);
       // Don't fail - just return empty teams
@@ -818,7 +809,6 @@ export class UsersService {
       );
 
       if (!currentUser[0]) {
-        console.log('getNearbyUsers: user not found');
         return [];
       }
 
@@ -828,12 +818,10 @@ export class UsersService {
       if ((!lat || !lng) && zip && zipCoords[zip]) {
         lat = zipCoords[zip].lat;
         lng = zipCoords[zip].lng;
-        console.log(`getNearbyUsers: using zip ${zip} coords (${lat}, ${lng}) for user ${userId}`);
       }
 
       // If still no location, return all users as fallback
       if (!lat || !lng) {
-        console.log('getNearbyUsers: user has no location or zip, returning all users');
         return await this.dataSource.query(`
           SELECT 
             id,
@@ -943,7 +931,6 @@ export class UsersService {
         LIMIT 100
       `, [userId, lat, lng, radiusMiles]);
 
-      console.log(`getNearbyUsers: found ${nearbyUsers.length} users within ${radiusMiles} miles of (${lat}, ${lng})`);
       return nearbyUsers;
     } catch (error) {
       console.error('getNearbyUsers error:', error.message);

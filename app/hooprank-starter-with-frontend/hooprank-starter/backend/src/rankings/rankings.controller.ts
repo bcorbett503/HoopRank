@@ -20,7 +20,6 @@ export class RankingsController {
     ) {
         const limit = Math.min(Math.max(parseInt(limitStr || '', 10) || 50, 1), 100);
         const offset = Math.max(parseInt(offsetStr || '', 10) || 0, 0);
-        console.log('getRankings: mode=', mode, 'scope=', scope, 'ageGroup=', ageGroup, 'gender=', gender);
 
         try {
             // For 3v3 or 5v5, return teams
@@ -59,7 +58,6 @@ export class RankingsController {
                 params.push(limit, offset);
 
                 const teams = await this.dataSource.query(query, params);
-                console.log('getRankings: found', teams.length, 'teams for mode', mode);
                 return { mode, rankings: teams.map((t: any, i: number) => ({ ...t, rank: offset + i + 1 })), hasMore: teams.length === limit };
             }
 
@@ -74,7 +72,6 @@ export class RankingsController {
                 `);
                 hasAgeColumn = colCheck.length > 0;
             } catch (e) {
-                console.log('Could not check for age column:', e.message);
             }
 
             const ageSelect = hasAgeColumn ? ', age' : ', NULL as age';
@@ -93,7 +90,6 @@ export class RankingsController {
                 LIMIT $1 OFFSET $2
             `, [limit, offset]);
 
-            console.log('getRankings: found', players.length, 'players');
             return { mode, rankings: players.map((p: any, i: number) => ({ ...p, rank: offset + i + 1 })), hasMore: players.length === limit };
         } catch (error) {
             console.error('getRankings error:', error.message);
@@ -146,19 +142,16 @@ export class RankingsController {
                     updated_at TIMESTAMPTZ DEFAULT NOW()
                 );
             `);
-            console.log('Created team_challenges table');
 
             // Add team match columns to matches table
             await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false;`);
             await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS creator_team_id VARCHAR(255);`);
             await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_team_id VARCHAR(255);`);
             await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_type VARCHAR(10) DEFAULT '1v1';`);
-            console.log('Added team match columns');
 
             // Create indexes
             await this.dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_challenges_from ON team_challenges(from_team_id);`);
             await this.dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_challenges_to ON team_challenges(to_team_id);`);
-            console.log('Created indexes');
 
             return { success: true, message: 'Team challenges migration complete' };
         } catch (error) {

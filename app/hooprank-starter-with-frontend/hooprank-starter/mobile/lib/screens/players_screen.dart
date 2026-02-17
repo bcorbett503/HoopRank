@@ -44,7 +44,6 @@ class _PlayersScreenState extends State<PlayersScreen> {
       setState(() {
         _isLoading = false;
       });
-      print('Error loading players: $e');
     }
   }
 

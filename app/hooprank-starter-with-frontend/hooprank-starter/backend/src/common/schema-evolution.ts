@@ -250,7 +250,7 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
 
         console.log('[SchemaEvolution] All migrations completed successfully');
     } catch (error) {
-        console.error('[SchemaEvolution] Migration error:', error.message);
-        // Don't throw - allow app to continue even if some migrations fail
+        console.error('[SchemaEvolution] FATAL: Migration failed — refusing to start:', error.message);
+        throw error; // Fail-closed: crash the app so Railway surfaces the issue
     }
 }

@@ -101,11 +101,9 @@ export class TeamsService {
      * Create a new team
      */
     async createTeam(userId: string, name: string, teamType: string, ageGroup?: string, gender?: string, skillLevel?: string, homeCourtId?: string, city?: string, description?: string): Promise<Team> {
-        console.log(`[TeamsService.createTeam] userId=${userId}, name=${name}, teamType=${teamType}, ageGroup=${ageGroup}, gender=${gender}, skillLevel=${skillLevel}`);
 
         // Validate userId
         if (!userId || userId.trim() === '') {
-            console.log('[TeamsService.createTeam] ERROR: userId is empty');
             throw new BadRequestException('User ID is required');
         }
 
@@ -663,7 +661,6 @@ export class TeamsService {
             };
 
             const response = await admin.messaging().sendEachForMulticast(message);
-            console.log(`Team message notifications: ${response.successCount} sent, ${response.failureCount} failed`);
         } catch (error) {
             console.error('Error sending team message notifications:', error);
         }
@@ -763,7 +760,6 @@ export class TeamsService {
             RETURNING *
         `, [fromTeamId, toTeamId, message || 'Team challenge!', userId]);
 
-        console.log(`[TeamsService] Created team challenge: ${fromTeamId} -> ${toTeamId}`);
         return result[0];
     }
 
@@ -841,7 +837,6 @@ export class TeamsService {
             WHERE table_name = 'matches' 
             AND column_name IN ('creator_team_id', 'opponent_team_id', 'creator_id', 'id')
         `);
-        console.log('[TeamsService] Column types before fix:', JSON.stringify(colTypes));
 
         // Ensure team_match column exists
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS team_match BOOLEAN DEFAULT false`);
@@ -852,7 +847,6 @@ export class TeamsService {
         await this.dataSource.query(`ALTER TABLE matches DROP COLUMN IF EXISTS opponent_team_id`);
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN creator_team_id UUID`);
         await this.dataSource.query(`ALTER TABLE matches ADD COLUMN opponent_team_id UUID`);
-        console.log('[TeamsService] Recreated team id columns as UUID');
 
         // Create team match - let database handle id generation
         const matchResult = await this.dataSource.query(`
@@ -866,7 +860,6 @@ export class TeamsService {
         // This is the root cause of the "invalid input syntax for type integer" error
         await this.dataSource.query(`ALTER TABLE team_challenges DROP COLUMN IF EXISTS match_id`);
         await this.dataSource.query(`ALTER TABLE team_challenges ADD COLUMN match_id UUID`);
-        console.log('[TeamsService] Fixed team_challenges.match_id column to UUID');
 
         // Update challenge
         await this.dataSource.query(`
@@ -874,7 +867,6 @@ export class TeamsService {
             WHERE id = $2
         `, [match.id, challengeId]);
 
-        console.log(`[TeamsService] Accepted team challenge ${challengeId}, created match ${match.id}`);
         return { challenge: { ...challenge, status: 'accepted' }, match };
     }
 
@@ -934,7 +926,6 @@ export class TeamsService {
         myScore: number,
         opponentScore: number,
     ): Promise<any> {
-        console.log(`[TeamsService] submitTeamMatchScore called: matchId=${matchId}, teamId=${teamId}, userId=${userId}, myScore=${myScore}, oppScore=${opponentScore}`);
 
         // Validate scores are non-negative integers
         if (!Number.isInteger(myScore) || !Number.isInteger(opponentScore) || myScore < 0 || opponentScore < 0) {
@@ -975,7 +966,6 @@ export class TeamsService {
                     WHERE id = $4
                 `, [creatorScore, opponentTeamScore, teamId, matchId]);
 
-                console.log(`[TeamsService] Match ${matchId} set to pending_confirmation, awaiting opponent team ${match.opponent_team_id}`);
 
                 // Notify opponent team
                 try {
@@ -1007,7 +997,6 @@ export class TeamsService {
      * Opponent confirms the submitted score → finalize the match
      */
     async confirmTeamMatchScore(matchId: string, teamId: string, userId: string): Promise<any> {
-        console.log(`[TeamsService] confirmTeamMatchScore: matchId=${matchId}, teamId=${teamId}`);
 
         const membership = await this.membersRepository.findOne({
             where: { teamId, userId, status: 'active' },
@@ -1039,7 +1028,6 @@ export class TeamsService {
         matchId: string, teamId: string, userId: string,
         myScore: number, opponentScore: number,
     ): Promise<any> {
-        console.log(`[TeamsService] amendTeamMatchScore: matchId=${matchId}, teamId=${teamId}, myScore=${myScore}, oppScore=${opponentScore}`);
 
         const membership = await this.membersRepository.findOne({
             where: { teamId, userId, status: 'active' },
@@ -1092,7 +1080,6 @@ export class TeamsService {
      * Original submitter accepts the amendment → finalize with amended scores
      */
     async confirmAmendment(matchId: string, teamId: string, userId: string): Promise<any> {
-        console.log(`[TeamsService] confirmAmendment: matchId=${matchId}, teamId=${teamId}`);
 
         const membership = await this.membersRepository.findOne({
             where: { teamId, userId, status: 'active' },
@@ -1137,7 +1124,6 @@ export class TeamsService {
      * Original submitter rejects the amendment → revert to pending_confirmation
      */
     async rejectAmendment(matchId: string, teamId: string, userId: string): Promise<any> {
-        console.log(`[TeamsService] rejectAmendment: matchId=${matchId}, teamId=${teamId}`);
 
         const membership = await this.membersRepository.findOne({
             where: { teamId, userId, status: 'active' },
@@ -1297,7 +1283,6 @@ export class TeamsService {
             }
         }
 
-        console.log(`[TeamsService] Match ${matchId} finalized. Winner: ${winnerTeamId}, Creator: ${creatorRating} → ${newCreatorRating.toFixed(2)}, Opponent: ${opponentRating} → ${newOpponentRating.toFixed(2)}`);
 
         // Notify both teams of result
         const score = `${creatorScore}-${opponentScore}`;
@@ -1342,7 +1327,6 @@ export class TeamsService {
 
             if (statusResult[0]?.id) {
                 await this.dataSource.query(`UPDATE matches SET status_id = $1 WHERE id = $2`, [statusResult[0].id, matchId]);
-                console.log(`[TeamsService] Created shadow status ${statusResult[0].id} for team match ${matchId}`);
             }
         } catch (e) {
             console.error('[TeamsService] Shadow status creation error (non-fatal):', e.message);
@@ -1415,7 +1399,6 @@ export class TeamsService {
         attendance.status = 'in';
         await this.attendanceRepository.save(attendance);
 
-        console.log(`[TeamsService] Created ${dto.type} event: ${saved.id} for team ${teamId}`);
 
         // If this is a game with an opponent, auto-create challenge + match
         // Per design: scheduled games are valid challenges (no acceptance needed)
@@ -1448,7 +1431,6 @@ export class TeamsService {
                 await this.dataSource.query(`UPDATE team_events SET match_id = $1 WHERE id = $2`, [match.id, saved.id]);
                 saved.matchId = match.id;
 
-                console.log(`[TeamsService] Auto-created challenge + match ${match.id} for game event ${saved.id}`);
             } catch (err) {
                 console.error(`[TeamsService] Failed to auto-create match for game event: ${err.message}`);
                 // Don't fail the event creation if match creation fails
@@ -1579,7 +1561,6 @@ export class TeamsService {
             await this.attendanceRepository.save(attendance);
         }
 
-        console.log(`[TeamsService] User ${userId} marked ${status} for event ${eventId}`);
         return { eventId, userId, status };
     }
 
@@ -1605,7 +1586,6 @@ export class TeamsService {
         // Delete event
         await this.eventsRepository.delete({ id: eventId });
 
-        console.log(`[TeamsService] Deleted event ${eventId} from team ${teamId}`);
     }
 
     /**
@@ -1668,7 +1648,6 @@ export class TeamsService {
                 `SELECT * FROM matches WHERE id = $1`, [event.matchId]
             );
             if (existingMatch.length > 0) {
-                console.log(`[TeamsService] Event ${eventId} already has match ${event.matchId}`);
                 return { match: existingMatch[0], event };
             }
         }
@@ -1694,7 +1673,6 @@ export class TeamsService {
         // Link event to match
         await this.dataSource.query(`UPDATE team_events SET match_id = $1 WHERE id = $2`, [match.id, eventId]);
 
-        console.log(`[TeamsService] Started match ${match.id} from event ${eventId}`);
         return { match, event };
     }
 }

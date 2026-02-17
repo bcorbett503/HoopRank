@@ -60,9 +60,7 @@ export class UsersController {
       throw new UnauthorizedException('Authentication failed');
     }
 
-    console.log(`[AUTHENTICATE] uid=${uid}, email=${email}`);
     const user = await this.usersService.findOrCreate(uid, email);
-    console.log(`[AUTHENTICATE] returned user.id=${user.id}, position=${user.position}`);
 
     // Return with iOS-compatible aliases
     const u = user as any;
@@ -174,14 +172,12 @@ export class UsersController {
       return { success: false, error: 'User ID required' };
     }
     try {
-      console.log('updateMe: userId=', userId, 'data=', data);
       const user = await this.usersService.updateProfile(userId, data);
       return user;
     } catch (error) {
       console.error('updateMe error:', error.message);
       // If user doesn't exist, try to create them first
       if (error.message === 'User not found') {
-        console.log('updateMe: user not found, creating...');
         try {
           await this.usersService.findOrCreate(userId, data.email || '');
           const user = await this.usersService.updateProfile(userId, data);
@@ -197,13 +193,10 @@ export class UsersController {
 
   @Get('me/follows')
   async getFollows(@Headers('x-user-id') userId: string) {
-    console.log('getFollows controller: userId received:', userId);
     if (!userId) {
-      console.log('getFollows controller: no userId, returning empty');
       return { courts: [], players: [], teams: [] };
     }
     const result = await this.usersService.getFollows(userId);
-    console.log('getFollows controller: returning result:', result);
     return result;
   }
 
@@ -223,7 +216,6 @@ export class UsersController {
     if (!userId) {
       return { success: false, error: 'User ID required' };
     }
-    console.log('followCourt controller: userId=', userId, 'body=', body, 'courtId=', body?.courtId);
     try {
       await this.usersService.followCourt(userId, body.courtId);
       // If alerts requested, also enable alerts (but don't fail if this throws)
@@ -615,14 +607,12 @@ export class UsersController {
       throw new ForbiddenException('You can only update your own profile');
     }
     try {
-      console.log('updateProfile: id=', id, 'data=', data);
       const user = await this.usersService.updateProfile(id, data);
       return user;
     } catch (error) {
       console.error('updateProfile error:', error.message);
       // If user doesn't exist, try to create them first
       if (error.message === 'User not found') {
-        console.log('updateProfile: user not found, creating...');
         try {
           await this.usersService.findOrCreate(id, data.email || '');
           const user = await this.usersService.updateProfile(id, data);

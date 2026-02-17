@@ -258,7 +258,6 @@ export class CourtsController {
                 'check_in'
             ).catch(err => console.error('Failed to send court activity notification:', err));
 
-            console.log(`[CheckIn] Triggered notification for ${userName} at ${courtName}`);
         } catch (err) {
             console.error('[CheckIn] Error fetching court/user for notification:', err);
         }

@@ -95,13 +95,11 @@ export class MatchesService {
         const creatorGames = parseInt((creator as any).games_played) || 0;
         const opponentGames = parseInt((opponent as any).games_played) || 0;
 
-        console.log(`[completeWithScores] Before update: creator=${creatorRating} (${creatorGames} games), opponent=${opponentRating} (${opponentGames} games)`);
 
         // Update ratings using new HoopRank logic
         const newCreatorRating = this.rater.updateRating(creatorRating, opponentRating, creatorGames, creatorWon ? 1 : 0);
         const newOpponentRating = this.rater.updateRating(opponentRating, creatorRating, opponentGames, creatorWon ? 0 : 1);
 
-        console.log(`[completeWithScores] After update: creator=${newCreatorRating}, opponent=${newOpponentRating}`);
 
         // Update users
         await this.dataSource.query(`
@@ -140,10 +138,8 @@ export class MatchesService {
             score_creator = $3, score_opponent = $4, court_id = $5, updated_at = NOW()
           WHERE id = $1
         `, [id, winnerId, scoreCreator, scoreOpponent, courtId]);
-        console.log(`[completeWithScores] Updated match ${id} with court_id=${courtId}`);
       } else {
         if (courtId) {
-          console.log(`[completeWithScores] Skipping invalid courtId=${courtId} (not a UUID)`);
         }
         await this.dataSource.query(`
           UPDATE matches SET status = 'completed', winner_id = $2, 
@@ -157,7 +153,6 @@ export class MatchesService {
         UPDATE challenges SET status = 'completed', updated_at = NOW()
         WHERE match_id = $1
       `, [id]);
-      console.log(`[completeWithScores] Marked challenge completed for match ${id}`);
 
       // Create shadow player_status for likes/comments (only on first completion)
       if (isFirstCompletion) {
@@ -178,7 +173,6 @@ export class MatchesService {
 
           if (statusResult[0]?.id) {
             await this.dataSource.query(`UPDATE matches SET status_id = $1 WHERE id = $2`, [statusResult[0].id, id]);
-            console.log(`[completeWithScores] Created shadow status ${statusResult[0].id} for match ${id}`);
           }
         } catch (e) {
           console.error('[completeWithScores] Shadow status creation error (non-fatal):', e.message);
@@ -249,7 +243,6 @@ export class MatchesService {
       `, [id, scoreCreator, scoreOpponent, submitterId]);
     }
 
-    console.log(`[submitScoreOnly] Match ${id} → score_submitted by ${submitterId}`);
 
     // Send push notification to the OTHER player asking them to confirm
     const otherUserId = submitterId === creatorId ? opponentId : creatorId;
@@ -295,7 +288,6 @@ export class MatchesService {
     const scoreOpponent = parseInt((match as any).score_opponent);
     const winnerId = scoreCreator > scoreOpponent ? creatorId : opponentId;
 
-    console.log(`[confirmScore] Match ${matchId} confirmed by ${confirmerId}, winner=${winnerId}`);
 
     // Now run the full rating-update + completion flow
     return this.completeWithScores(matchId, winnerId, scoreCreator, scoreOpponent);
@@ -341,7 +333,6 @@ export class MatchesService {
       WHERE id = $1 OR id = $2
     `, [creatorId, opponentId]);
 
-    console.log(`[contestScore] Match ${matchId} contested by ${contesterId}`);
 
     // Notify the submitter that the score was contested
     const contesterResult = await this.dataSource.query(`SELECT name FROM users WHERE id = $1`, [contesterId]);

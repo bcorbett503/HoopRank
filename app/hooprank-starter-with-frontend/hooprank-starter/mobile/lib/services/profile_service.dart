@@ -78,7 +78,6 @@ class ProfileService {
         return ProfileData.fromJson(jsonDecode(raw));
       }
     } catch (e) {
-      print('Error reading local profile: $e');
     }
 
     // Try API if local storage doesn't have it
@@ -109,7 +108,6 @@ class ProfileService {
           visibility: 'public',
         );
       } catch (e) {
-        print('Error fetching profile from API: $e');
         return null;
       }
     }
@@ -134,7 +132,6 @@ class ProfileService {
         'photoUrl': data.profilePictureUrl,
       });
     } catch (e) {
-      print('Error saving profile to API: $e');
       // Continue anyway - local storage save succeeded
     }
   }

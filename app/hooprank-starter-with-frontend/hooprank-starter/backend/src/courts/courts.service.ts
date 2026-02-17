@@ -26,7 +26,6 @@ export class CourtsService implements OnModuleInit {
             try {
                 await this.dataSource.query(`ALTER TABLE courts ADD COLUMN IF NOT EXISTS venue_type TEXT`);
                 await this.dataSource.query(`ALTER TABLE courts ADD COLUMN IF NOT EXISTS address TEXT`);
-                console.log('[CourtsService] venue_type + address columns ensured');
             } catch (e) {
                 console.error('[CourtsService] Failed to add columns:', e.message);
             }

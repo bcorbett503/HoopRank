@@ -21,7 +21,6 @@ export class MessagesService {
 
         if (isPostgres) {
             try {
-                console.log('sendMessage: checking for existing thread between:', { senderId, receiverId });
 
                 // Check if thread already exists between these two users
                 // Thread participants are stored in thread_participants table
@@ -38,10 +37,8 @@ export class MessagesService {
                 if (existingThread.length > 0) {
                     // Use existing thread
                     actualThreadId = existingThread[0].thread_id;
-                    console.log('sendMessage: using existing thread:', actualThreadId);
                 } else {
                     // Create new thread (minimal insert - just id and created_at)
-                    console.log('sendMessage: creating new thread:', threadId);
                     try {
                         await this.dataSource.query(`
                             INSERT INTO threads (id, created_at) VALUES ($1, NOW())
@@ -57,13 +54,11 @@ export class MessagesService {
                     }
                 }
 
-                console.log('sendMessage: inserting message with thread:', actualThreadId, 'courtId:', courtId);
                 const result = await this.dataSource.query(`
                     INSERT INTO messages (id, thread_id, from_id, to_id, body, read, is_challenge, challenge_status, match_id, court_id, image_url, created_at)
                     VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, $10, NOW())
                     RETURNING *
                 `, [id, actualThreadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null, courtId || null, imageUrl || null]);
-                console.log('sendMessage: success:', result[0]);
 
                 // Send push notification for non-challenge messages
                 if (!isChallenge) {
@@ -454,7 +449,6 @@ export class MessagesService {
                 await this.dataSource.query(`
                     ALTER TABLE messages ADD COLUMN read BOOLEAN DEFAULT false
                 `);
-                console.log('Added read column to messages table');
             }
 
             // Check if 'read_at' column exists  
@@ -467,7 +461,6 @@ export class MessagesService {
                 await this.dataSource.query(`
                     ALTER TABLE messages ADD COLUMN read_at TIMESTAMP
                 `);
-                console.log('Added read_at column to messages table');
             }
         } catch (error) {
             console.error('ensureReadColumnsExist error:', error.message);
