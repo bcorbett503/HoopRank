@@ -1647,9 +1647,12 @@ class ApiService {
     debugPrint(
         'UNIFIED_FEED: status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 500))}');
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      debugPrint('UNIFIED_FEED: parsed ${data.length} items');
-      return data.cast<Map<String, dynamic>>();
+      final decoded = jsonDecode(response.body);
+      // Backend returns { items: [...], hasMore: bool }
+      final List<dynamic> items =
+          decoded is List ? decoded : (decoded['items'] ?? []);
+      debugPrint('UNIFIED_FEED: parsed ${items.length} items');
+      return items.cast<Map<String, dynamic>>();
     }
     return [];
   }
