@@ -14,7 +14,7 @@ export class ScheduledRun {
     @Column({ type: 'varchar', length: 255, nullable: true })
     title?: string;
 
-    @Column({ name: 'game_mode', type: 'varchar', length: 20, default: "'5v5'" })
+    @Column({ name: 'game_mode', type: 'varchar', length: 20, default: '5v5' })
     gameMode: string;
 
     @Column({ name: 'court_type', type: 'varchar', length: 20, nullable: true })
@@ -23,7 +23,7 @@ export class ScheduledRun {
     @Column({ name: 'age_range', type: 'varchar', length: 20, nullable: true })
     ageRange?: string; // '18+', '21+', '30+', '40+', '50+', 'open'
 
-    @Column({ name: 'scheduled_at', type: 'timestamp' })
+    @Column({ name: 'scheduled_at', type: 'datetime' })
     scheduledAt: Date;
 
     @Column({ name: 'duration_minutes', type: 'integer', default: 120 })
@@ -41,7 +41,14 @@ export class ScheduledRun {
     @Column({ name: 'tag_mode', type: 'varchar', length: 20, nullable: true })
     tagMode?: string; // 'all', 'local', or 'individual'
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    // Subscriber-only: private/invite-only runs
+    @Column({ type: 'varchar', length: 20, default: 'public' })
+    visibility: string; // 'public' | 'private' | 'invite_only'
+
+    @Column({ name: 'invited_player_ids', type: 'text', nullable: true })
+    invitedPlayerIds?: string; // JSON array, used when visibility = 'invite_only'
+
+    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -57,9 +64,9 @@ export class RunAttendee {
     @Column({ name: 'user_id', type: 'varchar', length: 255 })
     userId: string;
 
-    @Column({ type: 'varchar', length: 20, default: "'going'" })
+    @Column({ type: 'varchar', length: 20, default: 'going' })
     status: string;
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }

@@ -1,14 +1,9 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 @Injectable()
-export class RunsService implements OnModuleInit {
+export class RunsService {
     constructor(private dataSource: DataSource) { }
-
-    async onModuleInit(): Promise<void> {
-        // Best-effort schema bootstrap so scheduled runs features work in prod without manual migrations.
-        await this.ensureTables();
-    }
 
     // ========== Create ==========
 
@@ -215,98 +210,5 @@ export class RunsService implements OnModuleInit {
         }
     }
 
-    // ========== Migration ==========
-
-    async ensureTables(): Promise<string> {
-        try {
-            await this.dataSource.query(`
-                CREATE TABLE IF NOT EXISTS scheduled_runs (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    court_id VARCHAR(255) NOT NULL,
-                    created_by VARCHAR(255) NOT NULL,
-                    title VARCHAR(255),
-                    game_mode VARCHAR(20) DEFAULT '5v5',
-                    court_type VARCHAR(20),
-                    age_range VARCHAR(20),
-                    scheduled_at TIMESTAMP NOT NULL,
-                    status_id INTEGER,
-                    duration_minutes INTEGER DEFAULT 120,
-                    max_players INTEGER DEFAULT 10,
-                    notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            `);
-
-            // Add columns that may not exist on older tables
-            const newColumns = [
-                { name: 'title', type: "VARCHAR(255)" },
-                { name: 'game_mode', type: "VARCHAR(20) DEFAULT '5v5'" },
-                { name: 'court_type', type: "VARCHAR(20)" },
-                { name: 'age_range', type: "VARCHAR(20)" },
-                { name: 'status_id', type: "INTEGER" },
-                { name: 'duration_minutes', type: "INTEGER DEFAULT 120" },
-                { name: 'max_players', type: "INTEGER DEFAULT 10" },
-                { name: 'notes', type: "TEXT" },
-                { name: 'tagged_player_ids', type: "TEXT" },
-                { name: 'tag_mode', type: "VARCHAR(20)" },
-            ];
-            for (const col of newColumns) {
-                try {
-                    await this.dataSource.query(`ALTER TABLE scheduled_runs ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
-                } catch (e) {
-                    // Column already exists - ignore
-                }
-            }
-
-            // Drop any FK constraints TypeORM may have auto-created
-            const fksToDrop = ['scheduled_runs_created_by_fkey', 'scheduled_runs_court_id_fkey'];
-            for (const fk of fksToDrop) {
-                try {
-                    await this.dataSource.query(`ALTER TABLE scheduled_runs DROP CONSTRAINT IF EXISTS "${fk}"`);
-                } catch (e) {
-                    // Constraint doesn't exist - ignore
-                }
-            }
-
-            await this.dataSource.query(`
-                CREATE TABLE IF NOT EXISTS run_attendees (
-                    id SERIAL PRIMARY KEY,
-                    run_id UUID NOT NULL,
-                    user_id VARCHAR(255) NOT NULL,
-                    status VARCHAR(20) DEFAULT 'going',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(run_id, user_id)
-                )
-            `);
-
-            // Migrate any existing scheduled runs from player_statuses
-            const existing = await this.dataSource.query(`
-                SELECT COUNT(*) as count FROM scheduled_runs
-            `);
-
-            if (parseInt(existing[0].count) === 0) {
-                // Check if there are statuses with scheduled_at to migrate
-                const statusRuns = await this.dataSource.query(`
-                    SELECT ps.id, ps.court_id, ps.user_id, ps.content, ps.scheduled_at, ps.created_at
-                    FROM player_statuses ps
-                    WHERE ps.scheduled_at IS NOT NULL AND ps.court_id IS NOT NULL AND ps.scheduled_at >= NOW()
-                `);
-
-                for (const sr of statusRuns) {
-                    await this.dataSource.query(`
-                        INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, scheduled_at, created_at)
-                        VALUES ($1, $2, $3, '5v5', $4, $5)
-                        ON CONFLICT DO NOTHING
-                    `, [sr.court_id, sr.user_id, sr.content, sr.scheduled_at, sr.created_at]);
-                }
-
-                return `Tables created. Migrated ${statusRuns.length} existing runs from player_statuses.`;
-            }
-
-            return 'Tables already exist.';
-        } catch (error) {
-            console.error('ensureTables error:', error.message);
-            return `Error: ${error.message}`;
-        }
-    }
 }
+

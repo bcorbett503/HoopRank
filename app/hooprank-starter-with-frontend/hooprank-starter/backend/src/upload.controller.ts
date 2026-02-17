@@ -1,10 +1,17 @@
-import { Controller, Post, Body, Headers, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Headers, HttpException, HttpStatus, Inject, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import * as admin from 'firebase-admin';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Upload controller handles image uploads from the mobile app.
- * The mobile sends base64-encoded image data as JSON, not multipart.
- * This endpoint stores the image data URL directly in the relevant table.
+ * The mobile sends base64-encoded image data as JSON.
+ * 
+ * When Firebase Storage is available, images are uploaded to Storage
+ * and the download URL is stored in the database.
+ * 
+ * When Firebase is unavailable (dev mode), falls back to storing
+ * the base64 data URL directly in the database.
  * 
  * Supported types:
  *   - 'profile' / 'avatar': Updates user's avatar_url
@@ -12,7 +19,64 @@ import { DataSource } from 'typeorm';
  */
 @Controller()
 export class UploadController {
-    constructor(private dataSource: DataSource) { }
+    constructor(
+        private dataSource: DataSource,
+        @Optional() @Inject('FIREBASE_APP') private firebaseApp: admin.app.App | null,
+    ) { }
+
+    /**
+     * Upload base64 image to Firebase Storage and return the public URL.
+     * Falls back to returning the data URL if Firebase Storage is unavailable.
+     */
+    private async uploadToStorage(
+        imageData: string,
+        folder: string,
+        filename: string,
+    ): Promise<string> {
+        // If Firebase is not initialized, fall back to base64 data URL
+        if (!this.firebaseApp || !admin.apps?.length) {
+            console.log('[Upload] Firebase unavailable, storing base64 data URL');
+            return imageData;
+        }
+
+        try {
+            const bucket = admin.storage().bucket();
+
+            // Parse the data URL: data:image/png;base64,iVBOR...
+            const match = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (!match) {
+                console.log('[Upload] Could not parse data URL, storing as-is');
+                return imageData;
+            }
+
+            const mimeType = match[1];
+            const base64Data = match[2];
+            const buffer = Buffer.from(base64Data, 'base64');
+            const extension = mimeType === 'image/png' ? 'png' : 'jpg';
+
+            const filePath = `${folder}/${filename}.${extension}`;
+            const file = bucket.file(filePath);
+
+            // Upload with public read access
+            await file.save(buffer, {
+                metadata: {
+                    contentType: mimeType,
+                    metadata: {
+                        firebaseStorageDownloadTokens: uuidv4(),
+                    },
+                },
+                public: true,
+            });
+
+            // Get the public URL
+            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+            console.log(`[Upload] Uploaded to Firebase Storage: ${publicUrl}`);
+            return publicUrl;
+        } catch (error) {
+            console.error('[Upload] Firebase Storage upload failed, falling back to base64:', error.message);
+            return imageData;
+        }
+    }
 
     @Post('upload')
     async uploadImage(
@@ -42,11 +106,16 @@ export class UploadController {
                     if (targetId !== userId) {
                         throw new HttpException('Forbidden: cannot update another user avatar', HttpStatus.FORBIDDEN);
                     }
+                    const url = await this.uploadToStorage(
+                        imageData,
+                        'avatars',
+                        `${userId}_${Date.now()}`,
+                    );
                     await this.dataSource.query(
                         `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2`,
-                        [imageData, targetId],
+                        [url, targetId],
                     );
-                    return { success: true, type, targetId, message: 'Avatar updated' };
+                    return { success: true, type, targetId, url, message: 'Avatar updated' };
                 }
 
                 case 'team': {
@@ -69,12 +138,16 @@ export class UploadController {
                     if (membership.length === 0 && ownership.length === 0) {
                         throw new HttpException('Forbidden: team access denied', HttpStatus.FORBIDDEN);
                     }
-                    // Update team logo
+                    const url = await this.uploadToStorage(
+                        imageData,
+                        'team-logos',
+                        `${targetId}_${Date.now()}`,
+                    );
                     await this.dataSource.query(
                         `UPDATE teams SET logo_url = $1, updated_at = NOW() WHERE id = $2`,
-                        [imageData, targetId],
+                        [url, targetId],
                     );
-                    return { success: true, type, targetId, message: 'Team logo updated' };
+                    return { success: true, type, targetId, url, message: 'Team logo updated' };
                 }
 
                 default:

@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Headers, HttpCode } from '@nestjs/common';
 import { TeamsService } from './teams.service';
+import { CreateTeamDto } from './dto/create-team.dto';
 
 @Controller('teams')
 export class TeamsController {
@@ -46,7 +47,7 @@ export class TeamsController {
     @Post()
     async createTeam(
         @Headers('x-user-id') userId: string,
-        @Body() body: { name: string; teamType?: string; team_type?: string; ageGroup?: string; gender?: string; skillLevel?: string; homeCourtId?: string; city?: string; description?: string },
+        @Body() body: CreateTeamDto,
     ) {
         const teamType = body.teamType || body.team_type || '3v3';
         return this.teamsService.createTeam(userId, body.name, teamType, body.ageGroup, body.gender, body.skillLevel, body.homeCourtId, body.city, body.description);
@@ -280,9 +281,9 @@ export class TeamsController {
     async sendTeamMessage(
         @Param('id') teamId: string,
         @Headers('x-user-id') userId: string,
-        @Body() body: { content: string },
+        @Body() body: { content: string; imageUrl?: string },
     ) {
-        return this.teamsService.sendTeamMessage(teamId, userId, body.content);
+        return this.teamsService.sendTeamMessage(teamId, userId, body.content, body.imageUrl);
     }
 
     // ====================

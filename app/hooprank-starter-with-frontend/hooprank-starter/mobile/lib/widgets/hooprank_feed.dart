@@ -11,6 +11,8 @@ import '../services/messages_service.dart';
 import '../models.dart';
 import 'feed_video_player.dart';
 import 'player_profile_sheet.dart';
+import 'shimmer_skeleton.dart';
+import 'animated_list_item.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -388,7 +390,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     debugPrint(
         'FEED: _buildForYouFeed called - _isLoadingForYou=$_isLoadingForYou, _forYouPosts.length=${_forYouPosts.length}, _pendingChallenges.length=${_pendingChallenges.length}, _pendingTeamChallenges.length=${_pendingTeamChallenges.length}');
     if (_isLoadingForYou) {
-      return const Center(child: CircularProgressIndicator());
+      return const FeedSkeletonLoader();
     }
 
     if (_forYouPosts.isEmpty &&
@@ -452,7 +454,10 @@ class _HoopRankFeedState extends State<HoopRankFeed>
           }
           // Finally: regular posts
           final postIndex = index - totalChallenges;
-          return _buildFeedItemCard(sortedPosts[postIndex]);
+          return AnimatedListItem(
+            index: postIndex,
+            child: _buildFeedItemCard(sortedPosts[postIndex]),
+          );
         },
       ),
     );
@@ -460,7 +465,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
   Widget _buildFollowingFeed() {
     if (_isLoadingFollowing) {
-      return const Center(child: CircularProgressIndicator());
+      return const FeedSkeletonLoader();
     }
 
     final checkInState = context.watch<CheckInState>();
@@ -3084,9 +3089,45 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                             ),
                           ),
                         )
-                      else
-                        Icon(Icons.more_horiz,
-                            color: Colors.white.withOpacity(0.2), size: 20),
+                      else if (!isOwnPost)
+                        PopupMenuButton<String>(
+                          icon: Icon(Icons.more_horiz,
+                              color: Colors.white.withOpacity(0.4), size: 20),
+                          color: const Color(0xFF2A2A2A),
+                          onSelected: (value) {
+                            if (value == 'report') {
+                              _showReportPostDialog(statusId);
+                            } else if (value == 'block') {
+                              _showBlockUserDialog(postUserId, userName);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'report',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.flag_outlined,
+                                      color: Colors.orange, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Report Post',
+                                      style: TextStyle(color: Colors.white)),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'block',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.block,
+                                      color: Colors.red, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('Block User',
+                                      style: TextStyle(color: Colors.white)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
 
@@ -3692,6 +3733,132 @@ class _HoopRankFeedState extends State<HoopRankFeed>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ========== Report & Block Dialogs (Guideline 1.2) ==========
+
+  void _showReportPostDialog(int statusId) {
+    final reasons = [
+      'Spam or misleading',
+      'Harassment or bullying',
+      'Hate speech',
+      'Violence or threats',
+      'Inappropriate content',
+      'Other',
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('Report Post',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
+            ),
+            const Divider(color: Colors.white12, height: 1),
+            ...reasons.map((reason) => ListTile(
+                  leading:
+                      const Icon(Icons.flag_outlined, color: Colors.orange),
+                  title: Text(reason,
+                      style: const TextStyle(color: Colors.white)),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    try {
+                      await ApiService.reportStatus(statusId, reason);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Report submitted. Thank you.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to report: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                )),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBlockUserDialog(String targetUserId, String userName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Block User',
+            style: TextStyle(color: Colors.white)),
+        content: Text(
+            'Are you sure you want to block $userName? You will no longer see their posts.',
+            style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ApiService.blockUser(targetUserId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$userName has been blocked.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  // Refresh feed to hide blocked user's content
+                  _loadForYouFeed();
+                  _loadFollowingFeed();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to block: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Block',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

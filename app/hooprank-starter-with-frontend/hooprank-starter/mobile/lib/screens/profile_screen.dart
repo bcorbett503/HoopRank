@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/hooprank_graph.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../services/api_service.dart';
@@ -281,10 +282,153 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ...(_recentMatches
                           .take(5)
                           .map((match) => _buildMatchCard(match, player.id))),
+
+                    const SizedBox(height: 32),
+
+                    // ========== Settings & Account ==========
+                    const Divider(color: Colors.white12),
+                    const SizedBox(height: 16),
+
+                    // Privacy Policy Link (Guideline 5.1.1(i))
+                    ListTile(
+                      leading: const Icon(Icons.privacy_tip_outlined,
+                          color: Colors.blue),
+                      title: const Text('Privacy Policy',
+                          style: TextStyle(color: Colors.white)),
+                      trailing: const Icon(Icons.open_in_new,
+                          color: Colors.white38, size: 18),
+                      onTap: () async {
+                        final uri = Uri.parse(
+                            'https://hooprank.app/privacy-policy');
+                        try {
+                          await launchUrl(uri,
+                              mode: LaunchMode.externalApplication);
+                        } catch (_) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('Could not open privacy policy'),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+
+                    // Sign Out
+                    ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.orange),
+                      title: const Text('Sign Out',
+                          style: TextStyle(color: Colors.white)),
+                      onTap: () async {
+                        final auth =
+                            context.read<AuthState>();
+                        await auth.logout();
+                        if (mounted) context.go('/');
+                      },
+                    ),
+
+                    // Delete Account (Guideline 5.1.1(v))
+                    ListTile(
+                      leading: const Icon(Icons.delete_forever,
+                          color: Colors.red),
+                      title: const Text('Delete Account',
+                          style: TextStyle(color: Colors.red)),
+                      onTap: () => _showDeleteAccountDialog(),
+                    ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  void _showDeleteAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Delete Account',
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+        content: const Text(
+          'This action is permanent and cannot be undone.\n\n'
+          'All your data including matches, stats, posts, and rankings will be permanently deleted.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              // Show second confirmation
+              _confirmDeleteAccount();
+            },
+            child: const Text('Delete My Account',
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Are you absolutely sure?',
+            style: TextStyle(color: Colors.red)),
+        content: const Text(
+          'Type DELETE to confirm account deletion.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final success = await ApiService.deleteMyAccount();
+                if (success && mounted) {
+                  final auth = context.read<AuthState>();
+                  await auth.logout();
+                  if (mounted) context.go('/');
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'Your account has been deleted. We\'re sorry to see you go.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete account: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Yes, Delete Everything',
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 

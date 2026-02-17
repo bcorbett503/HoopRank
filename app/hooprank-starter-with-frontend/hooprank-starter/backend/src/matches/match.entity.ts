@@ -51,19 +51,19 @@ export class Match {
     @Column({ name: 'score_opponent', type: 'int', nullable: true })
     scoreOpponent: number;
 
-    @Column({ name: 'timer_start', type: 'timestamptz', nullable: true })
+    @Column({ name: 'timer_start', type: 'datetime', nullable: true })
     timerStart: Date;
 
-    @Column({ type: 'jsonb', nullable: true })
+    @Column({ type: 'simple-json', nullable: true })
     score: any;
 
-    @Column({ type: 'jsonb', nullable: true })
+    @Column({ type: 'simple-json', nullable: true })
     result: any;
 
-    @Column({ name: 'started_by', type: 'jsonb', default: '{}' })
+    @Column({ name: 'started_by', type: 'simple-json', nullable: true })
     startedBy: any;
 
-    @Column({ type: 'text', array: true, nullable: true })
+    @Column({ type: 'simple-array', nullable: true })
     participants: string[];
 
     // Team match fields
@@ -76,7 +76,7 @@ export class Match {
     @Column({ name: 'opponent_team_id', type: 'uuid', nullable: true })
     opponentTeamId: string;
 
-    @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
+    @Column({ name: 'completed_at', type: 'datetime', nullable: true })
     completedAt: Date;
 
     @CreateDateColumn({ name: 'created_at' })

@@ -99,7 +99,7 @@ class ApiService {
     return response;
   }
 
-  static Future<http.Response> _authedGet(
+  static Future<http.Response> authedGet(
     Uri uri, {
     Map<String, String>? headers,
     String? userId,
@@ -111,7 +111,7 @@ class ApiService {
     );
   }
 
-  static Future<http.Response> _authedPost(
+  static Future<http.Response> authedPost(
     Uri uri, {
     Map<String, String>? headers,
     Object? body,
@@ -128,7 +128,7 @@ class ApiService {
     );
   }
 
-  static Future<http.Response> _authedPut(
+  static Future<http.Response> authedPut(
     Uri uri, {
     Map<String, String>? headers,
     Object? body,
@@ -144,7 +144,7 @@ class ApiService {
     );
   }
 
-  static Future<http.Response> _authedDelete(
+  static Future<http.Response> authedDelete(
     Uri uri, {
     Map<String, String>? headers,
     Object? body,
@@ -168,7 +168,7 @@ class ApiService {
     String? photoUrl,
     String? provider,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/users/auth'),
       headers: {
         'Authorization': 'Bearer $idToken',
@@ -197,7 +197,7 @@ class ApiService {
   static Future<User?> getMe() async {
     if (_userId == null || _userId!.isEmpty) return null;
 
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/users/me'),
       headers: {
         'x-user-id': _userId!,
@@ -214,7 +214,7 @@ class ApiService {
   /// Generic GET request to any endpoint
   static Future<dynamic> get(String path) async {
     try {
-      final response = await _authedGet(
+      final response = await authedGet(
         Uri.parse('$baseUrl$path'),
       );
 
@@ -228,7 +228,7 @@ class ApiService {
   }
 
   static Future<User> devLogin(String id, String name) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/auth/dev'),
       headers: {
         'Content-Type': 'application/json',
@@ -248,7 +248,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>?> getProfile(String userId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/users/$userId'),
     );
 
@@ -273,7 +273,7 @@ class ApiService {
       }
 
       debugPrint('>>> getCourtsFromApi: calling $url');
-      final response = await _authedGet(
+      final response = await authedGet(
         Uri.parse(url),
         headers: {
           'x-user-id': _userId ?? '',
@@ -314,7 +314,7 @@ class ApiService {
     // Just use the userId passed in directly
 
     try {
-      final response = await _authedPost(
+      final response = await authedPost(
         Uri.parse('$baseUrl/users/$userId/profile'),
         headers: {
           'Content-Type': 'application/json',
@@ -357,7 +357,7 @@ class ApiService {
       final dataUrl = 'data:$mimeType;base64,$base64Image';
       debugPrint('uploadImage: Base64 data URL length: ${dataUrl.length}');
 
-      final response = await _authedPost(
+      final response = await authedPost(
         Uri.parse('$baseUrl/upload'),
         headers: {
           'x-user-id': _userId ?? '',
@@ -394,7 +394,7 @@ class ApiService {
   }) async {
     if (_userId == null) throw Exception('Not authenticated');
 
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/api/v1/matches'),
       headers: {
         'Content-Type': 'application/json',
@@ -418,7 +418,7 @@ class ApiService {
   }) async {
     if (_userId == null) throw Exception('Not authenticated');
 
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/challenges'),
       headers: {
         'Content-Type': 'application/json',
@@ -458,7 +458,7 @@ class ApiService {
     if (_userId == null || _userId!.isEmpty) return [];
 
     try {
-      final response = await _authedGet(
+      final response = await authedGet(
         Uri.parse('$baseUrl/challenges'),
         headers: {
           'x-user-id': _userId!,
@@ -480,7 +480,7 @@ class ApiService {
   /// Get rankings (players for 1v1, teams for 3v3/5v5)
   static Future<List<Map<String, dynamic>>> getRankings(
       {required String mode}) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/rankings?mode=$mode'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -500,7 +500,7 @@ class ApiService {
     try {
       final uri = Uri.parse('$baseUrl/users');
       final response =
-          await _authedGet(uri, headers: {'x-user-id': _userId ?? ''});
+          await authedGet(uri, headers: {'x-user-id': _userId ?? ''});
 
       debugPrint(
           '>>> getPlayers() response: ${response.statusCode}, length: ${response.body.length}');
@@ -538,7 +538,7 @@ class ApiService {
     try {
       final uri = Uri.parse('$baseUrl/users/nearby?radiusMiles=$radiusMiles');
       final response =
-          await _authedGet(uri, headers: {'x-user-id': _userId ?? ''});
+          await authedGet(uri, headers: {'x-user-id': _userId ?? ''});
 
       debugPrint(
           '>>> getNearbyPlayers() response: ${response.statusCode}, length: ${response.body.length}');
@@ -569,7 +569,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>?> getUserStats(String userId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/users/$userId/stats'),
     );
 
@@ -582,7 +582,7 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> getUserRankHistory(
       String userId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/users/$userId/rank-history'),
     );
 
@@ -598,7 +598,7 @@ class ApiService {
   /// Register FCM token for push notifications
   static Future<void> registerFcmToken(String userId, String token) async {
     debugPrint('FCM: Registering token for user $userId');
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/users/me/fcm-token'),
       headers: {
         'Content-Type': 'application/json',
@@ -616,7 +616,7 @@ class ApiService {
 
   /// Clear FCM token for current user on logout/account switch
   static Future<void> unregisterFcmToken(String userId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/users/me/fcm-token'),
       userId: userId,
     );
@@ -631,7 +631,7 @@ class ApiService {
     if (_userId == null || _userId!.isEmpty) return 0;
 
     try {
-      final response = await _authedGet(
+      final response = await authedGet(
         Uri.parse('$baseUrl/messages/unread-count'),
         headers: {
           'x-user-id': _userId!,
@@ -650,7 +650,7 @@ class ApiService {
 
   /// Get a specific match by ID
   static Future<Map<String, dynamic>?> getMatch(String matchId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/api/v1/matches/$matchId'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -680,7 +680,7 @@ class ApiService {
       body['courtId'] = courtId;
     }
 
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/api/v1/matches/$matchId/score'),
       headers: {
         'x-user-id': _userId!,
@@ -701,7 +701,7 @@ class ApiService {
   static Future<Map<String, dynamic>> confirmScore(String matchId) async {
     if (_userId == null) throw Exception('Not authenticated');
 
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/api/v1/matches/$matchId/confirm'),
       headers: {
         'x-user-id': _userId!,
@@ -724,7 +724,7 @@ class ApiService {
   static Future<Map<String, dynamic>> contestScore(String matchId) async {
     if (_userId == null) throw Exception('Not authenticated');
 
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/api/v1/matches/$matchId/contest'),
       headers: {
         'x-user-id': _userId!,
@@ -759,7 +759,7 @@ class ApiService {
     }
 
     // Primary endpoint for profile history.
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/users/$userId/recent-games'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -774,7 +774,7 @@ class ApiService {
     // Fallback: some backend deployments may not hydrate /recent-games
     // consistently. Pull full matches and keep finalized rows so profile
     // history still shows completed outcomes.
-    final fallbackResponse = await _authedGet(
+    final fallbackResponse = await authedGet(
       Uri.parse('$baseUrl/users/$userId/matches'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -793,7 +793,7 @@ class ApiService {
 
   /// Get user's current rating info
   static Future<Map<String, dynamic>?> getUserRating(String userId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/users/$userId/rating'),
     );
 
@@ -805,7 +805,7 @@ class ApiService {
 
   /// Get matches awaiting score confirmation from current user
   static Future<List<Map<String, dynamic>>> getPendingConfirmations() async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/api/v1/matches/pending-confirmation'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -824,7 +824,7 @@ class ApiService {
   /// Get local activity feed (recent games from nearby players)
   static Future<List<Map<String, dynamic>>> getLocalActivity(
       {int limit = 20, int radiusMiles = 25}) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse(
           '$baseUrl/activity/local?limit=$limit&radiusMiles=$radiusMiles'),
       headers: {
@@ -846,7 +846,7 @@ class ApiService {
       {int limit = 3}) async {
     debugPrint(
         '>>> getGlobalActivity: calling $baseUrl/activity/global?limit=$limit');
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/activity/global?limit=$limit'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -870,7 +870,7 @@ class ApiService {
 
   /// Get user's teams
   static Future<List<Map<String, dynamic>>> getMyTeams() async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/teams'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -886,7 +886,7 @@ class ApiService {
 
   /// Get pending team invites
   static Future<List<Map<String, dynamic>>> getTeamInvites() async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/teams/invites'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -931,7 +931,7 @@ class ApiService {
     if (city != null) body['city'] = city;
     if (description != null) body['description'] = description;
 
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams'),
       headers: {
         'x-user-id': _userId!,
@@ -951,7 +951,7 @@ class ApiService {
 
   /// Get team details
   static Future<Map<String, dynamic>?> getTeamDetail(String teamId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/teams/$teamId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -964,7 +964,7 @@ class ApiService {
 
   /// Accept team invite
   static Future<bool> acceptTeamInvite(String teamId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/accept'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -973,7 +973,7 @@ class ApiService {
 
   /// Decline team invite
   static Future<bool> declineTeamInvite(String teamId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/decline'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -982,7 +982,7 @@ class ApiService {
 
   /// Leave team
   static Future<bool> leaveTeam(String teamId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/leave'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -991,7 +991,7 @@ class ApiService {
 
   /// Delete team (owner only)
   static Future<bool> deleteTeam(String teamId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/teams/$teamId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1017,7 +1017,7 @@ class ApiService {
 
   /// Invite player to team
   static Future<bool> inviteToTeam(String teamId, String userId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/invite/$userId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1026,7 +1026,7 @@ class ApiService {
 
   /// Get a user's team memberships (for checking before invite)
   static Future<List<Map<String, dynamic>>> getUserTeams(String userId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/teams/user/$userId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1039,7 +1039,7 @@ class ApiService {
 
   /// Remove member from team (owner only)
   static Future<bool> removeTeamMember(String teamId, String userId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/teams/$teamId/members/$userId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1056,7 +1056,7 @@ class ApiService {
     var url = '$baseUrl/rankings?mode=$teamType&scope=$scope';
     if (ageGroup != null) url += '&ageGroup=$ageGroup';
     if (gender != null) url += '&gender=$gender';
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse(url),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1079,7 +1079,7 @@ class ApiService {
     required String opponentTeamId,
     String? message,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/challenge/$opponentTeamId'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1095,7 +1095,7 @@ class ApiService {
 
   /// Get pending team challenges
   static Future<List<Map<String, dynamic>>> getTeamChallenges() async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/teams/challenges'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1113,7 +1113,7 @@ class ApiService {
     required String challengerTeamId,
     required String opponentTeamId,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$challengerTeamId/challenge/$opponentTeamId'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1130,7 +1130,7 @@ class ApiService {
 
   /// Accept team challenge
   static Future<bool> acceptTeamChallenge(String matchId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/challenges/$matchId/accept'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1139,7 +1139,7 @@ class ApiService {
 
   /// Decline team challenge
   static Future<bool> declineTeamChallenge(String matchId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/challenges/$matchId/decline'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1153,7 +1153,7 @@ class ApiService {
     required int myTeamScore,
     required int opponentTeamScore,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/score'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1175,7 +1175,7 @@ class ApiService {
     required String teamId,
     required String matchId,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/confirm'),
       headers: {'x-user-id': _userId ?? '', 'Content-Type': 'application/json'},
     );
@@ -1190,7 +1190,7 @@ class ApiService {
     required int myScore,
     required int opponentScore,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/amend'),
       headers: {'x-user-id': _userId ?? '', 'Content-Type': 'application/json'},
       body: jsonEncode({'myScore': myScore, 'opponentScore': opponentScore}),
@@ -1204,7 +1204,7 @@ class ApiService {
     required String teamId,
     required String matchId,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/confirm-amendment'),
       headers: {'x-user-id': _userId ?? '', 'Content-Type': 'application/json'},
     );
@@ -1217,7 +1217,7 @@ class ApiService {
     required String teamId,
     required String matchId,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/matches/$matchId/reject-amendment'),
       headers: {'x-user-id': _userId ?? '', 'Content-Type': 'application/json'},
     );
@@ -1227,7 +1227,7 @@ class ApiService {
 
   /// Get pending team match scores for the current user
   static Future<List<dynamic>> getPendingTeamScores() async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/teams/pending-scores'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1266,7 +1266,7 @@ class ApiService {
       if (notes != null) 'notes': notes,
     };
 
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/events'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1286,7 +1286,7 @@ class ApiService {
     required String teamId,
     required String eventId,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/events/$eventId/start-match'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1301,7 +1301,7 @@ class ApiService {
 
   /// Get upcoming events for a team
   static Future<List<Map<String, dynamic>>> getTeamEvents(String teamId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/teams/$teamId/events'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1317,7 +1317,7 @@ class ApiService {
   /// Toggle attendance for a team event (IN / OUT)
   static Future<bool> toggleEventAttendance(
       String teamId, String eventId, String status) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/teams/$teamId/events/$eventId/attendance'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1330,7 +1330,7 @@ class ApiService {
 
   /// Delete a team event
   static Future<bool> deleteTeamEvent(String teamId, String eventId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/teams/$teamId/events/$eventId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1370,7 +1370,7 @@ class ApiService {
 
   /// Get all user's follows (courts + players)
   static Future<Map<String, dynamic>> getFollows() async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/users/me/follows'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1383,7 +1383,7 @@ class ApiService {
   /// Follow a court
   static Future<bool> followCourt(String courtId,
       {bool alertsEnabled = false}) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/users/me/follows/courts'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1400,7 +1400,7 @@ class ApiService {
 
   /// Unfollow a court
   static Future<bool> unfollowCourt(String courtId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse(
           '$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}'),
       headers: {'x-user-id': _userId ?? ''},
@@ -1410,7 +1410,7 @@ class ApiService {
 
   /// Set court alert preference
   static Future<bool> setCourtAlert(String courtId, bool enabled) async {
-    final response = await _authedPut(
+    final response = await authedPut(
       Uri.parse(
           '$baseUrl/users/me/follows/courts/${Uri.encodeComponent(courtId)}/alerts'),
       headers: {
@@ -1424,7 +1424,7 @@ class ApiService {
 
   /// Follow a player
   static Future<bool> followPlayer(String playerId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/users/me/follows/players'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1438,7 +1438,7 @@ class ApiService {
 
   /// Unfollow a player
   static Future<bool> unfollowPlayer(String playerId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/users/me/follows/players/$playerId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1447,7 +1447,7 @@ class ApiService {
 
   /// Follow a team
   static Future<bool> followTeam(String teamId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/users/me/follows/teams'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1461,7 +1461,7 @@ class ApiService {
 
   /// Unfollow a team
   static Future<bool> unfollowTeam(String teamId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/users/me/follows/teams/$teamId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1474,7 +1474,7 @@ class ApiService {
 
   /// Check in to a court
   static Future<Map<String, dynamic>?> checkInToCourt(String courtId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/check-in'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1486,7 +1486,7 @@ class ApiService {
 
   /// Check out from a court
   static Future<bool> checkOutFromCourt(String courtId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/check-out'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1496,7 +1496,7 @@ class ApiService {
   /// Get activity for a specific court
   static Future<List<Map<String, dynamic>>> getCourtActivity(
       String courtId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/activity'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1510,7 +1510,7 @@ class ApiService {
   /// Get active check-ins for a court
   static Future<List<Map<String, dynamic>>> getActiveCheckIns(
       String courtId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/check-ins'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1526,7 +1526,7 @@ class ApiService {
     String courtId, {
     int limit = 50,
   }) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse(
           '$baseUrl/courts/${Uri.encodeComponent(courtId)}/followers?limit=$limit'),
       headers: {'x-user-id': _userId ?? ''},
@@ -1547,7 +1547,7 @@ class ApiService {
 
   /// Get activity from all followed courts and players
   static Future<Map<String, dynamic>> getFollowedActivity() async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/users/me/follows/activity'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1597,7 +1597,7 @@ class ApiService {
         'taggedPlayerIds': taggedPlayerIds,
     };
     debugPrint('API createStatus: body keys=${body.keys.toList()}');
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/statuses'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1617,7 +1617,7 @@ class ApiService {
 
   /// Get status feed (followed users + own statuses)
   static Future<List<Map<String, dynamic>>> getStatusFeed() async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/statuses/feed'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1640,7 +1640,7 @@ class ApiService {
       url += '&lat=$lat&lng=$lng';
     }
     debugPrint('UNIFIED_FEED: calling $url userId=$_userId');
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse(url),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1656,7 +1656,7 @@ class ApiService {
 
   /// Like a status
   static Future<bool> likeStatus(int statusId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/statuses/$statusId/like'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1665,7 +1665,7 @@ class ApiService {
 
   /// Unlike a status
   static Future<bool> unlikeStatus(int statusId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/statuses/$statusId/like'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1674,7 +1674,7 @@ class ApiService {
 
   /// Get likes for a status
   static Future<List<Map<String, dynamic>>> getStatusLikes(int statusId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/statuses/$statusId/likes'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1688,7 +1688,7 @@ class ApiService {
   /// Add a comment to a status
   static Future<Map<String, dynamic>?> addStatusComment(
       int statusId, String content) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/statuses/$statusId/comments'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1705,7 +1705,7 @@ class ApiService {
   /// Get comments for a status
   static Future<List<Map<String, dynamic>>> getStatusComments(
       int statusId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/statuses/$statusId/comments'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1718,7 +1718,7 @@ class ApiService {
 
   /// Delete a comment
   static Future<bool> deleteStatusComment(int commentId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/statuses/comments/$commentId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1727,7 +1727,7 @@ class ApiService {
 
   /// Delete a status (post)
   static Future<bool> deleteStatus(int statusId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/statuses/$statusId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1741,7 +1741,7 @@ class ApiService {
   /// Get all posts by a specific user
   static Future<List<Map<String, dynamic>>> getUserPosts(
       String targetUserId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/statuses/user/$targetUserId'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1756,7 +1756,7 @@ class ApiService {
 
   /// Mark as attending an event
   static Future<bool> markAttending(int statusId) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/statuses/$statusId/attend'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1765,7 +1765,7 @@ class ApiService {
 
   /// Remove attendance from event
   static Future<bool> removeAttending(int statusId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/statuses/$statusId/attend'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1774,7 +1774,7 @@ class ApiService {
 
   /// Get attendees for an event
   static Future<List<Map<String, dynamic>>> getAttendees(int statusId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/statuses/$statusId/attendees'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1791,7 +1791,7 @@ class ApiService {
 
   /// Get upcoming runs at a specific court
   static Future<List<ScheduledRun>> getCourtRuns(String courtId) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/courts/${Uri.encodeComponent(courtId)}/runs'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1805,7 +1805,7 @@ class ApiService {
   /// Get runs near user's location (for discoverability)
   static Future<List<ScheduledRun>> getNearbyRuns(
       {int radiusMiles = 25}) async {
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse('$baseUrl/runs/nearby?radiusMiles=$radiusMiles'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1822,7 +1822,7 @@ class ApiService {
     final url = today
         ? '$baseUrl/runs/courts-with-runs?today=true'
         : '$baseUrl/runs/courts-with-runs';
-    final response = await _authedGet(
+    final response = await authedGet(
       Uri.parse(url),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1850,7 +1850,7 @@ class ApiService {
     List<String>? taggedPlayerIds,
     String? tagMode,
   }) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/runs'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1880,7 +1880,7 @@ class ApiService {
 
   /// Join a scheduled run
   static Future<bool> joinRun(String runId, {String status = 'going'}) async {
-    final response = await _authedPost(
+    final response = await authedPost(
       Uri.parse('$baseUrl/runs/$runId/join'),
       headers: {
         'x-user-id': _userId ?? '',
@@ -1893,7 +1893,7 @@ class ApiService {
 
   /// Leave a scheduled run
   static Future<bool> leaveRun(String runId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/runs/$runId/leave'),
       headers: {'x-user-id': _userId ?? ''},
     );
@@ -1902,8 +1902,85 @@ class ApiService {
 
   /// Cancel a run (creator only)
   static Future<bool> cancelRun(String runId) async {
-    final response = await _authedDelete(
+    final response = await authedDelete(
       Uri.parse('$baseUrl/runs/$runId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  // ===================
+  // Report & Block (Guideline 1.2)
+  // ===================
+
+  /// Report a user
+  static Future<bool> reportUser(String reportedUserId, String reason) async {
+    final response = await authedPost(
+      Uri.parse('$baseUrl/users/me/report'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'reportedUserId': reportedUserId,
+        'reason': reason,
+      }),
+    );
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  /// Report a status/post
+  static Future<bool> reportStatus(int statusId, String reason) async {
+    final response = await authedPost(
+      Uri.parse('$baseUrl/statuses/$statusId/report'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'reason': reason}),
+    );
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  /// Block a user
+  static Future<bool> blockUser(String targetUserId) async {
+    final response = await authedPost(
+      Uri.parse('$baseUrl/users/me/blocked/$targetUserId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  /// Unblock a user
+  static Future<bool> unblockUser(String targetUserId) async {
+    final response = await authedDelete(
+      Uri.parse('$baseUrl/users/me/blocked/$targetUserId'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    return response.statusCode == 200;
+  }
+
+  /// Get blocked users list
+  static Future<List<String>> getBlockedUsers() async {
+    final response = await authedGet(
+      Uri.parse('$baseUrl/users/me/blocked'),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((e) => e.toString()).toList();
+    }
+    return [];
+  }
+
+  // ===================
+  // Account Deletion (Guideline 5.1.1(v))
+  // ===================
+
+  /// Delete the current user's account and all data
+  static Future<bool> deleteMyAccount() async {
+    final response = await authedDelete(
+      Uri.parse('$baseUrl/users/me'),
       headers: {'x-user-id': _userId ?? ''},
     );
     return response.statusCode == 200;

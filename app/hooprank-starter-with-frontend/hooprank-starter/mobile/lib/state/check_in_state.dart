@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../services/court_service.dart';
+import '../services/analytics_service.dart';
 
 /// Activity item for display in the Followed Courts feed
 class CourtActivity {
@@ -461,8 +462,13 @@ class CheckInState extends ChangeNotifier {
     await _saveUserCheckIns();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.checkInToCourt(courtId);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.checkInToCourt(courtId);
+      AnalyticsService.logCourtCheckIn(courtId: courtId);
+    } catch (e) {
+      debugPrint('Failed to sync check-in to backend: $e');
+    }
   }
 
   /// Check out current user from a court
@@ -479,8 +485,12 @@ class CheckInState extends ChangeNotifier {
     await _saveUserCheckIns();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.checkOutFromCourt(courtId);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.checkOutFromCourt(courtId);
+    } catch (e) {
+      debugPrint('Failed to sync check-out to backend: $e');
+    }
   }
 
   /// Get all courts the current user is checked into
@@ -501,9 +511,14 @@ class CheckInState extends ChangeNotifier {
     await _saveFollowedCourts();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.followCourt(courtId,
-        alertsEnabled: _alertCourts.contains(courtId));
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.followCourt(courtId,
+          alertsEnabled: _alertCourts.contains(courtId));
+      AnalyticsService.logCourtFollow(courtId: courtId);
+    } catch (e) {
+      debugPrint('Failed to sync follow court to backend: $e');
+    }
   }
 
   /// Unfollow a court
@@ -512,8 +527,12 @@ class CheckInState extends ChangeNotifier {
     await _saveFollowedCourts();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.unfollowCourt(courtId);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.unfollowCourt(courtId);
+    } catch (e) {
+      debugPrint('Failed to sync unfollow court to backend: $e');
+    }
   }
 
   /// Toggle follow status for a court
@@ -546,8 +565,12 @@ class CheckInState extends ChangeNotifier {
     await _saveAlertCourts();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.setCourtAlert(courtId, true);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.setCourtAlert(courtId, true);
+    } catch (e) {
+      debugPrint('Failed to sync alert enable to backend: $e');
+    }
   }
 
   /// Disable alerts for a court
@@ -556,8 +579,12 @@ class CheckInState extends ChangeNotifier {
     await _saveAlertCourts();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.setCourtAlert(courtId, false);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.setCourtAlert(courtId, false);
+    } catch (e) {
+      debugPrint('Failed to sync alert disable to backend: $e');
+    }
   }
 
   /// Toggle alert status for a court
@@ -711,8 +738,12 @@ class CheckInState extends ChangeNotifier {
     await _saveFollowedPlayers();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.followPlayer(playerId);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.followPlayer(playerId);
+    } catch (e) {
+      debugPrint('Failed to sync follow player to backend: $e');
+    }
   }
 
   /// Unfollow a player
@@ -723,8 +754,12 @@ class CheckInState extends ChangeNotifier {
     await _saveFollowedPlayers();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.unfollowPlayer(playerId);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.unfollowPlayer(playerId);
+    } catch (e) {
+      debugPrint('Failed to sync unfollow player to backend: $e');
+    }
   }
 
   /// Toggle follow status for a player
@@ -797,8 +832,12 @@ class CheckInState extends ChangeNotifier {
     await _saveFollowedTeams();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.followTeam(teamId);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.followTeam(teamId);
+    } catch (e) {
+      debugPrint('Failed to sync follow team to backend: $e');
+    }
   }
 
   /// Unfollow a team
@@ -810,8 +849,12 @@ class CheckInState extends ChangeNotifier {
     await _saveFollowedTeams();
     notifyListeners();
 
-    // Sync to backend
-    ApiService.unfollowTeam(teamId);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.unfollowTeam(teamId);
+    } catch (e) {
+      debugPrint('Failed to sync unfollow team to backend: $e');
+    }
   }
 
   /// Toggle follow status for a team
@@ -885,8 +928,13 @@ class CheckInState extends ChangeNotifier {
 
     notifyListeners();
 
-    // Sync to backend
-    ApiService.createStatus(status);
+    // Sync to backend (optimistic — local state already updated)
+    try {
+      await ApiService.createStatus(status);
+      AnalyticsService.logStatusPosted();
+    } catch (e) {
+      debugPrint('Failed to sync status to backend: $e');
+    }
   }
 
   /// Clear current user's status

@@ -1,12 +1,15 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
+import 'package:url_launcher/url_launcher.dart';
 import '../state/app_state.dart';
 import '../models.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -63,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
           debugPrint('LOGIN: Backend returned user: ${user.name}, position=${user.position}, isProfileComplete=${user.isProfileComplete}');
           
           await auth.login(user, token: idToken);
+          AnalyticsService.logLogin(provider: provider, success: true);
           debugPrint('LOGIN: After auth.login, currentUser position=${auth.currentUser?.position}');
           
           // Let the router handle redirect based on user.isProfileComplete
@@ -72,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
       } catch (e) {
-        debugPrint('Backend auth failed: $e');
+        debugPrint('⚠️ Backend auth failed, using local fallback: $e');
         // Create a temporary user object with incomplete profile
         final user = User(
           id: userId,
@@ -82,8 +86,15 @@ class _LoginScreenState extends State<LoginScreen> {
         );
         // IMPORTANT: Pass token even on fallback so authenticated API calls work
         await auth.login(user, token: idToken);
-        
+        AnalyticsService.logLogin(provider: provider, success: false);
+
         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Signed in, but server sync failed. Some features may be limited.'),
+              duration: Duration(seconds: 4),
+            ),
+          );
           context.go('/play'); // Router will redirect to /profile/setup
         }
       }
@@ -238,10 +249,42 @@ class _LoginScreenState extends State<LoginScreen> {
                   */
                   const SizedBox(height: 24),
                   
-                  const Text(
-                    'By continuing, you agree to our Terms of Service and Privacy Policy',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  // "By continuing" text with tappable links
+                  RichText(
                     textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+                      children: [
+                        const TextSpan(text: 'By continuing, you agree to our '),
+                        TextSpan(
+                          text: 'Terms & Conditions',
+                          style: const TextStyle(
+                            color: Color(0xFF4A90D9),
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () => launchUrl(
+                              Uri.parse('https://hooprank-503.web.app/terms'),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                        ),
+                        const TextSpan(text: ' and '),
+                        TextSpan(
+                          text: 'Privacy Policy',
+                          style: const TextStyle(
+                            color: Color(0xFF4A90D9),
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () => launchUrl(
+                              Uri.parse('https://hooprank-503.web.app/privacy'),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 32),
                   

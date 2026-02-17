@@ -14,6 +14,10 @@
       {
         "source": "/support",
         "destination": "/support.html"
+      },
+      {
+        "source": "/terms",
+        "destination": "/terms.html"
       }
     ]
   },

@@ -134,11 +134,6 @@ export class RunsController {
         return { success: deleted };
     }
 
-    // Migration endpoint to create tables
-    @Post('runs/migrate')
-    async migrate() {
-        return this.runsService.ensureTables();
-    }
 
     // ========== /courts/:id/runs endpoint ==========
     // The mobile app calls GET /courts/:id/runs

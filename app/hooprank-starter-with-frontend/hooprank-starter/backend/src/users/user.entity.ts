@@ -64,6 +64,16 @@ export class User {
     @Column({ type: 'date', nullable: true })
     birthdate: Date;
 
+    @Column({ name: 'home_court_id', type: 'varchar', length: 255, nullable: true })
+    homeCourtId: string;
+
+    // Subscriber fields
+    @Column({ name: 'subscription_tier', type: 'text', default: 'free' })
+    subscriptionTier: string; // 'free' | 'pro' | 'elite'
+
+    @Column({ name: 'subscription_expires_at', type: 'datetime', nullable: true })
+    subscriptionExpiresAt: Date;
+
     @Column({ name: 'fcm_token', type: 'text', nullable: true })
     fcmToken: string;
 

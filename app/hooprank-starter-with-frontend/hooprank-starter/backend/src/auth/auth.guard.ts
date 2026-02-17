@@ -32,17 +32,9 @@ export class AuthGuard implements CanActivate {
         const allowInsecureAuth = this.configService.get<string>('ALLOW_INSECURE_AUTH') === 'true';
 
         if (!token) {
-            // Production-safe fallback: trust x-user-id header for mobile clients
-            // that have already authenticated via Firebase on the client side.
-            // This header is set by the mobile app after validating the Firebase token locally.
-            const headerUid = request.headers['x-user-id'];
-            if (headerUid) {
-                request.headers['x-user-id'] = String(headerUid);
-                request['user'] = { uid: headerUid, email: '' };
-                return this.enforceAdminForSensitiveRoutes(request, String(headerUid), context);
-            }
-
-            // Explicitly opt-in dev fallback only; never enabled by default.
+            // No Bearer token — reject unless dev-mode is explicitly enabled.
+            // The mobile app always sends a Firebase ID token; there is no
+            // legitimate production scenario where x-user-id alone is sufficient.
             if (allowInsecureAuth) {
                 const fallbackUid = request.body?.id;
                 if (!fallbackUid) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 import '../state/check_in_state.dart';
 
 /// Widget to display and manage scheduled runs at a court
@@ -50,6 +51,7 @@ class _ScheduledRunsWidgetState extends State<ScheduledRunsWidget> {
   Future<void> _joinRun(ScheduledRun run) async {
     final success = await ApiService.joinRun(run.id);
     if (success) {
+      AnalyticsService.logRunJoined(runId: run.id);
       _loadRuns();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

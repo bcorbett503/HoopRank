@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
+import 'services/analytics_service.dart';
 
 import 'state/app_state.dart';
 import 'state/check_in_state.dart';
@@ -45,23 +48,34 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // Initialize Crashlytics — catch all Flutter framework errors
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
   // Set up background message handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // Initialize notification service
   await NotificationService().initialize();
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthState()),
-        ChangeNotifierProvider(create: (_) => MatchState()),
-        ChangeNotifierProvider(create: (_) => CheckInState()),
-        ChangeNotifierProvider(create: (_) => TutorialState()),
-        Provider(create: (_) => CourtService()),
-      ],
-      child: const HoopRankApp(),
-    ),
+  // Wrap in runZonedGuarded to catch async errors Crashlytics can't see
+  runZonedGuarded(
+    () {
+      runApp(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => AuthState()),
+            ChangeNotifierProvider(create: (_) => MatchState()),
+            ChangeNotifierProvider(create: (_) => CheckInState()),
+            ChangeNotifierProvider(create: (_) => TutorialState()),
+            Provider(create: (_) => CourtService()),
+          ],
+          child: const HoopRankApp(),
+        ),
+      );
+    },
+    (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    },
   );
 }
 
@@ -103,20 +117,26 @@ class _HoopRankAppState extends State<HoopRankApp> {
       // Initialize states
       tutorialState.initialize();
 
-      // Initialize CheckInState when user changes
+      // Initialize CheckInState and analytics when user changes
       authState.addListener(() {
         final user = authState.currentUser;
         if (user != null) {
           checkInState.initialize(user.id);
+          // Set user identity for crash reports and analytics
+          FirebaseCrashlytics.instance.setUserIdentifier(user.id);
+          AnalyticsService.setUserId(user.id);
         }
       });
 
       // Initialize now if user already logged in
       if (authState.currentUser != null) {
         checkInState.initialize(authState.currentUser!.id);
+        FirebaseCrashlytics.instance.setUserIdentifier(authState.currentUser!.id);
+        AnalyticsService.setUserId(authState.currentUser!.id);
       }
 
       _router = _createRouter(authState, tutorialState);
+      NotificationService.setRouter(_router!);
     }
   }
 
@@ -126,6 +146,7 @@ class _HoopRankAppState extends State<HoopRankApp> {
       initialLocation: '/play',
       // Re-run redirects when auth OR tutorial state changes (tutorial loads prefs async).
       refreshListenable: Listenable.merge([authState, tutorialState]),
+      observers: [AnalyticsService.observer],
       redirect: (context, state) {
         final user = authState.currentUser;
         final loggedIn = user != null;

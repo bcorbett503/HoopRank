@@ -1,9 +1,6 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models.dart';
 import 'api_service.dart';
-import 'auth_service.dart';
 
 class Message {
   final String id;
@@ -14,6 +11,7 @@ class Message {
   final String? matchId;
   final bool isChallenge;
   final String? challengeStatus; // 'pending', 'accepted', 'declined', 'expired'
+  final String? imageUrl;
 
   Message({
     required this.id,
@@ -24,6 +22,7 @@ class Message {
     this.matchId,
     this.isChallenge = false,
     this.challengeStatus,
+    this.imageUrl,
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
@@ -41,6 +40,7 @@ class Message {
       matchId: (json['matchId'] ?? json['match_id'])?.toString(),
       isChallenge: json['isChallenge'] ?? json['is_challenge'] ?? false,
       challengeStatus: (json['challengeStatus'] ?? json['challenge_status'])?.toString(),
+      imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
     );
   }
 
@@ -52,6 +52,7 @@ class Message {
       'content': content,
       'matchId': matchId,
       'isChallenge': isChallenge,
+      if (imageUrl != null) 'imageUrl': imageUrl,
     };
   }
 }
@@ -113,6 +114,7 @@ class TeamMessage {
   final DateTime createdAt;
   final String? senderName;
   final String? senderPhotoUrl;
+  final String? imageUrl;
 
   TeamMessage({
     required this.id,
@@ -121,6 +123,7 @@ class TeamMessage {
     required this.createdAt,
     this.senderName,
     this.senderPhotoUrl,
+    this.imageUrl,
   });
 
   factory TeamMessage.fromJson(Map<String, dynamic> json) {
@@ -131,6 +134,7 @@ class TeamMessage {
       createdAt: DateTime.parse(json['createdAt']),
       senderName: json['senderName'],
       senderPhotoUrl: json['senderPhotoUrl'],
+      imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
     );
   }
 }
@@ -170,31 +174,16 @@ class TeamConversation {
   }
 }
 
+/// MessagesService — all HTTP calls go through ApiService.authed*() wrappers
+/// for consistent token refresh and 401 retry behaviour.
 class MessagesService {
-  String get baseUrl => ApiService.baseUrl; // Use same URL as ApiService
-  final _storage = const FlutterSecureStorage();
-  // NOTE: methods below that still use raw http.get/post should be migrated to
-  // ApiService._authedGet/_authedPost over time for consistent token refresh.
-
-  Future<String?> _getToken() async {
-    // Prefer a fresh Firebase ID token (auto-refreshed); fall back to stored token
-    try {
-      final freshToken = await AuthService.getIdToken();
-      if (freshToken != null && freshToken.isNotEmpty) return freshToken;
-    } catch (_) {}
-    return await _storage.read(key: 'auth_token');
-  }
+  String get baseUrl => ApiService.baseUrl;
 
   Future<List<ChallengeRequest>> getPendingChallenges(String userId) async {
-    final token = await _getToken();
     print('Getting challenges for userId: $userId');
-    // Use new /challenges endpoint instead of /messages/challenges
-    final response = await http.get(
+    final response = await ApiService.authedGet(
       Uri.parse('$baseUrl/challenges'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-      },
+      userId: userId,
     );
 
     print('Challenges response status: ${response.statusCode}');
@@ -203,7 +192,6 @@ class MessagesService {
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       print('Parsed ${data.length} challenges');
-      // Transform new API format to ChallengeRequest format
       return data.map((raw) {
         final c = raw as Map<String, dynamic>;
 
@@ -213,7 +201,6 @@ class MessagesService {
           return <String, dynamic>{};
         }
 
-        // New API returns fromUser/toUser, but keep legacy key support.
         final fromUser = asMap(c['fromUser']);
         final toUser = asMap(c['toUser']);
         final court = c['court'] is Map ? (c['court'] as Map).cast<String, dynamic>() : null;
@@ -222,7 +209,6 @@ class MessagesService {
         final toUserId = (c['to_user_id'] ?? c['toUserId'] ?? toUser['id'])?.toString() ?? '';
         final isSent = fromUserId == userId;
 
-        // Direction must reflect sender/receiver so feed and rankings remain accurate.
         final direction = isSent ? 'sent' : 'received';
         final otherUserJson = isSent ? toUser : fromUser;
         final fallbackOtherUser = <String, dynamic>{
@@ -230,7 +216,6 @@ class MessagesService {
           'name': 'Unknown',
         };
 
-        // Create a pseudo-message for compatibility
         final message = Message(
           id: c['id']?.toString() ?? '',
           senderId: fromUserId,
@@ -259,13 +244,9 @@ class MessagesService {
   }
 
   Future<void> cancelChallenge(String userId, String challengeId) async {
-    final token = await _getToken();
-    final response = await http.delete(
+    final response = await ApiService.authedDelete(
       Uri.parse('$baseUrl/challenges/$challengeId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-      },
+      userId: userId,
     );
 
     if (response.statusCode != 200) {
@@ -276,15 +257,10 @@ class MessagesService {
 
   /// Accept a challenge and get the created matchId
   Future<Map<String, dynamic>> acceptChallenge(String userId, String challengeId) async {
-    final token = await _getToken();
     print('Accepting challenge: $challengeId for user: $userId');
-    final response = await http.put(
+    final response = await ApiService.authedPut(
       Uri.parse('$baseUrl/challenges/$challengeId/accept'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-        'Content-Type': 'application/json',
-      },
+      userId: userId,
     );
 
     print('Accept response status: ${response.statusCode}');
@@ -300,15 +276,10 @@ class MessagesService {
 
   /// Decline a challenge
   Future<void> declineChallenge(String userId, String challengeId) async {
-    final token = await _getToken();
     print('Declining challenge: $challengeId for user: $userId');
-    final response = await http.put(
+    final response = await ApiService.authedPut(
       Uri.parse('$baseUrl/challenges/$challengeId/decline'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-        'Content-Type': 'application/json',
-      },
+      userId: userId,
     );
 
     print('Decline response status: ${response.statusCode}');
@@ -321,14 +292,9 @@ class MessagesService {
   }
 
   Future<List<Conversation>> getConversations(String userId) async {
-    final token = await _getToken();
-    final response = await http.get(
-      // Header-driven route: userId comes from x-user-id header, not the path.
+    final response = await ApiService.authedGet(
       Uri.parse('$baseUrl/messages/conversations'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-      },
+      userId: userId,
     );
 
     if (response.statusCode == 200) {
@@ -340,13 +306,9 @@ class MessagesService {
   }
 
   Future<void> deleteThread(String userId, String threadId) async {
-    final token = await _getToken();
-    final response = await http.delete(
+    final response = await ApiService.authedDelete(
       Uri.parse('$baseUrl/threads/$threadId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-      },
+      userId: userId,
     );
 
     if (response.statusCode != 200) {
@@ -356,14 +318,9 @@ class MessagesService {
   }
 
   Future<List<Message>> getMessages(String userId, String otherUserId) async {
-    final token = await _getToken();
-    final response = await http.get(
-      // Header-driven route: userId comes from x-user-id header, not the path.
+    final response = await ApiService.authedGet(
       Uri.parse('$baseUrl/messages/$otherUserId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-      },
+      userId: userId,
     );
 
     if (response.statusCode == 200) {
@@ -376,23 +333,17 @@ class MessagesService {
 
   /// Mark all messages from otherUserId as read
   Future<void> markConversationAsRead(String userId, String otherUserId) async {
-    final token = await _getToken();
     try {
-      await http.put(
+      await ApiService.authedPut(
         Uri.parse('$baseUrl/messages/$otherUserId/read'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'x-user-id': userId,
-        },
+        userId: userId,
       );
     } catch (e) {
       print('Error marking conversation as read: $e');
     }
   }
 
-  Future<Message> sendMessage(String senderId, String receiverId, String content, {String? matchId}) async {
-    final token = await _getToken();
-    
+  Future<Message> sendMessage(String senderId, String receiverId, String content, {String? matchId, String? imageUrl}) async {
     print('=== SENDING MESSAGE ===');
     print('senderId: $senderId');
     print('receiverId: $receiverId');
@@ -403,19 +354,18 @@ class MessagesService {
       'receiverId': receiverId,
       'content': content,
     };
-    // Only include matchId if it's not null (Zod rejects null, needs undefined)
     if (matchId != null) {
       body['matchId'] = matchId;
     }
+    if (imageUrl != null) {
+      body['imageUrl'] = imageUrl;
+    }
     
-    final response = await http.post(
+    final response = await ApiService.authedPost(
       Uri.parse('$baseUrl/messages'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-        'x-user-id': senderId,
-      },
       body: json.encode(body),
+      headers: {'Content-Type': 'application/json'},
+      userId: senderId,
     );
 
     print('Response status: ${response.statusCode}');
@@ -431,8 +381,6 @@ class MessagesService {
   /// Send a challenge to another player
   /// Optionally tag a court where the game will be played
   Future<void> sendChallenge(String senderId, String receiverId, String message, {String? courtId}) async {
-    final token = await _getToken();
-    
     print('=== SENDING CHALLENGE ===');
     print('senderId: $senderId');
     print('receiverId: $receiverId');
@@ -447,14 +395,11 @@ class MessagesService {
       body['courtId'] = courtId;
     }
     
-    final response = await http.post(
+    final response = await ApiService.authedPost(
       Uri.parse('$baseUrl/challenges'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-        'x-user-id': senderId,
-      },
       body: json.encode(body),
+      headers: {'Content-Type': 'application/json'},
+      userId: senderId,
     );
 
     print('Challenge response status: ${response.statusCode}');
@@ -470,13 +415,9 @@ class MessagesService {
 
   /// Get list of team chats the user is a member of
   Future<List<TeamConversation>> getTeamChats(String userId) async {
-    final token = await _getToken();
-    final response = await http.get(
+    final response = await ApiService.authedGet(
       Uri.parse('$baseUrl/messages/team-chats'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-      },
+      userId: userId,
     );
 
     if (response.statusCode == 200) {
@@ -489,13 +430,9 @@ class MessagesService {
 
   /// Get messages for a specific team chat
   Future<List<TeamMessage>> getTeamMessages(String userId, String teamId) async {
-    final token = await _getToken();
-    final response = await http.get(
+    final response = await ApiService.authedGet(
       Uri.parse('$baseUrl/teams/$teamId/messages'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-      },
+      userId: userId,
     );
 
     if (response.statusCode == 200) {
@@ -507,16 +444,16 @@ class MessagesService {
   }
 
   /// Send a message to a team chat
-  Future<TeamMessage> sendTeamMessage(String userId, String teamId, String content) async {
-    final token = await _getToken();
-    final response = await http.post(
+  Future<TeamMessage> sendTeamMessage(String userId, String teamId, String content, {String? imageUrl}) async {
+    final body = <String, dynamic>{'content': content};
+    if (imageUrl != null) {
+      body['imageUrl'] = imageUrl;
+    }
+    final response = await ApiService.authedPost(
       Uri.parse('$baseUrl/teams/$teamId/messages'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-      },
-      body: json.encode({'content': content}),
+      body: json.encode(body),
+      headers: {'Content-Type': 'application/json'},
+      userId: userId,
     );
 
     if (response.statusCode == 201) {
@@ -530,17 +467,13 @@ class MessagesService {
 
   /// Get pending team challenges for all teams the user is a member of
   Future<List<TeamChallengeRequest>> getPendingTeamChallenges(String userId, List<String> teamIds) async {
-    final token = await _getToken();
     final List<TeamChallengeRequest> allChallenges = [];
 
     for (final teamId in teamIds) {
       try {
-        final response = await http.get(
+        final response = await ApiService.authedGet(
           Uri.parse('$baseUrl/teams/$teamId/challenges'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'x-user-id': userId,
-          },
+          userId: userId,
         );
 
         if (response.statusCode == 200) {
@@ -559,14 +492,9 @@ class MessagesService {
 
   /// Accept a team challenge
   Future<Map<String, dynamic>> acceptTeamChallenge(String userId, String teamId, String challengeId) async {
-    final token = await _getToken();
-    final response = await http.post(
+    final response = await ApiService.authedPost(
       Uri.parse('$baseUrl/teams/$teamId/challenges/$challengeId/accept'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-        'Content-Type': 'application/json',
-      },
+      userId: userId,
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -579,14 +507,9 @@ class MessagesService {
 
   /// Decline a team challenge
   Future<void> declineTeamChallenge(String userId, String teamId, String challengeId) async {
-    final token = await _getToken();
-    final response = await http.post(
+    final response = await ApiService.authedPost(
       Uri.parse('$baseUrl/teams/$teamId/challenges/$challengeId/decline'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'x-user-id': userId,
-        'Content-Type': 'application/json',
-      },
+      userId: userId,
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) {

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Match } from './match.entity';
@@ -7,7 +7,7 @@ import { HoopRankService } from '../ratings/hooprank.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
-export class MatchesService implements OnModuleInit {
+export class MatchesService {
   private rater = new HoopRankService();
 
   constructor(
@@ -17,44 +17,6 @@ export class MatchesService implements OnModuleInit {
     private dataSource: DataSource,
     private notificationsService: NotificationsService,
   ) { }
-
-  /**
-   * Runs once on server boot — ensures DB schema supports 2-phase score confirmation.
-   */
-  async onModuleInit() {
-    const isPostgres = !!process.env.DATABASE_URL;
-    if (!isPostgres) return;
-
-    try {
-      // Add score_submitter_id column
-      await this.dataSource.query(`
-        ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_submitter_id VARCHAR
-      `).catch(() => { });
-
-      // Update status check constraint to include new statuses
-      await this.dataSource.query(`
-        ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_status_check
-      `).catch(() => { });
-      await this.dataSource.query(`
-        ALTER TABLE matches ADD CONSTRAINT matches_status_check
-        CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested', 'pending_confirmation', 'pending_amendment'))
-      `).catch(() => { });
-
-      // Add games_contested column to users
-      await this.dataSource.query(`
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS games_contested INT DEFAULT 0
-      `).catch(() => { });
-
-      // Add status_id column to matches (links to player_statuses for likes/comments)
-      await this.dataSource.query(`
-        ALTER TABLE matches ADD COLUMN IF NOT EXISTS status_id INTEGER
-      `).catch(() => { });
-
-      console.log('[MatchesService] Schema migration complete: score_submitter_id, matches_status_check, games_contested, status_id');
-    } catch (e) {
-      console.error('[MatchesService] Schema migration error (non-fatal):', e.message);
-    }
-  }
 
   async create(creatorId: string, opponentId?: string, courtId?: string): Promise<Match> {
     // Use raw SQL for production compatibility
@@ -251,20 +213,6 @@ export class MatchesService implements OnModuleInit {
   ): Promise<Match> {
     const isPostgres = !!process.env.DATABASE_URL;
     if (!isPostgres) throw new Error('Only supported on PostgreSQL');
-
-    // Ensure score_submitter_id column exists (idempotent)
-    await this.dataSource.query(`
-      ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_submitter_id VARCHAR
-    `).catch(() => { /* column may already exist */ });
-
-    // Ensure status check constraint includes new statuses (idempotent)
-    await this.dataSource.query(`
-      ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_status_check
-    `).catch(() => { });
-    await this.dataSource.query(`
-      ALTER TABLE matches ADD CONSTRAINT matches_status_check
-      CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested', 'pending_confirmation', 'pending_amendment'))
-    `).catch(() => { /* constraint may already exist */ });
 
     const match = await this.get(id);
     if (!match) throw new Error('Match not found');

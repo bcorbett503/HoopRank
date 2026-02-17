@@ -34,6 +34,8 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_opponent INTEGER`);
         await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
         await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS winner_id UUID`);
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS score_submitter_id VARCHAR`);
+        await dataSource.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS status_id INTEGER`);
 
         // ============================================
         // TEAMS TABLE MIGRATIONS  
@@ -55,6 +57,9 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
 
         // Age column for rankings filter
         await dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER`);
+
+        // Games contested counter
+        await dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS games_contested INT DEFAULT 0`);
 
         // Standardize rating precision to DECIMAL(3,2)
         await dataSource.query(`ALTER TABLE users ALTER COLUMN hoop_rank TYPE DECIMAL(3,2)`);
@@ -130,6 +135,40 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_event_attendance_event_id ON team_event_attendance(event_id)`);
         await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_team_event_attendance_user_id ON team_event_attendance(user_id)`);
 
+        // ============================================
+        // REPORT & BLOCK TABLES
+        // ============================================
+
+        await dataSource.query(`
+            CREATE TABLE IF NOT EXISTS user_reports (
+                id SERIAL PRIMARY KEY,
+                reporter_id VARCHAR(255) NOT NULL,
+                reported_user_id VARCHAR(255) NOT NULL,
+                reason TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await dataSource.query(`
+            CREATE TABLE IF NOT EXISTS content_reports (
+                id SERIAL PRIMARY KEY,
+                reporter_id VARCHAR(255) NOT NULL,
+                status_id INTEGER NOT NULL,
+                reason TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await dataSource.query(`
+            CREATE TABLE IF NOT EXISTS blocked_users (
+                id SERIAL PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                blocked_user_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, blocked_user_id)
+            )
+        `);
+
         // Link team_events to matches for game→match pipeline
         await dataSource.query(`ALTER TABLE team_events ADD COLUMN IF NOT EXISTS match_id UUID`);
 
@@ -164,6 +203,50 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
             ALTER TABLE matches ADD CONSTRAINT matches_status_check
             CHECK (status IN ('pending', 'accepted', 'completed', 'cancelled', 'ended', 'score_submitted', 'contested', 'pending_confirmation', 'pending_amendment'))
         `);
+        // ============================================
+        // ENGAGEMENT TABLE COLUMN TYPE FIXES
+        // ============================================
+        // These tables may have been created with INTEGER user_id
+        // but need VARCHAR for Firebase UIDs.
+        const engagementTables = ['status_likes', 'status_comments', 'event_attendees'];
+        for (const table of engagementTables) {
+            try {
+                const tableExists = await dataSource.query(`
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables
+                        WHERE table_name = $1
+                    )
+                `, [table]);
+
+                if (!tableExists[0]?.exists) continue;
+
+                const columnInfo = await dataSource.query(`
+                    SELECT data_type FROM information_schema.columns
+                    WHERE table_name = $1 AND column_name = 'user_id'
+                `, [table]);
+
+                if (columnInfo.length > 0 && columnInfo[0]?.data_type === 'integer') {
+                    await dataSource.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${table}_user_id_fkey`);
+                    await dataSource.query(`ALTER TABLE ${table} ALTER COLUMN user_id TYPE VARCHAR(255) USING user_id::VARCHAR(255)`);
+                }
+
+                // Ensure status_id FK points to player_statuses
+                await dataSource.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${table}_status_id_fkey`).catch(() => { });
+                await dataSource.query(`
+                    ALTER TABLE ${table}
+                    ADD CONSTRAINT ${table}_status_id_fkey
+                    FOREIGN KEY (status_id) REFERENCES player_statuses(id) ON DELETE CASCADE
+                `).catch(() => { });
+            } catch (tableError) {
+                console.error(`[SchemaEvolution] Error fixing ${table}:`, tableError.message);
+            }
+        }
+
+        // ============================================
+        // MESSAGE MEDIA COLUMNS
+        // ============================================
+        await dataSource.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url TEXT`);
+        await dataSource.query(`ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS image_url TEXT`);
 
         console.log('[SchemaEvolution] All migrations completed successfully');
     } catch (error) {

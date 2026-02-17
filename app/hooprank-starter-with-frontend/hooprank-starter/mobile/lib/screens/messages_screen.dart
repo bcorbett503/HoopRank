@@ -29,11 +29,16 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
     _loadAllConversations();
     // Auto-refresh when a push notification arrives
     NotificationService.addOnNotificationListener(_onPushReceived);
+    // Register so tapping the Messages tab triggers a refresh
+    ScaffoldWithNavBar.refreshMessagesTab = _loadAllConversations;
   }
 
   @override
   void dispose() {
     NotificationService.removeOnNotificationListener(_onPushReceived);
+    if (ScaffoldWithNavBar.refreshMessagesTab == _loadAllConversations) {
+      ScaffoldWithNavBar.refreshMessagesTab = null;
+    }
     super.dispose();
   }
 

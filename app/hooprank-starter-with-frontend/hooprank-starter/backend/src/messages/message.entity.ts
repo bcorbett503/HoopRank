@@ -42,6 +42,9 @@ export class Message {
     @Column({ name: 'match_id', type: 'uuid', nullable: true })
     matchId: string;
 
+    @Column({ name: 'image_url', type: 'text', nullable: true })
+    imageUrl: string;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

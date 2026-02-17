@@ -4,6 +4,7 @@ import '../state/app_state.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
+import '../services/analytics_service.dart';
 import 'chat_screen.dart';
 
 class PlayersScreen extends StatefulWidget {
@@ -145,6 +146,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
         message: message,
       );
 
+      AnalyticsService.logChallengeSent(mode: '1v1');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Challenge sent to ${player.name}!')),

@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards, Request, Query, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards, Request, Query, ForbiddenException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { User } from './user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DataSource } from 'typeorm';
 import { Public } from '../auth/public.decorator';
+import { AuthenticateDto } from './dto/authenticate.dto';
 
 @Controller('users')
 export class UsersController {
@@ -19,8 +21,9 @@ export class UsersController {
    * Verifies Firebase token from header or body if available.
    */
   @Public()
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('auth')
-  async authenticate(@Request() req, @Body() body: { id?: string; email?: string; firebaseToken?: string; idToken?: string }) {
+  async authenticate(@Request() req, @Body() body: AuthenticateDto) {
     // Try to verify Firebase token if provided (from header or body)
     let uid = '';
     let email = body.email || '';
@@ -29,27 +32,32 @@ export class UsersController {
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     const firebaseToken = bearerToken || body.firebaseToken || body.idToken;
 
-    if (firebaseToken) {
-      try {
-        const admin = require('firebase-admin');
-        if (admin.apps.length > 0) {
-          const decoded = await admin.auth().verifyIdToken(firebaseToken);
-          uid = decoded.uid;
-          email = email || decoded.email || '';
-        }
-      } catch (e) {
-        console.warn('[AUTHENTICATE] Token verification failed, using fallback:', e.message);
+    if (!firebaseToken) {
+      console.error('[AUTHENTICATE] No authentication token provided');
+      throw new UnauthorizedException('Authentication token required');
+    }
+
+    try {
+      const admin = require('firebase-admin');
+      if (admin.apps.length === 0) {
+        console.error('[AUTHENTICATE] Firebase Admin not initialized');
+        throw new ServiceUnavailableException('Authentication service unavailable');
       }
+      const decoded = await admin.auth().verifyIdToken(firebaseToken);
+      uid = decoded.uid;
+      email = email || decoded.email || '';
+    } catch (e) {
+      // Re-throw NestJS exceptions as-is
+      if (e instanceof UnauthorizedException || e instanceof ServiceUnavailableException) {
+        throw e;
+      }
+      console.error('[AUTHENTICATE] Token verification failed:', e.message);
+      throw new UnauthorizedException('Invalid authentication token');
     }
 
-    // Fallback: use x-user-id header or body.id
     if (!uid) {
-      uid = req.headers?.['x-user-id'] || body.id || '';
-    }
-
-    if (!uid) {
-      console.error('[AUTHENTICATE] No user ID available');
-      return { error: 'No user identity provided' };
+      console.error('[AUTHENTICATE] No user ID from token');
+      throw new UnauthorizedException('Authentication failed');
     }
 
     console.log(`[AUTHENTICATE] uid=${uid}, email=${email}`);
@@ -68,13 +76,6 @@ export class UsersController {
       avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
       photo_url: u.avatarUrl ?? u.avatar_url ?? null,
     };
-  }
-
-
-  // One-time migration endpoint - must be before :id routes
-  @Post('admin/run-migrations')
-  async runMigrations() {
-    return this.usersService.runMigrations();
   }
 
   // Debug endpoint to check user_followed_courts table

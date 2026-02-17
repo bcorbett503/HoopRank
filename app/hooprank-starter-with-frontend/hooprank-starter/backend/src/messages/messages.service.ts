@@ -14,7 +14,7 @@ export class MessagesService {
         private notificationsService: NotificationsService,
     ) { }
 
-    async sendMessage(senderId: string, receiverId: string, content: string, matchId?: string, isChallenge?: boolean, courtId?: string): Promise<Message> {
+    async sendMessage(senderId: string, receiverId: string, content: string, matchId?: string, isChallenge?: boolean, courtId?: string, imageUrl?: string): Promise<Message> {
         const isPostgres = !!process.env.DATABASE_URL;
         const id = uuidv4();
         const threadId = uuidv4();
@@ -59,10 +59,10 @@ export class MessagesService {
 
                 console.log('sendMessage: inserting message with thread:', actualThreadId, 'courtId:', courtId);
                 const result = await this.dataSource.query(`
-                    INSERT INTO messages (id, thread_id, from_id, to_id, body, read, is_challenge, challenge_status, match_id, court_id, created_at)
-                    VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, NOW())
+                    INSERT INTO messages (id, thread_id, from_id, to_id, body, read, is_challenge, challenge_status, match_id, court_id, image_url, created_at)
+                    VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, $10, NOW())
                     RETURNING *
-                `, [id, actualThreadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null, courtId || null]);
+                `, [id, actualThreadId, senderId, receiverId, content, isChallenge || false, isChallenge ? 'pending' : null, matchId || null, courtId || null, imageUrl || null]);
                 console.log('sendMessage: success:', result[0]);
 
                 // Send push notification for non-challenge messages
@@ -290,7 +290,7 @@ export class MessagesService {
                     SELECT id, thread_id, from_id as "senderId", to_id as "receiverId", 
                            body as content, created_at as "createdAt", 
                            is_challenge as "isChallenge", challenge_status as "challengeStatus",
-                           match_id as "matchId"
+                           match_id as "matchId", image_url as "imageUrl"
                     FROM messages
                     WHERE (from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)
                     ORDER BY created_at ASC

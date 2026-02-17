@@ -303,6 +303,9 @@ export class StatusesService {
                 u.avatar_url as "userPhotoUrl",
                 ps.content,
                 ps.image_url as "imageUrl",
+                ps.video_url as "videoUrl",
+                ps.video_thumbnail_url as "videoThumbnailUrl",
+                ps.video_duration_ms as "videoDurationMs",
                 ps.created_at as "createdAt",
                 (SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id) as "likeCount",
                 (SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id) as "commentCount"
@@ -353,6 +356,9 @@ export class StatusesService {
                     u.avatar_url as "userPhotoUrl",
                     ps.content,
                     ps.image_url as "imageUrl",
+                    ps.video_url as "videoUrl",
+                    ps.video_thumbnail_url as "videoThumbnailUrl",
+                    ps.video_duration_ms as "videoDurationMs",
                     ps.created_at as "createdAt",
                     (SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id) as "likeCount",
                     (SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id) as "commentCount",
@@ -383,6 +389,9 @@ export class StatusesService {
                 u.avatar_url as "userPhotoUrl",
                 ps.content,
                 ps.image_url as "imageUrl",
+                ps.video_url as "videoUrl",
+                ps.video_thumbnail_url as "videoThumbnailUrl",
+                ps.video_duration_ms as "videoDurationMs",
                 ps.created_at as "createdAt",
                 (SELECT COUNT(*) FROM status_likes WHERE status_id = ps.id) as "likeCount",
                 (SELECT COUNT(*) FROM status_comments WHERE status_id = ps.id) as "commentCount",
@@ -1004,163 +1013,4 @@ export class StatusesService {
         }
     }
 
-
-    // Debug method to check player_statuses table contents
-    async debugPlayerStatuses(): Promise<any> {
-        try {
-            // Get all statuses
-            const allStatuses = await this.dataSource.query(`
-                SELECT * FROM player_statuses ORDER BY created_at DESC LIMIT 10
-            `);
-
-            // Get followed players for test user
-            const followedPlayers = await this.dataSource.query(`
-                SELECT * FROM user_followed_players LIMIT 5
-            `);
-
-            // Get followed courts for test user  
-            const followedCourts = await this.dataSource.query(`
-                SELECT * FROM user_followed_courts LIMIT 5
-            `);
-
-            // Get users table schema
-            const usersColumns = await this.dataSource.query(`
-                SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'users'
-            `);
-
-            // Get check_ins
-            const checkIns = await this.dataSource.query(`
-                SELECT * FROM check_ins ORDER BY checked_in_at DESC LIMIT 5
-            `);
-
-            // Get matches
-            const matches = await this.dataSource.query(`
-                SELECT * FROM matches ORDER BY created_at DESC LIMIT 5
-            `);
-
-            // Get users table sample (to check id type and data)
-            const users = await this.dataSource.query(`
-                SELECT id, email, name, avatar_url FROM users LIMIT 5
-            `);
-
-            // Get player_statuses schema
-            const statusesSchema = await this.dataSource.query(`
-                SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'player_statuses'
-            `);
-
-            return {
-                allStatuses,
-                followedPlayers,
-                followedCourts,
-                usersColumns,
-                checkIns,
-                matches,
-                users,
-                statusesSchema
-            };
-        } catch (error) {
-            return { error: error.message, stack: error.stack };
-        }
-    }
-
-    // Simple test query to debug unified feed
-    async testFeedQuery(userId: string): Promise<any> {
-        try {
-            // Just query statuses directly without complex CTEs
-            const simpleQuery = await this.dataSource.query(`
-                SELECT 
-                    'status' as type,
-                    ps.id,
-                    ps.user_id as "userId",
-                    ps.content,
-                    ps.court_id as "courtId",
-                    ps.created_at as "createdAt"
-                FROM player_statuses ps
-                WHERE ps.user_id = $1
-                ORDER BY ps.created_at DESC
-                LIMIT 10
-            `, [userId]);
-
-            return {
-                userId,
-                simpleQuery,
-                message: 'Direct query without JOINs or CTEs'
-            };
-        } catch (error) {
-            return { error: error.message };
-        }
-    }
-
-    // Migration method to add video columns
-    async migrateVideoColumns(): Promise<any> {
-        try {
-            // Check if columns already exist
-            const checkQuery = `
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'player_statuses' 
-                AND column_name IN ('video_url', 'video_thumbnail_url', 'video_duration_ms');
-            `;
-            const existing = await this.dataSource.query(checkQuery);
-
-            if (existing.length === 3) {
-                return {
-                    success: true,
-                    message: 'Video columns already exist',
-                    columns: existing.map((r: any) => r.column_name)
-                };
-            }
-
-            // Add columns that don't exist
-            const alterQuery = `
-                ALTER TABLE player_statuses 
-                ADD COLUMN IF NOT EXISTS video_url VARCHAR(500),
-                ADD COLUMN IF NOT EXISTS video_thumbnail_url VARCHAR(500),
-                ADD COLUMN IF NOT EXISTS video_duration_ms INTEGER;
-            `;
-            await this.dataSource.query(alterQuery);
-
-            // Verify columns were added
-            const verify = await this.dataSource.query(checkQuery);
-
-            return {
-                success: true,
-                message: 'Video columns added successfully',
-                columns: verify.map((r: any) => r.column_name)
-            };
-        } catch (error) {
-            console.error('Migration error:', error.message);
-            return { success: false, error: error.message };
-        }
-    }
-
-    async migrateRunAttributeColumns(): Promise<any> {
-        try {
-            const alterQuery = `
-                ALTER TABLE player_statuses 
-                ADD COLUMN IF NOT EXISTS game_mode VARCHAR(10),
-                ADD COLUMN IF NOT EXISTS court_type VARCHAR(20),
-                ADD COLUMN IF NOT EXISTS age_range VARCHAR(10);
-            `;
-            await this.dataSource.query(alterQuery);
-
-            // Verify columns were added
-            const checkQuery = `
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'player_statuses' 
-                AND column_name IN ('game_mode', 'court_type', 'age_range');
-            `;
-            const verify = await this.dataSource.query(checkQuery);
-
-            return {
-                success: true,
-                message: 'Run attribute columns added successfully',
-                columns: verify.map((r: any) => r.column_name)
-            };
-        } catch (error) {
-            console.error('Migration error:', error.message);
-            return { success: false, error: error.message };
-        }
-    }
 }

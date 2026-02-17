@@ -18,10 +18,10 @@ export class TeamEvent {
     @Column({ type: 'text' })
     title: string;
 
-    @Column({ name: 'event_date', type: 'timestamptz' })
+    @Column({ name: 'event_date', type: 'datetime' })
     eventDate: Date;
 
-    @Column({ name: 'end_date', type: 'timestamptz', nullable: true })
+    @Column({ name: 'end_date', type: 'datetime', nullable: true })
     endDate: Date | null;
 
     @Column({ name: 'location_name', type: 'text', nullable: true })

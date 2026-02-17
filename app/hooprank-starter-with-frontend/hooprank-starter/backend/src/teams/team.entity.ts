@@ -111,6 +111,9 @@ export class TeamMessage {
     @Column({ type: 'text' })
     content: string;
 
+    @Column({ name: 'image_url', type: 'text', nullable: true })
+    imageUrl: string;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

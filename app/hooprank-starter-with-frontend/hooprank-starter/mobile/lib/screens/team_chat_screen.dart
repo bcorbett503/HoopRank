@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../state/app_state.dart';
 import '../services/messages_service.dart';
+import '../services/analytics_service.dart';
 
 /// Team group chat screen - displays messages from all team members
 class TeamChatScreen extends StatefulWidget {
@@ -28,6 +32,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   List<TeamMessage> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  File? _pendingImageFile;
 
   @override
   void initState() {
@@ -78,17 +83,36 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   }
 
   Future<void> _sendMessage() async {
-    final content = _messageController.text.trim();
-    if (content.isEmpty || _isSending) return;
+    final hasText = _messageController.text.trim().isNotEmpty;
+    final hasImage = _pendingImageFile != null;
+    if ((!hasText && !hasImage) || _isSending) return;
 
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
-    setState(() => _isSending = true);
+    final content = _messageController.text.trim();
+    final imageFile = _pendingImageFile;
     _messageController.clear();
+    setState(() {
+      _pendingImageFile = null;
+      _isSending = true;
+    });
 
     try {
-      final newMessage = await _messagesService.sendTeamMessage(userId, widget.teamId, content);
+      String? imageUrl;
+      if (imageFile != null) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final ref = FirebaseStorage.instance.ref().child('chat_images/$userId/team_$timestamp.jpg');
+        await ref.putFile(imageFile);
+        imageUrl = await ref.getDownloadURL();
+      }
+
+      final messageContent = content.isNotEmpty ? content : '📷 Image';
+      final newMessage = await _messagesService.sendTeamMessage(
+        userId, widget.teamId, messageContent,
+        imageUrl: imageUrl,
+      );
+      AnalyticsService.logMessageSent();
       if (mounted) {
         setState(() {
           _messages.add(newMessage);
@@ -100,10 +124,33 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
       if (mounted) {
         setState(() => _isSending = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send: $e')),
+          SnackBar(content: Text('Error sending message: $e')),
         );
       }
     }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    XFile? picked;
+    try {
+      picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        imageQuality: 80,
+        requestFullMetadata: false,
+      );
+    } catch (e) {
+      debugPrint('Image picker error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load that image. Try a different photo.')),
+        );
+      }
+      return;
+    }
+    if (picked == null) return;
+    setState(() => _pendingImageFile = File(picked!.path));
   }
 
   @override
@@ -180,6 +227,38 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                         },
                       ),
           ),
+          // Image preview strip
+          if (_pendingImageFile != null)
+            Container(
+              color: Colors.grey.shade200,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      _pendingImageFile!,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Image attached',
+                      style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => setState(() => _pendingImageFile = null),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
           // Message input
           Container(
             padding: const EdgeInsets.all(8),
@@ -196,11 +275,15 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
             child: SafeArea(
               child: Row(
                 children: [
+                  IconButton(
+                    icon: Icon(Icons.photo, color: Colors.deepOrange.shade300),
+                    onPressed: _isSending ? null : _pickImage,
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
                       decoration: InputDecoration(
-                        hintText: 'Message your team...',
+                        hintText: _pendingImageFile != null ? 'Add a caption...' : 'Message your team...',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                           borderSide: BorderSide.none,
@@ -282,11 +365,40 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: isMe ? null : Border.all(color: Colors.grey.withOpacity(0.3)),
                   ),
-                  child: Text(
-                    message.content,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : null,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (message.imageUrl != null && message.imageUrl!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              message.imageUrl!,
+                              width: 200,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const SizedBox(
+                                  width: 200, height: 150,
+                                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                );
+                              },
+                              errorBuilder: (context, error, stack) => const SizedBox(
+                                width: 200, height: 100,
+                                child: Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (message.content.isNotEmpty && message.content != '📷 Image')
+                        Text(
+                          message.content,
+                          style: TextStyle(
+                            color: isMe ? Colors.white : null,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Padding(

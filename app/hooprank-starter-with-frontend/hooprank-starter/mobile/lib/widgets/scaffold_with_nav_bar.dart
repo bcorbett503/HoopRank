@@ -19,6 +19,9 @@ class ScaffoldWithNavBar extends StatefulWidget {
   /// Static callback used by HomeScreen to force-refresh the embedded feed tab.
   static void Function()? refreshFeedTab;
 
+  /// Static callback to force-refresh the Messages tab when switching to it.
+  static void Function()? refreshMessagesTab;
+
   @override
   State<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
 }
@@ -96,6 +99,11 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
       if (tutorial.isActive && tutorial.currentStep?.id == 'go_to_rankings') {
         tutorial.completeStep('go_to_rankings');
       }
+    }
+
+    if (index == 1) {
+      // Messages tab: refresh conversations so new threads appear immediately
+      ScaffoldWithNavBar.refreshMessagesTab?.call();
     }
 
     if (index == 2) {

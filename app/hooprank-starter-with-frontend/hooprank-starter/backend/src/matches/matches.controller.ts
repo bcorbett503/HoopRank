@@ -2,6 +2,7 @@ import { Body, Controller, ForbiddenException, Get, Headers, HttpCode, Param, Po
 import { MatchesService } from './matches.service';
 import { Match } from './match.entity';
 import { CreateMatchDto } from './dto/create-match.dto';
+import { SubmitScoreDto } from './dto/submit-score.dto';
 import { MessagesService } from '../messages/messages.service';
 
 /** Map backend status to iOS MatchStatus enum values */
@@ -108,7 +109,7 @@ export class MatchesController {
   @Post(':id/score')
   async submitScore(
     @Param('id') id: string,
-    @Body() body: { me: number; opponent: number; courtId?: string },
+    @Body() body: SubmitScoreDto,
     @Headers('x-user-id') userId: string
   ): Promise<{ match: Match }> {
     try {
@@ -135,92 +136,6 @@ export class MatchesController {
       console.error(`[submitScore] Error for match ${id}:`, error);
       throw error;
     }
-  }
-
-  @Get('pending-confirmation')
-  async getPendingConfirmations(@Headers('x-user-id') userId: string) {
-    if (!userId) return [];
-    return this.matches.getPendingConfirmations(userId);
-  }
-
-  @Post(':id/confirm')
-  @HttpCode(200)
-  async confirmScore(
-    @Param('id') id: string,
-    @Headers('x-user-id') userId: string
-  ): Promise<{ match: Match }> {
-    if (!userId) throw new Error('Authentication required');
-    const match = await this.matches.confirmScore(id, userId);
-    return { match: mapMatchForIOS(match) };
-  }
-
-  @Post(':id/contest')
-  @HttpCode(200)
-  async contestScore(
-    @Param('id') id: string,
-    @Headers('x-user-id') userId: string
-  ): Promise<{ match: Match }> {
-    if (!userId) throw new Error('Authentication required');
-    const match = await this.matches.contestScore(id, userId);
-    return { match: mapMatchForIOS(match) };
-  }
-
-  @Get(':id')
-  async get(@Param('id') id: string): Promise<Match | { error: string }> {
-    const match = await this.matches.get(id);
-    return mapMatchForIOS(match) ?? { error: 'not found' };
-  }
-}
-
-/**
- * Alias controller — serves the same match endpoints at /matches/*
- * (without the /api/v1 prefix) for clients that use the shorter path.
- */
-@Controller('matches')
-export class MatchesAliasController {
-  constructor(
-    private readonly matches: MatchesService,
-    private readonly messages: MessagesService
-  ) { }
-
-  @Post()
-  async create(
-    @Headers('x-user-id') userId: string,
-    @Body() body: CreateMatchDto & { message?: string },
-  ): Promise<Match> {
-    const creatorId = userId;
-    const opponentId = body.guestId || (body as any).opponentId;
-    const match = await this.matches.create(creatorId, opponentId, body.courtId);
-    if (body.message && opponentId) {
-      await this.messages.sendMessage(creatorId, opponentId, body.message, match.id);
-    }
-    return mapMatchForIOS(match);
-  }
-
-  @Post(':id/accept')
-  async accept(
-    @Param('id') id: string,
-    @Body() body: { guestId?: string; opponentId?: string },
-    @Headers('x-user-id') userId?: string,
-  ): Promise<Match> {
-    if (!userId) throw new Error('opponentId required');
-    return mapMatchForIOS(await this.matches.accept(id, userId));
-  }
-
-  @Post(':id/score')
-  async submitScore(
-    @Param('id') id: string,
-    @Body() body: { me: number; opponent: number; courtId?: string },
-    @Headers('x-user-id') userId: string
-  ): Promise<{ match: Match }> {
-    const match = await this.matches.get(id);
-    if (!match) throw new Error('Match not found');
-    const creatorId = (match as any).creator_id || match.creatorId;
-    const isSubmitterCreator = userId === creatorId;
-    const scoreCreator = isSubmitterCreator ? body.me : body.opponent;
-    const scoreOpponent = isSubmitterCreator ? body.opponent : body.me;
-    const updatedMatch = await this.matches.submitScoreOnly(id, userId, scoreCreator, scoreOpponent, body.courtId);
-    return { match: mapMatchForIOS(updatedMatch) };
   }
 
   @Get('pending-confirmation')

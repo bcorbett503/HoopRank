@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
@@ -9,96 +10,8 @@ import { HttpExceptionFilter } from './common/http-exception.filter';
 // Run necessary database migrations at startup
 async function runStartupMigrations(dataSource: DataSource): Promise<void> {
   console.log('Running startup migrations...');
-
-  // Run consolidated schema evolution first
   await runSchemaEvolution(dataSource);
-
-  try {
-    // Check and fix user_id column types for engagement tables
-    // These were originally created as INTEGER but need to be VARCHAR for Firebase UIDs
-    const tablesToFix = ['status_likes', 'status_comments', 'event_attendees'];
-
-    for (const table of tablesToFix) {
-      try {
-        // Check if table exists
-        const tableExists = await dataSource.query(`
-          SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_name = $1
-          )
-        `, [table]);
-
-        if (!tableExists[0]?.exists) {
-          console.log(`  Table ${table} does not exist, skipping...`);
-          continue;
-        }
-
-        // Check current column type
-        const columnInfo = await dataSource.query(`
-          SELECT data_type FROM information_schema.columns 
-          WHERE table_name = $1 AND column_name = 'user_id'
-        `, [table]);
-
-        if (columnInfo.length === 0) {
-          console.log(`  Table ${table} has no user_id column, skipping...`);
-          continue;
-        }
-
-        const currentType = columnInfo[0]?.data_type;
-
-        if (currentType === 'integer') {
-          console.log(`  Fixing ${table}.user_id: integer -> varchar...`);
-
-          // Drop FK constraint if exists
-          await dataSource.query(`
-            ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${table}_user_id_fkey
-          `);
-
-          // Change column type
-          await dataSource.query(`
-            ALTER TABLE ${table} 
-            ALTER COLUMN user_id TYPE VARCHAR(255) USING user_id::VARCHAR(255)
-          `);
-
-          console.log(`  ✓ Fixed ${table}.user_id`);
-        } else {
-          console.log(`  ${table}.user_id already varchar, skipping...`);
-        }
-
-        // Also fix status_id foreign key to point to player_statuses
-        // The original migration may have created FK pointing to wrong table
-        console.log(`  Checking ${table}.status_id FK constraint...`);
-
-        try {
-          // Drop old FK constraint if exists (might reference wrong table)
-          await dataSource.query(`
-            ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${table}_status_id_fkey
-          `);
-
-          // Re-create with correct reference to player_statuses
-          await dataSource.query(`
-            ALTER TABLE ${table} 
-            ADD CONSTRAINT ${table}_status_id_fkey 
-            FOREIGN KEY (status_id) 
-            REFERENCES player_statuses(id) 
-            ON DELETE CASCADE
-          `);
-
-          console.log(`  ✓ Verified ${table}.status_id FK`);
-        } catch (fkError) {
-          // Constraint might already exist with correct reference
-          console.log(`  FK constraint already correct or error: ${fkError.message}`);
-        }
-      } catch (tableError) {
-        console.error(`  Error fixing ${table}:`, tableError.message);
-      }
-    }
-
-    console.log('Startup migrations complete.');
-  } catch (error) {
-    console.error('Startup migration error:', error.message);
-    // Don't throw - allow app to continue starting
-  }
+  console.log('Startup migrations complete.');
 }
 
 async function bootstrap() {
@@ -110,6 +23,13 @@ async function bootstrap() {
 
   // Register global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Enable DTO validation globally — strips unknown fields, transforms types
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,        // strip properties not in the DTO
+    transform: true,        // auto-cast query params to declared types
+    forbidNonWhitelisted: false, // don't throw on extra fields, just strip them
+  }));
 
   // Increase JSON body size limit for base64 image uploads
   app.use(bodyParser.json({ limit: '5mb' }));

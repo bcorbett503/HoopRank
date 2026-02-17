@@ -576,6 +576,7 @@ export class TeamsService {
             id: m.id,
             senderId: m.senderId,
             content: m.content,
+            imageUrl: m.imageUrl || null,
             createdAt: m.createdAt,
             senderName: null,  // Could lookup from users
             senderPhotoUrl: null,
@@ -585,7 +586,7 @@ export class TeamsService {
     /**
      * Send a message to a team chat
      */
-    async sendTeamMessage(teamId: string, userId: string, content: string): Promise<TeamMessage> {
+    async sendTeamMessage(teamId: string, userId: string, content: string, imageUrl?: string): Promise<TeamMessage> {
         // Verify user is a member
         const membership = await this.membersRepository.findOne({
             where: { teamId, userId, status: 'active' },
@@ -605,7 +606,8 @@ export class TeamsService {
             teamId,
             senderId: userId,
             content,
-        });
+            imageUrl: imageUrl || null,
+        } as any);
         await this.messagesRepository.save(message);
 
         // Send push notifications to other team members
@@ -726,6 +728,11 @@ export class TeamsService {
      * Create a challenge from one team to another
      */
     async createTeamChallenge(fromTeamId: string, toTeamId: string, userId: string, message?: string): Promise<any> {
+        // Prevent self-challenge
+        if (fromTeamId === toTeamId) {
+            throw new BadRequestException('A team cannot challenge itself');
+        }
+
         // Verify user is a member of the challenging team
         const membership = await this.membersRepository.findOne({
             where: { teamId: fromTeamId, userId, status: 'active' },
@@ -928,6 +935,11 @@ export class TeamsService {
         opponentScore: number,
     ): Promise<any> {
         console.log(`[TeamsService] submitTeamMatchScore called: matchId=${matchId}, teamId=${teamId}, userId=${userId}, myScore=${myScore}, oppScore=${opponentScore}`);
+
+        // Validate scores are non-negative integers
+        if (!Number.isInteger(myScore) || !Number.isInteger(opponentScore) || myScore < 0 || opponentScore < 0) {
+            throw new BadRequestException('Scores must be non-negative integers');
+        }
 
         try {
             // Verify user is a member of this team
@@ -1202,7 +1214,8 @@ export class TeamsService {
         creatorScore: number, opponentScore: number,
         submittingTeamId: string | null,
     ): Promise<any> {
-        const winnerTeamId = creatorScore > opponentScore ? match.creator_team_id : match.opponent_team_id;
+        const isDraw = creatorScore === opponentScore;
+        const winnerTeamId = isDraw ? null : (creatorScore > opponentScore ? match.creator_team_id : match.opponent_team_id);
 
         // Get current team ratings
         const creatorTeamResult = await this.dataSource.query(`SELECT id, rating FROM teams WHERE id = $1`, [match.creator_team_id]);
@@ -1216,49 +1229,71 @@ export class TeamsService {
         const creatorRating = parseFloat(creatorTeam?.rating || '3.0');
         const opponentRating = parseFloat(opponentTeam?.rating || '3.0');
 
-        // Calculate new Elo ratings
+        // Calculate new Elo ratings (draw = 0.5 actual score)
         const K = 0.2;
         const expectedCreator = 1 / (1 + Math.pow(10, (opponentRating - creatorRating) / 1));
-        const creatorWon = match.creator_team_id === winnerTeamId ? 1 : 0;
+        const creatorActual = isDraw ? 0.5 : (match.creator_team_id === winnerTeamId ? 1 : 0);
 
-        const newCreatorRating = Math.max(1, Math.min(5, creatorRating + K * (creatorWon - expectedCreator)));
-        const newOpponentRating = Math.max(1, Math.min(5, opponentRating + K * ((1 - creatorWon) - (1 - expectedCreator))));
+        const newCreatorRating = Math.max(1, Math.min(5, creatorRating + K * (creatorActual - expectedCreator)));
+        const newOpponentRating = Math.max(1, Math.min(5, opponentRating + K * ((1 - creatorActual) - (1 - expectedCreator))));
 
-        const winnerOldRating = match.creator_team_id === winnerTeamId ? creatorRating : opponentRating;
-        const winnerNewRating = match.creator_team_id === winnerTeamId ? newCreatorRating : newOpponentRating;
-        const loserOldRating = match.creator_team_id === winnerTeamId ? opponentRating : creatorRating;
-        const loserNewRating = match.creator_team_id === winnerTeamId ? newOpponentRating : newCreatorRating;
+        if (isDraw) {
+            // Draw: no winner, update ratings only (no W/L change)
+            await this.dataSource.query(`
+                UPDATE matches SET
+                    status = 'completed',
+                    winner_id = NULL,
+                    score_creator = $1,
+                    score_opponent = $2,
+                    completed_at = NOW()
+                WHERE id = $3
+            `, [creatorScore, opponentScore, matchId]);
 
-        await this.dataSource.query(`
-            UPDATE matches SET
-                status = 'completed',
-                winner_id = $1,
-                score_creator = $2,
-                score_opponent = $3,
-                completed_at = NOW(),
-                winner_old_rating = $5,
-                winner_new_rating = $6,
-                loser_old_rating = $7,
-                loser_new_rating = $8
-            WHERE id = $4
-        `, [winnerTeamId, creatorScore, opponentScore, matchId,
-            winnerOldRating.toFixed(2), winnerNewRating.toFixed(2),
-            loserOldRating.toFixed(2), loserNewRating.toFixed(2)]);
-
-        // Update team ratings and W/L records
-        if (match.creator_team_id === winnerTeamId) {
-            await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
+            // Update ratings without W/L
+            await this.dataSource.query(`UPDATE teams SET rating = $1 WHERE id = $2`,
                 [newCreatorRating.toFixed(2), match.creator_team_id]);
             if (match.opponent_team_id) {
-                await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
+                await this.dataSource.query(`UPDATE teams SET rating = $1 WHERE id = $2`,
                     [newOpponentRating.toFixed(2), match.opponent_team_id]);
             }
         } else {
-            await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
-                [newCreatorRating.toFixed(2), match.creator_team_id]);
-            if (match.opponent_team_id) {
+            // Clear winner: update match with winner + rating history
+            const winnerOldRating = match.creator_team_id === winnerTeamId ? creatorRating : opponentRating;
+            const winnerNewRating = match.creator_team_id === winnerTeamId ? newCreatorRating : newOpponentRating;
+            const loserOldRating = match.creator_team_id === winnerTeamId ? opponentRating : creatorRating;
+            const loserNewRating = match.creator_team_id === winnerTeamId ? newOpponentRating : newCreatorRating;
+
+            await this.dataSource.query(`
+                UPDATE matches SET
+                    status = 'completed',
+                    winner_id = $1,
+                    score_creator = $2,
+                    score_opponent = $3,
+                    completed_at = NOW(),
+                    winner_old_rating = $5,
+                    winner_new_rating = $6,
+                    loser_old_rating = $7,
+                    loser_new_rating = $8
+                WHERE id = $4
+            `, [winnerTeamId, creatorScore, opponentScore, matchId,
+                winnerOldRating.toFixed(2), winnerNewRating.toFixed(2),
+                loserOldRating.toFixed(2), loserNewRating.toFixed(2)]);
+
+            // Update team ratings and W/L records
+            if (match.creator_team_id === winnerTeamId) {
                 await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
-                    [newOpponentRating.toFixed(2), match.opponent_team_id]);
+                    [newCreatorRating.toFixed(2), match.creator_team_id]);
+                if (match.opponent_team_id) {
+                    await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
+                        [newOpponentRating.toFixed(2), match.opponent_team_id]);
+                }
+            } else {
+                await this.dataSource.query(`UPDATE teams SET rating = $1, losses = COALESCE(losses, 0) + 1 WHERE id = $2`,
+                    [newCreatorRating.toFixed(2), match.creator_team_id]);
+                if (match.opponent_team_id) {
+                    await this.dataSource.query(`UPDATE teams SET rating = $1, wins = COALESCE(wins, 0) + 1 WHERE id = $2`,
+                        [newOpponentRating.toFixed(2), match.opponent_team_id]);
+                }
             }
         }
 

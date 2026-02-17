@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { CacheService } from './common/cache.service';
 
 import { MatchesModule } from './matches/matches.module';
 import { UsersModule } from './users/users.module';
@@ -24,8 +26,12 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ActivityModule } from './activity/activity.module';
 import { RankingsModule } from './rankings/rankings.module';
 import { RunsModule } from './runs/runs.module';
+import { SubscriptionModule } from './subscription/subscription.module';
 import { ScheduledRun, RunAttendee } from './runs/scheduled-run.entity';
 import { HealthController } from './health.controller';
+import { SeedingController } from './admin/seeding.controller';
+import { DebugController } from './admin/debug.controller';
+import { AdminController } from './admin/admin.controller';
 import { UploadController } from './upload.controller';
 import { MeController, InvitesController, ThreadsController } from './stubs.controller';
 import { SnakeNamingStrategy } from './snake-naming.strategy';
@@ -74,13 +80,22 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     ActivityModule,
     RankingsModule,
     RunsModule,
+    SubscriptionModule,
+    // Global rate limit: 100 requests per 60 seconds per IP
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
   ],
-  controllers: [HealthController, UploadController, MeController, InvitesController, ThreadsController],
+  controllers: [HealthController, SeedingController, DebugController, AdminController, UploadController, MeController, InvitesController, ThreadsController],
   providers: [
     {
       provide: APP_GUARD,
       useClass: AuthGuard,
     },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    CacheService,
   ],
+  exports: [CacheService],
 })
 export class AppModule { }

@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../state/app_state.dart';
 import '../models.dart';
 import '../services/messages_service.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final User? otherUser;
@@ -22,7 +26,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final FocusNode _focusNode = FocusNode(); // For keyboard auto-focus
   List<Message> _messages = [];
   bool _isLoading = true;
+  bool _isSending = false;
   User? _otherUser;
+  File? _pendingImageFile;
 
   @override
   void initState() {
@@ -97,39 +103,74 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (_controller.text.trim().isEmpty) return;
+    final hasText = _controller.text.trim().isNotEmpty;
+    final hasImage = _pendingImageFile != null;
+    if (!hasText && !hasImage) return;
 
     final userId = Provider.of<AuthState>(context, listen: false).currentUser?.id;
-    
-    // Debug logging
-    debugPrint('=== SEND MESSAGE DEBUG ===');
-    debugPrint('userId (sender): $userId');
-    debugPrint('_otherUser: $_otherUser');
-    debugPrint('_otherUser?.id: ${_otherUser?.id}');
-    debugPrint('content: ${_controller.text.trim()}');
-    
-    if (userId == null || _otherUser == null) {
-      // Show visible error so user can see what's null
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('DEBUG: userId=$userId, otherUser=${_otherUser?.id ?? "NULL"}')),
-      );
-      return;
-    }
+    if (userId == null || _otherUser == null) return;
 
     final content = _controller.text.trim();
+    final imageFile = _pendingImageFile;
     _controller.clear();
+    setState(() {
+      _pendingImageFile = null;
+      _isSending = true;
+    });
 
     try {
-      final message = await _messagesService.sendMessage(userId, _otherUser!.id, content);
-      setState(() {
-        _messages.add(message);
-      });
-      _scrollToBottom();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sending message: $e')),
+      String? imageUrl;
+      if (imageFile != null) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final ref = FirebaseStorage.instance.ref().child('chat_images/$userId/$timestamp.jpg');
+        await ref.putFile(imageFile);
+        imageUrl = await ref.getDownloadURL();
+      }
+
+      final messageContent = content.isNotEmpty ? content : '📷 Image';
+      final message = await _messagesService.sendMessage(
+        userId, _otherUser!.id, messageContent,
+        imageUrl: imageUrl,
       );
+      AnalyticsService.logMessageSent();
+      if (mounted) {
+        setState(() {
+          _messages.add(message);
+          _isSending = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending message: $e')),
+        );
+      }
     }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    XFile? picked;
+    try {
+      picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        imageQuality: 80,
+        requestFullMetadata: false,
+      );
+    } catch (e) {
+      debugPrint('Image picker error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load that image. Try a different photo.')),
+        );
+      }
+      return;
+    }
+    if (picked == null) return;
+    setState(() => _pendingImageFile = File(picked!.path));
   }
 
   @override
@@ -187,15 +228,39 @@ class _ChatScreenState extends State<ChatScreen> {
                                     ],
                                   ),
                                 ),
-                              Text(
-                                message.content,
-                                style: TextStyle(
-                                  color: message.isChallenge
-                                      ? Colors.black87
-                                      : (isMe ? Colors.white : Colors.black),
-                                  fontWeight: message.isChallenge ? FontWeight.w500 : FontWeight.normal,
+                              if (message.imageUrl != null && message.imageUrl!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      message.imageUrl!,
+                                      width: 200,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (context, child, progress) {
+                                        if (progress == null) return child;
+                                        return const SizedBox(
+                                          width: 200, height: 150,
+                                          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stack) => const SizedBox(
+                                        width: 200, height: 100,
+                                        child: Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              if (message.content.isNotEmpty && message.content != '📷 Image')
+                                Text(
+                                  message.content,
+                                  style: TextStyle(
+                                    color: message.isChallenge
+                                        ? Colors.black87
+                                        : (isMe ? Colors.white : Colors.black),
+                                    fontWeight: message.isChallenge ? FontWeight.w500 : FontWeight.normal,
+                                  ),
+                                ),
                               if (message.matchId != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 4),
@@ -215,19 +280,56 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
           ),
+          // Image preview strip
+          if (_pendingImageFile != null)
+            Container(
+              color: Colors.grey.shade200,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      _pendingImageFile!,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Image attached',
+                      style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => setState(() => _pendingImageFile = null),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+          // Message input bar
           Container(
             color: Colors.white,
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
+                IconButton(
+                  icon: Icon(Icons.photo, color: Colors.blue.shade400),
+                  onPressed: _isSending ? null : _pickImage,
+                ),
                 Expanded(
                   child: TextField(
                     controller: _controller,
                     focusNode: _focusNode,
-                    autofocus: true, // Auto-focus when screen opens
+                    autofocus: true,
                     style: const TextStyle(color: Colors.black),
                     decoration: InputDecoration(
-                      hintText: 'Type a message...',
+                      hintText: _pendingImageFile != null ? 'Add a caption...' : 'Type a message...',
                       hintStyle: TextStyle(color: Colors.grey.shade600),
                       filled: true,
                       fillColor: Colors.grey.shade100,
@@ -243,10 +345,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(width: 8),
                 CircleAvatar(
                   backgroundColor: Colors.blue,
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white),
-                    onPressed: _sendMessage,
-                  ),
+                  child: _isSending
+                      ? const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.send, color: Colors.white),
+                          onPressed: _sendMessage,
+                        ),
                 ),
               ],
             ),

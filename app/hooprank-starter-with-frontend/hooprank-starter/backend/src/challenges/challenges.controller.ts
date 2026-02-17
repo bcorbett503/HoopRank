@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Param, Headers, Put, Delete, HttpException, HttpStatus } from '@nestjs/common';
 import { ChallengesService } from './challenges.service';
+import { CreateChallengeDto } from './dto/create-challenge.dto';
 
 @Controller('challenges')
 export class ChallengesController {
@@ -14,7 +15,7 @@ export class ChallengesController {
     @Post()
     async createChallenge(
         @Headers('x-user-id') userId: string,
-        @Body() body: { toUserId: string; message?: string; courtId?: string }
+        @Body() body: CreateChallengeDto
     ) {
         if (!userId) {
             throw new HttpException('Unauthorized: x-user-id header required', HttpStatus.UNAUTHORIZED);

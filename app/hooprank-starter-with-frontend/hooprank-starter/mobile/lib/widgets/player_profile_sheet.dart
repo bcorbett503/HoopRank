@@ -549,6 +549,44 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                     ),
                   ],
 
+                  // Report & Block buttons (Guideline 1.2)
+                  if (!isSelf) ...[
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showReportUserDialog(player),
+                            icon: const Icon(Icons.flag_outlined, size: 18),
+                            label: const Text('Report'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.orange,
+                              side: const BorderSide(color: Colors.orange),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showBlockUserDialog(player),
+                            icon: const Icon(Icons.block, size: 18),
+                            label: const Text('Block'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
                   const SizedBox(height: 24),
 
                   // Stats grid - show loading indicator while fetching
@@ -1018,6 +1056,124 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ========== Report & Block (Guideline 1.2) ==========
+
+  void _showReportUserDialog(User player) {
+    final reasons = [
+      'Spam or misleading',
+      'Harassment or bullying',
+      'Hate speech',
+      'Inappropriate behavior',
+      'Cheating / fake account',
+      'Other',
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text('Report ${player.name}',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            const Divider(),
+            ...reasons.map((reason) => ListTile(
+                  leading:
+                      const Icon(Icons.flag_outlined, color: Colors.orange),
+                  title: Text(reason),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    try {
+                      await ApiService.reportUser(player.id, reason);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Report submitted. Thank you.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to report: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                )),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBlockUserDialog(User player) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Block User'),
+        content: Text(
+            'Are you sure you want to block ${player.name}? You will no longer see their content.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ApiService.blockUser(player.id);
+                if (mounted) {
+                  Navigator.pop(context); // Close profile sheet
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${player.name} has been blocked.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to block: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Block',
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

@@ -14,7 +14,7 @@ export class MessagesController {
     @Post()
     async sendMessage(
         @Headers('x-user-id') userId: string,
-        @Body() body: { senderId?: string; receiverId?: string; toUserId?: string; content: string; matchId?: string; isChallenge?: boolean }
+        @Body() body: { senderId?: string; receiverId?: string; toUserId?: string; content: string; matchId?: string; isChallenge?: boolean; imageUrl?: string }
     ) {
         // Sender is always the authenticated user; ignore caller-supplied senderId.
         const senderId = userId;
@@ -25,7 +25,7 @@ export class MessagesController {
         if (body.senderId && body.senderId !== senderId) {
             throw new ForbiddenException('senderId must match authenticated user');
         }
-        return this.messagesService.sendMessage(senderId, receiverId, body.content, body.matchId, body.isChallenge);
+        return this.messagesService.sendMessage(senderId, receiverId, body.content, body.matchId, body.isChallenge, undefined, body.imageUrl);
     }
 
     @Get('challenges')

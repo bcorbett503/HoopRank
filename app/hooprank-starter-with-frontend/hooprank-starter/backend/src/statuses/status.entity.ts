@@ -17,7 +17,7 @@ export class PlayerStatus {
     @Column({ name: 'image_url', type: 'varchar', nullable: true })
     imageUrl?: string;
 
-    @Column({ name: 'scheduled_at', type: 'timestamp', nullable: true })
+    @Column({ name: 'scheduled_at', type: 'datetime', nullable: true })
     scheduledAt?: Date;
 
     @Column({ name: 'court_id', type: 'varchar', length: 255, nullable: true })
@@ -41,7 +41,7 @@ export class PlayerStatus {
     @Column({ name: 'age_range', type: 'varchar', length: 10, nullable: true })
     ageRange?: string;
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -58,7 +58,7 @@ export class StatusLike {
     @Column({ name: 'user_id' })
     userId: string;
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -77,7 +77,7 @@ export class StatusComment {
     @Column()
     content: string;
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -94,7 +94,7 @@ export class EventAttendee {
     @Column({ name: 'user_id' })
     userId: string;
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -114,7 +114,7 @@ export class UserFollowedCourt {
     @Column({ name: 'alerts_enabled', default: false })
     alertsEnabled: boolean;
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -130,7 +130,7 @@ export class UserFollowedPlayer {
     @Column({ name: 'followed_id', type: 'varchar', length: 255 })
     followedId: string;
 
-    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -145,9 +145,9 @@ export class CheckIn {
     @Column({ name: 'court_id' })
     courtId: string;
 
-    @Column({ name: 'checked_in_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'checked_in_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
     checkedInAt: Date;
 
-    @Column({ name: 'checked_out_at', type: 'timestamp', nullable: true })
+    @Column({ name: 'checked_out_at', type: 'datetime', nullable: true })
     checkedOutAt?: Date;
 }

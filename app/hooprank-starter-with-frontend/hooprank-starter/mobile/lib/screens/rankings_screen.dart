@@ -8,6 +8,7 @@ import '../state/tutorial_state.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/shimmer_skeleton.dart';
 import '../services/messages_service.dart';
 import '../widgets/player_profile_sheet.dart';
 import 'chat_screen.dart';
@@ -926,7 +927,7 @@ class _RankingsScreenState extends State<RankingsScreen>
 
         Expanded(
           child: _isLoadingPlayers
-              ? const Center(child: CircularProgressIndicator())
+              ? const RankingSkeletonLoader()
               : filtered.isEmpty
                   ? const Center(child: Text('No players found'))
                   : RefreshIndicator(
@@ -1350,7 +1351,7 @@ class _RankingsScreenState extends State<RankingsScreen>
 
         Expanded(
           child: _isLoadingTeams
-              ? const Center(child: CircularProgressIndicator())
+              ? const TeamSkeletonLoader()
               : filteredTeams.isEmpty
                   ? Center(
                       child: Column(

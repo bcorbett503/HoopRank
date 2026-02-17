@@ -2,6 +2,7 @@ import { Controller, Get, Post, Delete, Body, Param, Headers, Query, BadRequestE
 import { StatusesService } from './statuses.service';
 import { UsersService } from '../users/users.service';
 import { filterContent } from '../common/content_filter';
+import { CreateStatusDto } from './dto/create-status.dto';
 
 @Controller('statuses')
 export class StatusesController {
@@ -14,21 +15,7 @@ export class StatusesController {
     @Post()
     async createStatus(
         @Headers('x-user-id') userId: string,
-        @Body() body: {
-            content: string;
-            imageUrl?: string;
-            scheduledAt?: string;
-            isRecurring?: boolean;
-            courtId?: string;
-            videoUrl?: string;
-            videoThumbnailUrl?: string;
-            videoDurationMs?: number;
-            gameMode?: string;
-            courtType?: string;
-            ageRange?: string;
-            taggedPlayerIds?: string[];
-            tagMode?: string;
-        },
+        @Body() body: CreateStatusDto,
     ) {
         if (!userId) {
             return { success: false, error: 'User ID required' };
@@ -75,30 +62,6 @@ export class StatusesController {
         return this.statusesService.getFeed(userId);
     }
 
-    // Debug endpoint to check player_statuses table
-    @Get('debug-statuses')
-    async debugStatuses() {
-        return this.statusesService.debugPlayerStatuses();
-    }
-
-    // Test endpoint to debug feed query in isolation
-    @Get('test-feed')
-    async testFeed(@Headers('x-user-id') userId: string) {
-        return this.statusesService.testFeedQuery(userId);
-    }
-
-    // Migration endpoint to add video columns
-    @Post('migrate-video-columns')
-    async migrateVideoColumns() {
-        return this.statusesService.migrateVideoColumns();
-    }
-
-    // Migration endpoint to add run attribute columns
-    @Post('migrate-run-attributes')
-    async migrateRunAttributes() {
-        return this.statusesService.migrateRunAttributeColumns();
-    }
-
     // Get unified feed (statuses + check-ins + matches)
     // Supports filter: 'foryou' (local 50mi), 'following' (followed only), 'all' (default)
     @Get('unified-feed')
@@ -107,17 +70,24 @@ export class StatusesController {
         @Query('filter') filter: string = 'all',
         @Query('lat') lat?: string,
         @Query('lng') lng?: string,
+        @Query('limit') limitStr?: string,
+        @Query('offset') offsetStr?: string,
     ) {
         try {
             if (!userId) {
                 return [];
             }
+            const limit = Math.min(Math.max(parseInt(limitStr || '', 10) || 50, 1), 100);
+            const offset = Math.max(parseInt(offsetStr || '', 10) || 0, 0);
             const latitude = lat ? parseFloat(lat) : undefined;
             const longitude = lng ? parseFloat(lng) : undefined;
-            return await this.statusesService.getUnifiedFeed(userId, filter || 'all', 50, latitude, longitude);
+            const results = await this.statusesService.getUnifiedFeed(userId, filter || 'all', limit + 1, latitude, longitude);
+            // Fetch limit+1 to detect hasMore, return only limit items
+            const hasMore = results.length > limit;
+            return { items: results.slice(0, limit), hasMore };
         } catch (error) {
             console.error('Controller getUnifiedFeed error:', error.message);
-            return [];
+            return { items: [], hasMore: false };
         }
     }
 

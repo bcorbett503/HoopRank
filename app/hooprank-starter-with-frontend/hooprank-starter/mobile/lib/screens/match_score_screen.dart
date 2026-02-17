@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class MatchScoreScreen extends StatefulWidget {
   const MatchScoreScreen({super.key});
@@ -123,6 +124,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
         // Do not treat submit as finalized rating update yet.
       }
 
+      AnalyticsService.logMatchCompleted(mode: isTeamMatch ? match.mode ?? '5v5' : '1v1');
       context.go('/match/result');
     } catch (e) {
       if (mounted) {

@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 import 'api_service.dart';
 
 /// Handles push notifications via Firebase Cloud Messaging
@@ -18,6 +20,11 @@ class NotificationService with WidgetsBindingObserver {
 
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
+
+  /// GoRouter instance for deep-link navigation on notification tap.
+  /// Set from main.dart after router creation.
+  static GoRouter? _router;
+  static void setRouter(GoRouter router) => _router = router;
 
   /// Callbacks to notify when a push notification is received (for screen refreshes)
   static final List<VoidCallback> _onNotificationCallbacks = [];
@@ -211,7 +218,8 @@ class NotificationService with WidgetsBindingObserver {
     // Notify listeners to refresh (e.g., home screen)
     _notifyListeners();
 
-    // Show local notification without badge increment
+    // Show local notification without badge increment.
+    // Encode data as JSON so _onNotificationTap can parse it for deep-linking.
     if (message.notification != null) {
       _localNotifications.show(
         message.hashCode,
@@ -230,21 +238,81 @@ class NotificationService with WidgetsBindingObserver {
             presentBadge: false,
           ),
         ),
-        payload: message.data.toString(),
+        payload: jsonEncode(message.data),
       );
     }
   }
 
   void _handleMessageTap(RemoteMessage message) {
     debugPrint('Message tap: ${message.data}');
-    // Clear badge when user taps a notification
     clearBadge();
+    _navigateForData(message.data);
   }
 
   void _onNotificationTap(NotificationResponse response) {
     debugPrint('Local notification tap: ${response.payload}');
-    // Clear badge when user taps a local notification
     clearBadge();
+    if (response.payload != null && response.payload!.isNotEmpty) {
+      try {
+        final data = Map<String, dynamic>.from(jsonDecode(response.payload!));
+        _navigateForData(data);
+      } catch (_) {
+        // Payload wasn't valid JSON — legacy or malformed, fall through.
+      }
+    }
+  }
+
+  /// Deep-link to the correct screen based on the notification data payload.
+  /// Matches the `type` values sent by NotificationsService on the backend.
+  void _navigateForData(Map<String, dynamic> data) {
+    final router = _router;
+    if (router == null) return;
+
+    final type = data['type'] as String? ?? '';
+    switch (type) {
+      case 'message':
+        // threadId is the other user's ID in DM context
+        final threadId = data['threadId'] as String? ?? '';
+        if (threadId.isNotEmpty) {
+          router.go('/messages/chat/$threadId');
+        } else {
+          router.go('/messages');
+        }
+        break;
+      case 'challenge':
+        // Show the feed where challenge banners appear
+        router.go('/play');
+        break;
+      case 'score_submitted':
+      case 'score_contested':
+      case 'match_completed':
+        router.go('/matches');
+        break;
+      case 'court_activity':
+        final courtId = data['courtId'] as String? ?? '';
+        if (courtId.isNotEmpty) {
+          router.go('/courts?courtId=$courtId');
+        } else {
+          router.go('/courts');
+        }
+        break;
+      case 'team_invite':
+      case 'team_invite_accepted':
+      case 'team_event':
+      case 'team_score_submitted':
+      case 'team_amendment':
+      case 'team_amendment_response':
+      case 'team_match_finalized':
+        router.go('/teams');
+        break;
+      case 'follow':
+        router.go('/play');
+        break;
+      default:
+        // Unknown type — just go home
+        router.go('/play');
+        break;
+    }
   }
 }
 

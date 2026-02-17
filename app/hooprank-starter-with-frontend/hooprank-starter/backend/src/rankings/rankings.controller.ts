@@ -15,7 +15,11 @@ export class RankingsController {
         @Query('scope') scope: string = 'global',
         @Query('ageGroup') ageGroup?: string,
         @Query('gender') gender?: string,
+        @Query('limit') limitStr?: string,
+        @Query('offset') offsetStr?: string,
     ) {
+        const limit = Math.min(Math.max(parseInt(limitStr || '', 10) || 50, 1), 100);
+        const offset = Math.max(parseInt(offsetStr || '', 10) || 0, 0);
         console.log('getRankings: mode=', mode, 'scope=', scope, 'ageGroup=', ageGroup, 'gender=', gender);
 
         try {
@@ -51,11 +55,12 @@ export class RankingsController {
                     paramIndex++;
                 }
 
-                query += ` ORDER BY COALESCE(t.rating, 3.0) DESC LIMIT 100`;
+                query += ` ORDER BY COALESCE(t.rating, 3.0) DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+                params.push(limit, offset);
 
                 const teams = await this.dataSource.query(query, params);
                 console.log('getRankings: found', teams.length, 'teams for mode', mode);
-                return { mode, rankings: teams.map((t: any, i: number) => ({ ...t, rank: i + 1 })) };
+                return { mode, rankings: teams.map((t: any, i: number) => ({ ...t, rank: offset + i + 1 })), hasMore: teams.length === limit };
             }
 
             // For 1v1, return individual players
@@ -85,11 +90,11 @@ export class RankingsController {
                 FROM users
                 WHERE hoop_rank IS NOT NULL AND name IS NOT NULL
                 ORDER BY hoop_rank DESC
-                LIMIT 100
-            `);
+                LIMIT $1 OFFSET $2
+            `, [limit, offset]);
 
             console.log('getRankings: found', players.length, 'players');
-            return { mode, rankings: players.map((p: any, i: number) => ({ ...p, rank: i + 1 })) };
+            return { mode, rankings: players.map((p: any, i: number) => ({ ...p, rank: offset + i + 1 })), hasMore: players.length === limit };
         } catch (error) {
             console.error('getRankings error:', error.message);
             return { mode, rankings: [] };
