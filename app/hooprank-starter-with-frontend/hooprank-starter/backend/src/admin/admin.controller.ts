@@ -14,6 +14,21 @@ export class AdminController {
     constructor(private dataSource: DataSource) { }
 
     /**
+     * Add image_url columns to messages and team_messages tables
+     */
+    @Public()
+    @Post('migrate/message-image-url')
+    async migrateMessageImageUrl() {
+        try {
+            await this.dataSource.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url TEXT`);
+            await this.dataSource.query(`ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS image_url TEXT`);
+            return { success: true, message: 'image_url columns added to messages and team_messages' };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Migrate image_url column to TEXT to support larger base64 images
      */
     @Post('migrate/image-url-text')
