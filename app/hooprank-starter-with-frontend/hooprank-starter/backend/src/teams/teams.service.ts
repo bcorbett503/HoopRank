@@ -608,14 +608,14 @@ export class TeamsService {
             content,
             imageUrl: imageUrl || null,
         } as any);
-        await this.messagesRepository.save(message);
+        const savedMessage = await this.messagesRepository.save(message as any);
 
         // Send push notifications to other team members
         this.sendTeamMessageNotification(teamId, userId, team.name, content).catch(err => {
             console.error('Failed to send team message notifications:', err);
         });
 
-        return message;
+        return savedMessage as any as TeamMessage;
     }
 
     /**
