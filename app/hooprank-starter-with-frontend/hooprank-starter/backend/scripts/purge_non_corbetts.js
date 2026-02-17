@@ -15,7 +15,12 @@ const https = require('https');
 const admin = require('firebase-admin');
 
 const BASE_URL = 'https://heartfelt-appreciation-production-65f1.up.railway.app';
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyDpxXOVbelRrNUhMTJPiZ_19VCm0GcZxHM';
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
+if (!FIREBASE_API_KEY) {
+    console.error('❌ FIREBASE_API_KEY environment variable is required.');
+    console.error('   Usage: FIREBASE_API_KEY="your-key" node purge_non_corbetts.js');
+    process.exit(1);
+}
 
 // Brett Corbett — the authenticated user for API calls
 const AUTH_USER_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2';
