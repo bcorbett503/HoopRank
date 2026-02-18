@@ -917,6 +917,51 @@ async function testUsersExtended() {
     } catch (e) { fail('GET /users/:id/recent-games', e.message); }
 }
 
+async function testOnboarding() {
+    // Onboarding progress persistence — users.controller.ts getMe() returns
+    // onboarding_progress, users.service.ts updateProfile() handles JSONB writes.
+    // Mobile app reads/writes via ApiService.getOnboardingProgress/updateOnboardingProgress.
+    console.log('\n═══ 14.5 ONBOARDING PERSISTENCE ═══');
+
+    // Read current onboarding_progress (may be null for first run)
+    let originalProgress = null;
+    try {
+        const r = await GET('/users/me');
+        if (r.status === 200 && r.body) {
+            originalProgress = r.body.onboarding_progress || r.body.onboardingProgress;
+            pass('GET onboarding (read)', `current=${JSON.stringify(originalProgress || null).slice(0, 60)}`);
+        } else fail('GET onboarding (read)', `status ${r.status}`);
+    } catch (e) { fail('GET onboarding (read)', e.message); }
+
+    // Write test onboarding progress
+    const testProgress = { check_in: true, follow_court: true, schedule_run: false };
+    try {
+        const r = await PUT('/users/me', { onboarding_progress: testProgress });
+        if (r.status === 200) pass('PUT onboarding (write)', 'wrote test progress');
+        else fail('PUT onboarding (write)', `status ${r.status}: ${JSON.stringify(r.body).slice(0, 100)}`);
+    } catch (e) { fail('PUT onboarding (write)', e.message); }
+
+    // Verify it persisted
+    try {
+        const r = await GET('/users/me');
+        if (r.status === 200 && r.body) {
+            const saved = r.body.onboarding_progress || r.body.onboardingProgress;
+            if (saved && saved.check_in === true && saved.follow_court === true) {
+                pass('GET onboarding (verify)', `persisted=${JSON.stringify(saved).slice(0, 60)}`);
+            } else {
+                fail('GET onboarding (verify)', `expected check_in:true, got ${JSON.stringify(saved)}`);
+            }
+        } else fail('GET onboarding (verify)', `status ${r.status}`);
+    } catch (e) { fail('GET onboarding (verify)', e.message); }
+
+    // Restore original value (cleanup)
+    try {
+        const r = await PUT('/users/me', { onboarding_progress: originalProgress || {} });
+        if (r.status === 200) pass('PUT onboarding (restore)', 'restored original');
+        else fail('PUT onboarding (restore)', `status ${r.status}`);
+    } catch (e) { fail('PUT onboarding (restore)', e.message); }
+}
+
 async function testStubs() {
     // Stub controllers: MeController, InvitesController, ThreadsController
     console.log('\n═══ 15. STUBS (me/invites/threads) ═══');
@@ -1026,6 +1071,7 @@ async function main() {
     await testRankings();
     await testCourtsExtended();
     await testUsersExtended();
+    await testOnboarding();
     await testStubs();
     await testUpload();
 
