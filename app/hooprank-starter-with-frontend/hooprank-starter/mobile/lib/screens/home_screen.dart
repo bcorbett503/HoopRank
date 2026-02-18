@@ -1840,7 +1840,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(
+        child: Flex(
+          direction: Axis.vertical,
           crossAxisAlignment: CrossAxisAlignment.start,
           clipBehavior: Clip.hardEdge,
           children: [
