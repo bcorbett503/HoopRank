@@ -6,6 +6,7 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
+import '../utils/image_utils.dart';
 
 /// Status indicator badge for challenges
 /// Shows appropriate color and icon based on challenge direction and status
@@ -203,7 +204,7 @@ class ChallengeDialog extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 40,
-            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+            backgroundImage: avatarUrl != null ? safeImageProvider(avatarUrl!) : null,
             child: avatarUrl == null
                 ? Text(playerName[0].toUpperCase(),
                     style: const TextStyle(fontSize: 24))

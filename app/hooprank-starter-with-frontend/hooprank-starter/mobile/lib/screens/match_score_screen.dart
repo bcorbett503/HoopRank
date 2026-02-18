@@ -36,8 +36,8 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     final isTeamMatch = _isTeamMatch(match);
 
     if (matchId == null) {
-      // Fallback to mock flow if no match ID
-      _submitMock(userScore, oppScore);
+      setState(() => _error = 'No active match found. Please start a new match.');
+      debugPrint('SCORE_SUBMIT: No matchId — cannot submit score without an active match');
       return;
     }
 
@@ -136,29 +136,7 @@ class _MatchScoreScreenState extends State<MatchScoreScreen> {
     }
   }
 
-  void _submitMock(int userScore, int oppScore) {
-    // Fallback mock flow for development
-    final match = context.read<MatchState>();
-    final auth = context.read<AuthState>();
-    final me = auth.currentUser;
 
-    match.setScores(userScore, oppScore);
-
-    // Simple mock delta calculation
-    final won = userScore > oppScore;
-    final delta = won ? 0.15 : -0.1;
-    final currentRating = me?.rating ?? 3.0;
-
-    match.setOutcome(
-      deltaVal: delta,
-      rBefore: currentRating,
-      rAfter: currentRating + delta,
-      rkBefore: 1,
-      rkAfter: 1,
-    );
-
-    context.go('/match/result');
-  }
 
   @override
   Widget build(BuildContext context) {

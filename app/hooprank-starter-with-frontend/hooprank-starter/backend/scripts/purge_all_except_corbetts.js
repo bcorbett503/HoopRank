@@ -1,85 +1,116 @@
 /**
  * Purge ALL users and related data EXCEPT Brett, Kevin, and Richard Corbett.
- * Courts are preserved. Only user-generated data is removed.
+ * Uses the production API (DELETE /users/admin/user/:userId) instead of direct DB.
+ * Courts and scheduled runs are preserved.
+ *
+ * Usage: node scripts/purge_all_except_corbetts.js
  */
-const { Client } = require('pg');
+const https = require('https');
 
-const DATABASE_URL = 'postgresql://postgres:PgWRGfwrQprwVnLpYMNLSNxlNKNTIuxO@autorack.proxy.rlwy.net:52122/railway';
+const PROD_HOST = 'heartfelt-appreciation-production-65f1.up.railway.app';
 
-const KEEP_IDS = [
+const KEEP_IDS = new Set([
     '4ODZUrySRUhFDC5wVW6dCySBprD2', // Brett Corbett
     '0OW2dC3NsqexmTFTXgu57ZQfaIo2', // Kevin Corbett
     'Zc3Ey4VTslZ3VxsPtcqulmMw9e53', // Richard Corbett
-];
+]);
 
-const KEEP_LIST = KEEP_IDS.map(id => `'${id}'`).join(',');
+// Use Brett's ID for the x-user-id header
+const ADMIN_USER = '4ODZUrySRUhFDC5wVW6dCySBprD2';
 
-async function purge() {
-    const client = new Client({
-        connectionString: DATABASE_URL,
-        ssl: false,
-        connectionTimeoutMillis: 30000,
-        keepAlive: true,
-    });
+function request(method, path) {
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: PROD_HOST,
+            port: 443,
+            path,
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': ADMIN_USER,
+            },
+            timeout: 30000,
+        };
 
-    try {
-        await client.connect();
-        console.log('Connected.\n');
-
-        // Preview who will be deleted
-        const preview = await client.query(
-            `SELECT id, name FROM users WHERE id NOT IN (${KEEP_LIST}) ORDER BY name`
-        );
-        console.log(`Will delete ${preview.rowCount} users (keeping ${KEEP_IDS.length}):`);
-        preview.rows.forEach(u => console.log(`  - ${u.name} (${u.id.substring(0, 8)}…)`));
-        console.log('');
-
-        // Delete from child tables first (foreign key order)
-        const deletions = [
-            `DELETE FROM status_likes WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM status_comments WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM event_attendees WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM player_statuses WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM check_ins WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM user_followed_courts WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM user_followed_players WHERE follower_id NOT IN (${KEEP_LIST}) OR followed_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM user_court_alerts WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM friendships WHERE user_id NOT IN (${KEEP_LIST}) OR friend_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM team_members WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM run_attendees WHERE user_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM scheduled_runs WHERE created_by NOT IN (${KEEP_LIST})`,
-            `DELETE FROM messages WHERE from_id NOT IN (${KEEP_LIST}) OR to_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM challenges WHERE challenger_id NOT IN (${KEEP_LIST}) OR challenged_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM matches WHERE creator_id NOT IN (${KEEP_LIST}) OR opponent_id NOT IN (${KEEP_LIST})`,
-            `DELETE FROM teams WHERE created_by NOT IN (${KEEP_LIST})`,
-            // Finally: users
-            `DELETE FROM users WHERE id NOT IN (${KEEP_LIST})`,
-        ];
-
-        for (const sql of deletions) {
-            try {
-                const result = await client.query(sql);
-                const table = sql.match(/FROM (\w+)/)?.[1] || '?';
-                if (result.rowCount > 0) {
-                    console.log(`  ✓ ${table}: deleted ${result.rowCount} rows`);
+        const req = https.request(options, (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+                try {
+                    resolve({ status: res.statusCode, data: JSON.parse(body || '{}') });
+                } catch (e) {
+                    resolve({ status: res.statusCode, data: body });
                 }
-            } catch (e) {
-                const table = sql.match(/FROM (\w+)/)?.[1] || '?';
-                console.log(`  ⚠ ${table}: ${e.message}`);
-            }
-        }
+            });
+        });
 
-        // Verify
-        const remaining = await client.query('SELECT id, name FROM users ORDER BY name');
-        console.log(`\nRemaining users (${remaining.rowCount}):`);
-        remaining.rows.forEach(u => console.log(`  ✓ ${u.name}`));
-
-        console.log('\nDone!');
-    } catch (e) {
-        console.error('Error:', e.message);
-    } finally {
-        await client.end();
-    }
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+        req.end();
+    });
 }
 
-purge();
+async function purge() {
+    console.log('🔍 Fetching all users from production API...\n');
+
+    // Step 1: Get all users
+    const usersRes = await request('GET', '/users');
+    if (usersRes.status !== 200 || !Array.isArray(usersRes.data)) {
+        console.error('Failed to fetch users:', usersRes.status, usersRes.data);
+        return;
+    }
+
+    const allUsers = usersRes.data;
+    const toDelete = allUsers.filter(u => !KEEP_IDS.has(u.id));
+    const toKeep = allUsers.filter(u => KEEP_IDS.has(u.id));
+
+    console.log(`Total users: ${allUsers.length}`);
+    console.log(`Keeping ${toKeep.length}:`);
+    toKeep.forEach(u => console.log(`  ✓ ${u.name} (${u.id.substring(0, 8)}…)`));
+    console.log(`Deleting ${toDelete.length}:`);
+    toDelete.forEach(u => console.log(`  ✗ ${u.name || u.email || u.id} (${u.id.substring(0, 8)}…)`));
+    console.log('');
+
+    if (toDelete.length === 0) {
+        console.log('✅ Nothing to delete!');
+        return;
+    }
+
+    // Step 2: Delete each user via admin API
+    let deleted = 0;
+    let failed = 0;
+
+    for (const user of toDelete) {
+        const label = user.name || user.email || user.id;
+        try {
+            const res = await request('DELETE', `/users/admin/user/${encodeURIComponent(user.id)}`);
+            if (res.status === 200 && res.data?.success) {
+                deleted++;
+                const tables = res.data.deletedFrom?.length || 0;
+                console.log(`  ✓ Deleted ${label} (cleaned ${tables} tables)`);
+            } else {
+                failed++;
+                console.log(`  ⚠ ${label}: status=${res.status} ${JSON.stringify(res.data)}`);
+            }
+        } catch (e) {
+            failed++;
+            console.log(`  ✗ ${label}: ${e.message}`);
+        }
+
+        // Small delay to avoid overwhelming the server
+        await new Promise(r => setTimeout(r, 200));
+    }
+
+    console.log(`\n📊 Summary: ${deleted} deleted, ${failed} failed`);
+
+    // Step 3: Verify
+    const verifyRes = await request('GET', '/users');
+    if (verifyRes.status === 200 && Array.isArray(verifyRes.data)) {
+        console.log(`\nRemaining users (${verifyRes.data.length}):`);
+        verifyRes.data.forEach(u => console.log(`  ✓ ${u.name}`));
+    }
+
+    console.log('\n✅ Purge complete!');
+}
+
+purge().catch(e => console.error('Fatal error:', e.message));

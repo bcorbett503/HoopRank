@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../state/app_state.dart';
 import '../services/messages_service.dart';
 import '../services/analytics_service.dart';
+import '../utils/image_utils.dart';
 
 /// Team group chat screen - displays messages from all team members
 class TeamChatScreen extends StatefulWidget {
@@ -328,7 +329,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
             CircleAvatar(
               radius: 16,
               backgroundImage: message.senderPhotoUrl != null
-                  ? NetworkImage(message.senderPhotoUrl!)
+                  ? safeImageProvider(message.senderPhotoUrl!)
                   : null,
               backgroundColor: Colors.deepOrange.withOpacity(0.2),
               child: message.senderPhotoUrl == null

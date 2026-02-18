@@ -5,6 +5,7 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
 import '../services/analytics_service.dart';
+import '../utils/image_utils.dart';
 import 'chat_screen.dart';
 
 class PlayersScreen extends StatefulWidget {
@@ -309,7 +310,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
                             child: ListTile(
                               leading: CircleAvatar(
                                 backgroundImage: player.photoUrl != null
-                                    ? NetworkImage(player.photoUrl!)
+                                    ? safeImageProvider(player.photoUrl!)
                                     : null,
                                 child: player.photoUrl == null
                                     ? Text(player.name.isNotEmpty ? player.name[0] : '?')

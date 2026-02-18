@@ -61,21 +61,6 @@ class CourtService {
         debugPrint('CourtService: Loaded ${_courts.length} courts from local assets (fallback)');
       }
 
-      // The Olympic Club – signature court not yet in the production DB.
-      // No hardcoded king/user data; kings come from the API when available.
-      final olympicClub = Court(
-        id: '44444444-4444-4444-4444-444444444444',
-        name: 'The Olympic Club',
-        lat: 37.7878,
-        lng: -122.4099,
-        address: '524 Post Street, San Francisco, CA',
-        isSignature: true,
-        isIndoor: true,
-        access: 'members',
-      );
-      if (!_courts.any((c) => c.id == olympicClub.id)) {
-        _courts.insert(0, olympicClub);
-      }
 
       _isLoaded = true;
       debugPrint('CourtService: Total courts available: ${_courts.length}');

@@ -4,6 +4,7 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../state/check_in_state.dart';
 import '../screens/chat_screen.dart';
+import '../utils/image_utils.dart';
 
 /// A clickable player name that shows their profile when tapped
 class ClickablePlayerName extends StatelessWidget {
@@ -35,7 +36,7 @@ class ClickablePlayerName extends StatelessWidget {
             CircleAvatar(
               radius: 14,
               backgroundImage:
-                  photoUrl != null ? NetworkImage(photoUrl!) : null,
+                  photoUrl != null ? safeImageProvider(photoUrl!) : null,
               backgroundColor: Colors.deepOrange.withOpacity(0.2),
               child: photoUrl == null
                   ? Text(
@@ -399,7 +400,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       CircleAvatar(
                         radius: 40,
                         backgroundImage: player.photoUrl != null
-                            ? NetworkImage(player.photoUrl!)
+                            ? safeImageProvider(player.photoUrl!)
                             : null,
                         backgroundColor: Colors.deepOrange[50],
                         child: player.photoUrl == null

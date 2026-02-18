@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../utils/image_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
@@ -501,7 +502,7 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
                           return ActionChip(
                             avatar: player.photoUrl != null
                                 ? CircleAvatar(
-                                    backgroundImage: NetworkImage(player.photoUrl!),
+                                    backgroundImage: safeImageProvider(player.photoUrl!),
                                     radius: 12,
                                   )
                                 : CircleAvatar(

@@ -379,55 +379,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _confirmDeleteAccount() {
+    final deleteController = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Are you absolutely sure?',
-            style: TextStyle(color: Colors.red)),
-        content: const Text(
-          'Type DELETE to confirm account deletion.',
-          style: TextStyle(color: Colors.white70),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text('Are you absolutely sure?',
+              style: TextStyle(color: Colors.red)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Type DELETE to confirm account deletion.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: deleteController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Type DELETE here',
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey[700]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(color: Colors.red),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onChanged: (_) => setDialogState(() {}),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child:
+                  const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            TextButton(
+              onPressed: deleteController.text.trim() == 'DELETE'
+                  ? () async {
+                      Navigator.pop(ctx);
+                      try {
+                        final success = await ApiService.deleteMyAccount();
+                        if (success && mounted) {
+                          final auth = context.read<AuthState>();
+                          await auth.logout();
+                          if (mounted) context.go('/');
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Your account has been deleted. We\'re sorry to see you go.'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to delete account: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  : null,
+              child: Text('Yes, Delete Everything',
+                  style: TextStyle(
+                      color: deleteController.text.trim() == 'DELETE'
+                          ? Colors.red
+                          : Colors.grey,
+                      fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child:
-                const Text('Cancel', style: TextStyle(color: Colors.white54)),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                final success = await ApiService.deleteMyAccount();
-                if (success && mounted) {
-                  final auth = context.read<AuthState>();
-                  await auth.logout();
-                  if (mounted) context.go('/');
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'Your account has been deleted. We\'re sorry to see you go.'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to delete account: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Yes, Delete Everything',
-                style: TextStyle(
-                    color: Colors.red, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>HoopRank Token Generator</title>
+    <style>
+        body {
+            font-family: -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+
+        h1 {
+            color: #e94560;
+        }
+
+        button {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 8px 4px;
+        }
+
+        button:hover {
+            background: #c73e54;
+        }
+
+        #token {
+            word-break: break-all;
+            background: #16213e;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            font-family: monospace;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+            user-select: all;
+        }
+
+        #status {
+            margin-top: 12px;
+            color: #0f3460;
+            font-weight: bold;
+        }
+
+        .success {
+            color: #4ecca3 !important;
+        }
+
+        .error {
+            color: #e94560 !important;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🏀 HoopRank Token Generator</h1>
+    <p>Sign in to get a Firebase ID token for API seeding.</p>
+
+    <button onclick="signInGoogle()">Sign in with Google</button>
+    <button onclick="signInEmail()">Sign in with Email</button>
+
+    <div id="status"></div>
+    <div id="token" style="display:none"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js';
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDtPMA0ze_BUhENT3zcjoLoIrrOeAVLCjo",
+            authDomain: "hooprank-503.firebaseapp.com",
+            projectId: "hooprank-503",
+            storageBucket: "hooprank-503.firebasestorage.app",
+            messagingSenderId: "655663987178",
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        window.signInGoogle = async function () {
+            const status = document.getElementById('status');
+            status.className = '';
+            status.textContent = 'Opening Google sign-in popup...';
+            try {
+                const provider = new GoogleAuthProvider();
+                const result = await signInWithPopup(auth, provider);
+                const token = await result.user.getIdToken();
+                showToken(token, result.user);
+            } catch (e) {
+                status.className = 'error';
+                status.textContent = 'Error: ' + e.message;
+                console.error(e);
+            }
+        };
+
+        window.signInEmail = async function () {
+            const email = prompt('Email:');
+            const password = prompt('Password:');
+            if (!email || !password) return;
+            const status = document.getElementById('status');
+            status.className = '';
+            status.textContent = 'Signing in...';
+            try {
+                const result = await signInWithEmailAndPassword(auth, email, password);
+                const token = await result.user.getIdToken();
+                showToken(token, result.user);
+            } catch (e) {
+                status.className = 'error';
+                status.textContent = 'Error: ' + e.message;
+            }
+        };
+
+        function showToken(token, user) {
+            const status = document.getElementById('status');
+            const tokenEl = document.getElementById('token');
+            status.className = 'success';
+            status.textContent = `✓ Signed in as ${user.displayName || user.email} (${user.uid})`;
+            tokenEl.style.display = 'block';
+            tokenEl.textContent = token;
+
+            // Also copy to clipboard
+            navigator.clipboard.writeText(token).then(() => {
+                status.textContent += ' — Token copied to clipboard!';
+            }).catch(() => { });
+
+            // Save to localStorage for easy retrieval
+            localStorage.setItem('hooprank_token', token);
+            localStorage.setItem('hooprank_uid', user.uid);
+
+            // Also log it
+            console.log('=== FIREBASE ID TOKEN ===');
+            console.log(token);
+            console.log('=== UID ===');
+            console.log(user.uid);
+        }
+    </script>
+</body>
+
+</html>

@@ -195,8 +195,9 @@ export class MatchesService {
   }
 
   /**
-   * Phase 1: Store scores without updating ratings — sets status to 'score_submitted'.
-   * Ensures the score_submitter_id column exists, then writes the scores.
+   * Phase 1: Store scores and IMMEDIATELY complete the match (update ratings,
+   * create feed item, mark challenge done). The opponent can still contest,
+   * which will reverse all effects.
    */
   async submitScoreOnly(
     id: string,
@@ -225,26 +226,17 @@ export class MatchesService {
       throw new Error('You are not a participant in this match');
     }
 
-    // Optionally update court if valid UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const isValidUUID = courtId && uuidRegex.test(courtId);
+    // Store score_submitter_id so contestScore knows who submitted
+    await this.dataSource.query(`
+      UPDATE matches SET score_submitter_id = $2, updated_at = NOW()
+      WHERE id = $1
+    `, [id, submitterId]);
 
-    if (isValidUUID) {
-      await this.dataSource.query(`
-        UPDATE matches SET status = 'score_submitted', score_creator = $2, score_opponent = $3,
-          score_submitter_id = $4, court_id = $5, updated_at = NOW()
-        WHERE id = $1
-      `, [id, scoreCreator, scoreOpponent, submitterId, courtId]);
-    } else {
-      await this.dataSource.query(`
-        UPDATE matches SET status = 'score_submitted', score_creator = $2, score_opponent = $3,
-          score_submitter_id = $4, updated_at = NOW()
-        WHERE id = $1
-      `, [id, scoreCreator, scoreOpponent, submitterId]);
-    }
+    // Determine the winner and immediately complete the match
+    const winnerId = scoreCreator > scoreOpponent ? creatorId : opponentId;
+    const completed = await this.completeWithScores(id, winnerId, scoreCreator, scoreOpponent, courtId);
 
-
-    // Send push notification to the OTHER player asking them to confirm
+    // Notify the OTHER player so they can confirm or contest
     const otherUserId = submitterId === creatorId ? opponentId : creatorId;
     const submitterResult = await this.dataSource.query(`SELECT name FROM users WHERE id = $1`, [submitterId]);
     const submitterName = submitterResult[0]?.name || 'Your opponent';
@@ -253,12 +245,13 @@ export class MatchesService {
       otherUserId, submitterName, scoreCreator, scoreOpponent, id
     ).catch(() => { });
 
-    const result = await this.dataSource.query(`SELECT * FROM matches WHERE id = $1`, [id]);
-    return result[0];
+    return completed;
   }
 
   /**
-   * Phase 2a: Opponent confirms the score — triggers rating update + match completion.
+   * Phase 2a: Opponent confirms the score.
+   * With instant results, the match is already completed — this is a no-op
+   * acknowledgment. Kept for backward compatibility.
    */
   async confirmScore(matchId: string, confirmerId: string): Promise<Match> {
     const isPostgres = !!process.env.DATABASE_URL;
@@ -268,33 +261,29 @@ export class MatchesService {
     if (!match) throw new Error('Match not found');
 
     const status = (match as any).status;
-    if (status !== 'score_submitted') {
-      throw new Error(`Cannot confirm — match status is '${status}', expected 'score_submitted'`);
+
+    // Match is already completed (instant results) — just return it
+    if (status === 'completed') {
+      return match;
     }
 
-    const creatorId = (match as any).creator_id || match.creatorId;
-    const opponentId = (match as any).opponent_id || match.opponentId;
-    const submitterId = (match as any).score_submitter_id;
-
-    // Only the NON-submitter can confirm
-    if (confirmerId === submitterId) {
-      throw new Error('You submitted the score — only the other player can confirm');
-    }
-    if (confirmerId !== creatorId && confirmerId !== opponentId) {
-      throw new Error('You are not a participant in this match');
+    // Backward compat: if still score_submitted (old flow), complete it
+    if (status === 'score_submitted') {
+      const creatorId = (match as any).creator_id || match.creatorId;
+      const opponentId = (match as any).opponent_id || match.opponentId;
+      const scoreCreator = parseInt((match as any).score_creator);
+      const scoreOpponent = parseInt((match as any).score_opponent);
+      const winnerId = scoreCreator > scoreOpponent ? creatorId : opponentId;
+      return this.completeWithScores(matchId, winnerId, scoreCreator, scoreOpponent);
     }
 
-    const scoreCreator = parseInt((match as any).score_creator);
-    const scoreOpponent = parseInt((match as any).score_opponent);
-    const winnerId = scoreCreator > scoreOpponent ? creatorId : opponentId;
-
-
-    // Now run the full rating-update + completion flow
-    return this.completeWithScores(matchId, winnerId, scoreCreator, scoreOpponent);
+    throw new Error(`Cannot confirm — match status is '${status}'`);
   }
 
   /**
-   * Phase 2b: Opponent contests the score — match is voided, no rating change.
+   * Phase 2b: Opponent contests the score — REVERSES instant results:
+   * restores original ratings, decrements games_played, deletes the shadow
+   * feed item, and sets the match to 'contested'.
    */
   async contestScore(matchId: string, contesterId: string): Promise<Match> {
     const isPostgres = !!process.env.DATABASE_URL;
@@ -304,8 +293,9 @@ export class MatchesService {
     if (!match) throw new Error('Match not found');
 
     const status = (match as any).status;
-    if (status !== 'score_submitted') {
-      throw new Error(`Cannot contest — match status is '${status}', expected 'score_submitted'`);
+    // Accept both completed (instant results) and score_submitted (legacy)
+    if (status !== 'completed' && status !== 'score_submitted') {
+      throw new Error(`Cannot contest — match status is '${status}'`);
     }
 
     const creatorId = (match as any).creator_id || match.creatorId;
@@ -320,11 +310,57 @@ export class MatchesService {
       throw new Error('You are not a participant in this match');
     }
 
-    // Set status to contested, clear scores
+    // --- Reverse the instant rating changes ---
+    const scoreCreator = parseInt((match as any).score_creator);
+    const scoreOpponent = parseInt((match as any).score_opponent);
+
+    if (!isNaN(scoreCreator) && !isNaN(scoreOpponent)) {
+      const creator = await this.users.get(creatorId);
+      const opponent = await this.users.get(opponentId);
+
+      if (creator && opponent) {
+        const creatorWon = (match as any).winner_id === creatorId;
+        const curCreatorRating = parseFloat((creator as any).hoop_rank) || 3.0;
+        const curOpponentRating = parseFloat((opponent as any).hoop_rank) || 3.0;
+        // games_played was incremented during completion — use current - 1 for
+        // the reverse calculation so the K-factor matches what was applied.
+        const curCreatorGames = Math.max((parseInt((creator as any).games_played) || 1) - 1, 0);
+        const curOpponentGames = Math.max((parseInt((opponent as any).games_played) || 1) - 1, 0);
+
+        // Reverse: recalculate what the rating WAS before the match completed
+        const origCreatorRating = this.rater.updateRating(curCreatorRating, curOpponentRating, curCreatorGames, creatorWon ? 0 : 1);
+        const origOpponentRating = this.rater.updateRating(curOpponentRating, curCreatorRating, curOpponentGames, creatorWon ? 1 : 0);
+
+        // Restore original ratings and decrement games_played
+        await this.dataSource.query(`
+          UPDATE users SET hoop_rank = $1, games_played = GREATEST(COALESCE(games_played, 1) - 1, 0), updated_at = NOW()
+          WHERE id = $2
+        `, [origCreatorRating, creatorId]);
+
+        await this.dataSource.query(`
+          UPDATE users SET hoop_rank = $1, games_played = GREATEST(COALESCE(games_played, 1) - 1, 0), updated_at = NOW()
+          WHERE id = $2
+        `, [origOpponentRating, opponentId]);
+      }
+    }
+
+    // --- Delete shadow feed item ---
+    const statusId = (match as any).status_id;
+    if (statusId) {
+      await this.dataSource.query(`DELETE FROM player_statuses WHERE id = $1`, [statusId]).catch(() => { });
+    }
+
+    // --- Reset match state ---
     await this.dataSource.query(`
       UPDATE matches SET status = 'contested', score_creator = NULL, score_opponent = NULL,
-        winner_id = NULL, updated_at = NOW()
+        winner_id = NULL, status_id = NULL, updated_at = NOW()
       WHERE id = $1
+    `, [matchId]);
+
+    // Revert challenge status back to accepted so it remains visible
+    await this.dataSource.query(`
+      UPDATE challenges SET status = 'accepted', updated_at = NOW()
+      WHERE match_id = $1
     `, [matchId]);
 
     // Increment games_contested for both players
@@ -332,7 +368,6 @@ export class MatchesService {
       UPDATE users SET games_contested = COALESCE(games_contested, 0) + 1, updated_at = NOW()
       WHERE id = $1 OR id = $2
     `, [creatorId, opponentId]);
-
 
     // Notify the submitter that the score was contested
     const contesterResult = await this.dataSource.query(`SELECT name FROM users WHERE id = $1`, [contesterId]);

@@ -127,50 +127,70 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
     return Scaffold(
       appBar: isFeedScreen ? null : const HoopRankAppBar(),
       body: widget.navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: widget.navigationShell.currentIndex,
-        onDestinationSelected: (int index) => _onTap(context, index),
-        destinations: [
-          NavigationDestination(
-            key: TutorialKeys.getKey(TutorialKeys.rankingsTab),
-            icon: const Icon(Icons.leaderboard),
-            label: 'Rankings',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: _unreadCount > 0,
-              label: Text(
-                _unreadCount > 99 ? '99+' : _unreadCount.toString(),
-                style: const TextStyle(fontSize: 10),
+      bottomNavigationBar: Builder(
+        builder: (context) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          // Scale: 10px on ~320pt phones, 13px on ~430pt+ phones
+          final labelSize = (screenWidth / 33).clamp(10.0, 13.0);
+          final iconSize = (screenWidth / 18).clamp(20.0, 24.0);
+          return NavigationBarTheme(
+            data: NavigationBarThemeData(
+              height: 65,
+              labelTextStyle: WidgetStateProperty.all(
+                TextStyle(fontSize: labelSize, overflow: TextOverflow.ellipsis),
               ),
-              child: const Icon(Icons.message),
-            ),
-            label: 'Messages',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: _challengeCount > 0,
-              label: Text(
-                _challengeCount > 99 ? '99+' : _challengeCount.toString(),
-                style: const TextStyle(fontSize: 10),
+              iconTheme: WidgetStateProperty.all(
+                IconThemeData(size: iconSize),
               ),
-              child: const Icon(Icons.sports_basketball),
             ),
-            label: 'Feed',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: _teamInvitesCount > 0,
-              label: Text(
-                _teamInvitesCount > 99 ? '99+' : _teamInvitesCount.toString(),
-                style: const TextStyle(fontSize: 10),
-              ),
-              child: const Icon(Icons.groups),
+            child: NavigationBar(
+              selectedIndex: widget.navigationShell.currentIndex,
+              onDestinationSelected: (int index) => _onTap(context, index),
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              destinations: [
+                NavigationDestination(
+                  key: TutorialKeys.getKey(TutorialKeys.rankingsTab),
+                  icon: const Icon(Icons.leaderboard),
+                  label: 'Rankings',
+                ),
+                NavigationDestination(
+                  icon: Badge(
+                    isLabelVisible: _unreadCount > 0,
+                    label: Text(
+                      _unreadCount > 99 ? '99+' : _unreadCount.toString(),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                    child: const Icon(Icons.message),
+                  ),
+                  label: 'Messages',
+                ),
+                NavigationDestination(
+                  icon: Badge(
+                    isLabelVisible: _challengeCount > 0,
+                    label: Text(
+                      _challengeCount > 99 ? '99+' : _challengeCount.toString(),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                    child: const Icon(Icons.sports_basketball),
+                  ),
+                  label: 'Feed',
+                ),
+                NavigationDestination(
+                  icon: Badge(
+                    isLabelVisible: _teamInvitesCount > 0,
+                    label: Text(
+                      _teamInvitesCount > 99 ? '99+' : _teamInvitesCount.toString(),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                    child: const Icon(Icons.groups),
+                  ),
+                  label: 'Teams',
+                ),
+                const NavigationDestination(icon: Icon(Icons.place), label: 'Courts'),
+              ],
             ),
-            label: 'Teams',
-          ),
-          const NavigationDestination(icon: Icon(Icons.place), label: 'Courts'),
-        ],
+          );
+        },
       ),
     );
   }

@@ -75,7 +75,7 @@ class User {
     final rawContestRate = json['contestRate'] ?? json['contest_rate'];
     final contestRate = rawContestRate != null
         ? _parseDouble(rawContestRate)
-        : (gamesPlayed > 0 ? gamesContested / gamesPlayed : 0.0);
+        : (gamesPlayed > 0 ? gamesContested.toDouble() / gamesPlayed : 0.0);
 
     // Handle both camelCase (app) and snake_case (production backend) field names
     final position = json['position']?.toString();

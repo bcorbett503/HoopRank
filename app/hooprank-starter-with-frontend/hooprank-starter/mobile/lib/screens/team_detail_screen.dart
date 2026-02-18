@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import '../utils/image_utils.dart';
 import '../state/check_in_state.dart';
 import '../widgets/player_profile_sheet.dart';
 
@@ -716,7 +717,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           ? () => PlayerProfileSheet.showById(context, memberId.toString())
           : null,
       leading: CircleAvatar(
-        backgroundImage: member['photoUrl'] != null ? NetworkImage(member['photoUrl']) : null,
+        backgroundImage: member['photoUrl'] != null ? safeImageProvider(member['photoUrl']) : null,
         backgroundColor: isPending ? Colors.grey[300] : Colors.deepOrange[100],
         child: member['photoUrl'] == null
             ? Text(

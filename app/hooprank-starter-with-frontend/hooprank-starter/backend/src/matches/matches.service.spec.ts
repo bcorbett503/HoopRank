@@ -105,7 +105,7 @@ describe('MatchesService', () => {
             ).rejects.toThrow('Only supported on PostgreSQL');
         });
 
-        it('should store scores and set status on PostgreSQL', async () => {
+        it('should store scores and immediately complete match on PostgreSQL', async () => {
             process.env.DATABASE_URL = 'postgres://test';
 
             const match = {
@@ -115,16 +115,36 @@ describe('MatchesService', () => {
                 opponent_id: 'user-b',
             };
 
-            // get() returns via raw query
+            const creatorUser = { id: 'user-a', hoop_rank: '3.0', games_played: '0', name: 'Player A' };
+            const opponentUser = { id: 'user-b', hoop_rank: '3.0', games_played: '0', name: 'Player B' };
+
+            mockUsers.get
+                .mockResolvedValueOnce(creatorUser)
+                .mockResolvedValueOnce(opponentUser)
+                .mockResolvedValueOnce(creatorUser)  // for shadow status creator name
+                .mockResolvedValueOnce(opponentUser); // for shadow status opponent name
+
             mockDataSource.query
-                .mockResolvedValueOnce([match])   // get() → SELECT
-                .mockResolvedValueOnce([])          // UPDATE
-                .mockResolvedValueOnce([{ name: 'Player A' }]) // submitter name
-                .mockResolvedValueOnce([{ ...match, status: 'score_submitted', score_creator: 21, score_opponent: 15 }]); // final SELECT
+                .mockResolvedValueOnce([match])   // get() → SELECT in submitScoreOnly
+                .mockResolvedValueOnce([])          // UPDATE score_submitter_id
+                // completeWithScores chain:
+                .mockResolvedValueOnce([match])     // SELECT match
+                .mockResolvedValueOnce([])          // UPDATE creator rating
+                .mockResolvedValueOnce([])          // UPDATE opponent rating
+                .mockResolvedValueOnce([])          // UPDATE match (completed)
+                .mockResolvedValueOnce([])          // UPDATE challenges
+                .mockResolvedValueOnce([{ ...match, status: 'completed', score_creator: 21, score_opponent: 15 }]) // shadow status SELECT
+                .mockResolvedValueOnce([{ id: 'status-1' }]) // INSERT player_statuses
+                .mockResolvedValueOnce([])          // UPDATE match status_id
+                .mockResolvedValueOnce([{ ...match, status: 'completed', score_creator: 21, score_opponent: 15 }]) // final SELECT
+                .mockResolvedValueOnce([{ name: 'Player A' }]) // submitter name for notification
+                ;
+
+            mockNotifications.sendMatchCompletedNotification = jest.fn().mockResolvedValue(undefined);
 
             const result = await service.submitScoreOnly('match-1', 'user-a', 21, 15);
 
-            expect(result.status).toBe('score_submitted');
+            expect(result.status).toBe('completed');
             expect((result as any).score_creator).toBe(21);
         });
 
@@ -172,11 +192,31 @@ describe('MatchesService', () => {
                 opponent_id: 'user-b',
             };
 
+            const creatorUser = { id: 'user-a', hoop_rank: '3.0', games_played: '0', name: 'Player A' };
+            const opponentUser = { id: 'user-b', hoop_rank: '3.0', games_played: '0', name: 'Player B' };
+
+            mockUsers.get
+                .mockResolvedValueOnce(creatorUser)
+                .mockResolvedValueOnce(opponentUser)
+                .mockResolvedValueOnce(creatorUser)
+                .mockResolvedValueOnce(opponentUser);
+
             mockDataSource.query
-                .mockResolvedValueOnce([match])
-                .mockResolvedValueOnce([])
-                .mockResolvedValueOnce([{ name: 'Player A' }])
-                .mockResolvedValueOnce([{ ...match, status: 'score_submitted' }]);
+                .mockResolvedValueOnce([match])   // get()
+                .mockResolvedValueOnce([])          // UPDATE score_submitter_id
+                .mockResolvedValueOnce([match])     // completeWithScores SELECT
+                .mockResolvedValueOnce([])          // UPDATE creator rating
+                .mockResolvedValueOnce([])          // UPDATE opponent rating
+                .mockResolvedValueOnce([])          // UPDATE match
+                .mockResolvedValueOnce([])          // UPDATE challenges
+                .mockResolvedValueOnce([{ ...match, status: 'completed' }]) // shadow SELECT
+                .mockResolvedValueOnce([{ id: 'status-1' }]) // INSERT status
+                .mockResolvedValueOnce([])          // UPDATE match status_id
+                .mockResolvedValueOnce([{ ...match, status: 'completed' }]) // final SELECT
+                .mockResolvedValueOnce([{ name: 'Player A' }]) // submitter name
+                ;
+
+            mockNotifications.sendMatchCompletedNotification = jest.fn().mockResolvedValue(undefined);
 
             await service.submitScoreOnly('match-1', 'user-a', 21, 15);
 
@@ -200,7 +240,7 @@ describe('MatchesService', () => {
             ).rejects.toThrow('Only supported on PostgreSQL');
         });
 
-        it('should reject if match is not score_submitted', async () => {
+        it('should reject if match is not score_submitted or completed', async () => {
             process.env.DATABASE_URL = 'postgres://test';
 
             const match = { id: 'match-1', status: 'accepted', creator_id: 'user-a', opponent_id: 'user-b' };
@@ -208,27 +248,26 @@ describe('MatchesService', () => {
 
             await expect(
                 service.confirmScore('match-1', 'user-b'),
-            ).rejects.toThrow("expected 'score_submitted'");
+            ).rejects.toThrow("Cannot confirm");
         });
 
-        it('should reject if submitter tries to confirm own score', async () => {
+        it('should return match as-is if already completed (no-op)', async () => {
             process.env.DATABASE_URL = 'postgres://test';
 
             const match = {
                 id: 'match-1',
-                status: 'score_submitted',
+                status: 'completed',
                 creator_id: 'user-a',
                 opponent_id: 'user-b',
-                score_submitter_id: 'user-a',
                 score_creator: 21,
                 score_opponent: 15,
+                winner_id: 'user-a',
             };
 
             mockDataSource.query.mockResolvedValueOnce([match]);
 
-            await expect(
-                service.confirmScore('match-1', 'user-a'),
-            ).rejects.toThrow('only the other player can confirm');
+            const result = await service.confirmScore('match-1', 'user-b');
+            expect(result.status).toBe('completed');
         });
     });
 
@@ -247,10 +286,13 @@ describe('MatchesService', () => {
 
             const match = {
                 id: 'match-1',
-                status: 'score_submitted',
+                status: 'completed',
                 creator_id: 'user-a',
                 opponent_id: 'user-b',
                 score_submitter_id: 'user-a',
+                score_creator: 21,
+                score_opponent: 15,
+                winner_id: 'user-a',
             };
 
             mockDataSource.query.mockResolvedValueOnce([match]);
@@ -260,20 +302,35 @@ describe('MatchesService', () => {
             ).rejects.toThrow('cannot contest your own submission');
         });
 
-        it('should void the match and clear scores on contest', async () => {
+        it('should reverse ratings and void the match on contest', async () => {
             process.env.DATABASE_URL = 'postgres://test';
 
             const match = {
                 id: 'match-1',
-                status: 'score_submitted',
+                status: 'completed',
                 creator_id: 'user-a',
                 opponent_id: 'user-b',
                 score_submitter_id: 'user-a',
+                score_creator: 21,
+                score_opponent: 15,
+                winner_id: 'user-a',
+                status_id: 'status-1',
             };
+
+            const creatorUser = { id: 'user-a', hoop_rank: '3.2', games_played: '1', name: 'Player A' };
+            const opponentUser = { id: 'user-b', hoop_rank: '2.8', games_played: '1', name: 'Player B' };
+
+            mockUsers.get
+                .mockResolvedValueOnce(creatorUser)
+                .mockResolvedValueOnce(opponentUser);
 
             mockDataSource.query
                 .mockResolvedValueOnce([match])     // get()
-                .mockResolvedValueOnce([])            // UPDATE (void match)
+                .mockResolvedValueOnce([])            // UPDATE creator rating (reverse)
+                .mockResolvedValueOnce([])            // UPDATE opponent rating (reverse)
+                .mockResolvedValueOnce([])            // DELETE shadow status
+                .mockResolvedValueOnce([])            // UPDATE match (contested)
+                .mockResolvedValueOnce([])            // UPDATE challenges
                 .mockResolvedValueOnce([])            // UPDATE users (games_contested)
                 .mockResolvedValueOnce([{ name: 'Player B' }]) // contester name
                 .mockResolvedValueOnce([{ ...match, status: 'contested' }]); // final SELECT
@@ -281,10 +338,6 @@ describe('MatchesService', () => {
             const result = await service.contestScore('match-1', 'user-b');
 
             expect(result.status).toBe('contested');
-            // Verify scores were cleared in the UPDATE
-            const updateCall = mockDataSource.query.mock.calls[1];
-            expect(updateCall[0]).toContain('score_creator = NULL');
-            expect(updateCall[0]).toContain('score_opponent = NULL');
         });
 
         it('should send notification to submitter about contest', async () => {
@@ -292,16 +345,29 @@ describe('MatchesService', () => {
 
             const match = {
                 id: 'match-1',
-                status: 'score_submitted',
+                status: 'completed',
                 creator_id: 'user-a',
                 opponent_id: 'user-b',
                 score_submitter_id: 'user-a',
+                score_creator: 21,
+                score_opponent: 15,
+                winner_id: 'user-a',
             };
 
+            const creatorUser = { id: 'user-a', hoop_rank: '3.2', games_played: '1', name: 'Player A' };
+            const opponentUser = { id: 'user-b', hoop_rank: '2.8', games_played: '1', name: 'Player B' };
+
+            mockUsers.get
+                .mockResolvedValueOnce(creatorUser)
+                .mockResolvedValueOnce(opponentUser);
+
             mockDataSource.query
-                .mockResolvedValueOnce([match])
-                .mockResolvedValueOnce([])
-                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([match])     // get()
+                .mockResolvedValueOnce([])            // UPDATE creator rating
+                .mockResolvedValueOnce([])            // UPDATE opponent rating
+                .mockResolvedValueOnce([])            // UPDATE match (contested)
+                .mockResolvedValueOnce([])            // UPDATE challenges
+                .mockResolvedValueOnce([])            // UPDATE users (games_contested)
                 .mockResolvedValueOnce([{ name: 'Player B' }])
                 .mockResolvedValueOnce([{ ...match, status: 'contested' }]);
 

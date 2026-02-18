@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../state/app_state.dart';
 import '../services/messages_service.dart';
 import '../services/notification_service.dart';
+import '../utils/image_utils.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
 import 'chat_screen.dart';
@@ -470,7 +471,7 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
                     child: CircleAvatar(
                       radius: 24,
                       backgroundImage: conversation.user.photoUrl != null
-                          ? NetworkImage(conversation.user.photoUrl!)
+                          ? safeImageProvider(conversation.user.photoUrl!)
                           : null,
                       backgroundColor: Colors.blue.withOpacity(0.2),
                       child: conversation.user.photoUrl == null

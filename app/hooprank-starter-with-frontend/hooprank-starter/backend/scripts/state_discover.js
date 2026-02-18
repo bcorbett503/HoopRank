@@ -76,6 +76,7 @@ function generateQueries(state, cities) {
             `community center gym ${city} ${state}`,
             `YMCA basketball ${city} ${state}`,
             `indoor basketball court ${city} ${state}`,
+            `athletic club basketball ${city} ${state}`,
         );
     }
     for (const city of mid) {
@@ -100,6 +101,9 @@ function generateQueries(state, cities) {
         `Gold's Gym ${sn}`,
         `indoor basketball facility ${sn}`,
         `basketball training facility ${sn}`,
+        `athletic club gym basketball ${sn}`,
+        `sports club basketball court ${sn}`,
+        `private club gymnasium ${sn}`,
     );
     return queries;
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../utils/image_utils.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
@@ -974,7 +975,7 @@ class _RankingsScreenState extends State<RankingsScreen>
                   radius: 24,
                   backgroundColor: Colors.blue.withOpacity(0.2),
                   backgroundImage: player.photoUrl != null
-                      ? NetworkImage(player.photoUrl!)
+                      ? safeImageProvider(player.photoUrl!)
                       : null,
                   child: player.photoUrl == null
                       ? Text(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
+import '../utils/image_utils.dart';
 import '../widgets/court_map_widget.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../widgets/court_details_sheet.dart';
@@ -192,7 +193,7 @@ class _MapScreenState extends State<MapScreen> {
                                           radius: 22,
                                           backgroundImage: player.photoUrl !=
                                                   null
-                                              ? NetworkImage(player.photoUrl!)
+                                              ? safeImageProvider(player.photoUrl!)
                                               : null,
                                           backgroundColor:
                                               Colors.blue.withOpacity(0.2),

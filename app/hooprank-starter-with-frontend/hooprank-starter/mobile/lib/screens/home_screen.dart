@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/mock_data.dart'; // Still needed for mockPlayers in build
+
 import '../services/location_service.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
@@ -15,6 +15,7 @@ import '../state/app_state.dart';
 import '../state/tutorial_state.dart';
 import '../state/check_in_state.dart';
 import '../models.dart';
+import '../utils/image_utils.dart';
 import '../services/court_service.dart';
 import '../services/video_upload_service.dart';
 import '../widgets/hooprank_feed.dart';
@@ -1396,7 +1397,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             CircleAvatar(
               radius: 40,
               backgroundImage: player['avatarUrl'] != null
-                  ? NetworkImage(player['avatarUrl'])
+                  ? safeImageProvider(player['avatarUrl'])
                   : null,
               child: player['avatarUrl'] == null
                   ? Text(playerName[0].toUpperCase(),
@@ -1712,8 +1713,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final topPlayers = mockPlayers.take(5).toList();
-
     return Scaffold(
       appBar: AppBar(
         title: RichText(

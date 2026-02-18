@@ -9,6 +9,7 @@ import '../state/tutorial_state.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
 import '../models.dart';
+import '../utils/image_utils.dart';
 import 'feed_video_player.dart';
 import 'player_profile_sheet.dart';
 import 'shimmer_skeleton.dart';
@@ -825,7 +826,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                             backgroundColor:
                                 Colors.green.withValues(alpha: 0.2),
                             backgroundImage: player.photoUrl != null
-                                ? NetworkImage(player.photoUrl!)
+                                ? safeImageProvider(player.photoUrl!)
                                 : null,
                             child: player.photoUrl == null
                                 ? Text(
@@ -1104,15 +1105,17 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          Text(
-                            opponent.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14, // Slightly smaller
+                          GestureDetector(
+                            onTap: () => PlayerProfileSheet.showById(context, opponent.id),
+                            child: Text(
+                              opponent.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
-                          // Maybe add rating here if we had it easily available, but name is fine
                         ],
                       ),
                     ],
@@ -1126,7 +1129,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                     radius: 18, // Reduced from 22
                     backgroundColor: Colors.orange.withOpacity(0.3),
                     backgroundImage: opponent.photoUrl != null
-                        ? NetworkImage(opponent.photoUrl!)
+                        ? safeImageProvider(opponent.photoUrl!)
                         : null,
                     child: opponent.photoUrl == null
                         ? Text(
@@ -1719,6 +1722,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     final userPhotoUrl = item['userPhotoUrl']?.toString();
     final courtName = item['courtName']?.toString() ?? 'Unknown Court';
     final createdAt = item['createdAt'];
+    final checkinUserId = item['userId']?.toString() ?? '';
 
     String timeAgo = _formatTimeAgo(createdAt);
 
@@ -1778,19 +1782,24 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                              fontSize: 15, color: Colors.white, height: 1.3),
-                          children: [
-                            TextSpan(
-                                text: userName,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold)),
-                            const TextSpan(
-                                text: ' checked in',
-                                style: TextStyle(color: Colors.white70)),
-                          ],
+                      GestureDetector(
+                        onTap: checkinUserId.isNotEmpty
+                            ? () => PlayerProfileSheet.showById(context, checkinUserId)
+                            : null,
+                        child: RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                                fontSize: 15, color: Colors.white, height: 1.3),
+                            children: [
+                              TextSpan(
+                                  text: userName,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                              const TextSpan(
+                                  text: ' checked in',
+                                  style: TextStyle(color: Colors.white70)),
+                            ],
+                          ),
                         ),
                       ),
                       if (timeAgo.isNotEmpty)
@@ -1851,6 +1860,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     final matchScore = item['matchScore']?.toString(); // e.g. "21-18" or null
     final itemType = item['type']?.toString() ?? 'match';
     final isTeamMatch = itemType == 'team_match';
+    final matchUserId = item['userId']?.toString() ?? '';
 
     // statusId links to player_statuses for likes/comments
     final statusId = item['statusId'] is int
@@ -1962,11 +1972,16 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                             const SizedBox(width: 4),
                           ],
                           Flexible(
-                              child: Text(displayName,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14),
-                                  overflow: TextOverflow.ellipsis)),
+                              child: GestureDetector(
+                                onTap: matchUserId.isNotEmpty
+                                    ? () => PlayerProfileSheet.showById(context, matchUserId)
+                                    : null,
+                                child: Text(displayName,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14),
+                                    overflow: TextOverflow.ellipsis),
+                              )),
                         ],
                       ),
                       Text('played at $displayCourtName',
@@ -3000,14 +3015,19 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                             Row(
                               children: [
                                 Flexible(
-                                  child: Text(
-                                    userName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: Colors.white,
+                                  child: GestureDetector(
+                                    onTap: postUserId.isNotEmpty
+                                        ? () => PlayerProfileSheet.showById(context, postUserId)
+                                        : null,
+                                    child: Text(
+                                      userName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: Colors.white,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 if (isScheduledEvent) ...[
