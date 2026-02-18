@@ -25,10 +25,10 @@ export class User {
     @Column({ name: 'avatar_url', type: 'text', nullable: true })
     avatarUrl: string;
 
-    @Column({ name: 'hoop_rank', type: 'numeric', precision: 3, scale: 2, default: 3.0 })
+    @Column({ name: 'hoop_rank', type: 'numeric', precision: 3, scale: 2, nullable: true, default: 3.0 })
     hoopRank: number;
 
-    @Column({ type: 'numeric', precision: 3, scale: 2, default: 5.0 })
+    @Column({ type: 'numeric', precision: 3, scale: 2, nullable: true, default: 5.0 })
     reputation: number;
 
     @Column({ type: 'text', nullable: true })
@@ -43,7 +43,7 @@ export class User {
     @Column({ type: 'text', nullable: true })
     zip: string;
 
-    @Column({ name: 'loc_enabled', type: 'boolean', default: false })
+    @Column({ name: 'loc_enabled', type: 'boolean', nullable: true, default: false })
     locEnabled: boolean;
 
     @Column({ type: 'text', nullable: true })
@@ -68,7 +68,7 @@ export class User {
     homeCourtId: string;
 
     // Subscriber fields
-    @Column({ name: 'subscription_tier', type: 'text', default: 'free' })
+    @Column({ name: 'subscription_tier', type: 'text', nullable: true, default: 'free' })
     subscriptionTier: string; // 'free' | 'pro' | 'elite'
 
     @Column({ name: 'subscription_expires_at', type: 'timestamp', nullable: true })
