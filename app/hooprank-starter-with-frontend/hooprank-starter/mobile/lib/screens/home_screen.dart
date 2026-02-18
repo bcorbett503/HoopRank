@@ -1840,8 +1840,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: ClipRect(
         child: Column(
-          clipBehavior: Clip.hardEdge,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Static header: STATUS composer ──
@@ -2082,6 +2082,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   key: ValueKey('hooprank-feed-$_feedReloadVersion')),
             ),
           ],
+        ),
         ),
       ),
     );

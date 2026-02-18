@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -118,6 +119,42 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
     setState(() {
       _isMuted = !_isMuted;
       _controller!.setVolume(_isMuted ? 0 : 1);
+    });
+  }
+
+  void _openFullscreen() {
+    if (_controller == null || !_isInitialized) return;
+    final wasPlaying = _controller!.value.isPlaying;
+    _controller!.pause();
+
+    Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        pageBuilder: (_, __, ___) => _FullscreenVideoPage(
+          controller: _controller!,
+          wasPlaying: wasPlaying,
+          isMuted: _isMuted,
+          onMuteToggle: () {
+            setState(() {
+              _isMuted = !_isMuted;
+              _controller!.setVolume(_isMuted ? 0 : 1);
+            });
+          },
+        ),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    ).then((_) {
+      // Restore portrait orientation when returning
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+      if (wasPlaying && !_hasUserPaused && _isVisible) {
+        _controller!.play();
+      }
+      if (mounted) setState(() {});
     });
   }
 
@@ -319,6 +356,18 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
                   constraints:
                       const BoxConstraints.tightFor(width: 34, height: 34),
                 ),
+                IconButton(
+                  onPressed: _openFullscreen,
+                  icon: const Icon(
+                    Icons.fullscreen,
+                    color: Colors.white,
+                  ),
+                  iconSize: 22,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 34, height: 34),
+                ),
               ],
             );
           },
@@ -380,6 +429,218 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
     return AspectRatio(
       aspectRatio: controller.value.aspectRatio,
       child: VideoPlayer(controller),
+    );
+  }
+}
+
+/// Fullscreen landscape video page that reuses the existing controller
+class _FullscreenVideoPage extends StatefulWidget {
+  final VideoPlayerController controller;
+  final bool wasPlaying;
+  final bool isMuted;
+  final VoidCallback onMuteToggle;
+
+  const _FullscreenVideoPage({
+    required this.controller,
+    required this.wasPlaying,
+    required this.isMuted,
+    required this.onMuteToggle,
+  });
+
+  @override
+  State<_FullscreenVideoPage> createState() => _FullscreenVideoPageState();
+}
+
+class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
+  bool _showControls = true;
+  bool _isMuted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isMuted = widget.isMuted;
+    // Force landscape
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    // Hide status bar for immersive experience
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Resume playback if it was playing
+    if (widget.wasPlaying) {
+      widget.controller.play();
+    }
+    // Auto-hide controls after 3 seconds
+    _scheduleHideControls();
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  void _scheduleHideControls() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && widget.controller.value.isPlaying) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+    if (_showControls) {
+      _scheduleHideControls();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        onTap: _toggleControls,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Video
+            Center(
+              child: AspectRatio(
+                aspectRatio: widget.controller.value.aspectRatio,
+                child: VideoPlayer(widget.controller),
+              ),
+            ),
+
+            // Controls overlay
+            if (_showControls) ...[
+              // Close button
+              Positioned(
+                top: 16,
+                left: 16,
+                child: SafeArea(
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black45,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Center play/pause
+              ValueListenableBuilder<VideoPlayerValue>(
+                valueListenable: widget.controller,
+                builder: (context, value, _) {
+                  return GestureDetector(
+                    onTap: () {
+                      if (value.isPlaying) {
+                        widget.controller.pause();
+                      } else {
+                        widget.controller.play();
+                        _scheduleHideControls();
+                      }
+                      setState(() {});
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        value.isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                        size: 48,
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              // Bottom controls bar
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.7),
+                        ],
+                      ),
+                    ),
+                    child: ValueListenableBuilder<VideoPlayerValue>(
+                      valueListenable: widget.controller,
+                      builder: (context, value, _) {
+                        final durationMs = value.duration.inMilliseconds;
+                        var positionMs = value.position.inMilliseconds;
+                        final safeDurationMs = durationMs <= 0 ? 1 : durationMs;
+                        if (positionMs < 0) positionMs = 0;
+                        if (positionMs > safeDurationMs) positionMs = safeDurationMs;
+
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 3,
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                                  activeTrackColor: Colors.white,
+                                  inactiveTrackColor: Colors.white.withOpacity(0.25),
+                                  thumbColor: Colors.white,
+                                ),
+                                child: Slider(
+                                  min: 0,
+                                  max: safeDurationMs.toDouble(),
+                                  value: positionMs.toDouble(),
+                                  onChanged: (v) {
+                                    widget.controller.seekTo(Duration(milliseconds: v.round()));
+                                  },
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isMuted = !_isMuted;
+                                  widget.controller.setVolume(_isMuted ? 0 : 1);
+                                });
+                                widget.onMuteToggle();
+                              },
+                              icon: Icon(
+                                _isMuted ? Icons.volume_off : Icons.volume_up,
+                                color: Colors.white,
+                              ),
+                              iconSize: 22,
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(
+                                Icons.fullscreen_exit,
+                                color: Colors.white,
+                              ),
+                              iconSize: 24,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
