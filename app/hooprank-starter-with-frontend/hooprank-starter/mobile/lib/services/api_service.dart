@@ -430,7 +430,7 @@ class ApiService {
       debugPrint('uploadImage: Response status=${response.statusCode}');
       debugPrint('uploadImage: Response body=${response.body}');
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('Image uploaded successfully for $type: $targetId');
         // Parse the response to extract the uploaded URL
         try {
