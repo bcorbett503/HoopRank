@@ -19,8 +19,7 @@ import 'dart:math' as math;
 
 /// Unified HoopRank Feed with For You/Following tabs
 class HoopRankFeed extends StatefulWidget {
-  final Widget? headerWidget;
-  const HoopRankFeed({super.key, this.headerWidget});
+  const HoopRankFeed({super.key});
 
   @override
   State<HoopRankFeed> createState() => _HoopRankFeedState();
@@ -369,36 +368,30 @@ class _HoopRankFeedState extends State<HoopRankFeed>
         _pendingChallenges.isEmpty &&
         _pendingTeamChallenges.isEmpty) {
       debugPrint('FEED: Showing empty state - no posts and no challenges');
-      return ListView(
-        padding: const EdgeInsets.only(bottom: 100),
-        children: [
-          if (widget.headerWidget != null) widget.headerWidget!,
-          _buildEmptyState(
-            'No local activity yet',
-            'Be the first to post at a court near you!',
-            extraContent: _userLocation == null
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Enable location to see activity within 50 miles',
-                          style: TextStyle(
-                              color: Colors.orange.shade300, fontSize: 12),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: _enableLocationAndRefresh,
-                          child: const Text('Enable Location'),
-                        ),
-                      ],
+      return _buildEmptyState(
+        'No local activity yet',
+        'Be the first to post at a court near you!',
+        extraContent: _userLocation == null
+            ? Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Enable location to see activity within 50 miles',
+                      style: TextStyle(
+                          color: Colors.orange.shade300, fontSize: 12),
+                      textAlign: TextAlign.center,
                     ),
-                  )
-                : null,
-          ),
-        ],
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: _enableLocationAndRefresh,
+                      child: const Text('Enable Location'),
+                    ),
+                  ],
+                ),
+              )
+            : null,
       );
     }
 
@@ -419,14 +412,9 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       },
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: totalItems + (widget.headerWidget != null ? 1 : 0),
+        itemCount: totalItems,
         itemBuilder: (context, index) {
-          // First item: header widget (onboarding checklist, etc.)
-          if (widget.headerWidget != null) {
-            if (index == 0) return widget.headerWidget!;
-            index = index - 1; // Adjust for header
-          }
-          // Then: team challenges
+          // First: team challenges
           if (index < _pendingTeamChallenges.length) {
             return _buildTeamChallengeCard(_pendingTeamChallenges[index]);
           }
