@@ -101,8 +101,13 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_player_statuses_court_id ON player_statuses(court_id)`);
         await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_player_statuses_user_id ON player_statuses(user_id)`);
 
-        // Users indexes
-        await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_users_hoop_rank ON users(hoop_rank) WHERE hoop_rank IS NOT NULL`);
+        // Users indexes (only create if column exists)
+        const hoopRankExists = await dataSource.query(
+            `SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'hoop_rank'`
+        );
+        if (hoopRankExists.length > 0) {
+            await dataSource.query(`CREATE INDEX IF NOT EXISTS idx_users_hoop_rank ON users(hoop_rank) WHERE hoop_rank IS NOT NULL`);
+        }
 
         // ============================================
         // TEAM EVENTS TABLE (practices & games)
