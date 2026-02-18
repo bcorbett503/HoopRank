@@ -115,6 +115,11 @@ class _HoopRankAppState extends State<HoopRankApp> {
       // Initialize states
       onboardingState.initialize();
 
+      // Wire onboarding hooks into centralized state managers
+      CheckInState.onCourtFollowed = () {
+        onboardingState.completeItem(OnboardingItems.followCourt);
+      };
+
       // Initialize CheckInState and analytics when user changes
       authState.addListener(() {
         final user = authState.currentUser;

@@ -459,6 +459,10 @@ class CheckInState extends ChangeNotifier {
     return _followedCourts.contains(courtId);
   }
 
+  /// Optional callback invoked when a court is newly followed.
+  /// Set from the widget layer to trigger onboarding completion.
+  static void Function()? onCourtFollowed;
+
   /// Follow a court
   Future<void> followCourt(String courtId) async {
     if (_followedCourts.contains(courtId)) return;
@@ -466,6 +470,9 @@ class CheckInState extends ChangeNotifier {
     _followedCourts.add(courtId);
     await _saveFollowedCourts();
     notifyListeners();
+
+    // Trigger onboarding hook (set from widget layer)
+    onCourtFollowed?.call();
 
     // Sync to backend (optimistic — local state already updated)
     try {

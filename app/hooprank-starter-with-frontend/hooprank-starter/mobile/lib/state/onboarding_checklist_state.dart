@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_service.dart';
 
 /// Keys for each onboarding checklist item.
 class OnboardingItems {
@@ -20,11 +21,12 @@ class OnboardingItems {
   ];
 }
 
-/// Manages the onboarding checklist state, replacing the old tutorial overlay.
+/// Manages the onboarding checklist state with dual persistence:
+///   1. SharedPreferences — fast local reads, survives app restarts
+///   2. Backend DB (users.onboarding_progress) — survives reinstalls, syncs across devices
 ///
-/// Each of the 6 items is persisted individually via SharedPreferences so
-/// progress survives app restarts. The widget shown on the home screen reads
-/// this state to render checked/unchecked items.
+/// On initialize(), the backend and local states are merged (union) so nothing
+/// is lost if either side is ahead. On completeItem(), both stores are updated.
 class OnboardingChecklistState extends ChangeNotifier {
   static const String _prefPrefix = 'onboarding_';
   static const String _dismissedKey = 'onboarding_dismissed';
@@ -59,10 +61,11 @@ class OnboardingChecklistState extends ChangeNotifier {
 
   // ── Lifecycle ──
 
-  /// Load persisted state from SharedPreferences.
+  /// Load persisted state from SharedPreferences + backend, merging both.
   Future<void> initialize() async {
     if (_initialized) return;
 
+    // 1. Fast local read
     final prefs = await SharedPreferences.getInstance();
     for (final key in OnboardingItems.all) {
       _completed[key] = prefs.getBool('$_prefPrefix$key') ?? false;
@@ -70,11 +73,41 @@ class OnboardingChecklistState extends ChangeNotifier {
     _dismissed = prefs.getBool(_dismissedKey) ?? false;
     _initialized = true;
     notifyListeners();
+
+    // 2. Async backend merge (non-blocking)
+    try {
+      final remote = await ApiService.getOnboardingProgress();
+      if (remote.isNotEmpty) {
+        bool changed = false;
+        for (final key in OnboardingItems.all) {
+          if (remote[key] == true && _completed[key] != true) {
+            _completed[key] = true;
+            await prefs.setBool('$_prefPrefix$key', true);
+            changed = true;
+          }
+        }
+        if (changed) {
+          debugPrint('ONBOARDING: Merged ${remote.entries.where((e) => e.value).length} items from backend');
+          notifyListeners();
+        }
+
+        // Push local state back if local has items the backend doesn't
+        final localMap = <String, bool>{};
+        for (final key in OnboardingItems.all) {
+          if (_completed[key] == true) localMap[key] = true;
+        }
+        if (localMap.length > remote.entries.where((e) => e.value).length) {
+          ApiService.updateOnboardingProgress(localMap);
+        }
+      }
+    } catch (e) {
+      debugPrint('ONBOARDING: Backend merge failed (offline?): $e');
+    }
   }
 
   // ── Actions ──
 
-  /// Mark a single item as complete and persist.
+  /// Mark a single item as complete and persist to both local + backend.
   Future<void> completeItem(String key) async {
     debugPrint('ONBOARDING: completeItem called for key=$key, already=${_completed[key]}');
     if (_completed[key] == true) return; // already done
@@ -82,8 +115,16 @@ class OnboardingChecklistState extends ChangeNotifier {
     debugPrint('ONBOARDING: ✅ Marked $key as complete');
     notifyListeners();
 
+    // Persist locally
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('$_prefPrefix$key', true);
+
+    // Persist to backend (fire-and-forget)
+    final progressMap = <String, bool>{};
+    for (final k in OnboardingItems.all) {
+      if (_completed[k] == true) progressMap[k] = true;
+    }
+    ApiService.updateOnboardingProgress(progressMap);
 
     // Auto-dismiss when all items are complete (the widget will animate out).
     if (allComplete) {
@@ -111,5 +152,8 @@ class OnboardingChecklistState extends ChangeNotifier {
     _dismissed = false;
     await prefs.setBool(_dismissedKey, false);
     notifyListeners();
+
+    // Reset backend too
+    ApiService.updateOnboardingProgress({});
   }
 }

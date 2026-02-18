@@ -227,6 +227,47 @@ class ApiService {
     return null;
   }
 
+  /// Fetch onboarding progress from the backend (stored in users.onboarding_progress)
+  static Future<Map<String, bool>> getOnboardingProgress() async {
+    if (_userId == null || _userId!.isEmpty) return {};
+
+    try {
+      final response = await authedGet(
+        Uri.parse('$baseUrl/users/me'),
+        headers: {'x-user-id': _userId!},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final raw = data['onboarding_progress'];
+        if (raw is Map) {
+          return raw.map((k, v) => MapEntry(k.toString(), v == true));
+        }
+      }
+    } catch (e) {
+      debugPrint('ONBOARDING: Failed to fetch progress from backend: $e');
+    }
+    return {};
+  }
+
+  /// Push updated onboarding progress to the backend
+  static Future<void> updateOnboardingProgress(Map<String, bool> progress) async {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    try {
+      await authedPut(
+        Uri.parse('$baseUrl/users/me'),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': _userId!,
+        },
+        body: jsonEncode({'onboarding_progress': progress}),
+      );
+    } catch (e) {
+      debugPrint('ONBOARDING: Failed to push progress to backend: $e');
+    }
+  }
+
   /// Generic GET request to any endpoint
   static Future<dynamic> get(String path) async {
     try {
