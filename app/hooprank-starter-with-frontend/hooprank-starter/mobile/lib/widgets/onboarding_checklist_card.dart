@@ -77,7 +77,7 @@ class OnboardingChecklistCard extends StatefulWidget {
 
 class _OnboardingChecklistCardState extends State<OnboardingChecklistCard>
     with SingleTickerProviderStateMixin {
-  bool _collapsed = true;
+  bool _collapsed = false;
   late AnimationController _celebrationController;
   late Animation<double> _celebrationAnimation;
   bool _showCelebration = false;

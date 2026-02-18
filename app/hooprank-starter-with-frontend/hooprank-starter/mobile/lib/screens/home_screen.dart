@@ -1970,8 +1970,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               },
             ),
 
-            // Onboarding checklist (shown until all items complete)
-            Flexible(child: const OnboardingChecklistCard()),
+            // Onboarding checklist is now rendered inside the feed scroll area
 
             if (_pendingConfirmations.isNotEmpty) ...[
               _buildPendingConfirmationsSection(),
@@ -2078,7 +2077,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             // ── Scrollable: Feed fills remaining space ──
             Expanded(
               child: HoopRankFeed(
-                  key: ValueKey('hooprank-feed-$_feedReloadVersion')),
+                  key: ValueKey('hooprank-feed-$_feedReloadVersion'),
+                  headerWidget: const OnboardingChecklistCard()),
             ),
           ],
         ),
