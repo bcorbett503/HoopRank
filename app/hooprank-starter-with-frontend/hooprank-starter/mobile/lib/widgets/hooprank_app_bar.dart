@@ -81,11 +81,11 @@ class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
         // Help/Tutorial button - restarts the interactive tutorial
         IconButton(
           icon: const Icon(Icons.help_outline),
-          tooltip: 'Restart Tutorial',
+          tooltip: 'Show Checklist',
           onPressed: () async {
             final onboarding =
                   Provider.of<OnboardingChecklistState>(context, listen: false);
-              await onboarding.reset();
+              await onboarding.undismiss();
               if (context.mounted) {
                 context.go('/play');
               }

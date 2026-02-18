@@ -57,7 +57,8 @@ class OnboardingChecklistState extends ChangeNotifier {
   bool isComplete(String key) => _completed[key] == true;
 
   /// Whether the checklist card should be visible.
-  bool get shouldShow => _initialized && !_dismissed && !allComplete;
+  /// Shows even when all items are complete — user must explicitly dismiss.
+  bool get shouldShow => _initialized && !_dismissed;
 
   // ── Lifecycle ──
 
@@ -125,13 +126,6 @@ class OnboardingChecklistState extends ChangeNotifier {
       if (_completed[k] == true) progressMap[k] = true;
     }
     ApiService.updateOnboardingProgress(progressMap);
-
-    // Auto-dismiss when all items are complete (the widget will animate out).
-    if (allComplete) {
-      _dismissed = true;
-      await prefs.setBool(_dismissedKey, true);
-      notifyListeners();
-    }
   }
 
   /// User manually collapses/hides the checklist.
@@ -140,6 +134,15 @@ class OnboardingChecklistState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_dismissedKey, true);
+  }
+
+  /// Re-show the checklist (used by the ? help button).
+  /// Does NOT reset progress — just un-dismisses.
+  Future<void> undismiss() async {
+    _dismissed = false;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_dismissedKey, false);
   }
 
   /// Reset all items (used by the "help" button to re-show the checklist).

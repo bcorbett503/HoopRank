@@ -103,13 +103,7 @@ class _OnboardingChecklistCardState extends State<OnboardingChecklistCard>
 
   void _handleAllComplete(OnboardingChecklistState state) {
     setState(() => _showCelebration = true);
-    _celebrationController.forward().then((_) {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          state.dismiss();
-        }
-      });
-    });
+    _celebrationController.forward();
   }
 
   @override
@@ -207,9 +201,11 @@ class _OnboardingChecklistCardState extends State<OnboardingChecklistCard>
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        _collapsed
-                            ? '$completed of $total complete'
-                            : 'Get Started',
+                        state.allComplete
+                            ? '🎉 All done!'
+                            : _collapsed
+                                ? '$completed of $total complete'
+                                : 'Get Started',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -217,6 +213,16 @@ class _OnboardingChecklistCardState extends State<OnboardingChecklistCard>
                         ),
                       ),
                     ),
+                    // X dismiss button
+                    GestureDetector(
+                      onTap: () => state.dismiss(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.close,
+                            color: Colors.white54, size: 18),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     // Collapse chevron
                     AnimatedRotation(
                       turns: _collapsed ? -0.25 : 0,

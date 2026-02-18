@@ -1822,11 +1822,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           IconButton(
             icon: const Icon(Icons.help_outline),
-            tooltip: 'Get Started',
+            tooltip: 'Show Checklist',
             onPressed: () async {
               final onboarding =
                   Provider.of<OnboardingChecklistState>(context, listen: false);
-              await onboarding.reset();
+              await onboarding.undismiss();
             },
           ),
           IconButton(
