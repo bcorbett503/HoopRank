@@ -125,6 +125,8 @@ class _HoopRankAppState extends State<HoopRankApp> {
         final user = authState.currentUser;
         if (user != null) {
           checkInState.initialize(user.id);
+          // Re-initialize onboarding for the new user (scoped to their userId)
+          onboardingState.initializeForUser(user.id);
           // Set user identity for crash reports and analytics
           FirebaseCrashlytics.instance.setUserIdentifier(user.id);
           AnalyticsService.setUserId(user.id);

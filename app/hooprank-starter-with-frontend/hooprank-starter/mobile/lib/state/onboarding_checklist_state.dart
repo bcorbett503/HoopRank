@@ -27,13 +27,19 @@ class OnboardingItems {
 ///
 /// On initialize(), the backend and local states are merged (union) so nothing
 /// is lost if either side is ahead. On completeItem(), both stores are updated.
+///
+/// State is user-scoped: SharedPreferences keys include the userId so switching
+/// accounts on the same device loads the correct onboarding progress.
 class OnboardingChecklistState extends ChangeNotifier {
-  static const String _prefPrefix = 'onboarding_';
   static const String _dismissedKey = 'onboarding_dismissed';
 
   final Map<String, bool> _completed = {};
   bool _dismissed = false;
   bool _initialized = false;
+  String? _userId;
+
+  /// Prefix for SharedPreferences keys, scoped to the current user.
+  String get _prefPrefix => 'onboarding_${_userId ?? ''}_';
 
   // ── Getters ──
 
@@ -62,16 +68,29 @@ class OnboardingChecklistState extends ChangeNotifier {
 
   // ── Lifecycle ──
 
-  /// Load persisted state from SharedPreferences + backend, merging both.
+  /// Legacy initialization (no userId). Falls back to un-scoped keys.
   Future<void> initialize() async {
     if (_initialized) return;
+    await _loadState();
+  }
 
+  /// User-scoped initialization. Resets and reloads if the user changed.
+  Future<void> initializeForUser(String userId) async {
+    if (_initialized && _userId == userId) return; // Same user, already loaded
+    _userId = userId;
+    _initialized = false;
+    _completed.clear();
+    _dismissed = false;
+    await _loadState();
+  }
+
+  Future<void> _loadState() async {
     // 1. Fast local read
     final prefs = await SharedPreferences.getInstance();
     for (final key in OnboardingItems.all) {
       _completed[key] = prefs.getBool('$_prefPrefix$key') ?? false;
     }
-    _dismissed = prefs.getBool(_dismissedKey) ?? false;
+    _dismissed = prefs.getBool('${_prefPrefix}dismissed') ?? false;
     _initialized = true;
     notifyListeners();
 
@@ -133,7 +152,7 @@ class OnboardingChecklistState extends ChangeNotifier {
     _dismissed = true;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_dismissedKey, true);
+    await prefs.setBool('${_prefPrefix}dismissed', true);
   }
 
   /// Re-show the checklist (used by the ? help button).
@@ -142,7 +161,7 @@ class OnboardingChecklistState extends ChangeNotifier {
     _dismissed = false;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_dismissedKey, false);
+    await prefs.setBool('${_prefPrefix}dismissed', false);
   }
 
   /// Reset all items (used by the "help" button to re-show the checklist).
@@ -153,10 +172,11 @@ class OnboardingChecklistState extends ChangeNotifier {
       await prefs.setBool('$_prefPrefix$key', false);
     }
     _dismissed = false;
-    await prefs.setBool(_dismissedKey, false);
+    await prefs.setBool('${_prefPrefix}dismissed', false);
     notifyListeners();
 
     // Reset backend too
     ApiService.updateOnboardingProgress({});
   }
 }
+

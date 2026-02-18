@@ -396,7 +396,7 @@ class ApiService {
   /// [type] - 'profile' or 'team'
   /// [targetId] - userId or teamId
   /// [imageFile] - the image file to upload
-  /// Returns null on success, or an error message on failure
+  /// Returns the uploaded image URL on success, or null on failure
   static Future<String?> uploadImage({
     required String type,
     required String targetId,
@@ -432,15 +432,24 @@ class ApiService {
 
       if (response.statusCode == 200) {
         debugPrint('Image uploaded successfully for $type: $targetId');
-        return null; // Success
+        // Parse the response to extract the uploaded URL
+        try {
+          final data = jsonDecode(response.body);
+          final url = data['url'] as String?;
+          debugPrint('uploadImage: Uploaded URL=$url');
+          return url;
+        } catch (e) {
+          debugPrint('uploadImage: Failed to parse response: $e');
+          return null;
+        }
       } else {
         debugPrint(
             'Upload failed: status=${response.statusCode}, body=${response.body}');
-        return 'Status ${response.statusCode}: ${response.body}';
+        return null;
       }
     } catch (e) {
       debugPrint('Upload error: $e');
-      return 'Error: $e';
+      return null;
     }
   }
 
