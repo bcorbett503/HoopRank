@@ -66,10 +66,11 @@ class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: CircleAvatar(
                   radius: 16,
-                  backgroundImage: photoUrl != null
+                  backgroundImage: photoUrl != null &&
+                          !isPlaceholderImage(photoUrl)
                       ? safeImageProvider(photoUrl)
                       : null,
-                  child: photoUrl == null
+                  child: photoUrl == null || isPlaceholderImage(photoUrl)
                       ? const Icon(Icons.person, size: 18)
                       : null,
                 ),

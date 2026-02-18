@@ -152,23 +152,28 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       final playerId = auth.currentUser?.id;
 
       if (userId != null && playerId != null) {
-        // Upload image if a new one was selected - convert to base64 data URL
+        // Upload image via the proper upload endpoint if a new one was selected
         String? avatarUrl;
         if (_imageFile != null) {
           try {
-            final bytes = await _imageFile!.readAsBytes();
-            final base64Image = base64Encode(bytes);
-            final mimeType = _imageFile!.path.toLowerCase().endsWith('.png')
-                ? 'image/png'
-                : 'image/jpeg';
-            avatarUrl = 'data:$mimeType;base64,$base64Image';
-            debugPrint('Profile photo encoded: ${avatarUrl.length} chars');
+            final uploadedUrl = await ApiService.uploadImage(
+              type: 'avatar',
+              targetId: userId,
+              imageFile: _imageFile!,
+            );
+            if (uploadedUrl != null) {
+              avatarUrl = uploadedUrl;
+              debugPrint('Profile photo uploaded: $avatarUrl');
+            } else {
+              debugPrint('Profile photo upload returned null');
+            }
           } catch (e) {
-            debugPrint('Failed to encode profile photo: $e');
+            debugPrint('Failed to upload profile photo: $e');
           }
         } else if (_profilePictureUrl != null &&
-            !_profilePictureUrl!.startsWith('/')) {
-          // Keep existing network URL
+            !_profilePictureUrl!.startsWith('/') &&
+            !_profilePictureUrl!.startsWith('data:')) {
+          // Keep existing network URL (but not data: URIs)
           avatarUrl = _profilePictureUrl;
         }
 

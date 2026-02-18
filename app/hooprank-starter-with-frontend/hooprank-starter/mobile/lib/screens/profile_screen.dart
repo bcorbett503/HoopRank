@@ -181,10 +181,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             CircleAvatar(
                               radius: 40,
                               backgroundColor: const Color(0xFFFF6B35),
-                              backgroundImage: player.photoUrl != null
+                              backgroundImage: player.photoUrl != null &&
+                                      !isPlaceholderImage(player.photoUrl)
                                   ? safeImageProvider(player.photoUrl!)
                                   : null,
-                              child: player.photoUrl == null
+                              child: player.photoUrl == null ||
+                                      isPlaceholderImage(player.photoUrl)
                                   ? Text(
                                       (_profileName ?? player.name).isNotEmpty
                                           ? (_profileName ?? player.name)[0]
