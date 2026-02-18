@@ -83,6 +83,9 @@ export class User {
     @Column({ name: 'auth_provider', type: 'text', nullable: true })
     authProvider: string;
 
+    @Column({ name: 'onboarding_progress', type: 'jsonb', nullable: true, default: () => "'{}'" })
+    onboardingProgress: Record<string, boolean>;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

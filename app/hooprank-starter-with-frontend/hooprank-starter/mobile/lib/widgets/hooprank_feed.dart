@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:share_plus/share_plus.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
-import '../state/tutorial_state.dart';
+import '../state/onboarding_checklist_state.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
 import '../models.dart';
@@ -52,9 +52,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       {}; // statusId -> show attendee list
   final Map<int, List<Map<String, dynamic>>> _attendeeDetails =
       {}; // statusId -> attendee list
-  bool _didSetInitialTab = false;
-  TutorialState? _tutorialState;
-  VoidCallback? _tutorialListener;
+
 
   @override
   void initState() {
@@ -65,40 +63,12 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     // first frame is rendered, not during initState.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
-      _tutorialState = context.read<TutorialState>();
-
-      void maybeSetInitialTab() {
-        final tutorial = _tutorialState;
-        if (tutorial == null) return;
-        if (_didSetInitialTab) return;
-
-        // First-login onboarding: default to Following tab so the tutorial can
-        // highlight the "Courts" CTA in the empty state.
-        final shouldDefaultToFollowing = tutorial.isActive ||
-            (tutorial.initialized && !tutorial.tutorialComplete);
-        if (shouldDefaultToFollowing) {
-          _didSetInitialTab = true;
-          _tabController.index = 1;
-        }
-      }
-
-      maybeSetInitialTab();
-      _tutorialListener = () {
-        if (!mounted) return;
-        maybeSetInitialTab();
-      };
-      _tutorialState!.addListener(_tutorialListener!);
-
       _initLocation();
     });
   }
 
   @override
   void dispose() {
-    if (_tutorialState != null && _tutorialListener != null) {
-      _tutorialState!.removeListener(_tutorialListener!);
-    }
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
@@ -528,11 +498,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
-                            key: TutorialKeys.getKey(
-                                TutorialKeys.feedCtaCourtsButton),
                             onPressed: () {
-                              final tutorial = context.read<TutorialState>();
-                              tutorial.completeStep('feed_find_courts');
                               context.go('/courts');
                             },
                             icon: const Icon(Icons.location_on, size: 16),
@@ -2496,6 +2462,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     } else if (success && !currentlyAttending && mounted) {
       // User just clicked IN — auto-expand and fetch attendee list
       _loadAttendees(statusId, autoExpand: true);
+      // Complete onboarding item
+      context.read<OnboardingChecklistState>().completeItem('join_run');
     }
   }
 

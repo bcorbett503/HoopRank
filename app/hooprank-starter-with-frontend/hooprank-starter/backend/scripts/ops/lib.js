@@ -1,0 +1,269 @@
+#!/usr/bin/env node
+/**
+ * ops/lib.js — Shared helpers for court discovery & run seeding
+ *
+ * Used by discover_courts.js and seed_runs.js.
+ * No standalone execution — import with require().
+ */
+
+const crypto = require('crypto');
+
+// ═══════════════════════════════════════════════════════════════════
+//  Constants
+// ═══════════════════════════════════════════════════════════════════
+
+const BASE = 'https://heartfelt-appreciation-production-65f1.up.railway.app';
+const BASE_HOST = 'heartfelt-appreciation-production-65f1.up.railway.app';
+const BRETT_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2';
+const DAY = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const STATE_NAMES = { NY: 'New York', IL: 'Illinois', FL: 'Florida', PA: 'Pennsylvania', OH: 'Ohio', MI: 'Michigan', GA: 'Georgia', NC: 'North Carolina', NJ: 'New Jersey', VA: 'Virginia', IN: 'Indiana', TN: 'Tennessee', MD: 'Maryland', MO: 'Missouri', WI: 'Wisconsin', MN: 'Minnesota', AL: 'Alabama', SC: 'South Carolina', LA: 'Louisiana', KY: 'Kentucky', CO: 'Colorado', AZ: 'Arizona', CT: 'Connecticut', OK: 'Oklahoma', MS: 'Mississippi', NV: 'Nevada', KS: 'Kansas', IA: 'Iowa', UT: 'Utah', NE: 'Nebraska', NM: 'New Mexico', WV: 'West Virginia', HI: 'Hawaii', DC: 'District of Columbia', DE: 'Delaware', ME: 'Maine', VT: 'Vermont', ID: 'Idaho', MT: 'Montana', WY: 'Wyoming', ND: 'North Dakota', SD: 'South Dakota', AK: 'Alaska', CA: 'California', TX: 'Texas', WA: 'Washington', OR: 'Oregon' };
+
+// ═══════════════════════════════════════════════════════════════════
+//  Utility
+// ═══════════════════════════════════════════════════════════════════
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Deterministic UUID from name+city (used by discovery pipeline) */
+function generateUUID(name) {
+    const hash = crypto.createHash('md5').update(name).digest('hex');
+    return `${hash.substr(0, 8)}-${hash.substr(8, 4)}-${hash.substr(12, 4)}-${hash.substr(16, 4)}-${hash.substr(20, 12)}`;
+}
+
+/** Haversine distance in km between two lat/lng points */
+function haversineKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Date helpers
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Get the next N weeks of dates for a given day of the week.
+ * Uses setUTCHours so stored times match intended display times.
+ */
+function getNextOccurrences(dayOfWeek, hour, minute, weeks = 4) {
+    const dates = [];
+    const now = new Date();
+    const start = new Date(now);
+    start.setUTCHours(0, 0, 0, 0);
+    for (let w = 0; w < weeks; w++) {
+        for (let d = 0; d < 7; d++) {
+            const candidate = new Date(start);
+            candidate.setUTCDate(start.getUTCDate() + w * 7 + d);
+            if (candidate.getUTCDay() === dayOfWeek) {
+                candidate.setUTCHours(hour, minute, 0, 0);
+                if (candidate > now) dates.push(candidate);
+            }
+        }
+    }
+    return dates;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  API wrappers
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Create a court via admin API.
+ * Supports both Bearer token and x-user-id auth.
+ */
+async function createCourt(court, token) {
+    const id = court.id || crypto.randomUUID();
+    const qs = new URLSearchParams({
+        id,
+        name: court.name,
+        city: court.city,
+        lat: String(court.lat),
+        lng: String(court.lng),
+        indoor: String(court.indoor !== false),
+        access: court.access || 'public',
+        venue_type: court.venue_type || '',
+        address: court.address || '',
+    });
+    const headers = { 'x-user-id': BRETT_ID };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE}/courts/admin/create?${qs}`, {
+        method: 'POST',
+        headers,
+    });
+    const result = await res.json();
+    return { id: result.court?.id || result.id || id, result };
+}
+
+/**
+ * Seed a single run occurrence.
+ */
+async function seedRun(body, token) {
+    const headers = {
+        'Content-Type': 'application/json',
+        'x-user-id': BRETT_ID,
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE}/runs`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+    });
+    return res.json();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Google Places Discovery — Filters
+// ═══════════════════════════════════════════════════════════════════
+
+const SKIP = [/gymnastics/i, /gym ?world/i, /parkour/i, /yoga/i, /pilates/i, /boxing/i, /martial/i, /karate/i, /jiu.?jitsu/i, /taekwondo/i, /kung fu/i, /swim/i, /aquatic/i, /pool/i, /dance/i, /ballet/i, /spin/i, /climbing/i, /boulder/i, /trampoline/i, /cheer/i, /golf/i, /tennis only/i, /racquet/i, /pickleball/i, /badminton/i, /volleyball(?! .*basketball)/i, /supply/i, /store/i, /shop/i, /equipment/i, /camp(?:s|ing)?\b/i, /athletic department/i, /physical therapy/i, /rehab/i, /chiropract/i, /preschool(?! gym)/i, /daycare/i, /child care/i, /childcare/i, /dog\s/i, /pet\s/i, /veterinar/i, /salon/i, /beauty/i, /nail/i, /barber/i, /nursing/i, /dental/i, /medical/i, /pharmacy/i, /skating rink/i, /ice rink/i, /hockey rink/i, /crossfit(?! .*basketball)/i, /rowing/i, /crew house/i, /boathouse/i, /church(?!.*gym)/i, /mosque/i, /temple/i, /synagogue(?!.*gym)/i, /spa\b/i, /tattoo/i];
+const KEEP = [/school/i, /elementary/i, /middle school/i, /high school/i, /gymnasium/i, /gym\b/i, /recreation/i, /community center/i, /ymca/i, /ywca/i, /jcc/i, /boys.*girls.*club/i, /basketball/i, /fitness/i, /athletic/i, /sports/i, /university/i, /college/i, /academy/i, /24 hour/i, /life time/i, /la fitness/i, /planet fitness/i, /gold'?s? gym/i, /bay club/i, /equinox/i];
+
+function shouldInclude(name, types) {
+    for (const p of SKIP) if (p.test(name)) return false;
+    for (const p of KEEP) if (p.test(name)) return true;
+    if ((types || []).some(t => ['gym', 'school', 'university', 'community_center', 'sports_complex', 'health', 'stadium'].some(bt => t.includes(bt)))) return true;
+    return false;
+}
+
+/**
+ * Search Google Places API (New) for a text query.
+ * @param {string} query - Text search query
+ * @param {string} apiKey - Google API key
+ * @returns {Promise<Array>} Array of place results
+ */
+async function discoverPlaces(query, apiKey) {
+    const body = JSON.stringify({ textQuery: query, maxResultCount: 20 });
+    const res = await fetch(
+        'https://places.googleapis.com/v1/places:searchText',
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask':
+                    'places.displayName,places.formattedAddress,places.location,places.types',
+            },
+            body,
+        },
+    );
+    const result = await res.json();
+    return result.places || [];
+}
+
+/**
+ * Lookup a single venue by name via Google Places API.
+ * Returns the first matching result.
+ */
+async function lookupVenue(name, apiKey) {
+    const places = await discoverPlaces(name, apiKey);
+    if (!places.length) return null;
+    const p = places[0];
+    const loc = p.location || {};
+    return {
+        name: p.displayName?.text || name,
+        address: p.formattedAddress || '',
+        lat: loc.latitude,
+        lng: loc.longitude,
+        types: p.types || [],
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Address / City parsing
+// ═══════════════════════════════════════════════════════════════════
+
+/** Extract "City, ST" from a formatted Google address */
+function extractCity(address) {
+    const parts = address.split(',').map(p => p.trim());
+    if (parts.length >= 3) {
+        const city = parts[parts.length - 3] || parts[0];
+        const st = parts[parts.length - 2];
+        const m = st.match(/^([A-Z]{2})/);
+        if (m) return `${city}, ${m[1]}`;
+    }
+    const m = address.match(/,\s*([^,]+),\s*([A-Z]{2})\s+\d/);
+    if (m) return `${m[1].trim()}, ${m[2]}`;
+    return null;
+}
+
+/** Infer venue_type from name */
+function inferVenueType(name) {
+    const n = name.toLowerCase();
+    if (/elementary|middle school|high school|prep school|junior high|academy|montessori/i.test(n)) return 'school';
+    if (/college|university/i.test(n)) return 'college';
+    if (/ymca|ywca|jcc|community center|recreation|rec center|boys.*girls.*club|parks/i.test(n)) return 'rec_center';
+    if (/church/i.test(n)) return 'church';
+    return 'gym';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Backend helpers (for 4-phase pipeline)
+// ═══════════════════════════════════════════════════════════════════
+
+/** Simple GET returning parsed JSON */
+async function httpGet(url) {
+    const res = await fetch(url);
+    return res.json();
+}
+
+/** POST to Railway admin endpoint (no body, uses query params) */
+async function adminPost(path) {
+    const res = await fetch(`${BASE}${path}`, {
+        method: 'POST',
+        headers: { 'x-user-id': BRETT_ID },
+    });
+    let data;
+    try { data = await res.json(); } catch { data = { status: res.status }; }
+    return data;
+}
+
+/** Run Phase 3 classification rules against indoor courts */
+async function classifyVenues(state) {
+    const schoolPatterns = ['%Elementary%', '%Middle School%', '%High School%', '%Prep School%', '%School Gym%', '%School Gymnasium%', '%Junior High%', '%Academy%', '%Montessori%'];
+    const collegePatterns = ['%College%', '%University%'];
+    const recPatterns = ['%YMCA%', '%YWCA%', '%JCC%', '%Community Center%', '%Recreation%', '%Rec Center%', '%Boys%Girls%Club%', '%Parks%'];
+    const gymPatterns = ['%24 Hour%', '%Life Time%', '%LA Fitness%', '%Planet Fitness%', '%Fitness%', '%Athletic Club%', '%Gold%Gym%', '%Health Club%', '%Training%', '%Sport%'];
+
+    for (const p of schoolPatterns)
+        await adminPost(`/courts/admin/update-venue-type?venue_type=school&name_pattern=${encodeURIComponent(p)}&indoor=true`);
+    for (const p of collegePatterns)
+        await adminPost(`/courts/admin/update-venue-type?venue_type=college&name_pattern=${encodeURIComponent(p)}&indoor=true`);
+    for (const p of recPatterns)
+        await adminPost(`/courts/admin/update-venue-type?venue_type=rec_center&name_pattern=${encodeURIComponent(p)}&indoor=true`);
+    for (const p of gymPatterns)
+        await adminPost(`/courts/admin/update-venue-type?venue_type=gym&name_pattern=${encodeURIComponent(p)}&indoor=true`);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Exports
+// ═══════════════════════════════════════════════════════════════════
+
+module.exports = {
+    BASE,
+    BASE_HOST,
+    BRETT_ID,
+    DAY,
+    STATE_NAMES,
+    sleep,
+    generateUUID,
+    haversineKm,
+    getNextOccurrences,
+    createCourt,
+    seedRun,
+    shouldInclude,
+    discoverPlaces,
+    lookupVenue,
+    extractCity,
+    inferVenueType,
+    httpGet,
+    adminPost,
+    classifyVenues,
+};

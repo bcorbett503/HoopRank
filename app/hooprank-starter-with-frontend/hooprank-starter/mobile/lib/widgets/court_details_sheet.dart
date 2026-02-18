@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../state/check_in_state.dart';
-import '../state/tutorial_state.dart';
+import '../state/onboarding_checklist_state.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../widgets/rating_widgets.dart';
 import '../screens/status_composer_screen.dart';
@@ -19,12 +19,7 @@ class CourtDetailsSheet {
       backgroundColor: Colors.transparent,
       builder: (context) => _CourtDetailsSheet(court: court),
     ).whenComplete(() {
-      if (!context.mounted) return;
-      final tutorial = context.read<TutorialState>();
-      // If the user closes the sheet early, make sure the tutorial can still
-      // progress past the King + swipe-down steps.
-      tutorial.completeStep('court_king');
-      tutorial.completeStep('court_swipe_down');
+      // no-op; sheet closed
     });
   }
 }
@@ -55,7 +50,7 @@ class _CourtDetailsSheet extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: Container(
-                  key: TutorialKeys.getKey(TutorialKeys.courtDragHandle),
+                  key: const ValueKey('court_drag_handle'),
                   width: 76,
                   height: 6,
                   decoration: BoxDecoration(
@@ -120,28 +115,22 @@ class _CourtDetailsSheet extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   SizedBox(
-                                    key: TutorialKeys.getKey(
-                                        TutorialKeys.courtFollowButton),
                                     width: 48,
                                     height: 48,
                                     child: IconButton(
                                       onPressed: () async {
-                                        final tutorial =
-                                            context.read<TutorialState>();
                                         if (isFollowing) {
                                           await checkInState
                                               .unfollowCourt(court.id);
                                         } else {
                                           await checkInState
                                               .followCourt(court.id);
-                                          tutorial.completeStep('court_follow');
-                                          // Give the user a moment to see the followers list and
-                                          // King designation, then advance to the swipe-down step.
-                                          Future.delayed(
-                                              const Duration(
-                                                  milliseconds: 2600), () {
-                                            tutorial.completeStep('court_king');
-                                          });
+                                          // Complete onboarding item
+                                          if (context.mounted) {
+                                            context
+                                                .read<OnboardingChecklistState>()
+                                                .completeItem('follow_court');
+                                          }
                                         }
                                       },
                                       icon: Icon(
@@ -198,8 +187,7 @@ class _CourtDetailsSheet extends StatelessWidget {
                             },
                             child: isFollowing
                                 ? _CourtFollowersCard(
-                                    key: TutorialKeys.getKey(
-                                        TutorialKeys.courtFollowersCard),
+                                    key: const ValueKey('court_followers_card'),
                                     courtId: court.id,
                                   )
                                 : Padding(

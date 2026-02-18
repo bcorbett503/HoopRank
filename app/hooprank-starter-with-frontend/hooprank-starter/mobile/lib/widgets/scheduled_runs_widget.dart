@@ -4,6 +4,7 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 import '../state/check_in_state.dart';
+import '../state/onboarding_checklist_state.dart';
 
 /// Widget to display and manage scheduled runs at a court
 class ScheduledRunsWidget extends StatefulWidget {
@@ -512,6 +513,18 @@ class _CreateRunSheetState extends State<CreateRunSheet> {
       );
 
       if (runId != null) {
+        // Complete onboarding item
+        debugPrint('ONBOARDING: CreateRunSheet runId=$runId, mounted=$mounted');
+        if (mounted) {
+          try {
+            context
+                .read<OnboardingChecklistState>()
+                .completeItem(OnboardingItems.scheduleRun);
+            debugPrint('ONBOARDING: schedule_run completion called from CreateRunSheet');
+          } catch (e) {
+            debugPrint('ONBOARDING: ERROR reading OnboardingChecklistState: $e');
+          }
+        }
         widget.onCreated();
       } else {
         if (mounted) {

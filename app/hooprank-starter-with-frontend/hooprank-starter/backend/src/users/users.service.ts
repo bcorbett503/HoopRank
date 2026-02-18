@@ -70,6 +70,7 @@ export class UsersService {
           position,
           city,
           games_played,
+          onboarding_progress,
           created_at,
           updated_at
         FROM users
@@ -203,13 +204,23 @@ export class UsersService {
         fcmToken: 'fcm_token',
         lat: 'lat',
         lng: 'lng',
+        onboardingProgress: 'onboarding_progress',
+        onboarding_progress: 'onboarding_progress',
       };
+
+      // Columns that are JSONB and need special handling
+      const jsonbColumns = new Set(['onboarding_progress']);
 
       for (const [key, value] of Object.entries(data)) {
         const column = columnMap[key];
         if (column && value !== undefined) {
-          updates.push(`${column} = $${paramIndex++}`);
-          values.push(value);
+          if (jsonbColumns.has(column)) {
+            updates.push(`${column} = $${paramIndex++}::jsonb`);
+            values.push(JSON.stringify(value));
+          } else {
+            updates.push(`${column} = $${paramIndex++}`);
+            values.push(value);
+          }
         }
       }
 

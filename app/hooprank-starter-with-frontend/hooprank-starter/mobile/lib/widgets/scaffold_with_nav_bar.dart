@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../state/tutorial_state.dart';
+
 import '../services/api_service.dart';
 import 'hooprank_app_bar.dart';
 
@@ -93,14 +93,6 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
 
   void _onTap(BuildContext context, int index) {
     // Check for tutorial step completion for Rankings (index 0)
-    if (index == 0) {
-      final tutorial = Provider.of<TutorialState>(context, listen: false);
-      // Only complete if we're on the specific step
-      if (tutorial.isActive && tutorial.currentStep?.id == 'go_to_rankings') {
-        tutorial.completeStep('go_to_rankings');
-      }
-    }
-
     if (index == 1) {
       // Messages tab: refresh conversations so new threads appear immediately
       ScaffoldWithNavBar.refreshMessagesTab?.call();
@@ -149,7 +141,6 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
               labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
               destinations: [
                 NavigationDestination(
-                  key: TutorialKeys.getKey(TutorialKeys.rankingsTab),
                   icon: const Icon(Icons.leaderboard),
                   label: 'Rankings',
                 ),

@@ -11,7 +11,7 @@ import '../services/zipcode_service.dart';
 import '../services/api_service.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
-import '../state/tutorial_state.dart';
+
 import 'basketball_marker.dart';
 
 class CourtMapWidget extends StatefulWidget {
@@ -286,9 +286,6 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   void _zoomToCourtAndSelect(Court court) {
     debugPrint(
         'MAP: Zooming to court: ${court.name} at (${court.lat}, ${court.lng})');
-    final tutorial = context.read<TutorialState>();
-    tutorial.completeStep('courts_select_court');
-    tutorial.completeStep('courts_open_run_court');
     final target = LatLng(court.lat, court.lng);
     _mapController.move(target, 16.0);
     // Show court details sheet after a brief delay to allow map animation
@@ -954,27 +951,14 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                         // Scheduled Runs dropdown (primary)
                         Expanded(
                           child: PopupMenuButton<String>(
-                            onOpened: () {
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (!mounted) return;
-                                context
-                                    .read<TutorialState>()
-                                    .completeStep('courts_open_find_runs');
-                              });
-                            },
+                            onOpened: () {},
                             onSelected: (value) async {
                               if (value == 'off') {
                                 await _setRunsFilter(null);
                                 return;
                               }
 
-                              if (value == 'all') {
-                                // Complete immediately so the tutorial can advance even while
-                                // we fetch run data (the popup closes before the async call completes).
-                                context
-                                    .read<TutorialState>()
-                                    .completeStep('courts_select_all_upcoming');
-                              }
+
 
                               await _setRunsFilter(value);
                             },
@@ -1004,8 +988,6 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                               PopupMenuItem(
                                 value: 'all',
                                 child: Container(
-                                  key: TutorialKeys.getKey(
-                                      TutorialKeys.courtsAllUpcomingMenuItem),
                                   width: double.infinity,
                                   child: Row(
                                     children: [
@@ -1045,8 +1027,6 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
                               ],
                             ],
                             child: Container(
-                              key: TutorialKeys.getKey(
-                                  TutorialKeys.courtsFindRunsButton),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
                                 color: _runsFilter != null
@@ -1388,7 +1368,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
 
                   return Container(
                     key: index == 0
-                        ? TutorialKeys.getKey(TutorialKeys.courtsTopCourtCard)
+                        ? null
                         : null,
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(

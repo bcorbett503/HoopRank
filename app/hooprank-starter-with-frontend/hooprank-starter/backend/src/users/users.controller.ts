@@ -118,6 +118,7 @@ export class UsersController {
       photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
       avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
       photo_url: u.avatarUrl ?? u.avatar_url ?? null,
+      onboarding_progress: u.onboardingProgress ?? u.onboarding_progress ?? {},
     };
   }
 

@@ -11,6 +11,7 @@ import '../services/analytics_service.dart';
 import '../models.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
+import '../state/onboarding_checklist_state.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
 import 'team_detail_screen.dart';
 import '../widgets/shimmer_skeleton.dart';
@@ -369,6 +370,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         _loadData();
         AnalyticsService.logTeamCreated(teamType: teamType);
         ScaffoldWithNavBar.refreshBadge?.call();
+        // Complete onboarding item
+        context
+            .read<OnboardingChecklistState>()
+            .completeItem(OnboardingItems.joinOrCreateTeam);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Team "$name" created!')),
         );
@@ -422,6 +427,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       await ApiService.acceptTeamInvite(invite['id']);
       _loadData();
       ScaffoldWithNavBar.refreshBadge?.call();
+      // Complete onboarding item
+      if (mounted) {
+        context
+            .read<OnboardingChecklistState>()
+            .completeItem(OnboardingItems.joinOrCreateTeam);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Joined ${invite['name']}!')),

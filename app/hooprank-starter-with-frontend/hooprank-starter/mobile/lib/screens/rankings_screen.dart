@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
-import '../state/tutorial_state.dart';
+import '../state/onboarding_checklist_state.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -866,18 +866,11 @@ class _RankingsScreenState extends State<RankingsScreen>
                 ),
                 const SizedBox(width: 6),
                 ChoiceChip(
-                  key: TutorialKeys.getKey(TutorialKeys.rankingsLocalChip),
                   label: const Text('Local'),
                   selected: _isLocal,
                   onSelected: (_) {
                     setState(() => _isLocal = true);
                     _fetchPlayers();
-                    // Complete tutorial step if active
-                    final tutorial = context.read<TutorialState>();
-                    if (tutorial.isActive &&
-                        tutorial.currentStep?.id == 'local_players') {
-                      tutorial.completeStep('local_players');
-                    }
                   },
                 ),
                 const SizedBox(width: 12),
@@ -1063,9 +1056,6 @@ class _RankingsScreenState extends State<RankingsScreen>
                 ),
                 // Quick action buttons (tutorial target for first player)
                 Row(
-                  key: index == 0
-                      ? TutorialKeys.getKey(TutorialKeys.playerActionButtons)
-                      : null,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
@@ -1076,12 +1066,6 @@ class _RankingsScreenState extends State<RankingsScreen>
                           const BoxConstraints(minWidth: 36, minHeight: 36),
                       padding: EdgeInsets.zero,
                       onPressed: () {
-                        // Complete tutorial step if active
-                        final tutorial = context.read<TutorialState>();
-                        if (tutorial.isActive &&
-                            tutorial.currentStep?.id == 'player_actions') {
-                          tutorial.completeStep('player_actions');
-                        }
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1108,12 +1092,10 @@ class _RankingsScreenState extends State<RankingsScreen>
                           );
                           return;
                         }
-                        // Complete tutorial step if active
-                        final tutorial = context.read<TutorialState>();
-                        if (tutorial.isActive &&
-                            tutorial.currentStep?.id == 'player_actions') {
-                          tutorial.completeStep('player_actions');
-                        }
+                        // Complete onboarding item
+                        context
+                            .read<OnboardingChecklistState>()
+                            .completeItem('challenge_player');
                         _showChallengeDialog(player);
                       },
                     ),
@@ -1137,12 +1119,10 @@ class _RankingsScreenState extends State<RankingsScreen>
                           padding: EdgeInsets.zero,
                           onPressed: () {
                             checkInState.toggleFollowPlayer(player.id);
-                            // Complete tutorial step if active
-                            final tutorial = context.read<TutorialState>();
-                            if (tutorial.isActive &&
-                                tutorial.currentStep?.id == 'player_actions') {
-                              tutorial.completeStep('player_actions');
-                            }
+                            // Complete onboarding item
+                            context
+                                .read<OnboardingChecklistState>()
+                                .completeItem('follow_player');
                           },
                         );
                       },

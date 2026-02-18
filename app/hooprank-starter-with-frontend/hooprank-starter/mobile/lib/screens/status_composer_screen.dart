@@ -11,6 +11,7 @@ import '../services/court_service.dart';
 import '../services/video_upload_service.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
+import '../state/onboarding_checklist_state.dart';
 
 /// Full-screen status composer with rich options for posting
 class StatusComposerScreen extends StatefulWidget {
@@ -747,6 +748,12 @@ class _StatusComposerScreenState extends State<StatusComposerScreen> {
       );
       
       if (mounted) {
+        // Complete onboarding item for scheduled runs
+        if (_scheduledTime != null) {
+          context
+              .read<OnboardingChecklistState>()
+              .completeItem(OnboardingItems.scheduleRun);
+        }
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

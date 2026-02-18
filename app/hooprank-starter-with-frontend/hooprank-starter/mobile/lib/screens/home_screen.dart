@@ -12,7 +12,8 @@ import '../services/messages_service.dart';
 import '../services/notification_service.dart';
 import '../services/analytics_service.dart';
 import '../state/app_state.dart';
-import '../state/tutorial_state.dart';
+import '../state/onboarding_checklist_state.dart';
+import '../widgets/onboarding_checklist_card.dart';
 import '../state/check_in_state.dart';
 import '../models.dart';
 import '../utils/image_utils.dart';
@@ -167,9 +168,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
 
       if (mounted) {
+        debugPrint('ONBOARDING: _submitStatus completed, _scheduledTime=$_scheduledTime');
         String message = 'Status updated!';
         if (_scheduledTime != null) {
           message = 'Game scheduled!';
+          // Complete onboarding item
+          debugPrint('ONBOARDING: Triggering schedule_run completion');
+          context
+              .read<OnboardingChecklistState>()
+              .completeItem(OnboardingItems.scheduleRun);
         } else if (_selectedVideo != null) {
           message = 'Video posted!';
         } else if (_selectedImage != null) {
@@ -1815,14 +1822,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           IconButton(
             icon: const Icon(Icons.help_outline),
-            tooltip: 'View Tutorial',
+            tooltip: 'Get Started',
             onPressed: () async {
-              final tutorial =
-                  Provider.of<TutorialState>(context, listen: false);
-              await tutorial.resetTutorial();
-              if (context.mounted) {
-                context.go('/courts');
-              }
+              final onboarding =
+                  Provider.of<OnboardingChecklistState>(context, listen: false);
+              await onboarding.reset();
             },
           ),
           IconButton(
@@ -1972,6 +1976,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               },
             ),
 
+            // Onboarding checklist (shown until all items complete)
+            const OnboardingChecklistCard(),
+
             if (_pendingConfirmations.isNotEmpty) ...[
               _buildPendingConfirmationsSection(),
               const SizedBox(height: 12),
@@ -2026,6 +2033,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 await ApiService.acceptTeamInvite(invite['id']);
                                 _loadTeamInvites();
                                 _loadMyTeams();
+                                // Complete onboarding item
+                                if (mounted) {
+                                  context
+                                      .read<OnboardingChecklistState>()
+                                      .completeItem(OnboardingItems.joinOrCreateTeam);
+                                }
                               } catch (_) {}
                             },
                             child: const Icon(Icons.check,

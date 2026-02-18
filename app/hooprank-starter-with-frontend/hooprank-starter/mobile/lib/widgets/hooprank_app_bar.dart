@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
-import '../state/tutorial_state.dart';
+import '../state/onboarding_checklist_state.dart';
 
 /// Shared HoopRank app bar widget for consistent top bar across all screens
 class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -83,11 +83,12 @@ class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
           icon: const Icon(Icons.help_outline),
           tooltip: 'Restart Tutorial',
           onPressed: () async {
-            final tutorial = Provider.of<TutorialState>(context, listen: false);
-            await tutorial.resetTutorial();
-            if (context.mounted) {
-              context.go('/courts');
-            }
+            final onboarding =
+                  Provider.of<OnboardingChecklistState>(context, listen: false);
+              await onboarding.reset();
+              if (context.mounted) {
+                context.go('/play');
+              }
           },
         ),
         // Logout button

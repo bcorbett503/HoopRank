@@ -11,9 +11,8 @@ import 'services/analytics_service.dart';
 
 import 'state/app_state.dart';
 import 'state/check_in_state.dart';
-import 'state/tutorial_state.dart';
+import 'state/onboarding_checklist_state.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
-import 'widgets/tutorial_overlay.dart';
 import 'screens/home_screen.dart';
 import 'screens/rankings_screen.dart';
 
@@ -65,7 +64,7 @@ void main() async {
             ChangeNotifierProvider(create: (_) => AuthState()),
             ChangeNotifierProvider(create: (_) => MatchState()),
             ChangeNotifierProvider(create: (_) => CheckInState()),
-            ChangeNotifierProvider(create: (_) => TutorialState()),
+            ChangeNotifierProvider(create: (_) => OnboardingChecklistState()),
             Provider(create: (_) => CourtService()),
           ],
           child: const HoopRankApp(),
@@ -111,10 +110,10 @@ class _HoopRankAppState extends State<HoopRankApp> {
 
       final authState = context.read<AuthState>();
       final checkInState = context.read<CheckInState>();
-      final tutorialState = context.read<TutorialState>();
+      final onboardingState = context.read<OnboardingChecklistState>();
 
       // Initialize states
-      tutorialState.initialize();
+      onboardingState.initialize();
 
       // Initialize CheckInState and analytics when user changes
       authState.addListener(() {
@@ -134,24 +133,22 @@ class _HoopRankAppState extends State<HoopRankApp> {
         AnalyticsService.setUserId(authState.currentUser!.id);
       }
 
-      _router = _createRouter(authState, tutorialState);
+      _router = _createRouter(authState);
       NotificationService.setRouter(_router!);
     }
   }
 
-  GoRouter _createRouter(AuthState authState, TutorialState tutorialState) {
+  GoRouter _createRouter(AuthState authState) {
     return GoRouter(
       navigatorKey: _rootNavigatorKey,
       initialLocation: '/play',
-      // Re-run redirects when auth OR tutorial state changes (tutorial loads prefs async).
-      refreshListenable: Listenable.merge([authState, tutorialState]),
+      refreshListenable: authState,
       observers: [AnalyticsService.observer],
       redirect: (context, state) {
         final user = authState.currentUser;
         final loggedIn = user != null;
         final isLoggingIn = state.uri.toString() == '/login';
         final isProfileSetup = state.uri.toString() == '/profile/setup';
-        final isPlay = state.uri.path == '/play';
 
         debugPrint(
             'ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}');
@@ -169,23 +166,6 @@ class _HoopRankAppState extends State<HoopRankApp> {
             !isLoggingIn) {
           debugPrint('ROUTER: -> /profile/setup (profile incomplete)');
           return '/profile/setup';
-        }
-
-        // Auto-start tutorial for first login (after profile setup), landing on Feed -> Following.
-        if (loggedIn &&
-            user.isProfileComplete &&
-            tutorialState.initialized &&
-            !tutorialState.tutorialComplete &&
-            !tutorialState.isActive &&
-            !isProfileSetup &&
-            !isLoggingIn) {
-          debugPrint('ROUTER: Starting interactive tutorial');
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            tutorialState.startTutorial();
-          });
-
-          // Force tutorial to start on Feed (step 1 highlights the Courts CTA button).
-          if (!isPlay) return '/play';
         }
 
         // Profile complete and on login screen - go to home
@@ -415,9 +395,6 @@ class _HoopRankAppState extends State<HoopRankApp> {
         ),
       ),
       routerConfig: _router!,
-      // Wrap all routes with TutorialOverlay inside MaterialApp for proper Directionality
-      builder: (context, child) =>
-          TutorialOverlay(child: child ?? const SizedBox()),
     );
   }
 }

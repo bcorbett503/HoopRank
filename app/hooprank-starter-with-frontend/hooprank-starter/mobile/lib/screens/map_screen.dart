@@ -10,7 +10,7 @@ import '../services/messages_service.dart';
 import '../services/analytics_service.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
-import '../state/tutorial_state.dart';
+
 
 class MapScreen extends StatefulWidget {
   final String? initialCourtId;
@@ -39,7 +39,7 @@ class _MapScreenState extends State<MapScreen> {
     // so the tutorial can't get stuck on a missing CTA state.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<TutorialState>().completeStep('feed_find_courts');
+      // Screen loaded — no additional setup needed
     });
   }
 
