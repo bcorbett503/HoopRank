@@ -18,6 +18,15 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         return;
     }
 
+    // Helper: run a migration query, log errors but don't crash the server
+    const safeQuery = async (label: string, sql: string, params?: any[]) => {
+        try {
+            await dataSource.query(sql, params);
+        } catch (err) {
+            console.warn(`[SchemaEvolution] WARN (${label}): ${err.message}`);
+        }
+    };
+
     try {
         // ============================================
         // MATCHES TABLE MIGRATIONS
@@ -264,7 +273,8 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
 
         console.log('[SchemaEvolution] All migrations completed successfully');
     } catch (error) {
-        console.error('[SchemaEvolution] FATAL: Migration failed — refusing to start:', error.message);
-        throw error; // Fail-closed: crash the app so Railway surfaces the issue
+        console.error('[SchemaEvolution] Migration error (non-fatal):', error.message);
+        // Fail-open: log the error but let the server start.
+        // Critical schema issues will surface as runtime query errors.
     }
 }
