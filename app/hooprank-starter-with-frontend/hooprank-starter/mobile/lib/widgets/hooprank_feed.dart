@@ -3548,9 +3548,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                             backgroundImage: comment[
                                                         'userPhotoUrl'] !=
                                                     null
-                                                ? (comment['userPhotoUrl']
-                                                    ? safeImageProvider(comment['userPhotoUrl'])
-                                                    : null,
+                                                ? safeImageProvider(comment['userPhotoUrl'])
+                                                : null,
                                             child: comment['userPhotoUrl'] ==
                                                     null
                                                 ? Text(
