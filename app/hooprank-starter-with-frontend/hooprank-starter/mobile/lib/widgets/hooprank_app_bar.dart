@@ -74,7 +74,9 @@ class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
                   onBackgroundImageError: photoUrl != null
                       ? (_, __) => debugPrint('App bar avatar failed to load: $photoUrl')
                       : null,
-                  child: const Icon(Icons.person, size: 18, color: Colors.white),
+                  child: (photoUrl == null || isPlaceholderImage(photoUrl))
+                      ? const Icon(Icons.person, size: 18, color: Colors.white)
+                      : null,
                 ),
               ),
             );

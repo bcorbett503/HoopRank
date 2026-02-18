@@ -1926,14 +1926,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 onBackgroundImageError: photoUrl != null
                                     ? (_, __) => debugPrint('Status avatar failed to load: $photoUrl')
                                     : null,
-                                child: Text(
+                                child: (photoUrl == null || isPlaceholderImage(photoUrl))
+                                    ? Text(
                                         name.isNotEmpty
                                             ? name[0].toUpperCase()
                                             : '?',
                                         style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold),
-                                      ),
+                                      )
+                                    : null,
                               );
                             }),
                             const SizedBox(width: 12),
