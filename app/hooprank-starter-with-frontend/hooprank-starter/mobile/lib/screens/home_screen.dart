@@ -1840,10 +1840,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Flex(
-          direction: Axis.vertical,
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          clipBehavior: Clip.hardEdge,
           children: [
             // ── Static header: STATUS composer ──
             const SizedBox(height: 16),
@@ -1920,19 +1918,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               return CircleAvatar(
                                 radius: 18,
                                 backgroundColor: Colors.deepOrange,
-                                backgroundImage: photoUrl != null
+                                backgroundImage: photoUrl != null &&
+                                        !isPlaceholderImage(photoUrl)
                                     ? safeImageProvider(photoUrl)
                                     : null,
-                                child: photoUrl == null
-                                    ? Text(
+                                onBackgroundImageError: photoUrl != null
+                                    ? (_, __) => debugPrint('Status avatar failed to load: $photoUrl')
+                                    : null,
+                                child: Text(
                                         name.isNotEmpty
                                             ? name[0].toUpperCase()
                                             : '?',
                                         style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold),
-                                      )
-                                    : null,
+                                      ),
                               );
                             }),
                             const SizedBox(width: 12),

@@ -203,6 +203,7 @@ class ApiService {
       debugPrint('AUTHENTICATE: raw response.body = ${response.body}');
       final data = jsonDecode(response.body);
       debugPrint('AUTHENTICATE: parsed json position = ${data['position']}');
+      debugPrint('AUTHENTICATE: parsed json photoUrl = ${data['photoUrl']}, avatar_url = ${data['avatar_url']}');
       return User.fromJson(data);
     } else {
       throw Exception('Failed to authenticate');

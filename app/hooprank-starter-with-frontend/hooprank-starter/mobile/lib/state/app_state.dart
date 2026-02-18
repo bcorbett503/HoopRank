@@ -40,6 +40,7 @@ class AuthState extends ChangeNotifier {
       try {
         final Map<String, dynamic> data = jsonDecode(raw);
         _currentUser = User.fromJson(data);
+        debugPrint('_init: cached user photoUrl=${_currentUser!.photoUrl}');
         ApiService.setUserId(_currentUser!.id);
 
         // Restore auth token from secure storage
@@ -105,7 +106,7 @@ class AuthState extends ChangeNotifier {
       final updatedUser = await ApiService.getMe();
       if (updatedUser != null) {
         debugPrint(
-            '_refreshUserInBackground: got user with position=${updatedUser.position}');
+            '_refreshUserInBackground: got user with position=${updatedUser.position}, photoUrl=${updatedUser.photoUrl}');
         _currentUser = updatedUser;
         notifyListeners();
 
@@ -145,7 +146,7 @@ class AuthState extends ChangeNotifier {
   Future<void> login(User user, {String? token}) async {
     _currentUser = user;
     debugPrint(
-        'AUTH_STATE.login: user.id=${user.id}, user.position=${user.position}, isProfileComplete=${user.isProfileComplete}');
+        'AUTH_STATE.login: user.id=${user.id}, user.position=${user.position}, user.photoUrl=${user.photoUrl}, isProfileComplete=${user.isProfileComplete}');
     ApiService.setUserId(user.id);
     if (token != null) {
       ApiService.setAuthToken(token);
@@ -233,6 +234,7 @@ class AuthState extends ChangeNotifier {
       final updatedUser = await ApiService.getMe();
       debugPrint('Got updated user: ${updatedUser?.name}');
       if (updatedUser != null) {
+        debugPrint('refreshUser: updated photoUrl=${updatedUser.photoUrl}');
         _currentUser = updatedUser;
         notifyListeners();
 
@@ -259,7 +261,7 @@ class AuthState extends ChangeNotifier {
   /// Update the user's position locally (used after profile setup to ensure isProfileComplete works)
   Future<void> updateUserPosition(String position) async {
     if (_currentUser == null) return;
-    debugPrint('Updating user position locally to: $position');
+    debugPrint('Updating user position locally to: $position (current photoUrl=${_currentUser!.photoUrl})');
     _currentUser = User(
       id: _currentUser!.id,
       name: _currentUser!.name,
