@@ -953,11 +953,13 @@ async function testUsersExtended() {
         else fail('GET /users/me/follows/activity', `status ${r.status}`);
     } catch (e) { fail('GET /users/me/follows/activity', e.message); }
 
-    // Follow/unfollow team (if a team exists)
+    // Follow/unfollow team — create a temporary team for this test
     try {
-        const teamsR = await GET('/teams');
-        if (teamsR.status === 200 && Array.isArray(teamsR.body) && teamsR.body.length > 0) {
-            const teamId = teamsR.body[0].id;
+        // Create a temporary team so we always have one to follow
+        const createR = await POST('/teams', { name: '[E2E] Follow Test', teamType: '3v3' });
+        if (createR.status === 201 && createR.body && createR.body.id) {
+            const teamId = createR.body.id;
+
             const fr = await POST('/users/me/follows/teams', { teamId });
             if (fr.status === 200 || fr.status === 201) pass('POST follow team', `followed ${teamId.slice(0, 8)}`);
             else fail('POST follow team', `status ${fr.status}`);
@@ -965,8 +967,11 @@ async function testUsersExtended() {
             const ur = await DEL(`/users/me/follows/teams/${teamId}`);
             if (ur.status === 200) pass('DELETE unfollow team', 'unfollowed');
             else fail('DELETE unfollow team', `status ${ur.status}`);
+
+            // Clean up the temporary team
+            await DEL(`/teams/${teamId}`);
         } else {
-            skip('POST/DELETE follow team', 'no teams found');
+            skip('POST/DELETE follow team', `team creation failed — status ${createR.status}`);
         }
     } catch (e) { fail('follow team', e.message); }
 

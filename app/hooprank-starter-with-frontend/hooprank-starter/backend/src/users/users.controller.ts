@@ -27,6 +27,8 @@ export class UsersController {
     // Try to verify Firebase token if provided (from header or body)
     let uid = '';
     let email = body.email || '';
+    let photoUrl = '';
+    let displayName = '';
 
     const authHeader = req.headers?.authorization;
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -46,6 +48,8 @@ export class UsersController {
       const decoded = await admin.auth().verifyIdToken(firebaseToken);
       uid = decoded.uid;
       email = email || decoded.email || '';
+      photoUrl = decoded.picture || '';   // Google profile picture URL
+      displayName = decoded.name || '';   // Google display name
     } catch (e) {
       // Re-throw NestJS exceptions as-is
       if (e instanceof UnauthorizedException || e instanceof ServiceUnavailableException) {
@@ -62,8 +66,30 @@ export class UsersController {
 
     const user = await this.usersService.findOrCreate(uid, email);
 
-    // Return with iOS-compatible aliases
+    // Sync profile picture and display name from the auth provider.
+    // Update if the DB value is empty, a base64 placeholder, or 'New Player'.
     const u = user as any;
+    const currentPhoto = u.avatar_url || u.avatarUrl || '';
+    const currentName = u.name || '';
+    const needsPhotoSync = photoUrl && (!currentPhoto || currentPhoto.startsWith('data:'));
+    const needsNameSync = displayName && (!currentName || currentName === 'New Player');
+
+    if (needsPhotoSync || needsNameSync) {
+      try {
+        const updates: Record<string, string> = {};
+        if (needsPhotoSync) updates.avatar_url = photoUrl;
+        if (needsNameSync) updates.name = displayName;
+        await this.usersService.updateProfile(uid, updates as any);
+        // Reflect in the response immediately
+        if (needsPhotoSync) { u.avatar_url = photoUrl; u.avatarUrl = photoUrl; }
+        if (needsNameSync) u.name = displayName;
+        console.log(`[AUTHENTICATE] Synced profile for ${uid}:`, Object.keys(updates).join(', '));
+      } catch (syncErr) {
+        console.error('[AUTHENTICATE] Profile sync failed:', syncErr.message);
+      }
+    }
+
+    // Return with iOS-compatible aliases
     return {
       ...u,
       rating: parseFloat(u.hoopRank ?? u.hoop_rank) || 3.0,
