@@ -954,25 +954,27 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
   Widget _buildEmptyState(String title, String subtitle,
       {Widget? extraContent}) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 40, left: 32, right: 32, bottom: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Icon(Icons.feed_outlined,
-              size: 48, color: Colors.white.withValues(alpha: 0.2)),
-          const SizedBox(height: 16),
-          Text(title,
-              style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          Text(subtitle,
-              style: const TextStyle(color: Colors.white38, fontSize: 13),
-              textAlign: TextAlign.center),
-          if (extraContent != null) extraContent,
-        ],
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 24, left: 32, right: 32, bottom: 16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Icon(Icons.feed_outlined,
+                size: 48, color: Colors.white.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            Text(title,
+                style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500)),
+            const SizedBox(height: 8),
+            Text(subtitle,
+                style: const TextStyle(color: Colors.white38, fontSize: 13),
+                textAlign: TextAlign.center),
+            if (extraContent != null) extraContent,
+          ],
+        ),
       ),
     );
   }
