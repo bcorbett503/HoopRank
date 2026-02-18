@@ -61,10 +61,19 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         // Games contested counter
         await dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS games_contested INT DEFAULT 0`);
 
-        // Standardize rating precision to DECIMAL(3,2)
-        await dataSource.query(`ALTER TABLE users ALTER COLUMN hoop_rank TYPE DECIMAL(3,2)`);
-        await dataSource.query(`ALTER TABLE users ALTER COLUMN reputation TYPE DECIMAL(3,2)`);
-        await dataSource.query(`ALTER TABLE teams ALTER COLUMN rating TYPE DECIMAL(3,2)`);
+        // Standardize rating precision to DECIMAL(3,2) — only if columns exist
+        const alterColumnTypeIfExists = async (table: string, column: string, type: string) => {
+            const exists = await dataSource.query(
+                `SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2`,
+                [table, column],
+            );
+            if (exists.length > 0) {
+                await dataSource.query(`ALTER TABLE ${table} ALTER COLUMN ${column} TYPE ${type}`);
+            }
+        };
+        await alterColumnTypeIfExists('users', 'hoop_rank', 'DECIMAL(3,2)');
+        await alterColumnTypeIfExists('users', 'reputation', 'DECIMAL(3,2)');
+        await alterColumnTypeIfExists('teams', 'rating', 'DECIMAL(3,2)');
 
         // ============================================
         // PLAYER_STATUSES TABLE MIGRATIONS
