@@ -1842,6 +1842,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          clipBehavior: Clip.hardEdge,
           children: [
             // ── Static header: STATUS composer ──
             const SizedBox(height: 16),
@@ -1969,7 +1970,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
 
             // Onboarding checklist (shown until all items complete)
-            const OnboardingChecklistCard(),
+            Flexible(child: const OnboardingChecklistCard()),
 
             if (_pendingConfirmations.isNotEmpty) ...[
               _buildPendingConfirmationsSection(),
