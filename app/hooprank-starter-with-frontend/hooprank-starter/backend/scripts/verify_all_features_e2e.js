@@ -46,15 +46,23 @@
  * │  invalid-order artifacts, not product regressions.                    │
  * └─────────────────────────────────────────────────────────────────────────┘
  * 
- * REQUIRED ENV VARS:
- *   DATABASE_URL                — Production PostgreSQL connection string
+ * REQUIRED ENV VARS (one of these auth methods):
+ *   TOKEN                      — Pre-existing Firebase ID token (fastest)
+ *   --- OR ---
+ *   FIREBASE_EMAIL              — Firebase user email
+ *   FIREBASE_PASSWORD           — Firebase user password
+ *   --- OR ---
  *   FIREBASE_PROJECT_ID         — Firebase project ID
  *   FIREBASE_CLIENT_EMAIL       — Firebase service account email
  *   FIREBASE_PRIVATE_KEY        — Firebase service account private key
  * 
+ * OPTIONAL:
+ *   DATABASE_URL                — PostgreSQL connection string (for cleanup)
+ *   FIREBASE_API_KEY            — Override the default Firebase Web API key
+ * 
  * Usage:
- *   DATABASE_URL="..." FIREBASE_PROJECT_ID="..." FIREBASE_CLIENT_EMAIL="..." \
- *   FIREBASE_PRIVATE_KEY="..." node verify_all_features_e2e.js
+ *   TOKEN="eyJ..." node verify_all_features_e2e.js
+ *   FIREBASE_EMAIL="user@example.com" FIREBASE_PASSWORD="pass" node verify_all_features_e2e.js
  */
 
 const https = require('https');
@@ -64,12 +72,9 @@ const { Pool } = require('pg');
 // Production URL — from api_service.dart line 10.
 const BASE_URL = 'https://heartfelt-appreciation-production-65f1.up.railway.app';
 
-// Firebase Web API key — needed for custom token → ID token exchange.
-// Set via env var or falls back to the project's web API key.
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || '';
-if (!FIREBASE_API_KEY) {
-    console.log('⚠️  FIREBASE_API_KEY not set — token exchange will fail');
-}
+// Firebase Web API key — public key from get_token.html Firebase config.
+// This is NOT a secret; it identifies the Firebase project for client-side auth.
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyDtPMA0ze_BUhENT3zcjoLoIrrOeAVLCjo';
 
 // Test user UIDs — pulled from production users table.
 const TEST_USER_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2'; // Brett Corbett
@@ -85,18 +90,38 @@ let skipped = 0;
 const failures = [];
 
 // ── Firebase Auth ───────────────────────────────────────────────────────────
-// This function is critical. Without an ID token, every authenticated
-// endpoint returns 401. We already confirmed this on the first test run
-// (48 out of 51 tests failed with 401).
+// Without an ID token, every authenticated endpoint returns 401.
+// Production has ALLOW_INSECURE_AUTH=false, so x-user-id alone doesn't work.
 //
-// The auth chain:
-//   1. admin.auth().createCustomToken(uid)  → server-side token (can't use directly)
-//   2. Exchange via Firebase REST API       → ID token (this is what the backend accepts)
-//   3. Attach as "Authorization: Bearer <idToken>" on every request
+// Token acquisition strategies (tried in order):
+//   1. TOKEN env var           — fastest; pass a pre-existing JWT directly
+//   2. Email/password sign-in  — uses Firebase REST API, no Admin SDK needed
+//      Set FIREBASE_EMAIL + FIREBASE_PASSWORD env vars
+//   3. Admin SDK custom token  — uses service account to create+exchange token
+//      Set FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY
 //
-// The mobile app does the equivalent via AuthService.getIdToken() in
-// api_service.dart line 56-68, which calls Firebase Auth SDK on-device.
+// The Firebase Web API key is hardcoded (it's public, same as in get_token.html).
 async function getFirebaseIdToken() {
+    // Strategy 1: Pre-existing token from env var (e.g. from get_token.html)
+    if (process.env.TOKEN) {
+        console.log('🔑 Using TOKEN from environment variable');
+        return process.env.TOKEN;
+    }
+
+    // Strategy 2: Email/password sign-in via Firebase REST API
+    const email = process.env.FIREBASE_EMAIL;
+    const password = process.env.FIREBASE_PASSWORD;
+    if (email && password) {
+        try {
+            const token = await signInWithPassword(email, password);
+            console.log('🔐 Got Firebase ID token via email/password sign-in');
+            return token;
+        } catch (e) {
+            console.log(`⚠️  Email/password sign-in failed: ${e.message}`);
+        }
+    }
+
+    // Strategy 3: Admin SDK custom token → ID token exchange
     try {
         const admin = require('firebase-admin');
 
@@ -105,10 +130,11 @@ async function getFirebaseIdToken() {
         let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
         if (!projectId || !clientEmail || !privateKey) {
-            // Without credentials, falls back to x-user-id header.
-            // This ONLY works if ALLOW_INSECURE_AUTH=true on the server.
-            // On production, it's false. So this path means all 401s.
-            console.log('⚠️  Firebase credentials not found — falling back to x-user-id header');
+            console.log('⚠️  No auth credentials found. Set one of:');
+            console.log('   • TOKEN=<jwt>                           (pre-existing token)');
+            console.log('   • FIREBASE_EMAIL + FIREBASE_PASSWORD    (email/password)');
+            console.log('   • FIREBASE_PROJECT_ID + CLIENT_EMAIL + PRIVATE_KEY (service account)');
+            console.log('   All authenticated endpoints will return 401.');
             return null;
         }
 
@@ -125,20 +151,50 @@ async function getFirebaseIdToken() {
             });
         }
 
-        // Step 1: Custom token (server-to-server, NOT accepted by auth.guard.ts)
         const customToken = await admin.auth().createCustomToken(TEST_USER_ID);
         console.log('🔑 Created Firebase custom token');
 
-        // Step 2: Exchange for ID token via Google Identity Toolkit REST API.
-        // Custom tokens and ID tokens are different. The backend only accepts ID tokens.
         const token = await exchangeCustomTokenForIdToken(customToken);
-        console.log('🔐 Got Firebase ID token');
+        console.log('🔐 Got Firebase ID token via Admin SDK');
         return token;
     } catch (e) {
         console.log(`⚠️  Firebase token generation failed: ${e.message}`);
         console.log('   Without a Bearer token, all authenticated endpoints will return 401.');
         return null;
     }
+}
+
+// Sign in with email/password via Firebase REST API (Identity Toolkit).
+// No server-side SDK needed — works the same way the mobile app authenticates.
+function signInWithPassword(email, password) {
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({
+            email,
+            password,
+            returnSecureToken: true,
+        });
+        const options = {
+            hostname: 'identitytoolkit.googleapis.com',
+            port: 443,
+            path: `/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) },
+        };
+        const req = https.request(options, res => {
+            let data = '';
+            res.on('data', chunk => (data += chunk));
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.idToken) resolve(parsed.idToken);
+                    else reject(new Error(parsed.error?.message || 'No idToken in response'));
+                } catch { reject(new Error('Failed to parse token response')); }
+            });
+        });
+        req.on('error', reject);
+        req.write(postData);
+        req.end();
+    });
 }
 
 function exchangeCustomTokenForIdToken(customToken) {

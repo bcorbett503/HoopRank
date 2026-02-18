@@ -70,6 +70,9 @@ export async function runSchemaEvolution(dataSource: DataSource): Promise<void> 
         // Games contested counter
         await dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS games_contested INT DEFAULT 0`);
 
+        // Onboarding progress — JSONB column for checklist state synced from mobile app
+        await dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_progress JSONB DEFAULT '{}'`);
+
         // Standardize rating precision to DECIMAL(3,2) — only if columns exist
         const alterColumnTypeIfExists = async (table: string, column: string, type: string) => {
             const exists = await dataSource.query(
