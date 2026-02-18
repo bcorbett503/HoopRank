@@ -355,8 +355,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                 fit: BoxFit.cover, width: 110, height: 110)
                             : (_profilePictureUrl != null &&
                                     !_profilePictureUrl!.startsWith('/'))
-                                ? Image.network(_profilePictureUrl!,
-                                    fit: BoxFit.cover, width: 110, height: 110)
+                                ? (_profilePictureUrl!.startsWith('data:')
+                                    ? Image.memory(
+                                        Uri.parse(_profilePictureUrl!).data!.contentAsBytes(),
+                                        fit: BoxFit.cover, width: 110, height: 110,
+                                        errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.grey.shade600, size: 40),
+                                      )
+                                    : Image.network(_profilePictureUrl!,
+                                        fit: BoxFit.cover, width: 110, height: 110,
+                                        errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.grey.shade600, size: 40),
+                                      ))
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
