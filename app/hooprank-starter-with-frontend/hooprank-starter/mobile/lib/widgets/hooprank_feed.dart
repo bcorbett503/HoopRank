@@ -1727,10 +1727,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                     radius: 20,
                     backgroundColor: Colors.grey[900],
                     backgroundImage: userPhotoUrl != null
-                        ? (userPhotoUrl.startsWith('data:')
-                            ? MemoryImage(
-                                Uri.parse(userPhotoUrl).data!.contentAsBytes())
-                            : NetworkImage(userPhotoUrl) as ImageProvider)
+                        ? safeImageProvider(userPhotoUrl)
                         : null,
                     child: userPhotoUrl == null
                         ? Text(
@@ -1911,10 +1908,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                   radius: 16,
                   backgroundColor: statusColor,
                   backgroundImage: userPhotoUrl != null
-                      ? (userPhotoUrl.startsWith('data:')
-                          ? MemoryImage(
-                              Uri.parse(userPhotoUrl).data!.contentAsBytes())
-                          : NetworkImage(userPhotoUrl) as ImageProvider)
+                      ? safeImageProvider(userPhotoUrl)
                       : null,
                   child: userPhotoUrl == null
                       ? Text(
@@ -2196,10 +2190,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                       backgroundColor: Colors.green.withOpacity(0.3),
                       backgroundImage: photoUrl != null &&
                               photoUrl.toString().isNotEmpty
-                          ? (photoUrl.toString().startsWith('data:')
-                              ? MemoryImage(
-                                  Uri.parse(photoUrl).data!.contentAsBytes())
-                              : NetworkImage(photoUrl) as ImageProvider)
+                          ? safeImageProvider(photoUrl.toString())
                           : null,
                       child: (photoUrl == null || photoUrl.toString().isEmpty)
                           ? Text(
@@ -2574,18 +2565,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                               backgroundImage: (attendees[i]['userPhotoUrl'] ??
                                           attendees[i]['photoUrl']) !=
                                       null
-                                  ? ((attendees[i]['userPhotoUrl'] ??
-                                              attendees[i]['photoUrl'])
-                                          .toString()
-                                          .startsWith('data:')
-                                      ? MemoryImage(Uri.parse((attendees[i]
-                                                      ['userPhotoUrl'] ??
-                                                  attendees[i]['photoUrl'])
-                                              .toString())
-                                          .data!
-                                          .contentAsBytes()) as ImageProvider
-                                      : NetworkImage(
-                                          (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString()))
+                                  ? safeImageProvider(
+                                      (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString())
                                   : null,
                               child: (attendees[i]['userPhotoUrl'] ??
                                           attendees[i]['photoUrl']) ==
@@ -2662,11 +2643,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                           radius: 12,
                           backgroundColor: Colors.grey[700],
                           backgroundImage: photo != null
-                              ? (photo.startsWith('data:')
-                                  ? MemoryImage(Uri.parse(photo)
-                                      .data!
-                                      .contentAsBytes()) as ImageProvider
-                                  : NetworkImage(photo))
+                              ? safeImageProvider(photo)
                               : null,
                           child: photo == null
                               ? Text(
@@ -2957,11 +2934,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                           radius: 20,
                           backgroundColor: Colors.grey[900],
                           backgroundImage: userPhotoUrl != null
-                              ? (userPhotoUrl.startsWith('data:')
-                                  ? MemoryImage(Uri.parse(userPhotoUrl)
-                                      .data!
-                                      .contentAsBytes())
-                                  : NetworkImage(userPhotoUrl) as ImageProvider)
+                              ? safeImageProvider(userPhotoUrl)
                               : null,
                           child: userPhotoUrl == null
                               ? Text(
@@ -3576,17 +3549,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                                         'userPhotoUrl'] !=
                                                     null
                                                 ? (comment['userPhotoUrl']
-                                                        .toString()
-                                                        .startsWith('data:')
-                                                    ? MemoryImage(Uri.parse(
-                                                            comment[
-                                                                'userPhotoUrl'])
-                                                        .data!
-                                                        .contentAsBytes())
-                                                    : NetworkImage(comment[
-                                                            'userPhotoUrl'])
-                                                        as ImageProvider)
-                                                : null,
+                                                    ? safeImageProvider(comment['userPhotoUrl'])
+                                                    : null,
                                             child: comment['userPhotoUrl'] ==
                                                     null
                                                 ? Text(

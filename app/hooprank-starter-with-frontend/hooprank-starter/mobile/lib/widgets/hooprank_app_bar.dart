@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../state/onboarding_checklist_state.dart';
+import '../utils/image_utils.dart';
 
 /// Shared HoopRank app bar widget for consistent top bar across all screens
 class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -66,9 +67,7 @@ class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
                 child: CircleAvatar(
                   radius: 16,
                   backgroundImage: photoUrl != null
-                      ? (photoUrl.startsWith('data:')
-                          ? MemoryImage(Uri.parse(photoUrl).data!.contentAsBytes())
-                          : NetworkImage(photoUrl) as ImageProvider)
+                      ? safeImageProvider(photoUrl)
                       : null,
                   child: photoUrl == null
                       ? const Icon(Icons.person, size: 18)

@@ -7,6 +7,7 @@ import '../widgets/hooprank_graph.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../services/api_service.dart';
 import '../state/app_state.dart';
+import '../utils/image_utils.dart';
 import 'package:intl/intl.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -181,12 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               radius: 40,
                               backgroundColor: const Color(0xFFFF6B35),
                               backgroundImage: player.photoUrl != null
-                                  ? (player.photoUrl!.startsWith('data:')
-                                      ? MemoryImage(Uri.parse(player.photoUrl!)
-                                          .data!
-                                          .contentAsBytes())
-                                      : NetworkImage(player.photoUrl!)
-                                          as ImageProvider)
+                                  ? safeImageProvider(player.photoUrl!)
                                   : null,
                               child: player.photoUrl == null
                                   ? Text(
