@@ -12,9 +12,14 @@ class CourtService {
 
   List<Court> _courts = [];
   bool _isLoaded = false;
+  DateTime? _lastLoadedAt;
+  static const _staleDuration = Duration(minutes: 30);
+
+  bool get _isStale => _lastLoadedAt == null ||
+      DateTime.now().difference(_lastLoadedAt!) > _staleDuration;
 
   Future<void> loadCourts() async {
-    if (_isLoaded) return;
+    if (_isLoaded && !_isStale) return;
 
     try {
       debugPrint('CourtService: Loading courts from API (primary source)...');
@@ -63,6 +68,7 @@ class CourtService {
 
 
       _isLoaded = true;
+      _lastLoadedAt = DateTime.now();
       debugPrint('CourtService: Total courts available: ${_courts.length}');
     } catch (e, st) {
       debugPrint('CourtService: Error loading courts: $e\n$st');
@@ -88,6 +94,13 @@ class CourtService {
       // Bay Area
       Court(id: 'mosswood', name: 'Mosswood Park', lat: 37.8258, lng: -122.2608, isSignature: true, isIndoor: false),
     ];
+  }
+
+  /// Force a fresh reload from the API (used on app resume).
+  Future<void> forceRefresh() async {
+    _isLoaded = false;
+    _lastLoadedAt = null;
+    await loadCourts();
   }
 
   /// Check if courts are loaded

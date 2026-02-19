@@ -636,6 +636,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _loadPendingConfirmations();
       _loadLocalActivity();
       _refreshEmbeddedFeed();
+      CourtService().forceRefresh(); // Refresh court data from cloud
     }
   }
 

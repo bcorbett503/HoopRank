@@ -36,7 +36,7 @@ class CourtMapWidget extends StatefulWidget {
   State<CourtMapWidget> createState() => _CourtMapWidgetState();
 }
 
-class _CourtMapWidgetState extends State<CourtMapWidget> {
+class _CourtMapWidgetState extends State<CourtMapWidget> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
@@ -250,6 +250,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeMap();
   }
 
@@ -298,10 +299,19 @@ class _CourtMapWidgetState extends State<CourtMapWidget> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _debounceTimer?.cancel();
     _mapController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-read courts from CourtService (which HomeScreen already refreshed)
+      _updateCourtsForMapCenter();
+    }
   }
 
   Future<void> _initializeMap() async {
