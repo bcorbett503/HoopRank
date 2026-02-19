@@ -71,7 +71,7 @@ export class User {
     @Column({ name: 'subscription_tier', type: 'text', nullable: true, default: 'free' })
     subscriptionTier: string; // 'free' | 'pro' | 'elite'
 
-    @Column({ name: 'subscription_expires_at', type: 'timestamp', nullable: true })
+    @Column({ name: 'subscription_expires_at', type: 'datetime', nullable: true })
     subscriptionExpiresAt: Date;
 
     @Column({ name: 'fcm_token', type: 'text', nullable: true })
@@ -83,7 +83,7 @@ export class User {
     @Column({ name: 'auth_provider', type: 'text', nullable: true })
     authProvider: string;
 
-    @Column({ name: 'onboarding_progress', type: 'jsonb', nullable: true, default: () => "'{}'" })
+    @Column({ name: 'onboarding_progress', type: 'simple-json', nullable: true })
     onboardingProgress: Record<string, boolean>;
 
     @CreateDateColumn({ name: 'created_at' })

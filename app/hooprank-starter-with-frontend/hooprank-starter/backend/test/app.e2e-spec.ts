@@ -570,9 +570,9 @@ describe('HoopRank E2E', () => {
             expect(res.body).toHaveProperty('profileVisibility');
         });
 
-        it('GET /invites returns an array', async () => {
+        it('GET /teams/invites returns an array', async () => {
             const res = await request(app.getHttpServer())
-                .get('/invites')
+                .get('/teams/invites')
                 .set('x-user-id', TEST_USER_A)
                 .expect(200);
 
