@@ -74,19 +74,26 @@ export class RankingsController {
             } catch (e) {
             }
 
-            const ageSelect = hasAgeColumn ? ', age' : ', NULL as age';
+            const ageSelect = hasAgeColumn ? ', u.age' : ', NULL as age';
             const players = await this.dataSource.query(`
                 SELECT 
-                    id,
-                    name,
-                    avatar_url as "photoUrl",
-                    hoop_rank as "rating",
-                    position,
-                    city
-                    ${ageSelect}
-                FROM users
-                WHERE hoop_rank IS NOT NULL AND name IS NOT NULL
-                ORDER BY hoop_rank DESC
+                    u.id,
+                    u.name,
+                    u.avatar_url as "photoUrl",
+                    u.hoop_rank as "rating",
+                    u.position,
+                    u.city
+                    ${ageSelect},
+                    (
+                        SELECT t.name 
+                        FROM team_members tm
+                        JOIN teams t ON t.id = tm.team_id
+                        WHERE tm.user_id = u.id AND tm.status = 'active'
+                        LIMIT 1
+                    ) as team
+                FROM users u
+                WHERE u.hoop_rank IS NOT NULL AND u.name IS NOT NULL
+                ORDER BY u.hoop_rank DESC
                 LIMIT $1 OFFSET $2
             `, [limit, offset]);
 
