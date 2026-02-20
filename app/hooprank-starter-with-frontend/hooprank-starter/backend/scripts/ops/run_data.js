@@ -161,6 +161,21 @@ const venues2 = [
     { key: 'hoytField', create: true, name: 'Hoyt Field', city: 'Cambridge, MA', lat: 42.3806, lng: -71.1334, indoor: false, access: 'public', venue_type: 'park', address: '1 Western Ave, Cambridge, MA 02139' },
     { key: 'buckleyPlayground', create: true, name: 'Buckley Playground', city: 'Boston, MA', lat: 42.3460, lng: -71.0530, indoor: false, access: 'public', venue_type: 'park', address: 'M St & E 5th St, Boston, MA 02127' },
 
+    // ── PENINSULA (San Mateo County / South Bay) ─────────────────
+    { key: 'sanMateoHS', courtId: '64288e25-f7be-078b-4f1a-1a98d1f7cf39', name: 'San Mateo High School Gym', city: 'San Mateo, CA' },
+    { key: 'kingCC', courtId: '01e37b12-7c8a-8262-c508-d06dfd325942', name: 'King Community Center Gym', city: 'San Mateo, CA' },
+    { key: 'redMorton', courtId: '895e0ee4-3975-fc03-1433-e17189eb257d', name: 'Red Morton Community Center', city: 'Redwood City, CA' },
+    { key: 'sanCarlosYouth', create: true, name: 'San Carlos Youth Center Gym', city: 'San Carlos, CA', lat: 37.5073, lng: -122.2611, indoor: true, access: 'public', venue_type: 'rec_center', address: '1000 Bransten Rd, San Carlos, CA 94070' },
+    { key: 'burtonPark', create: true, name: 'Burton Park', city: 'San Carlos, CA', lat: 37.5068, lng: -122.2620, indoor: false, access: 'public', venue_type: 'park', address: '1000 Bransten Rd, San Carlos, CA 94070' },
+    { key: 'arrillagaGym', courtId: '948f37e5-8de1-2921-3d4f-214ee7127c9a', name: 'Arrillaga Family Gymnasium', city: 'Menlo Park, CA' },
+    { key: 'onettaHarris', create: true, name: 'Onetta Harris Community Center', city: 'Menlo Park, CA', lat: 37.4524, lng: -122.1605, indoor: true, access: 'public', venue_type: 'rec_center', address: '100 Terminal Ave, Menlo Park, CA 94025' },
+    { key: 'oshmanJCC', courtId: 'f83ccc3a-42b1-7c2b-6589-8903b6b48b69', name: 'Oshman Family JCC', city: 'Palo Alto, CA' },
+    { key: 'mitchellPark', create: true, name: 'Mitchell Park', city: 'Palo Alto, CA', lat: 37.4254, lng: -122.1107, indoor: false, access: 'public', venue_type: 'park', address: '600 E Meadow Dr, Palo Alto, CA 94306' },
+    { key: 'terrabayGym', courtId: 'f898b6e3-503d-4b5e-d4d1-7dac92bc1429', name: 'Terrabay Gymnasium', city: 'South San Francisco, CA' },
+    { key: 'sanBrunoRec', create: true, name: 'San Bruno Recreation Center', city: 'San Bruno, CA', lat: 37.6305, lng: -122.4112, indoor: true, access: 'public', venue_type: 'rec_center', address: '251 City Park Way, San Bruno, CA 94066' },
+    { key: 'brewerIsland', courtId: '562f104b-85e4-876e-3aa2-015bf1641ae2', name: 'Brewer Island Gym', city: 'Foster City, CA' },
+    { key: 'whismanSC', courtId: '8a4d3001-83d7-9793-b884-42442e4ed913', name: 'Whisman Sports Center', city: 'Mountain View, CA' },
+
     // ── MERRITT ISLAND / SPACE COAST (FL) ────────────────────────
     { key: 'woodySimpson', create: true, name: 'Woody Simpson Park', city: 'Merritt Island, FL', lat: 28.3238, lng: -80.6762, indoor: false, access: 'public', venue_type: 'park', address: '100 E Merritt Island Cswy, Merritt Island, FL 32952' },
     { key: 'kiwanisIsland', create: true, name: 'Kiwanis Island Park Gym', city: 'Merritt Island, FL', lat: 28.3547, lng: -80.6641, indoor: true, access: 'public', venue_type: 'rec_center', address: '951 Kiwanis Island Park Rd, Merritt Island, FL 32952' },
@@ -358,6 +373,21 @@ const allRuns = [
     r('smithPlayground', 'Night Owl Run — Smith Playground', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Lighted "night owl" run; strong evening reliability (weather permitting).', durationMinutes: 120, maxPlayers: 16, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri, D.Sat, D.Sun], hour: 20, minute: 0 }] }),
     r('ringerPark', 'Weekend Afternoon — Ringer Park', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Consistent outdoor runs; student/young-pro mix; seasonal.', durationMinutes: 180, maxPlayers: 16, schedule: [{ days: [D.Sat, D.Sun], hour: 14, minute: 0 }] }),
     r('hoytField', 'Weekend Morning — Hoyt Field', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Outdoor overflow; "decent activity"; seasonal.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Sat, D.Sun], hour: 10, minute: 0 }] }),
+
+    // ── PENINSULA (San Mateo County / South Bay) ─────────────────
+    r('sanMateoHS', 'Monday Night Run — San Mateo HS', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: '$4 drop-in fee for adults, $3 for youth (with HS ID). Ages 18+ for adult play.', durationMinutes: 180, maxPlayers: 16, schedule: [{ days: [D.Mon], hour: 19, minute: 0 }] }),
+    r('kingCC', 'Evening Drop-in — King Community Center', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Free. Ages 18+. All skill levels welcome, teams formed on a drop-in basis.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 30 }] }),
+    r('redMorton', 'Lunch Run — Red Morton CC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Multi-visit card or drop-in fee required. Weekday lunch window.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 11, minute: 30 }] }),
+    r('redMorton', 'Wednesday Night — Red Morton CC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Evening session. Drop-in fee. Wed 7:00–10:00 PM.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Wed], hour: 19, minute: 0 }] }),
+    r('sanCarlosYouth', 'Sunday Drop-In — San Carlos Youth Center', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Adult Drop-In Basketball. $5 drop-in fee per person.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Sun], hour: 15, minute: 0 }] }),
+    r('arrillagaGym', 'Morning Drop-In — Arrillaga Gym', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '$2 drop-in fee. Tue/Fri: 8 AM–1 PM; Thu/Sat: 8 AM–1 PM & 5–8 PM.', durationMinutes: 300, maxPlayers: 16, schedule: [{ days: [D.Tue, D.Fri], hour: 8, minute: 0 }] }),
+    r('arrillagaGym', 'Thursday/Saturday Extended — Arrillaga Gym', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '$2 drop-in fee. Morning 8 AM–1 PM + evening 5–8 PM. Tue 6–8 PM is ladies only.', durationMinutes: 300, maxPlayers: 16, schedule: [{ days: [D.Thu, D.Sat], hour: 8, minute: 0 }] }),
+    r('onettaHarris', 'Afternoon Pickup — Onetta Harris CC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '$1 drop-in fee for afternoon pickup basketball.', durationMinutes: 210, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 12, minute: 0 }] }),
+    r('terrabayGym', 'Midday Open Gym — Terrabay Gym', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: '$4 for adults (18+), $3 for juniors/seniors. Saturdays 12–3 PM juniors only; Sundays 12:30–3 PM adults only.', durationMinutes: 150, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 12, minute: 30 }] }),
+    r('terrabayGym', 'Sunday Adults Only — Terrabay Gym', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Adults only. $4 drop-in. Sun 12:30–3 PM.', durationMinutes: 150, maxPlayers: 14, schedule: [{ days: [D.Sun], hour: 12, minute: 30 }] }),
+    r('sanBrunoRec', 'Evening Open Gym — San Bruno Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Adults (17+). $2 fee for children 16 and under. Must bring ID.', durationMinutes: 105, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Wed], hour: 19, minute: 30 }] }),
+    r('brewerIsland', 'Saturday Night Open Gym — Brewer Island', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Ages 16+. $5 per night drop-in or $15/month. Non-competitive pickup and free play.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Sat], hour: 19, minute: 0 }] }),
+    r('whismanSC', 'Sunday Evening — Whisman Sports Center', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Ages 18+. $3 drop-in fee. Restricted to Mountain View residents or employees of MV businesses.', durationMinutes: 150, maxPlayers: 14, schedule: [{ days: [D.Sun], hour: 17, minute: 0 }] }),
 
     // ── MERRITT ISLAND / SPACE COAST ─────────────────────────────
     r('woodySimpson', 'Friday Evening Run — Woody Simpson Park', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Tier-1 outdoor hub; lighted courts enable night runs; best documented competitive run is Friday evening.', durationMinutes: 180, maxPlayers: 16, schedule: [{ days: [D.Fri], hour: 18, minute: 0 }] }),

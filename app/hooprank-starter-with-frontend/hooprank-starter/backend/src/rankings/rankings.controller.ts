@@ -85,10 +85,20 @@ export class RankingsController {
                     u.city
                     ${ageSelect},
                     (
+                        SELECT tm.team_id
+                        FROM team_members tm
+                        WHERE tm.user_id = u.id
+                          AND tm.status IN ('active', 'accepted')
+                        ORDER BY tm.joined_at DESC
+                        LIMIT 1
+                    ) as "teamId",
+                    (
                         SELECT t.name 
                         FROM team_members tm
                         JOIN teams t ON t.id = tm.team_id
-                        WHERE tm.user_id = u.id AND tm.status = 'active'
+                        WHERE tm.user_id = u.id
+                          AND tm.status IN ('active', 'accepted')
+                        ORDER BY tm.joined_at DESC
                         LIMIT 1
                     ) as team
                 FROM users u
@@ -167,4 +177,3 @@ export class RankingsController {
         }
     }
 }
-

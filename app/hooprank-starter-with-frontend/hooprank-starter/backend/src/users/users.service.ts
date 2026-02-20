@@ -68,8 +68,15 @@ export class UsersService {
           avatar_url,
           hoop_rank,
           position,
+          height,
+          weight,
+          zip,
+          birthdate,
           city,
+          lat,
+          lng,
           games_played,
+          games_contested,
           onboarding_progress,
           created_at,
           updated_at
@@ -195,11 +202,15 @@ export class UsersService {
         displayName: 'name',
         email: 'email',
         avatarUrl: 'avatar_url',
+        photoUrl: 'avatar_url',
         hoopRank: 'hoop_rank',
         rating: 'hoop_rank',
         position: 'position',
         height: 'height',
         weight: 'weight',
+        zip: 'zip',
+        birthdate: 'birthdate',
+        dob: 'dob',
         city: 'city',
         fcmToken: 'fcm_token',
         lat: 'lat',
@@ -726,7 +737,24 @@ export class UsersService {
             hoop_rank as rating,
             position,
             city,
-            games_played as "gamesPlayed"
+            games_played as "gamesPlayed",
+            (
+              SELECT tm.team_id
+              FROM team_members tm
+              WHERE tm.user_id = users.id
+                AND tm.status IN ('active', 'accepted')
+              ORDER BY tm.joined_at DESC
+              LIMIT 1
+            ) as "teamId",
+            (
+              SELECT t.name
+              FROM team_members tm
+              JOIN teams t ON t.id = tm.team_id
+              WHERE tm.user_id = users.id
+                AND tm.status IN ('active', 'accepted')
+              ORDER BY tm.joined_at DESC
+              LIMIT 1
+            ) as team
           FROM users 
           WHERE name IS NOT NULL 
             AND name != ''
@@ -749,6 +777,23 @@ export class UsersService {
             position,
             city,
             games_played as "gamesPlayed",
+            (
+              SELECT tm.team_id
+              FROM team_members tm
+              WHERE tm.user_id = users.id
+                AND tm.status IN ('active', 'accepted')
+              ORDER BY tm.joined_at DESC
+              LIMIT 1
+            ) as "teamId",
+            (
+              SELECT t.name
+              FROM team_members tm
+              JOIN teams t ON t.id = tm.team_id
+              WHERE tm.user_id = users.id
+                AND tm.status IN ('active', 'accepted')
+              ORDER BY tm.joined_at DESC
+              LIMIT 1
+            ) as team,
             zip,
             COALESCE(lat, 
               CASE zip
@@ -806,6 +851,8 @@ export class UsersService {
           position,
           city,
           "gamesPlayed",
+          "teamId",
+          team,
           (
             3959 * acos(
               cos(radians($2)) * cos(radians(effective_lat)) *

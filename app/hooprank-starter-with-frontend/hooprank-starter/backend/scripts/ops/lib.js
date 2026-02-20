@@ -14,7 +14,7 @@ const crypto = require('crypto');
 
 const BASE = 'https://heartfelt-appreciation-production-65f1.up.railway.app';
 const BASE_HOST = 'heartfelt-appreciation-production-65f1.up.railway.app';
-const BRETT_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2';
+const BRETT_ID = 'Nb6UhM5ExOeUMWIRMeaxswVnLQl2';
 const DAY = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 const STATE_NAMES = { NY: 'New York', IL: 'Illinois', FL: 'Florida', PA: 'Pennsylvania', OH: 'Ohio', MI: 'Michigan', GA: 'Georgia', NC: 'North Carolina', NJ: 'New Jersey', VA: 'Virginia', IN: 'Indiana', TN: 'Tennessee', MD: 'Maryland', MO: 'Missouri', WI: 'Wisconsin', MN: 'Minnesota', AL: 'Alabama', SC: 'South Carolina', LA: 'Louisiana', KY: 'Kentucky', CO: 'Colorado', AZ: 'Arizona', CT: 'Connecticut', OK: 'Oklahoma', MS: 'Mississippi', NV: 'Nevada', KS: 'Kansas', IA: 'Iowa', UT: 'Utah', NE: 'Nebraska', NM: 'New Mexico', WV: 'West Virginia', HI: 'Hawaii', DC: 'District of Columbia', DE: 'Delaware', ME: 'Maine', VT: 'Vermont', ID: 'Idaho', MT: 'Montana', WY: 'Wyoming', ND: 'North Dakota', SD: 'South Dakota', AK: 'Alaska', CA: 'California', TX: 'Texas', WA: 'Washington', OR: 'Oregon' };
 
@@ -23,6 +23,63 @@ const STATE_NAMES = { NY: 'New York', IL: 'Illinois', FL: 'Florida', PA: 'Pennsy
 // ═══════════════════════════════════════════════════════════════════
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Automatically fetch a Firebase token via a temporary local server */
+async function getTokenInteractive() {
+    const http = require('http');
+    const { exec } = require('child_process');
+    const fs = require('fs');
+    const path = require('path');
+
+    return new Promise((resolve, reject) => {
+        const server = http.createServer((req, res) => {
+            if (req.url === '/') {
+                const htmlPath = path.join(__dirname, '../../get_token.html');
+                const html = fs.readFileSync(htmlPath, 'utf8');
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(html);
+            } else if (req.url === '/callback' && req.method === 'POST') {
+                let body = '';
+                req.on('data', chunk => body += chunk.toString());
+                req.on('end', () => {
+                    res.writeHead(200, { 'Access-Control-Allow-Origin': '*' });
+                    res.end('OK');
+                    server.close();
+                    resolve(body);
+                });
+            } else {
+                res.writeHead(404);
+                res.end();
+            }
+        });
+
+        server.on('error', (e) => {
+            if (e.code === 'EADDRINUSE') {
+                console.log('⚠️  Port 8888 is in use (another server running?). Please kill it or run with TOKEN=...');
+                reject(e);
+            }
+        });
+
+        server.listen(8888, () => {
+            console.log('\n🏀 Launching browser for Firebase authentication...');
+            console.log('   (If it does not open, navigate to http://localhost:8888)');
+            const url = 'http://localhost:8888';
+            const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+            exec(`${cmd} ${url}`);
+        });
+    });
+}
+
+/** Extract user_id from Firebase JWT to prevent auth mismatches */
+function getUserIdFromToken(token) {
+    if (!token || token === 'dry') return BRETT_ID;
+    try {
+        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        return payload.user_id || payload.sub || BRETT_ID;
+    } catch (e) {
+        return BRETT_ID;
+    }
+}
 
 /** Deterministic UUID from name+city (used by discovery pipeline) */
 function generateUUID(name) {
@@ -90,14 +147,19 @@ async function createCourt(court, token) {
         venue_type: court.venue_type || '',
         address: court.address || '',
     });
-    const headers = { 'x-user-id': BRETT_ID };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const userId = token ? getUserIdFromToken(token) : BRETT_ID;
+    const headers = { 'x-user-id': userId };
+    if (token && token !== 'dry') headers['Authorization'] = `Bearer ${token}`;
+    if (process.env.ADMIN_SECRET) headers['x-admin-secret'] = process.env.ADMIN_SECRET;
 
     const res = await fetch(`${BASE}/courts/admin/create?${qs}`, {
         method: 'POST',
         headers,
     });
     const result = await res.json();
+    if (!res.ok) {
+        throw new Error(result.message || 'Server error: ' + res.status);
+    }
     return { id: result.court?.id || result.id || id, result };
 }
 
@@ -105,11 +167,12 @@ async function createCourt(court, token) {
  * Seed a single run occurrence.
  */
 async function seedRun(body, token) {
+    const userId = token ? getUserIdFromToken(token) : BRETT_ID;
     const headers = {
         'Content-Type': 'application/json',
-        'x-user-id': BRETT_ID,
+        'x-user-id': userId,
     };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (token && token !== 'dry') headers['Authorization'] = `Bearer ${token}`;
 
     const res = await fetch(`${BASE}/runs`, {
         method: 'POST',
@@ -253,6 +316,7 @@ module.exports = {
     DAY,
     STATE_NAMES,
     sleep,
+    getTokenInteractive,
     generateUUID,
     haversineKm,
     getNextOccurrences,

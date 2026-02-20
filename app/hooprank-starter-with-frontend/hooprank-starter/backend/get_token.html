@@ -136,6 +136,15 @@
             localStorage.setItem('hooprank_token', token);
             localStorage.setItem('hooprank_uid', user.uid);
 
+            // POST to local CLI server if it's listening
+            fetch('/callback', { method: 'POST', body: token })
+                .then(res => {
+                    if (res.ok) {
+                        status.textContent += ' — Token sent to CLI! You can close this window.';
+                        setTimeout(() => window.close(), 2500);
+                    }
+                }).catch(() => { });
+
             // Also log it
             console.log('=== FIREBASE ID TOKEN ===');
             console.log(token);

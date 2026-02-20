@@ -77,8 +77,21 @@ const BASE_URL = 'https://heartfelt-appreciation-production-65f1.up.railway.app'
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyDtPMA0ze_BUhENT3zcjoLoIrrOeAVLCjo';
 
 // Test user UIDs — pulled from production users table.
-const TEST_USER_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2'; // Brett Corbett
+// If a TOKEN env var is provided, we auto-detect the UID from the JWT payload
+// so x-user-id matches and the auth guard doesn't reject the request.
+let TEST_USER_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2'; // Brett Corbett (default)
 const OTHER_USER_ID = '0OW2dC3NsqexmTFTXgu57ZQfaIo2'; // Kevin Corbett (second user for 2-player interactions)
+
+// Auto-detect UID from TOKEN env var (JWT payload is base64url in the second segment)
+if (process.env.TOKEN) {
+    try {
+        const payload = JSON.parse(Buffer.from(process.env.TOKEN.split('.')[1], 'base64url').toString());
+        if (payload.user_id) {
+            TEST_USER_ID = payload.user_id;
+            console.log(`🔍 Auto-detected UID from token: ${TEST_USER_ID}`);
+        }
+    } catch { /* fallback to hardcoded */ }
+}
 
 // A court that exists in production — verified via DB query.
 const TEST_COURT_ID = 'a9dd3cfc-44f8-3604-5844-1b030c2eeeae'; // Coastline Christian Schools Gym

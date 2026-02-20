@@ -23,7 +23,7 @@ export class ScheduledRun {
     @Column({ name: 'age_range', type: 'varchar', length: 20, nullable: true })
     ageRange?: string; // '18+', '21+', '30+', '40+', '50+', 'open'
 
-    @Column({ name: 'scheduled_at', type: 'datetime' })
+    @Column({ name: 'scheduled_at', type: 'timestamp' })
     scheduledAt: Date;
 
     @Column({ name: 'duration_minutes', type: 'integer', default: 120 })
@@ -48,7 +48,7 @@ export class ScheduledRun {
     @Column({ name: 'invited_player_ids', type: 'text', nullable: true })
     invitedPlayerIds?: string; // JSON array, used when visibility = 'invite_only'
 
-    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }
 
@@ -67,6 +67,6 @@ export class RunAttendee {
     @Column({ type: 'varchar', length: 20, default: 'going' })
     status: string;
 
-    @Column({ name: 'created_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+    @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 }

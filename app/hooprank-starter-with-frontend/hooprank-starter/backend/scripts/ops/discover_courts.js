@@ -17,7 +17,7 @@
 
 const {
     BASE, BRETT_ID, STATE_NAMES,
-    sleep, generateUUID, haversineKm,
+    sleep, getTokenInteractive, generateUUID, haversineKm,
     shouldInclude, discoverPlaces, lookupVenue,
     extractCity, inferVenueType,
     httpGet, adminPost, classifyVenues, createCourt,
@@ -28,7 +28,7 @@ const CITIES = require('./state_cities');
 // ── CLI parsing ──────────────────────────────────────────────────
 const args = process.argv.slice(2);
 const API_KEY = process.env.GOOGLE_API_KEY;
-const TOKEN = process.env.TOKEN;
+let TOKEN = process.env.TOKEN;
 const DRY = args.includes('--dry');
 
 const STATE = (() => {
@@ -349,6 +349,10 @@ async function runLookup(name) {
 // ── Main ─────────────────────────────────────────────────────────
 
 (async () => {
+    if (!DRY && !TOKEN) {
+        TOKEN = await getTokenInteractive();
+    }
+
     if (LOOKUP) return runLookup(LOOKUP);
     if (QUERY) return runSingleQuery(QUERY);
 

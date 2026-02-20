@@ -528,15 +528,22 @@ export class TeamsService {
             relations: ['team'],
         });
 
-        // Get last message for each team
+        // Get last message for each team, with sender name
         const results: any[] = [];
         for (const m of memberships) {
             if (!m.team) continue;
 
-            const lastMsg = await this.messagesRepository.findOne({
-                where: { teamId: m.team.id },
-                order: { createdAt: 'DESC' },
-            });
+            const lastMsgRows = await this.dataSource.query(`
+                SELECT tm.content, tm.created_at AS "createdAt",
+                       COALESCE(u.name, 'Player') AS "senderName"
+                FROM team_messages tm
+                LEFT JOIN users u ON u.id = tm.sender_id
+                WHERE tm.team_id = $1
+                ORDER BY tm.created_at DESC
+                LIMIT 1
+            `, [m.team.id]);
+
+            const lastMsg = lastMsgRows[0] || null;
 
             results.push({
                 teamId: m.team.id,
@@ -544,7 +551,7 @@ export class TeamsService {
                 teamType: m.team.teamType,
                 threadId: `team_${m.team.id}`,
                 lastMessage: lastMsg?.content || null,
-                lastSenderName: null,  // Could lookup sender name
+                lastSenderName: lastMsg?.senderName || null,
                 lastMessageAt: lastMsg?.createdAt || null,
             });
         }
@@ -563,22 +570,20 @@ export class TeamsService {
             throw new ForbiddenException('You are not a member of this team');
         }
 
-        // Get messages
-        const messages = await this.messagesRepository.find({
-            where: { teamId },
-            order: { createdAt: 'ASC' },
-            take: 100,  // Limit to last 100 messages
-        });
+        // Get messages with sender info via JOIN to users table
+        const messages = await this.dataSource.query(`
+            SELECT tm.id, tm.sender_id AS "senderId", tm.content, tm.image_url AS "imageUrl",
+                   tm.created_at AS "createdAt",
+                   COALESCE(u.name, 'Player') AS "senderName",
+                   u.avatar_url AS "senderPhotoUrl"
+            FROM team_messages tm
+            LEFT JOIN users u ON u.id = tm.sender_id
+            WHERE tm.team_id = $1
+            ORDER BY tm.created_at ASC
+            LIMIT 100
+        `, [teamId]);
 
-        return messages.map(m => ({
-            id: m.id,
-            senderId: m.senderId,
-            content: m.content,
-            imageUrl: m.imageUrl || null,
-            createdAt: m.createdAt,
-            senderName: null,  // Could lookup from users
-            senderPhotoUrl: null,
-        }));
+        return messages;
     }
 
     /**

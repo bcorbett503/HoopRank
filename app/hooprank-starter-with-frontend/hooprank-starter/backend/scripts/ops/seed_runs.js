@@ -12,12 +12,12 @@
  * and seeds scheduled run occurrences.
  */
 
-const { createCourt, seedRun, getNextOccurrences, sleep, BRETT_ID } = require('./lib');
+const { createCourt, seedRun, getNextOccurrences, sleep, getTokenInteractive, BRETT_ID } = require('./lib');
 const { venues, runs } = require('./run_data');
 
 // ── CLI parsing ──────────────────────────────────────────────────
 const args = process.argv.slice(2);
-const TOKEN = process.env.TOKEN;
+let TOKEN = process.env.TOKEN;
 const DRY = args.includes('--dry');
 const WEEKS = (() => {
     const i = args.indexOf('--weeks');
@@ -28,10 +28,7 @@ const MARKET = (() => {
     return i >= 0 && args[i + 1] ? args[i + 1].toLowerCase() : null;
 })();
 
-if (!TOKEN && !DRY) {
-    console.error('Usage: TOKEN=<firebase-id-token> node scripts/ops/seed_runs.js [--market <name>] [--dry] [--weeks N]');
-    process.exit(1);
-}
+
 
 // ── Market filter (city name substring matching) ─────────────────
 const MARKET_MAP = {
@@ -48,6 +45,7 @@ const MARKET_MAP = {
     iconic: ['Washington', 'Philadelphia', 'Shelby', 'Beachwood', 'Las Vegas', 'Miami', 'Coral Gables', 'Atlanta'],
     merritt: ['Merritt Island', 'Cocoa', 'Melbourne'],
     boston: ['Boston', 'Cambridge', 'Brighton'],
+    peninsula: ['San Mateo', 'Redwood City', 'San Carlos', 'Menlo Park', 'Palo Alto', 'South San Francisco', 'San Bruno', 'Foster City', 'Mountain View'],
 };
 
 function matchesMarket(venue) {
@@ -62,6 +60,9 @@ function matchesMarket(venue) {
 
 // ── Main ─────────────────────────────────────────────────────────
 (async () => {
+    if (!DRY && !TOKEN && !process.env.NO_INTERACTIVE) {
+        TOKEN = await getTokenInteractive();
+    }
     // Build venue index & filter
     const venueMap = {};
     venues.forEach((v) => { venueMap[v.key] = v; });
