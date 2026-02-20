@@ -31,76 +31,54 @@ export class AuthGuard implements CanActivate {
         const token = this.extractTokenFromHeader(request);
         const allowInsecureAuth = this.configService.get<string>('ALLOW_INSECURE_AUTH') === 'true';
 
+        // 1. Check for Admin Bypass First
         const configuredSecret = this.configService.get<string>('ADMIN_SECRET') || '';
         const providedSecret = this.normalizeHeaderValue(request.headers['x-admin-secret']) || '';
         const hasValidSecret = configuredSecret.length > 0 && providedSecret === configuredSecret;
 
-        if (!token) {
-            // Bypass Bearer token requirement if a valid ADMIN_SECRET is provided
-            if (hasValidSecret) {
-                const fallbackUid = request.headers['x-user-id'] || request.body?.id || 'admin-user';
-                request.headers['x-user-id'] = String(fallbackUid);
-                request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
-                return true; // Fast-path success for admin secret
-            }
-
-            // No Bearer token — reject unless dev-mode is explicitly enabled.
-            // The mobile app always sends a Firebase ID token; there is no
-            // legitimate production scenario where x-user-id alone is sufficient.
-            if (allowInsecureAuth) {
-                const fallbackUid = request.body?.id;
-                if (!fallbackUid) {
-                    throw new UnauthorizedException('Missing authentication token');
-                }
-                request.headers['x-user-id'] = String(fallbackUid);
-                request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
-                return this.enforceAdminForSensitiveRoutes(request, String(fallbackUid), context);
-            }
-            throw new UnauthorizedException('Missing authentication token');
-        }
-
-        if (admin.apps.length === 0) {
-            // Fail closed in secure mode when Firebase is unavailable.
-            if (!allowInsecureAuth) {
-                throw new UnauthorizedException('Authentication service unavailable');
-            }
-            const fallbackUid = request.headers['x-user-id'] || request.body?.id;
-            if (!fallbackUid) {
-                throw new UnauthorizedException('Authentication service unavailable');
-            }
+        if (hasValidSecret) {
+            const fallbackUid = request.headers['x-user-id'] || request.body?.id || 'admin-user';
             request.headers['x-user-id'] = String(fallbackUid);
             request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
-            return this.enforceAdminForSensitiveRoutes(request, String(fallbackUid), context);
+            return true; // Fast-path bypass
         }
 
+        // 2. Token Required Check
+        if (!token) {
+            throw new UnauthorizedException('Authentication token required');
+        }
+
+        let decodedToken: any;
+        let uid: string;
         try {
-            const decodedToken = await admin.auth().verifyIdToken(token);
-            const uid = decodedToken.uid;
-
-            // Never trust caller-supplied user identifiers that do not match token subject.
-            const headerUid = this.normalizeHeaderValue(request.headers['x-user-id']);
-            const allowHeaderNormalization = this.configService.get<string>('ALLOW_HEADER_NORMALIZATION') === 'true';
-            if (headerUid && headerUid !== uid) {
-                if (allowHeaderNormalization) {
-                    // Compatibility mode: normalize to token uid and audit-log the mismatch.
-                    console.warn(`[AUTH_AUDIT] x-user-id mismatch: header=${headerUid} token=${uid} path=${request.path} — normalized to token uid`);
-                    request.headers['x-user-id'] = uid;
-                } else {
-                    throw new UnauthorizedException('x-user-id does not match authenticated user');
-                }
-            }
-            if (!headerUid) {
-                request.headers['x-user-id'] = uid;
-            }
-
-            request['user'] = decodedToken;
-            return this.enforceAdminForSensitiveRoutes(request, uid, context);
+            decodedToken = await admin.auth().verifyIdToken(token);
+            uid = decodedToken.uid;
         } catch (error) {
+            console.error('[AUTH_GUARD] Token validation failed:', error);
             if (error instanceof UnauthorizedException || error instanceof ForbiddenException) {
                 throw error;
             }
             throw new UnauthorizedException('Invalid authentication token');
         }
+
+        // Never trust caller-supplied user identifiers that do not match token subject.
+        const headerUid = this.normalizeHeaderValue(request.headers['x-user-id']);
+        const allowHeaderNormalization = this.configService.get<string>('ALLOW_HEADER_NORMALIZATION') === 'true';
+        if (headerUid && headerUid !== uid) {
+            if (allowHeaderNormalization) {
+                // Compatibility mode: normalize to token uid and audit-log the mismatch.
+                console.warn(`[AUTH_AUDIT] x-user-id mismatch: header=${headerUid} token=${uid} path=${request.path} — normalized to token uid`);
+                request.headers['x-user-id'] = uid;
+            } else {
+                throw new UnauthorizedException('x-user-id does not match authenticated user');
+            }
+        }
+        if (!headerUid) {
+            request.headers['x-user-id'] = uid;
+        }
+
+        request['user'] = decodedToken;
+        return this.enforceAdminForSensitiveRoutes(request, uid, context);
     }
 
     private extractTokenFromHeader(request: any): string | undefined {
