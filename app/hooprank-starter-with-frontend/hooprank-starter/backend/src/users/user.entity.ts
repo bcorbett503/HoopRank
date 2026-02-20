@@ -71,7 +71,7 @@ export class User {
     @Column({ name: 'subscription_tier', type: 'text', nullable: true, default: 'free' })
     subscriptionTier: string; // 'free' | 'pro' | 'elite'
 
-    @Column({ name: 'subscription_expires_at', type: 'datetime', nullable: true })
+    @Column({ name: 'subscription_expires_at', type: 'timestamp', nullable: true })
     subscriptionExpiresAt: Date;
 
     @Column({ name: 'fcm_token', type: 'text', nullable: true })
