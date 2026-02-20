@@ -31,7 +31,19 @@ export class AuthGuard implements CanActivate {
         const token = this.extractTokenFromHeader(request);
         const allowInsecureAuth = this.configService.get<string>('ALLOW_INSECURE_AUTH') === 'true';
 
+        const configuredSecret = this.configService.get<string>('ADMIN_SECRET') || '';
+        const providedSecret = this.normalizeHeaderValue(request.headers['x-admin-secret']) || '';
+        const hasValidSecret = configuredSecret.length > 0 && providedSecret === configuredSecret;
+
         if (!token) {
+            // Bypass Bearer token requirement if a valid ADMIN_SECRET is provided
+            if (hasValidSecret) {
+                const fallbackUid = request.headers['x-user-id'] || request.body?.id || 'admin-user';
+                request.headers['x-user-id'] = String(fallbackUid);
+                request['user'] = { uid: fallbackUid, email: request.body?.email || '' };
+                return true; // Fast-path success for admin secret
+            }
+
             // No Bearer token — reject unless dev-mode is explicitly enabled.
             // The mobile app always sends a Firebase ID token; there is no
             // legitimate production scenario where x-user-id alone is sufficient.
