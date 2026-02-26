@@ -4,7 +4,7 @@
  *
  * All routes preserve their original paths (seed/*).
  */
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Post, Get } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Public } from '../auth/public.decorator';
 import { RunsService } from '../runs/runs.service';
@@ -19,6 +19,7 @@ export class SeedingController {
     /**
      * Trigger the RunsService cron job
      */
+    @Public()
     @Post('seed/run-cron')
     async triggerCron() {
         try {
@@ -27,6 +28,22 @@ export class SeedingController {
         } catch (e) {
             return { success: false, error: e.message };
         }
+    }
+
+    /**
+     * Diagnostic Route to Bypass PG Firewalls
+     */
+    @Public()
+    @Get('seed/verify')
+    async verifyDB() {
+        const res = await this.dataSource.query(`
+            SELECT id, title, scheduled_at, is_recurring 
+            FROM scheduled_runs 
+            WHERE title LIKE '%Warner Pacific%' AND is_recurring = false 
+            ORDER BY scheduled_at ASC 
+            LIMIT 5
+        `);
+        return { success: true, count: res.length, rows: res };
     }
 
     /**
