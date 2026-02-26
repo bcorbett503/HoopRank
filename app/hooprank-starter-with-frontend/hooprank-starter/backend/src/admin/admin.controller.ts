@@ -360,4 +360,39 @@ export class AdminController {
             return { success: false, error: error.message };
         }
     }
+
+    /**
+     * Search for duplicate courts and recurring run templates
+     */
+    @Get('cleanup/find-duplicates')
+    async findDuplicates() {
+        try {
+            const courts = await this.dataSource.query(`
+                SELECT name, lat, lng, COUNT(*) as cnt, array_agg(id) as ids
+                FROM courts
+                GROUP BY name, lat, lng
+                HAVING COUNT(*) > 1
+                ORDER BY cnt DESC;
+            `);
+
+            const runs = await this.dataSource.query(`
+                SELECT "courtId", title, "gameMode", "durationMinutes", COUNT(*) as cnt, array_agg(id) as ids
+                FROM scheduled_runs
+                WHERE "isRecurringTemplate" = true
+                GROUP BY "courtId", title, "gameMode", "durationMinutes"
+                HAVING COUNT(*) > 1
+                ORDER BY cnt DESC;
+            `);
+
+            return {
+                success: true,
+                duplicateCourtsCount: courts.length,
+                duplicateCourts: courts,
+                duplicateRunsCount: runs.length,
+                duplicateRuns: runs
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }
