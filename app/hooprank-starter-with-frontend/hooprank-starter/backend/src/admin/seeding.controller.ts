@@ -7,10 +7,27 @@
 import { Controller, Post } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Public } from '../auth/public.decorator';
+import { RunsService } from '../runs/runs.service';
 
 @Controller()
 export class SeedingController {
-    constructor(private dataSource: DataSource) { }
+    constructor(
+        private dataSource: DataSource,
+        private runsService: RunsService
+    ) { }
+
+    /**
+     * Trigger the RunsService cron job
+     */
+    @Post('seed/run-cron')
+    async triggerCron() {
+        try {
+            await this.runsService.spawnUpcomingRecurringRuns();
+            return { success: true, message: 'Cron forced successfully' };
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+    }
 
     /**
      * Seed The Olympic Club court for testing

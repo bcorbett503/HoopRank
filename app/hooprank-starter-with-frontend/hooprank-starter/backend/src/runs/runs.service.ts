@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class RunsService {
+    private readonly logger = new Logger(RunsService.name);
+
     constructor(private dataSource: DataSource) { }
 
     // ========== Create ==========
@@ -19,14 +22,18 @@ export class RunsService {
         notes?: string;
         taggedPlayerIds?: string[];
         tagMode?: string;
+        isRecurring?: boolean;
     }): Promise<any> {
         const taggedJson = data.taggedPlayerIds && data.taggedPlayerIds.length > 0
             ? JSON.stringify(data.taggedPlayerIds)
             : null;
 
+        const isRecur = data.isRecurring ? true : false;
+        const recurRule = isRecur ? 'weekly' : null;
+
         const result = await this.dataSource.query(`
-            INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, duration_minutes, max_players, notes, tagged_player_ids, tag_mode, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+            INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, duration_minutes, max_players, notes, tagged_player_ids, tag_mode, is_recurring, recurrence_rule, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
             RETURNING *
         `, [
             data.courtId,
@@ -41,6 +48,8 @@ export class RunsService {
             data.notes || null,
             taggedJson,
             data.tagMode || null,
+            isRecur,
+            recurRule
         ]);
 
         const run = result[0];
@@ -207,6 +216,90 @@ export class RunsService {
         } catch (error) {
             console.error('RunsService.getCourtsWithRuns error:', error.message);
             return [];
+        }
+    }
+
+    // ========== CRON SPANWER: True Recurring Runs ==========
+    // Runs every hour to find active templates and spawn the physical run 48 hrs out
+    @Cron(CronExpression.EVERY_HOUR)
+    async spawnUpcomingRecurringRuns() {
+        this.logger.log('CRON: Checking for upcoming recurring runs to spawn...');
+
+        try {
+            // 1) Find all "template" runs
+            // A template is a run where is_recurring = true
+            // We only look at templates whose 'scheduled_at' is in the past, meaning the FIRST instance already happened
+            // or is about to happen, making it a true template. 
+            // We use the original scheduled_at to derive the DAY OF WEEK and TIME.
+            const templates = await this.dataSource.query(`
+                SELECT 
+                    id, court_id, created_by, title, game_mode, court_type, 
+                    age_range, duration_minutes, max_players, notes, 
+                    tagged_player_ids, tag_mode, recurrence_rule, scheduled_at 
+                FROM scheduled_runs 
+                WHERE is_recurring = true AND recurrence_rule = 'weekly'
+            `);
+
+            if (templates.length === 0) return;
+
+            // Target window: any run that should occur between NOW and +48 hours
+            const now = new Date();
+            const windowEnd = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+
+            let spawnedCount = 0;
+
+            for (const template of templates) {
+                const originalDate = new Date(template.scheduled_at);
+                const targetDayOfWeek = originalDate.getUTCDay();
+                const targetHours = originalDate.getUTCHours();
+                const targetMinutes = originalDate.getUTCMinutes();
+
+                // Calculate the specific date this week that matches the template's day/time
+                // Crucial fix: Construct the clone using strictly UTC accessors
+                const upcomingInstance = new Date();
+                upcomingInstance.setUTCHours(targetHours, targetMinutes, 0, 0);
+
+                // Shift to the correct day of the current week (Sunday = 0)
+                const currentDay = upcomingInstance.getUTCDay();
+                const distance = (targetDayOfWeek + 7 - currentDay) % 7;
+                upcomingInstance.setUTCDate(upcomingInstance.getUTCDate() + distance);
+
+                // If 'upcomingInstance' is strictly inside our [NOW ... NOW + 48h] window
+                if (upcomingInstance > now && upcomingInstance <= windowEnd) {
+
+                    // 2) Check if we already spawned this exact instance to avoid duplicates
+                    const existingCheck = await this.dataSource.query(`
+                        SELECT id FROM scheduled_runs 
+                        WHERE court_id = $1 AND title = $2 AND scheduled_at = $3 AND is_recurring = false
+                    `, [template.court_id, template.title, upcomingInstance]);
+
+                    if (existingCheck.length === 0) {
+                        // 3) Spawn the physical instance for the feed!
+                        // Notice: is_recurring = false, because this is a concrete instance of the template
+                        await this.dataSource.query(`
+                            INSERT INTO scheduled_runs (
+                                court_id, created_by, title, game_mode, court_type, 
+                                age_range, duration_minutes, max_players, notes, 
+                                tagged_player_ids, tag_mode, scheduled_at, is_recurring, created_at
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, false, NOW())
+                        `, [
+                            template.court_id, template.created_by, template.title, template.game_mode, template.court_type,
+                            template.age_range, template.duration_minutes, template.max_players, template.notes,
+                            template.tagged_player_ids, template.tag_mode, upcomingInstance
+                        ]);
+
+                        spawnedCount++;
+                        this.logger.log(`CRON: Spawned recurring instance: "${template.title}" at ${upcomingInstance.toISOString()}`);
+                    }
+                }
+            }
+
+            if (spawnedCount > 0) {
+                this.logger.log(`CRON: Successfully spawned ${spawnedCount} recurring run instances.`);
+            }
+
+        } catch (error) {
+            this.logger.error('CRON Error spawning recurring runs:', error.message);
         }
     }
 
