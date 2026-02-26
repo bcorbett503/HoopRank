@@ -395,4 +395,22 @@ export class AdminController {
             return { success: false, error: error.message };
         }
     }
+    /**
+     * Temporary endpoint to clear master recurrence templates globally
+     */
+    @Get('cleanup/nuke-templates')
+    async nukeTemplates() {
+        try {
+            const deletedConcrete = await this.dataSource.query(`DELETE FROM scheduled_runs WHERE created_by = '4ODZUrySRUhFDC5wVW6dCySBprD2' AND is_recurring = false`);
+            const deletedTemplates = await this.dataSource.query(`DELETE FROM scheduled_runs WHERE is_recurring = true`);
+            return {
+                success: true,
+                message: 'Template purge successful',
+                deletedConcrete: deletedConcrete[1] || 0,
+                deletedTemplates: deletedTemplates[1] || 0,
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }
