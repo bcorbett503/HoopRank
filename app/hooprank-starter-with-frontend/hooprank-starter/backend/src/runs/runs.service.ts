@@ -98,6 +98,7 @@ export class RunsService {
             LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
             WHERE sr.court_id::TEXT = $1::TEXT
               AND sr.scheduled_at >= $3
+              AND sr.is_recurring = false
             ORDER BY sr.scheduled_at ASC
         `, [courtId, userId || '', now]);
 

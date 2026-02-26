@@ -23,6 +23,7 @@ export class RunsController {
             notes?: string;
             taggedPlayerIds?: string[];
             tagMode?: string;
+            isRecurring?: boolean;
         },
     ) {
         if (!userId) {
@@ -62,6 +63,7 @@ export class RunsController {
                 LEFT JOIN courts c ON sr.court_id::TEXT = c.id::TEXT
                 LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
                 WHERE sr.scheduled_at >= $1
+                  AND sr.is_recurring = false
                 ORDER BY sr.scheduled_at ASC
                 LIMIT 50
             `, [now]);
