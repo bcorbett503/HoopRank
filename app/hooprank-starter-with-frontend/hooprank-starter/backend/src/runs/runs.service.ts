@@ -70,47 +70,55 @@ export class RunsService {
         const now = new Date().toISOString();
 
         const runs = await this.dataSource.query(`
-            SELECT 
-                sr.id,
-                sr.court_id as "courtId",
-                c.name as "courtName",
-                c.city as "courtCity",
-                ST_Y(c.geog::geometry) as "courtLat",
-                ST_X(c.geog::geometry) as "courtLng",
-                sr.created_by as "createdBy",
-                COALESCE(u.name, 'Unknown') as "creatorName",
-                u.avatar_url as "creatorPhotoUrl",
-                sr.title,
-                sr.game_mode as "gameMode",
-                sr.court_type as "courtType",
-                sr.age_range as "ageRange",
-                sr.scheduled_at as "scheduledAt",
-                sr.duration_minutes as "durationMinutes",
-                sr.max_players as "maxPlayers",
-                sr.notes,
-                sr.tagged_player_ids as "taggedPlayerIds",
-                sr.tag_mode as "tagMode",
-                sr.created_at as "createdAt",
-                sr.is_recurring as "isRecurring",
-                sr.recurrence_rule as "recurrenceRule",
-                COALESCE((SELECT COUNT(*) FROM run_attendees WHERE run_id = sr.id), 0)::INTEGER as "attendeeCount",
-                EXISTS(SELECT 1 FROM run_attendees WHERE run_id = sr.id AND user_id = $2) as "isAttending"
-            FROM scheduled_runs sr
-            LEFT JOIN courts c ON sr.court_id::TEXT = c.id::TEXT
-            LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
-            WHERE sr.court_id::TEXT = $1::TEXT
-              AND (
-                 sr.is_recurring = true 
-                 OR 
-                 (sr.scheduled_at >= $3 AND sr.is_recurring = false AND NOT EXISTS (
-                     SELECT 1 FROM scheduled_runs parent 
-                     WHERE parent.is_recurring = true 
-                       AND parent.court_id = sr.court_id 
-                       AND parent.title = sr.title
-                       AND parent.duration_minutes = sr.duration_minutes
-                 ))
-              )
-            ORDER BY sr.scheduled_at ASC
+            SELECT * FROM (
+                SELECT DISTINCT ON (
+                    sr.court_id,
+                    EXTRACT(DOW FROM sr.scheduled_at AT TIME ZONE 'UTC'),
+                    EXTRACT(HOUR FROM sr.scheduled_at AT TIME ZONE 'UTC'),
+                    EXTRACT(MINUTE FROM sr.scheduled_at AT TIME ZONE 'UTC')
+                )
+                    sr.id,
+                    sr.court_id as "courtId",
+                    c.name as "courtName",
+                    c.city as "courtCity",
+                    ST_Y(c.geog::geometry) as "courtLat",
+                    ST_X(c.geog::geometry) as "courtLng",
+                    sr.created_by as "createdBy",
+                    COALESCE(u.name, 'Unknown') as "creatorName",
+                    u.avatar_url as "creatorPhotoUrl",
+                    sr.title,
+                    sr.game_mode as "gameMode",
+                    sr.court_type as "courtType",
+                    sr.age_range as "ageRange",
+                    sr.scheduled_at as "scheduledAt",
+                    sr.duration_minutes as "durationMinutes",
+                    sr.max_players as "maxPlayers",
+                    sr.notes,
+                    sr.tagged_player_ids as "taggedPlayerIds",
+                    sr.tag_mode as "tagMode",
+                    sr.created_at as "createdAt",
+                    sr.is_recurring as "isRecurring",
+                    sr.recurrence_rule as "recurrenceRule",
+                    COALESCE((SELECT COUNT(*) FROM run_attendees WHERE run_id = sr.id), 0)::INTEGER as "attendeeCount",
+                    EXISTS(SELECT 1 FROM run_attendees WHERE run_id = sr.id AND user_id = $2) as "isAttending"
+                FROM scheduled_runs sr
+                LEFT JOIN courts c ON sr.court_id::TEXT = c.id::TEXT
+                LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
+                WHERE sr.court_id::TEXT = $1::TEXT
+                  AND (
+                     sr.is_recurring = true 
+                     OR 
+                     sr.scheduled_at >= $3
+                  )
+                ORDER BY 
+                    sr.court_id,
+                    EXTRACT(DOW FROM sr.scheduled_at AT TIME ZONE 'UTC'),
+                    EXTRACT(HOUR FROM sr.scheduled_at AT TIME ZONE 'UTC'),
+                    EXTRACT(MINUTE FROM sr.scheduled_at AT TIME ZONE 'UTC'),
+                    sr.is_recurring DESC,
+                    sr.scheduled_at ASC
+            ) deduped
+            ORDER BY deduped."scheduledAt" ASC
         `, [courtId, userId || '', now]);
 
         // Attach attendees to each run
