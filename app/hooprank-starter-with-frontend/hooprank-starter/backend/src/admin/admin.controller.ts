@@ -413,4 +413,40 @@ export class AdminController {
             return { success: false, error: error.message };
         }
     }
+
+    /**
+     * Comprehensive audit for scheduled runs
+     */
+    @Get('audit/runs-report')
+    async auditRunsReport() {
+        try {
+            const duplicates = await this.dataSource.query(`
+                SELECT court_id, title, is_recurring, scheduled_at, COUNT(*) as cnt, array_agg(id) as ids
+                FROM scheduled_runs
+                GROUP BY court_id, title, is_recurring, scheduled_at
+                HAVING COUNT(*) > 1
+            `);
+
+            const nonAdminRuns = await this.dataSource.query(`
+                SELECT id, title, created_by, is_recurring, scheduled_at
+                FROM scheduled_runs
+                WHERE created_by != '4ODZUrySRUhFDC5wVW6dCySBprD2'
+            `);
+
+            const totalRuns = await this.dataSource.query(`
+                SELECT COUNT(*) as cnt FROM scheduled_runs
+            `);
+
+            return {
+                success: true,
+                totalRuns: totalRuns[0].cnt,
+                duplicatesFound: duplicates.length,
+                duplicates: duplicates,
+                nonAdminRunsFound: nonAdminRuns.length,
+                nonAdminRuns: nonAdminRuns
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }

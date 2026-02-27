@@ -28,30 +28,51 @@ function request(method, path) {
 }
 
 async function run() {
-    console.log("Fetching duplicated templates globally...");
-    const dups = await request('GET', '/cleanup/find-duplicates');
+    console.log("Memory Array Deduplication sweep initialized.");
 
-    if (!dups || !dups.success) {
-        console.error("Failed to fetch duplicates:", dups);
+    // SF Bounds
+    const qs = new URLSearchParams({
+        minLat: 37.75, maxLat: 37.81,
+        minLng: -122.51, maxLng: -122.38
+    });
+
+    const courts = await request('GET', `/courts?${qs}`);
+    if (!Array.isArray(courts)) {
+        console.error("Failed to load courts:", courts);
         return;
     }
 
-    const { duplicateRuns } = dups;
-    if (!duplicateRuns || duplicateRuns.length === 0) {
-        console.log("✅ Zero duplicate master templates found.");
-        return;
-    }
+    let wiped = 0;
+    console.log(`Scanning ${courts.length} active venues...`);
 
-    console.log(`Found ${duplicateRuns.length} overlapping templates.`);
-    for (const group of duplicateRuns) {
-        // Keep the first ID, delete the rest
-        const toDelete = group.ids.slice(1);
-        for (const runId of toDelete) {
-            console.log(`Erasing redundant template: ${runId}`);
-            await request('DELETE', `/runs/${runId}`);
+    for (const c of courts) {
+        const runs = await request('GET', `/courts/${c.id}/runs`);
+        if (!Array.isArray(runs)) continue;
+
+        // Group master templates by identity
+        const templates = runs.filter(r => r.isRecurring === true);
+        const map = {};
+
+        for (const t of templates) {
+            const key = `${t.title}_${t.gameMode}`;
+            if (!map[key]) map[key] = [];
+            map[key].push(t.id);
+        }
+
+        // Obliterate clones
+        for (const [key, ids] of Object.entries(map)) {
+            if (ids.length > 1) {
+                const redundant = ids.slice(1);
+                for (const kill of redundant) {
+                    console.log(`[${c.name}] Deleting duplicate template: ${key} (${kill})`);
+                    await request('DELETE', `/runs/${kill}`);
+                    wiped++;
+                }
+            }
         }
     }
-    console.log("Sweep complete.");
+
+    console.log(`Sweep complete. Successfully erased ${wiped} duplicate templates.`);
 }
 
 run().catch(console.error);
