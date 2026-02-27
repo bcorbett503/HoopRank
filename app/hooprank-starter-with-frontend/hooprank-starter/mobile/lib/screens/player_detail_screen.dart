@@ -27,14 +27,18 @@ class PlayerDetailScreen extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  child: Text(player.name.substring(0, 1), style: const TextStyle(fontSize: 24)),
+                  child: Text(player.name.substring(0, 1),
+                      style: const TextStyle(fontSize: 24)),
                 ),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(player.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    Text('${player.team} • ${player.position} • Age ${player.age} • ZIP ${player.zip ?? '-'}',
+                    Text(player.name,
+                        style: const TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text(
+                        '${player.team} • ${player.position} • Age ${player.age} • ${player.city ?? '-'}',
                         style: const TextStyle(color: Colors.grey)),
                   ],
                 ),
@@ -51,18 +55,25 @@ class PlayerDetailScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Overview', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        const Text('Overview',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 18)),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade200,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             children: [
-                              const Text('HoopRank ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              const Text('HoopRank ',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey)),
                               Text(player.rating.toStringAsFixed(2),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
                             ],
                           ),
                         ),
@@ -87,12 +98,14 @@ class PlayerDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Vitals', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const Text('Vitals',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18)),
                     const Divider(),
                     _buildVitalRow('Height', player.height),
                     _buildVitalRow('Weight', player.weight),
                     _buildVitalRow('Position', player.position),
-                    _buildVitalRow('ZIP', player.zip ?? '-'),
+                    _buildVitalRow('City', player.city ?? '-'),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
@@ -120,7 +133,8 @@ class PlayerDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(label, style: const TextStyle(color: Colors.grey)),
-              Text(value.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(value.toStringAsFixed(1),
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 4),

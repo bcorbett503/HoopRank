@@ -45,6 +45,7 @@ class User {
   final int gamesContested;
   final double contestRate;
   final int? age;
+  final List<String> badges;
 
   User({
     required this.id,
@@ -62,6 +63,7 @@ class User {
     this.gamesContested = 0,
     this.contestRate = 0.0,
     this.age,
+    this.badges = const [],
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -71,7 +73,8 @@ class User {
     }
 
     final gamesPlayed = _parseInt(json['gamesPlayed'] ?? json['games_played']);
-    final gamesContested = _parseInt(json['gamesContested'] ?? json['games_contested']);
+    final gamesContested =
+        _parseInt(json['gamesContested'] ?? json['games_contested']);
     final rawContestRate = json['contestRate'] ?? json['contest_rate'];
     final contestRate = rawContestRate != null
         ? _parseDouble(rawContestRate)
@@ -79,10 +82,18 @@ class User {
 
     // Handle both camelCase (app) and snake_case (production backend) field names
     final position = json['position']?.toString();
-    debugPrint('USER.fromJson: id=$id, json[position]=${json['position']}, parsed position=$position');
+    final rawBadges = json['badges'];
+    final parsedBadges = rawBadges is List
+        ? rawBadges.map((e) => e.toString()).toList()
+        : <String>[];
+
+    debugPrint(
+        'USER.fromJson: id=$id, json[position]=${json['position']}, parsed position=$position');
     return User(
       id: id,
-      name: json['name']?.toString() ?? json['display_name']?.toString() ?? 'Unknown',
+      name: json['name']?.toString() ??
+          json['display_name']?.toString() ??
+          'Unknown',
       photoUrl: json['photoUrl']?.toString() ?? json['avatar_url']?.toString(),
       team: json['team']?.toString(),
       position: position,
@@ -96,6 +107,7 @@ class User {
       gamesContested: gamesContested,
       contestRate: contestRate,
       age: json['age'] != null ? _parseInt(json['age']) : null,
+      badges: parsedBadges,
     );
   }
 
@@ -119,13 +131,14 @@ class User {
       age: age,
       height: height ?? '6\'0"',
       weight: weight,
-      zip: team,
+      city: city,
       rating: rating,
       offense: offense,
       defense: defense,
       shooting: shooting,
       passing: passing,
       rebounding: rebounding,
+      badges: badges,
     );
   }
 
@@ -148,13 +161,14 @@ class Player {
   final int age;
   final String height;
   final String weight;
-  final String? zip;
+  final String? city;
   final double rating;
   final double offense;
   final double defense;
   final double shooting;
   final double passing;
   final double rebounding;
+  final List<String> badges;
 
   Player({
     required this.id,
@@ -165,13 +179,14 @@ class Player {
     required this.age,
     required this.height,
     required this.weight,
-    this.zip,
+    this.city,
     required this.rating,
     required this.offense,
     required this.defense,
     required this.shooting,
     required this.passing,
     required this.rebounding,
+    this.badges = const [],
   });
 
   /// Create Player from JSON with resilient parsing
@@ -185,7 +200,9 @@ class Player {
       age: _parseInt(json['age'], fallback: 25),
       height: json['height']?.toString() ?? '6\'0"',
       weight: json['weight']?.toString() ?? '180 lbs',
-      zip: json['zip']?.toString(),
+      city: json['city']?.toString() ??
+          json['zip']
+              ?.toString(), // Fallback to zip if city is missing in existing JSON
       rating: _parseDouble(json['rating'], fallback: 3.0),
       offense: _parseDouble(json['offense'], fallback: 75),
       defense: _parseDouble(json['defense'], fallback: 75),
@@ -203,7 +220,7 @@ class Player {
       position: position,
       rating: rating,
       height: height,
-      team: zip,
+      team: team,
     );
   }
 
@@ -216,7 +233,8 @@ class Match {
   final String id;
   final String challengerId;
   final String opponentId;
-  final String status; // 'pending', 'accepted', 'completed', 'waiting', 'live', 'ended'
+  final String
+      status; // 'pending', 'accepted', 'completed', 'waiting', 'live', 'ended'
   final DateTime? scheduledAt;
   final String? courtId;
   final String? winnerId;
@@ -275,7 +293,8 @@ class Court {
   final bool isSignature; // Signature courts are high-traffic/famous venues
   final bool isIndoor; // Indoor venues (gyms, schools, rec centers)
   final String access; // 'public', 'members', or 'paid'
-  final String? venueType; // 'school', 'college', 'rec_center', 'gym', 'outdoor', 'other'
+  final String?
+      venueType; // 'school', 'college', 'rec_center', 'gym', 'outdoor', 'other'
   final int? followerCount; // Number of users following this court
   // King of the Court for each mode (name, rating, and user ID for challenges)
   final String? king1v1;
@@ -309,7 +328,6 @@ class Court {
     this.king5v5Id,
     this.king5v5Rating,
   });
-
 
   /// Legacy getter for backwards compatibility
   String? get king => king1v1;
@@ -363,17 +381,24 @@ class Court {
       isSignature: json['signature'] == true || json['isSignature'] == true,
       isIndoor: json['indoor'] == true || json['isIndoor'] == true,
       access: json['access']?.toString() ?? 'public',
-      venueType: json['venue_type']?.toString() ?? json['venueType']?.toString(),
+      venueType:
+          json['venue_type']?.toString() ?? json['venueType']?.toString(),
       followerCount: _parseInt(json['follower_count'] ?? json['followerCount']),
       king1v1: json['king1v1']?.toString() ?? json['king']?.toString(),
       king1v1Id: json['king1v1Id']?.toString(),
-      king1v1Rating: json['king1v1Rating'] != null ? _parseDouble(json['king1v1Rating']) : null,
+      king1v1Rating: json['king1v1Rating'] != null
+          ? _parseDouble(json['king1v1Rating'])
+          : null,
       king3v3: json['king3v3']?.toString(),
       king3v3Id: json['king3v3Id']?.toString(),
-      king3v3Rating: json['king3v3Rating'] != null ? _parseDouble(json['king3v3Rating']) : null,
+      king3v3Rating: json['king3v3Rating'] != null
+          ? _parseDouble(json['king3v3Rating'])
+          : null,
       king5v5: json['king5v5']?.toString(),
       king5v5Id: json['king5v5Id']?.toString(),
-      king5v5Rating: json['king5v5Rating'] != null ? _parseDouble(json['king5v5Rating']) : null,
+      king5v5Rating: json['king5v5Rating'] != null
+          ? _parseDouble(json['king5v5Rating'])
+          : null,
     );
   }
 }
@@ -406,8 +431,11 @@ class CourtFollower {
 
     return CourtFollower(
       id: json['id']?.toString() ?? json['userId']?.toString() ?? '',
-      name: json['name']?.toString() ?? json['userName']?.toString() ?? 'Unknown',
-      photoUrl: json['photoUrl']?.toString() ?? json['avatar_url']?.toString() ?? json['userPhotoUrl']?.toString(),
+      name:
+          json['name']?.toString() ?? json['userName']?.toString() ?? 'Unknown',
+      photoUrl: json['photoUrl']?.toString() ??
+          json['avatar_url']?.toString() ??
+          json['userPhotoUrl']?.toString(),
       rating: _parseDouble(json['rating'] ?? json['hoop_rank'], fallback: 0.0),
       rank: rank,
     );
@@ -458,6 +486,8 @@ class ScheduledRun {
   final int attendeeCount;
   final bool isAttending;
   final List<RunAttendee> attendees;
+  final bool isRecurring;
+  final String? recurrenceRule;
 
   ScheduledRun({
     required this.id,
@@ -481,33 +511,51 @@ class ScheduledRun {
     this.attendeeCount = 0,
     this.isAttending = false,
     this.attendees = const [],
+    this.isRecurring = false,
+    this.recurrenceRule,
   });
 
   /// Get relative time string for display
-  /// Note: scheduledAt stores local display times as UTC values,
-  /// so we compare using UTC date components for calendar accuracy.
+  /// Note: scheduledAt is treated as an absolute UTC timestamp and converted to the
+  /// user's local timezone for accurate display.
   String get timeString {
     final now = DateTime.now();
-    final diff = scheduledAt.difference(now);
-    
+    final localScheduled = scheduledAt.toLocal();
+
+    if (isRecurring) {
+      final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][localScheduled.weekday - 1];
+      return 'Every $dayName ${_formatTime(localScheduled)}';
+    }
+
+    final diff = localScheduled.difference(now);
+
     if (diff.isNegative) return 'Past';
-    
-    // Compare calendar dates using the stored UTC values as display dates
-    // and the user's local date for "today"
+
     final todayDate = DateTime(now.year, now.month, now.day);
-    final runDate = DateTime(scheduledAt.year, scheduledAt.month, scheduledAt.day);
+    final runDate =
+        DateTime(localScheduled.year, localScheduled.month, localScheduled.day);
     final calendarDiff = runDate.difference(todayDate).inDays;
-    
+
     if (calendarDiff == 0) {
-      if (diff.inHours < 1 && diff.inMinutes >= 0) return 'In ${diff.inMinutes}m';
-      return 'Today ${_formatTime(scheduledAt)}';
+      if (diff.inHours < 1 && diff.inMinutes >= 0) {
+        return 'In ${diff.inMinutes}m';
+      }
+      return 'Today ${_formatTime(localScheduled)}';
     } else if (calendarDiff == 1) {
-      return 'Tomorrow ${_formatTime(scheduledAt)}';
+      return 'Tomorrow ${_formatTime(localScheduled)}';
     } else if (calendarDiff < 7) {
-      final dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][scheduledAt.weekday - 1];
-      return '$dayName ${_formatTime(scheduledAt)}';
+      final dayName = [
+        'Mon',
+        'Tue',
+        'Wed',
+        'Thu',
+        'Fri',
+        'Sat',
+        'Sun'
+      ][localScheduled.weekday - 1];
+      return '$dayName ${_formatTime(localScheduled)}';
     } else {
-      return '${scheduledAt.month}/${scheduledAt.day} ${_formatTime(scheduledAt)}';
+      return '${localScheduled.month}/${localScheduled.day} ${_formatTime(localScheduled)}';
     }
   }
 
@@ -534,8 +582,10 @@ class ScheduledRun {
       courtId: json['courtId']?.toString() ?? '',
       courtName: json['courtName']?.toString(),
       courtCity: json['courtCity']?.toString(),
-      courtLat: json['courtLat'] != null ? _parseDouble(json['courtLat']) : null,
-      courtLng: json['courtLng'] != null ? _parseDouble(json['courtLng']) : null,
+      courtLat:
+          json['courtLat'] != null ? _parseDouble(json['courtLat']) : null,
+      courtLng:
+          json['courtLng'] != null ? _parseDouble(json['courtLng']) : null,
       createdBy: json['createdBy']?.toString() ?? '',
       creatorName: json['creatorName']?.toString() ?? 'Unknown',
       creatorPhotoUrl: json['creatorPhotoUrl']?.toString(),
@@ -543,16 +593,26 @@ class ScheduledRun {
       gameMode: json['gameMode']?.toString() ?? '5v5',
       courtType: json['courtType']?.toString(),
       ageRange: json['ageRange']?.toString(),
-      scheduledAt: DateTime.tryParse(json['scheduledAt']?.toString() ?? '') ?? DateTime.now(),
+      scheduledAt: (() {
+        String dtString = json['scheduledAt']?.toString() ?? '';
+        if (dtString.isNotEmpty && !dtString.endsWith('Z')) {
+          dtString += 'Z';
+        }
+        return DateTime.tryParse(dtString) ?? DateTime.now();
+      })(),
       durationMinutes: _parseInt(json['durationMinutes'], fallback: 120),
       maxPlayers: _parseInt(json['maxPlayers'], fallback: 10),
       notes: json['notes']?.toString(),
-      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
       attendeeCount: _parseInt(json['attendeeCount']),
       isAttending: json['isAttending'] == true,
+      isRecurring: json['isRecurring'] == true,
+      recurrenceRule: json['recurrenceRule']?.toString(),
       attendees: (json['attendees'] as List<dynamic>?)
-          ?.map((a) => RunAttendee.fromJson(a as Map<String, dynamic>))
-          .toList() ?? [],
+              ?.map((a) => RunAttendee.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 }

@@ -264,6 +264,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   String? _height;
   String? _city;
   String? _zip;
+  List<String> _badges = [];
 
   @override
   void initState() {
@@ -304,6 +305,10 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
             _city = profileData['city']?.toString();
             _zip = profileData['zip']?.toString() ??
                 profileData['team']?.toString();
+            _badges = (profileData['badges'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                [];
           }
 
           // Stats endpoint may have more accurate counts.
@@ -358,6 +363,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
     final height = _height ?? player.height;
     final city = _city;
     final zip = _zip ?? player.team;
+    final badges = _badges.isNotEmpty ? _badges : player.badges;
 
     final winRate = matchesPlayed > 0
         ? (wins / matchesPlayed * 100).toStringAsFixed(0)
@@ -433,6 +439,43 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                                       player.position!),
                               ],
                             ),
+                            if ((city ?? _getCityName(zip)).isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(Icons.location_city,
+                                      size: 14, color: Colors.grey[600]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    city ?? _getCityName(zip),
+                                    style: TextStyle(
+                                        color: Colors.grey[600], fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (badges.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 4.0,
+                                runSpacing: 4.0,
+                                children: badges
+                                    .map((badge) => Chip(
+                                          label: Text(badge,
+                                              style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white)),
+                                          backgroundColor: Colors.deepOrange,
+                                          side: BorderSide.none,
+                                          padding: EdgeInsets.zero,
+                                          visualDensity: VisualDensity.compact,
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ))
+                                    .toList(),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -467,8 +510,8 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                           onPressed: isSelf
                               ? null
                               : () {
-                                  final nav =
-                                      Navigator.of(context, rootNavigator: true);
+                                  final nav = Navigator.of(context,
+                                      rootNavigator: true);
                                   nav.pop();
 
                                   // Prefer injected behavior (Rankings), otherwise default to ChatScreen.
@@ -502,8 +545,8 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                           onPressed: isSelf
                               ? null
                               : () {
-                                  final nav =
-                                      Navigator.of(context, rootNavigator: true);
+                                  final nav = Navigator.of(context,
+                                      rootNavigator: true);
                                   final rootContext = nav.context;
                                   nav.pop();
 
@@ -514,7 +557,8 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                                     return;
                                   }
 
-                                  _showDefaultChallengeDialog(rootContext, player);
+                                  _showDefaultChallengeDialog(
+                                      rootContext, player);
                                 },
                           icon: const Icon(Icons.sports_basketball),
                           label: const Text('Challenge'),
@@ -564,8 +608,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.orange,
                               side: const BorderSide(color: Colors.orange),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                             ),
                           ),
                         ),
@@ -578,8 +621,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.red,
                               side: const BorderSide(color: Colors.red),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                             ),
                           ),
                         ),
@@ -662,9 +704,6 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
-                          _buildDetailRow(Icons.location_city, 'City',
-                              city ?? _getCityName(zip)),
-                          const Divider(),
                           _buildDetailRow(
                               Icons.height, 'Height', height ?? 'Not set'),
                           const Divider(),
@@ -1170,8 +1209,8 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
               }
             },
             child: const Text('Block',
-                style: TextStyle(
-                    color: Colors.red, fontWeight: FontWeight.bold)),
+                style:
+                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

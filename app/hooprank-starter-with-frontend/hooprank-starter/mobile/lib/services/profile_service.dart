@@ -8,7 +8,8 @@ class ProfileData {
   final String firstName;
   final String lastName;
   final DateTime? birthdate;
-  final String zip;
+  final String city;
+  final List<String> badges;
   final int heightFt;
   final int heightIn;
   final String position;
@@ -19,7 +20,8 @@ class ProfileData {
     required this.firstName,
     required this.lastName,
     this.birthdate,
-    required this.zip,
+    required this.city,
+    this.badges = const [],
     required this.heightFt,
     required this.heightIn,
     required this.position,
@@ -32,7 +34,7 @@ class ProfileData {
     if (birthdate == null) return 0;
     final now = DateTime.now();
     int age = now.year - birthdate!.year;
-    if (now.month < birthdate!.month || 
+    if (now.month < birthdate!.month ||
         (now.month == birthdate!.month && now.day < birthdate!.day)) {
       age--;
     }
@@ -43,7 +45,8 @@ class ProfileData {
         'firstName': firstName,
         'lastName': lastName,
         'birthdate': birthdate?.toIso8601String(),
-        'zip': zip,
+        'city': city,
+        'badges': badges,
         'heightFt': heightFt,
         'heightIn': heightIn,
         'position': position,
@@ -54,10 +57,14 @@ class ProfileData {
   factory ProfileData.fromJson(Map<String, dynamic> json) => ProfileData(
         firstName: json['firstName'] ?? '',
         lastName: json['lastName'] ?? '',
-        birthdate: json['birthdate'] != null 
-            ? DateTime.tryParse(json['birthdate']) 
+        birthdate: json['birthdate'] != null
+            ? DateTime.tryParse(json['birthdate'])
             : null,
-        zip: json['zip'] ?? '',
+        city: json['city'] ?? '',
+        badges: (json['badges'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
         heightFt: json['heightFt'] ?? 6,
         heightIn: json['heightIn'] ?? 0,
         position: json['position'] ?? 'G',
@@ -77,15 +84,14 @@ class ProfileService {
       if (raw != null) {
         return ProfileData.fromJson(jsonDecode(raw));
       }
-    } catch (e) {
-    }
+    } catch (e) {}
 
     // Try API if local storage doesn't have it
     if (!userId.startsWith('dev-user-')) {
       try {
         final data = await ApiService.getProfile(userId);
         if (data == null) return null;
-        
+
         // Parse birthdate or calculate from age
         DateTime? birthdate;
         if (data['birthdate'] != null) {
@@ -95,23 +101,40 @@ class ProfileService {
           final age = data['age'] as int;
           birthdate = DateTime(DateTime.now().year - age, 1, 1);
         }
-        
-        return ProfileData(
+
+        final rawHeight = data['height']?.toString().trim() ?? '';
+        final match = RegExp(r"^(\d+)'\s*(\d{1,2})?").firstMatch(rawHeight);
+        final parsedHeightFt = int.tryParse(match?.group(1) ?? '') ?? 6;
+        final parsedHeightIn = int.tryParse(match?.group(2) ?? '') ?? 0;
+
+        final profileData = ProfileData(
           firstName: data['name']?.split(' ')[0] ?? '',
           lastName: data['name']?.split(' ').skip(1).join(' ') ?? '',
           birthdate: birthdate,
-          zip: data['zip'] ?? '',
-          heightFt: int.tryParse(data['height']?.split("'")[0] ?? '0') ?? 0,
-          heightIn: int.tryParse(data['height']?.split("'")[1]?.replaceAll('"', '') ?? '0') ?? 0,
+          city: data['city'] ?? '',
+          badges: (data['badges'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+          heightFt: parsedHeightFt.clamp(4, 7),
+          heightIn: parsedHeightIn.clamp(0, 11),
           position: data['position'] ?? '',
-          profilePictureUrl: data['photoUrl'],
+          profilePictureUrl:
+              data['photoUrl'] ?? data['avatar_url'] ?? data['photo_url'],
           visibility: 'public',
         );
+
+        // Cache API profile locally so future loads are instant and resilient.
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_key(userId), jsonEncode(profileData.toJson()));
+        } catch (_) {}
+        return profileData;
       } catch (e) {
         return null;
       }
     }
-    
+
     return null;
   }
 
@@ -126,7 +149,8 @@ class ProfileService {
         'name': '${data.firstName} ${data.lastName}',
         'birthdate': data.birthdate?.toIso8601String(),
         'age': data.age, // Keep age for backward compatibility
-        'zip': data.zip,
+        'city': data.city,
+        'badges': data.badges,
         'height': "${data.heightFt}'${data.heightIn}\"",
         'position': data.position,
         'photoUrl': data.profilePictureUrl,
@@ -151,7 +175,7 @@ class ProfileService {
         age: data.age,
         height: "${data.heightFt}'${data.heightIn}\"",
         weight: p.weight,
-        zip: data.zip,
+        city: data.city,
         rating: p.rating,
         offense: p.offense,
         defense: p.defense,
@@ -163,7 +187,9 @@ class ProfileService {
       // Player not found
     }
   }
-  static Future<List<Map<String, dynamic>>> getRankHistory(String userId) async {
+
+  static Future<List<Map<String, dynamic>>> getRankHistory(
+      String userId) async {
     // Mock data for now
     // In a real app, this would fetch from backend
     await Future.delayed(const Duration(milliseconds: 500));
@@ -175,4 +201,3 @@ class ProfileService {
     ];
   }
 }
-

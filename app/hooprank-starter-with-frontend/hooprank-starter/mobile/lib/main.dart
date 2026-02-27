@@ -40,41 +40,38 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Background message: ${message.notification?.title}');
 }
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+void main() {
+  // Keep binding initialization + runApp in the same zone.
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
-  // Initialize Crashlytics — catch all Flutter framework errors
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    // Initialize Crashlytics — catch all Flutter framework errors
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-  // Set up background message handler
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // Set up background message handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Initialize notification service
-  await NotificationService().initialize();
+    // Initialize notification service
+    await NotificationService().initialize();
 
-  // Wrap in runZonedGuarded to catch async errors Crashlytics can't see
-  runZonedGuarded(
-    () {
-      runApp(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => AuthState()),
-            ChangeNotifierProvider(create: (_) => MatchState()),
-            ChangeNotifierProvider(create: (_) => CheckInState()),
-            ChangeNotifierProvider(create: (_) => OnboardingChecklistState()),
-            Provider(create: (_) => CourtService()),
-          ],
-          child: const HoopRankApp(),
-        ),
-      );
-    },
-    (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    },
-  );
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthState()),
+          ChangeNotifierProvider(create: (_) => MatchState()),
+          ChangeNotifierProvider(create: (_) => CheckInState()),
+          ChangeNotifierProvider(create: (_) => OnboardingChecklistState()),
+          Provider(create: (_) => CourtService()),
+        ],
+        child: const HoopRankApp(),
+      ),
+    );
+  }, (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+  });
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -136,7 +133,8 @@ class _HoopRankAppState extends State<HoopRankApp> {
       // Initialize now if user already logged in
       if (authState.currentUser != null) {
         checkInState.initialize(authState.currentUser!.id);
-        FirebaseCrashlytics.instance.setUserIdentifier(authState.currentUser!.id);
+        FirebaseCrashlytics.instance
+            .setUserIdentifier(authState.currentUser!.id);
         AnalyticsService.setUserId(authState.currentUser!.id);
       }
 

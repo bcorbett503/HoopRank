@@ -21,15 +21,13 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
-
-
   Future<void> _loginWithProvider(String provider) async {
     setState(() => _isLoading = true);
-    
+
     final auth = context.read<AuthState>();
     try {
       firebase.UserCredential? credential;
-      
+
       if (provider == 'apple') {
         credential = await AuthService.signInWithApple();
       } else if (provider == 'google') {
@@ -44,13 +42,16 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      final firebaseUser = credential.user!;
+      // Force a reload to guarantee we capture the freshly updated displayName
+      // (especially critical for Apple Sign-In which updates it asynchronously).
+      await credential.user!.reload();
+      final firebaseUser = firebase.FirebaseAuth.instance.currentUser!;
       final userId = firebaseUser.uid;
       debugPrint('LOGIN: Firebase UID = $userId');
 
       // Get ID token first so it's available for both success and fallback cases
       final idToken = await firebaseUser.getIdToken();
-      
+
       // Try to authenticate with backend (required)
       try {
         if (idToken != null) {
@@ -63,16 +64,39 @@ class _LoginScreenState extends State<LoginScreen> {
             photoUrl: firebaseUser.photoURL,
             provider: provider,
           );
-          debugPrint('LOGIN: Backend returned user: ${user.name}, position=${user.position}, isProfileComplete=${user.isProfileComplete}');
-          
+          debugPrint(
+              'LOGIN: Backend returned user: ${user.name}, position=${user.position}, isProfileComplete=${user.isProfileComplete}');
+
           await auth.login(user, token: idToken);
           AnalyticsService.logLogin(provider: provider, success: true);
-          debugPrint('LOGIN: After auth.login, currentUser position=${auth.currentUser?.position}');
-          
+          debugPrint(
+              'LOGIN: After auth.login, currentUser position=${auth.currentUser?.position}');
+
+          // Sign in with Apple users must not be asked for name/email again
+          // per Apple Guideline 4.0. We expand this to all providers to
+          // simplify the onboarding flow. If a user already has a name
+          // from their credential but no position (first-time), auto-set
+          // a default so they skip profile setup.
+          if (!user.isProfileComplete) {
+            debugPrint('LOGIN: First-time user — auto-completing profile');
+            try {
+              await ApiService.updateProfile(userId, {
+                'position': 'G',
+                'height': "6'0\"",
+              });
+              await auth.updateUserPosition('G');
+              debugPrint('LOGIN: Auto-set position=G for new user');
+            } catch (e) {
+              debugPrint(
+                  'LOGIN: Auto-complete failed, will show profile setup: $e');
+            }
+          }
+
           // Let the router handle redirect based on user.isProfileComplete
           // The router will redirect to /profile/setup if incomplete, or /play if complete
           if (mounted) {
-            context.go('/play'); // Router will intercept and redirect appropriately
+            context.go(
+                '/play'); // Router will intercept and redirect appropriately
           }
         }
       } catch (e) {
@@ -91,7 +115,8 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Signed in, but server sync failed. Some features may be limited.'),
+              content: Text(
+                  'Signed in, but server sync failed. Some features may be limited.'),
               duration: Duration(seconds: 4),
             ),
           );
@@ -139,12 +164,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
-                  
+
                   // Sign in with Apple Button (REQUIRED - must be first per Apple Guideline 4.8)
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : () => _loginWithProvider('apple'),
+                      onPressed:
+                          _isLoading ? null : () => _loginWithProvider('apple'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
@@ -164,19 +190,22 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 12),
                           const Text(
                             'Continue with Apple',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Google Sign In Button (official branding)
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : () => _loginWithProvider('google'),
+                      onPressed: _isLoading
+                          ? null
+                          : () => _loginWithProvider('google'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF1F1F1F),
@@ -206,14 +235,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 12),
                           const Text(
                             'Continue with Google',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Facebook Sign In Button - hidden for now
                   // To re-enable, uncomment this section:
                   /*
@@ -248,14 +278,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   */
                   const SizedBox(height: 24),
-                  
+
                   // "By continuing" text with tappable links
                   RichText(
                     textAlign: TextAlign.center,
                     text: TextSpan(
-                      style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.grey, height: 1.4),
                       children: [
-                        const TextSpan(text: 'By continuing, you agree to our '),
+                        const TextSpan(
+                            text: 'By continuing, you agree to our '),
                         TextSpan(
                           text: 'Terms & Conditions',
                           style: const TextStyle(
@@ -265,9 +297,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () => launchUrl(
-                              Uri.parse('https://hooprank-503.web.app/terms'),
-                              mode: LaunchMode.externalApplication,
-                            ),
+                                  Uri.parse(
+                                      'https://hooprank-503.web.app/terms'),
+                                  mode: LaunchMode.externalApplication,
+                                ),
                         ),
                         const TextSpan(text: ' and '),
                         TextSpan(
@@ -279,16 +312,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () => launchUrl(
-                              Uri.parse('https://hooprank-503.web.app/privacy'),
-                              mode: LaunchMode.externalApplication,
-                            ),
+                                  Uri.parse(
+                                      'https://hooprank-503.web.app/privacy'),
+                                  mode: LaunchMode.externalApplication,
+                                ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
-
                 ],
               ),
             ),
@@ -303,7 +335,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     CircularProgressIndicator(color: Color(0xFFFF6B35)),
                     SizedBox(height: 16),
-                    Text('Signing in...', style: TextStyle(color: Colors.white)),
+                    Text('Signing in...',
+                        style: TextStyle(color: Colors.white)),
                   ],
                 ),
               ),

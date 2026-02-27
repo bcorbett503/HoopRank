@@ -53,7 +53,6 @@ class _HoopRankFeedState extends State<HoopRankFeed>
   final Map<int, List<Map<String, dynamic>>> _attendeeDetails =
       {}; // statusId -> attendee list
 
-
   @override
   void initState() {
     super.initState();
@@ -378,7 +377,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Enable location to see activity within 50 miles',
+                      'Enable location to see activity within 10 miles',
                       style: TextStyle(
                           color: Colors.orange.shade300, fontSize: 12),
                       textAlign: TextAlign.center,
@@ -956,7 +955,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       {Widget? extraContent}) {
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.only(top: 24, left: 32, right: 32, bottom: 16),
+        padding:
+            const EdgeInsets.only(top: 24, left: 32, right: 32, bottom: 16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
@@ -1074,7 +1074,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                       Row(
                         children: [
                           GestureDetector(
-                            onTap: () => PlayerProfileSheet.showById(context, opponent.id),
+                            onTap: () => PlayerProfileSheet.showById(
+                                context, opponent.id),
                             child: Text(
                               opponent.name,
                               style: const TextStyle(
@@ -1749,7 +1750,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                     children: [
                       GestureDetector(
                         onTap: checkinUserId.isNotEmpty
-                            ? () => PlayerProfileSheet.showById(context, checkinUserId)
+                            ? () => PlayerProfileSheet.showById(
+                                context, checkinUserId)
                             : null,
                         child: RichText(
                           text: TextSpan(
@@ -1935,15 +1937,15 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                           ],
                           Flexible(
                               child: GestureDetector(
-                                onTap: matchUserId.isNotEmpty
-                                    ? () => PlayerProfileSheet.showById(context, matchUserId)
-                                    : null,
-                                child: Text(displayName,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14),
-                                    overflow: TextOverflow.ellipsis),
-                              )),
+                            onTap: matchUserId.isNotEmpty
+                                ? () => PlayerProfileSheet.showById(
+                                    context, matchUserId)
+                                : null,
+                            child: Text(displayName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 14),
+                                overflow: TextOverflow.ellipsis),
+                          )),
                         ],
                       ),
                       Text('played at $displayCourtName',
@@ -2190,10 +2192,10 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                     CircleAvatar(
                       radius: 28,
                       backgroundColor: Colors.green.withOpacity(0.3),
-                      backgroundImage: photoUrl != null &&
-                              photoUrl.toString().isNotEmpty
-                          ? safeImageProvider(photoUrl.toString())
-                          : null,
+                      backgroundImage:
+                          photoUrl != null && photoUrl.toString().isNotEmpty
+                              ? safeImageProvider(photoUrl.toString())
+                              : null,
                       child: (photoUrl == null || photoUrl.toString().isEmpty)
                           ? Text(
                               playerName.isNotEmpty
@@ -2567,8 +2569,10 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                               backgroundImage: (attendees[i]['userPhotoUrl'] ??
                                           attendees[i]['photoUrl']) !=
                                       null
-                                  ? safeImageProvider(
-                                      (attendees[i]['userPhotoUrl'] ?? attendees[i]['photoUrl']).toString())
+                                  ? safeImageProvider((attendees[i]
+                                              ['userPhotoUrl'] ??
+                                          attendees[i]['photoUrl'])
+                                      .toString())
                                   : null,
                               child: (attendees[i]['userPhotoUrl'] ??
                                           attendees[i]['photoUrl']) ==
@@ -2644,9 +2648,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                         CircleAvatar(
                           radius: 12,
                           backgroundColor: Colors.grey[700],
-                          backgroundImage: photo != null
-                              ? safeImageProvider(photo)
-                              : null,
+                          backgroundImage:
+                              photo != null ? safeImageProvider(photo) : null,
                           child: photo == null
                               ? Text(
                                   name[0].toUpperCase(),
@@ -2960,7 +2963,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                 Flexible(
                                   child: GestureDetector(
                                     onTap: postUserId.isNotEmpty
-                                        ? () => PlayerProfileSheet.showById(context, postUserId)
+                                        ? () => PlayerProfileSheet.showById(
+                                            context, postUserId)
                                         : null,
                                     child: Text(
                                       userName,
@@ -3547,11 +3551,11 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                             radius: 14,
                                             backgroundColor: Colors.deepOrange
                                                 .withOpacity(0.3),
-                                            backgroundImage: comment[
-                                                        'userPhotoUrl'] !=
-                                                    null
-                                                ? safeImageProvider(comment['userPhotoUrl'])
-                                                : null,
+                                            backgroundImage:
+                                                comment['userPhotoUrl'] != null
+                                                    ? safeImageProvider(
+                                                        comment['userPhotoUrl'])
+                                                    : null,
                                             child: comment['userPhotoUrl'] ==
                                                     null
                                                 ? Text(
@@ -3732,8 +3736,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
             ...reasons.map((reason) => ListTile(
                   leading:
                       const Icon(Icons.flag_outlined, color: Colors.orange),
-                  title: Text(reason,
-                      style: const TextStyle(color: Colors.white)),
+                  title:
+                      Text(reason, style: const TextStyle(color: Colors.white)),
                   onTap: () async {
                     Navigator.pop(ctx);
                     try {
@@ -3770,8 +3774,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Block User',
-            style: TextStyle(color: Colors.white)),
+        title: const Text('Block User', style: TextStyle(color: Colors.white)),
         content: Text(
             'Are you sure you want to block $userName? You will no longer see their posts.',
             style: const TextStyle(color: Colors.white70)),
@@ -3809,7 +3812,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
               }
             },
             child: const Text('Block',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                style:
+                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

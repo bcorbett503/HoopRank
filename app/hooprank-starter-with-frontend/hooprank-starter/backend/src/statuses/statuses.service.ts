@@ -69,19 +69,13 @@ export class StatusesService {
                         const statusId = createdStatus?.id ?? null;
 
                         if (isRecurring) {
-                            // Weekly recurring for one year from the scheduled date/time.
-                            // We intentionally materialize the recurrence into scheduled_runs
-                            // so existing queries (Courts->Runs, court details) work without
-                            // schema changes.
-                            // NOTE: scheduled_runs.title is VARCHAR(255); LEFT(...) prevents inserts
-                            // from failing if the status content is longer than 255 chars.
-                            const until = new Date(scheduledDate);
-                            until.setFullYear(until.getFullYear() + 1);
-
+                            // CREATE TRUE RECURRING TEMPLATE
+                            // We insert a single master run instance marked as recurring.
+                            // The backend's RunsService @Cron job relies on this template
+                            // to automatically spawn upcoming physical occurrences 48 hours in advance.
                             insertedRuns = await this.dataSource.query(`
-                                INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, created_at, status_id)
-                                SELECT $1, $2, LEFT($3, 255), $4, $5, $6, gs.scheduled_at, NOW(), $9
-                                FROM generate_series($7::timestamp, $8::timestamp, interval '1 week') AS gs(scheduled_at)
+                                INSERT INTO scheduled_runs (court_id, created_by, title, game_mode, court_type, age_range, scheduled_at, created_at, status_id, is_recurring, recurrence_rule)
+                                VALUES ($1, $2, LEFT($3, 255), $4, $5, $6, $7, NOW(), $8, true, 'weekly')
                                 RETURNING id
                             `, [
                                 courtId,
@@ -91,7 +85,6 @@ export class StatusesService {
                                 courtType || null,
                                 ageRange || null,
                                 scheduledDate,
-                                until,
                                 statusId,
                             ]);
                         } else {

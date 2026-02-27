@@ -8,8 +8,9 @@
  *   TOKEN=xxx node scripts/ops/seed_runs.js --market chicago --dry   # Dry-run Chicago
  *   TOKEN=xxx node scripts/ops/seed_runs.js --weeks 8                # Seed 8 weeks ahead
  *
+ *
  * Reads venue/run data from run_data.js, creates courts if needed,
- * and seeds scheduled run occurrences.
+ * and seeds a single true recurring template for each run schedule.
  */
 
 const { createCourt, seedRun, getNextOccurrences, sleep, getTokenInteractive, BRETT_ID } = require('./lib');
@@ -19,10 +20,6 @@ const { venues, runs } = require('./run_data');
 const args = process.argv.slice(2);
 let TOKEN = process.env.TOKEN;
 const DRY = args.includes('--dry');
-const WEEKS = (() => {
-    const i = args.indexOf('--weeks');
-    return i >= 0 && args[i + 1] ? parseInt(args[i + 1], 10) : 4;
-})();
 const MARKET = (() => {
     const i = args.indexOf('--market');
     return i >= 0 && args[i + 1] ? args[i + 1].toLowerCase() : null;
@@ -43,9 +40,19 @@ const MARKET_MAP = {
     texas: ['Austin', 'Houston', 'Dallas'],
     virginia: ['Arlington', 'Fairfax', 'Springfield', 'Richmond', 'Henrico', 'Midlothian', 'Virginia Beach'],
     iconic: ['Washington', 'Philadelphia', 'Shelby', 'Beachwood', 'Las Vegas', 'Miami', 'Coral Gables', 'Atlanta'],
+    philly: ['Philadelphia', 'Bala Cynwyd'],
+    dmv: ['Washington', 'Arlington', 'Fairfax', 'Springfield'],
+    pnw: ['Seattle', 'Bellevue', 'Portland', 'Milwaukie'],
+    atl: ['Atlanta', 'Decatur', 'Chamblee', 'Suwanee'],
+    miami: ['Miami', 'Miami Beach', 'North Miami', 'Coral Gables'],
+    denver: ['Denver', 'Greenwood Village'],
+    phoenix: ['Phoenix', 'Scottsdale', 'Tempe', 'Glendale', 'Mesa', 'Chandler'],
     merritt: ['Merritt Island', 'Cocoa', 'Melbourne'],
     boston: ['Boston', 'Cambridge', 'Brighton'],
+    detroit: ['Detroit', 'Ann Arbor', 'Royal Oak', 'Shelby Township'],
     peninsula: ['San Mateo', 'Redwood City', 'San Carlos', 'Menlo Park', 'Palo Alto', 'South San Francisco', 'San Bruno', 'Foster City', 'Mountain View'],
+    minneapolis: ['Minneapolis', 'St. Paul', 'Bloomington'],
+    sandiego: ['San Diego', 'La Jolla', 'Golden Hill'],
 };
 
 function matchesMarket(venue) {
@@ -56,6 +63,30 @@ function matchesMarket(venue) {
         process.exit(1);
     }
     return cities.some((c) => venue.city.includes(c));
+}
+
+// ── Timezone mapping ─────────────────────────────────────────────
+const STATE_TZ_MAP = {
+    'NY': 'America/New_York', 'NJ': 'America/New_York', 'PA': 'America/New_York',
+    'MD': 'America/New_York', 'DC': 'America/New_York', 'VA': 'America/New_York',
+    'NC': 'America/New_York', 'SC': 'America/New_York', 'GA': 'America/New_York',
+    'FL': 'America/New_York', 'OH': 'America/New_York', 'MI': 'America/New_York',
+    'MA': 'America/New_York', 'CT': 'America/New_York', 'IN': 'America/Indiana/Indianapolis',
+    'IL': 'America/Chicago', 'TX': 'America/Chicago', 'MN': 'America/Chicago',
+    'WI': 'America/Chicago', 'MO': 'America/Chicago',
+    'CO': 'America/Denver', 'UT': 'America/Denver', 'NM': 'America/Denver', 'WY': 'America/Denver',
+    'MT': 'America/Denver',
+    'AZ': 'America/Phoenix',
+    'NV': 'America/Los_Angeles', 'CA': 'America/Los_Angeles', 'WA': 'America/Los_Angeles',
+    'OR': 'America/Los_Angeles',
+};
+
+function getVenueTimezone(venue) {
+    if (!venue || !venue.city) return 'America/New_York';
+    const parts = venue.city.split(',');
+    if (parts.length < 2) return 'America/New_York';
+    const state = parts[1].trim().split(' ')[0].toUpperCase();
+    return STATE_TZ_MAP[state] || 'America/New_York';
 }
 
 // ── Main ─────────────────────────────────────────────────────────
@@ -79,7 +110,7 @@ function matchesMarket(venue) {
 
     console.log(`\n═══════════════════════════════════════`);
     console.log(`  HoopRank Run Seeder ${DRY ? '(DRY RUN)' : ''}`);
-    console.log(`  Market: ${MARKET || 'ALL'} | Weeks: ${WEEKS}`);
+    console.log(`  Market: ${MARKET || 'ALL'} | Mode: TRUE RECURRING TEMPLATES`);
     console.log(`  Run definitions: ${filteredRuns.length}`);
     console.log(`═══════════════════════════════════════\n`);
 
@@ -120,7 +151,7 @@ function matchesMarket(venue) {
     }
 
     // Step 2: Seed runs
-    console.log(`\n=== Seeding ${filteredRuns.length} run types (${WEEKS} weeks) ===`);
+    console.log(`\n=== Seeding ${filteredRuns.length} recurring run templates ===`);
     let created = 0, errors = 0, skipped = 0;
 
     for (const run of filteredRuns) {
@@ -132,50 +163,57 @@ function matchesMarket(venue) {
         }
 
         let runOk = 0;
+        const venue = venueMap[run.venueKey];
+        const tz = getVenueTimezone(venue);
+
         for (const sched of run.schedule) {
             for (const day of sched.days) {
-                const dates = getNextOccurrences(day, sched.hour, sched.minute, WEEKS);
-                for (const dt of dates) {
-                    const body = {
-                        courtId,
-                        scheduledAt: dt.toISOString(),
-                        title: run.title,
-                        gameMode: run.gameMode,
-                        courtType: run.courtType,
-                        ageRange: run.ageRange,
-                        notes: run.notes,
-                        durationMinutes: run.durationMinutes,
-                        maxPlayers: run.maxPlayers,
-                    };
+                // Get just the very FIRST upcoming occurrence to use as the template anchor date
+                const targetDates = getNextOccurrences(day, sched.hour, sched.minute, 1, tz);
+                if (targetDates.length === 0) continue;
 
-                    if (DRY) {
-                        runOk++;
+                const templateAnchorDate = targetDates[0];
+
+                const body = {
+                    courtId,
+                    scheduledAt: templateAnchorDate.toISOString(),
+                    title: run.title,
+                    gameMode: run.gameMode,
+                    courtType: run.courtType,
+                    ageRange: run.ageRange,
+                    notes: run.notes,
+                    durationMinutes: run.durationMinutes,
+                    maxPlayers: run.maxPlayers,
+                    isRecurring: true // Flags the API to create the recurrence template instead of a single instance
+                };
+
+                if (DRY) {
+                    runOk++;
+                    created++;
+                    continue;
+                }
+
+                await sleep(600);
+                try {
+                    const result = await seedRun(body, TOKEN);
+                    if (result.success) {
                         created++;
-                        continue;
-                    }
-
-                    await sleep(600);
-                    try {
-                        const result = await seedRun(body, TOKEN);
-                        if (result.success) {
-                            created++;
-                            runOk++;
-                        } else {
-                            console.error(`  ✗ ${run.title} ${dt.toISOString()}`, result);
-                            errors++;
-                        }
-                    } catch (e) {
-                        console.error(`  ✗ ${run.title}: ${e.message}`);
+                        runOk++;
+                    } else {
+                        console.error(`  ✗ ${run.title}`, result);
                         errors++;
                     }
+                } catch (e) {
+                    console.error(`  ✗ ${run.title}: ${e.message}`);
+                    errors++;
                 }
             }
         }
-        console.log(`  ✓ ${run.title} (${runOk} instances)`);
+        console.log(`  ✓ ${run.title} (${runOk} schedule templates)`);
     }
 
     console.log(`\n═══ Results ═══`);
-    console.log(`  Created: ${created} run instances`);
+    console.log(`  Created: ${created} master recurring templates`);
     console.log(`  Errors:  ${errors}`);
     console.log(`  Skipped: ${skipped}`);
     console.log(`  Courts:  ${Object.keys(courtIds).length}`);

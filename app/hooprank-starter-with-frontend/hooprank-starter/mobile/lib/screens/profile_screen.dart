@@ -32,6 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _profileCity; // Fresh city from API
   String? _profileHeight; // Fresh height from API
   String? _profileTeam; // Fresh team from API
+  List<String> _badges = [];
 
   int _parseIntValue(dynamic value) {
     if (value == null) return 0;
@@ -105,6 +106,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _profileCity = profileData['city']?.toString();
             _profileHeight = profileData['height']?.toString();
             _profileTeam = profileData['team']?.toString();
+            _badges = (profileData['badges'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                [];
             debugPrint(
                 'Parsed _profileName: $_profileName, _profileTeam: $_profileTeam');
           }
@@ -227,6 +232,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     fontSize: 16),
                               ),
                             ),
+                            if (_badges.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8.0,
+                                runSpacing: 8.0,
+                                alignment: WrapAlignment.center,
+                                children: _badges
+                                    .map((badge) => Chip(
+                                          label: Text(badge,
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.deepOrange)),
+                                          backgroundColor: Colors.deepOrange
+                                              .withOpacity(0.1),
+                                          side: BorderSide(
+                                              color: Colors.deepOrange
+                                                  .withOpacity(0.3)),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 4, vertical: 0),
+                                        ))
+                                    .toList(),
+                              ),
+                            ],
                             const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -296,8 +325,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       trailing: const Icon(Icons.open_in_new,
                           color: Colors.white38, size: 18),
                       onTap: () async {
-                        final uri = Uri.parse(
-                            'https://hooprank.app/privacy-policy');
+                        final uri =
+                            Uri.parse('https://hooprank.app/privacy-policy');
                         try {
                           await launchUrl(uri,
                               mode: LaunchMode.externalApplication);
@@ -305,8 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content:
-                                    Text('Could not open privacy policy'),
+                                content: Text('Could not open privacy policy'),
                               ),
                             );
                           }
@@ -320,8 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: const Text('Sign Out',
                           style: TextStyle(color: Colors.white)),
                       onTap: () async {
-                        final auth =
-                            context.read<AuthState>();
+                        final auth = context.read<AuthState>();
                         await auth.logout();
                         if (mounted) context.go('/');
                       },
@@ -329,8 +356,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     // Delete Account (Guideline 5.1.1(v))
                     ListTile(
-                      leading: const Icon(Icons.delete_forever,
-                          color: Colors.red),
+                      leading:
+                          const Icon(Icons.delete_forever, color: Colors.red),
                       title: const Text('Delete Account',
                           style: TextStyle(color: Colors.red)),
                       onTap: () => _showDeleteAccountDialog(),
@@ -368,8 +395,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _confirmDeleteAccount();
             },
             child: const Text('Delete My Account',
-                style: TextStyle(
-                    color: Colors.red, fontWeight: FontWeight.bold)),
+                style:
+                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -429,13 +456,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           final auth = context.read<AuthState>();
                           await auth.logout();
                           if (mounted) context.go('/');
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Your account has been deleted. We\'re sorry to see you go.'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
+                          if (mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Your account has been deleted. We\'re sorry to see you go.'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
                         }
                       } catch (e) {
                         if (mounted) {

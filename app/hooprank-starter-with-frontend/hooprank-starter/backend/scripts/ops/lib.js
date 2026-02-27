@@ -105,21 +105,28 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Get the next N weeks of dates for a given day of the week.
- * Uses setUTCHours so stored times match intended display times.
+ * Get the next N weeks of dates for a given day of the week, anchored to the target timezone.
+ * Uses luxon to accurately calculate absolute UTC coordinates corresponding to the local market time.
  */
-function getNextOccurrences(dayOfWeek, hour, minute, weeks = 4) {
+function getNextOccurrences(dayOfWeek, hour, minute, weeks = 4, timezone = 'America/New_York') {
+    const { DateTime } = require('luxon');
     const dates = [];
-    const now = new Date();
-    const start = new Date(now);
-    start.setUTCHours(0, 0, 0, 0);
+    const now = DateTime.utc();
+
+    // Start processing from today or a few days ago
+    let startLocal = DateTime.now().setZone(timezone).startOf('day');
+
     for (let w = 0; w < weeks; w++) {
         for (let d = 0; d < 7; d++) {
-            const candidate = new Date(start);
-            candidate.setUTCDate(start.getUTCDate() + w * 7 + d);
-            if (candidate.getUTCDay() === dayOfWeek) {
-                candidate.setUTCHours(hour, minute, 0, 0);
-                if (candidate > now) dates.push(candidate);
+            let candidateLocal = startLocal.plus({ days: (w * 7) + d });
+            // JS dayOfWeek: 0=Sun, 1=Mon. Luxon: 1=Mon, 7=Sun
+            let luxonDay = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+            if (candidateLocal.weekday === luxonDay) {
+                // Set the exact local hour and minute in that specific timezone
+                candidateLocal = candidateLocal.set({ hour, minute });
+                const jsDate = candidateLocal.toJSDate();
+                if (jsDate > now.toJSDate()) dates.push(jsDate);
             }
         }
     }
@@ -135,6 +142,22 @@ function getNextOccurrences(dayOfWeek, hour, minute, weeks = 4) {
  * Supports both Bearer token and x-user-id auth.
  */
 async function createCourt(court, token) {
+    // 1. Check if the court already exists by exact name/city
+    const userId = token ? getUserIdFromToken(token) : BRETT_ID;
+    const headers = { 'x-user-id': userId };
+    if (token && token !== 'dry') headers['Authorization'] = `Bearer ${token}`;
+    if (process.env.ADMIN_SECRET) headers['x-admin-secret'] = process.env.ADMIN_SECRET;
+
+    const searchRes = await fetch(`${BASE}/courts?minLat=${court.lat - 0.01}&maxLat=${court.lat + 0.01}&minLng=${court.lng - 0.01}&maxLng=${court.lng + 0.01}`, { headers });
+    if (searchRes.ok) {
+        const nearCourts = await searchRes.json();
+        const existing = nearCourts.find(c => c.name === court.name && c.city === court.city);
+        if (existing) {
+            console.log(`\n    [Lib] Found existing court: ${existing.name} -> ID: ${existing.id}`);
+            return { id: existing.id, result: existing };
+        }
+    }
+
     const id = court.id || crypto.randomUUID();
     const qs = new URLSearchParams({
         id,
@@ -147,8 +170,6 @@ async function createCourt(court, token) {
         venue_type: court.venue_type || '',
         address: court.address || '',
     });
-    const userId = token ? getUserIdFromToken(token) : BRETT_ID;
-    const headers = { 'x-user-id': userId };
     if (token && token !== 'dry') headers['Authorization'] = `Bearer ${token}`;
     if (process.env.ADMIN_SECRET) headers['x-admin-secret'] = process.env.ADMIN_SECRET;
 
@@ -173,6 +194,7 @@ async function seedRun(body, token) {
         'x-user-id': userId,
     };
     if (token && token !== 'dry') headers['Authorization'] = `Bearer ${token}`;
+    if (process.env.ADMIN_SECRET) headers['x-admin-secret'] = process.env.ADMIN_SECRET;
 
     const res = await fetch(`${BASE}/runs`, {
         method: 'POST',

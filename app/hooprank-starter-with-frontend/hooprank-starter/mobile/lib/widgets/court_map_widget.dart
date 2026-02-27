@@ -36,7 +36,8 @@ class CourtMapWidget extends StatefulWidget {
   State<CourtMapWidget> createState() => _CourtMapWidgetState();
 }
 
-class _CourtMapWidgetState extends State<CourtMapWidget> with WidgetsBindingObserver {
+class _CourtMapWidgetState extends State<CourtMapWidget>
+    with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
@@ -352,29 +353,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget> with WidgetsBindingObse
       debugPrint('MAP: GPS location failed: $e');
     }
 
-    // If GPS failed, try to use the user's registered zipcode
-    if (!locationObtained) {
-      try {
-        final authState = Provider.of<AuthState>(context, listen: false);
-        final userId = authState.currentUser?.id;
-
-        if (userId != null) {
-          final profile = await ProfileService.getProfile(userId);
-
-          if (profile != null && profile.zip.isNotEmpty) {
-            final coords = ZipcodeService.getCoordinatesForZipcode(profile.zip);
-            _initialCenter = LatLng(coords.latitude, coords.longitude);
-            _currentZoom =
-                12.0; // Slightly zoomed out for zipcode-based centering
-            locationObtained = true;
-            debugPrint(
-                'MAP: Using zipcode location for ${profile.zip}: ${coords.latitude}, ${coords.longitude}');
-          }
-        }
-      } catch (e) {
-        debugPrint('MAP: Zipcode fallback failed: $e');
-      }
-    }
+    // If GPS failed, the app will simply use the default coordinates (San Rafael).
+    // The legacy Zip Code fallback logic was removed as profiles now use City.
 
     // Log if using default location
     if (!locationObtained) {
@@ -968,8 +948,6 @@ class _CourtMapWidgetState extends State<CourtMapWidget> with WidgetsBindingObse
                                 return;
                               }
 
-
-
                               await _setRunsFilter(value);
                             },
                             itemBuilder: (context) => [
@@ -1377,9 +1355,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget> with WidgetsBindingObse
                   final hasActivity = checkInCount > 0;
 
                   return Container(
-                    key: index == 0
-                        ? null
-                        : null,
+                    key: index == 0 ? null : null,
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E1E1E),

@@ -94,6 +94,14 @@ const venues = [
 
     // ── NEW YORK CITY ────────────────────────────────────────────
     { key: 'chelseaRec', courtId: '86bf4577-6e22-c57c-6a78-506d9043bb8d', name: 'Chelsea Recreation Center', city: 'New York, NY' },
+    { key: 'mcburney', create: true, name: 'McBurney YMCA', city: 'New York, NY', lat: 40.7381, lng: -73.9984, indoor: true, venue_type: 'rec_center', address: '125 W 14th St, New York, NY 10011' },
+    { key: 'majorOwens', create: true, name: 'Major R. Owens Community Center', city: 'Brooklyn, NY', lat: 40.6698, lng: -73.9554, indoor: true, venue_type: 'rec_center', address: '1561 Bedford Ave, Brooklyn, NY 11225' },
+    { key: 'chelseaPiers', create: true, name: 'Chelsea Piers Fitness', city: 'New York, NY', lat: 40.7483, lng: -74.0094, indoor: true, venue_type: 'gym', address: 'Pier 60, New York, NY 10011' },
+    { key: 'artisticSports', create: true, name: 'Artistic Sports Complex', city: 'Queens, NY', lat: 40.5976, lng: -73.9980, indoor: true, venue_type: 'gym', address: 'Queens, NY' },
+    { key: 'fastbreakStaten', create: true, name: 'Fastbreak Basketball Center', city: 'Staten Island, NY', lat: 40.5126, lng: -74.2372, indoor: true, venue_type: 'gym', address: '236 Richmond Valley Rd, Staten Island, NY 10309' },
+    { key: 'parksRecManhattan', create: true, name: 'Constance Baker Motley Recreation Center', city: 'New York, NY', lat: 40.7589, lng: -73.9653, indoor: true, venue_type: 'rec_center', address: '348 E 54th St, New York, NY 10022' },
+    { key: 'parksRecQueens', create: true, name: 'Al Oerter Recreation Center', city: 'Queens, NY', lat: 40.7363, lng: -73.8340, indoor: true, venue_type: 'rec_center', address: '131-40 Fowler Ave, Queens, NY 11355' },
+    { key: 'lifeTimeSky', create: true, name: 'Life Time Sky', city: 'New York, NY', lat: 40.7612, lng: -73.9975, indoor: true, venue_type: 'gym', address: '605 W 42nd St, New York, NY 10036' },
     { key: 'thePost', courtId: '3e01c0f4-443c-9342-bcb1-6db7ff35278e', name: 'The Post BK', city: 'Brooklyn, NY' },
     { key: 'bballCity', courtId: '52c3e9b1-c9e5-c197-3694-f0f5c0194e1b', name: 'Basketball City', city: 'New York, NY' },
     { key: 'crossIslandY', courtId: '632e099b-2775-11ae-11c8-3ab41bc576f6', name: 'Cross Island YMCA', city: 'Queens, NY' },
@@ -107,6 +115,43 @@ const venues = [
     { key: 'northwestRec', courtId: 'e6f5e9b9-1667-2efe-ccfd-62b90b8f1b58', name: 'Northwest Recreation Center', city: 'Austin, TX' },
     { key: 'fondeRec', courtId: '6c3e9fcf-db0d-7183-9839-9729d83b0962', name: 'Fonde Recreation Center', city: 'Houston, TX' },
     { key: 'reverchonPark', create: true, name: 'Reverchon Park Basketball Courts', city: 'Dallas, TX', lat: 32.7990, lng: -96.8080, indoor: false, venue_type: 'park', address: '3505 Maple Ave, Dallas, TX 75219' },
+    { key: 'mi3Center', create: true, name: 'MI3 Center', city: 'Houston, TX', lat: 29.9880, lng: -95.4055, indoor: true, venue_type: 'gym', address: '1135 Makawa Rd, Houston, TX 77090' },
+    { key: 'churchillRec', create: true, name: 'Churchill Recreation Center', city: 'Dallas, TX', lat: 32.9099, lng: -96.7865, indoor: true, venue_type: 'rec_center', address: '6906 Churchill Way, Dallas, TX 75230' },
+    { key: 'nashDavisRec', create: true, name: 'Nash-Davis Recreation Center', city: 'Dallas, TX', lat: 32.7937, lng: -96.8407, indoor: true, venue_type: 'rec_center', address: '3710 N Hampton Rd, Dallas, TX 75212' },
+    { key: 'smuDedmanRec', create: true, name: 'SMU Dedman Center for Lifetime Sports', city: 'Dallas, TX', lat: 32.8422, lng: -96.7836, indoor: true, venue_type: 'university', address: '6000 Bush Ave, Dallas, TX 75205' },
+
+    // ── CHICAGO ───────────────────────────────────────────────────
+    { key: 'lakeshoreSF', create: true, name: 'Lakeshore Sport & Fitness', city: 'Chicago, IL', lat: 41.8844, lng: -87.6202, indoor: true, venue_type: 'gym', address: '211 N Stetson Ave, Chicago, IL 60601' },
+    { key: 'rayMeyerFitness', create: true, name: 'Ray Meyer Fitness Center', city: 'Chicago, IL', lat: 41.9256, lng: -87.6552, indoor: true, venue_type: 'university', address: '2235 N Sheffield Ave, Chicago, IL 60614' },
+    { key: 'lifeTimeRiverNorth', create: true, name: 'Life Time River North', city: 'Chicago, IL', lat: 41.8906, lng: -87.6256, indoor: true, venue_type: 'gym', address: '15 W Illinois St, Chicago, IL 60654' },
+    { key: 'ratnerAthletics', create: true, name: 'Ratner Athletics Center', city: 'Chicago, IL', lat: 41.7941, lng: -87.6006, indoor: true, venue_type: 'university', address: '5530 S Ellis Ave, Chicago, IL 60637' },
+    { key: 'lakeViewYMCA', create: true, name: 'Lake View YMCA', city: 'Chicago, IL', lat: 41.9405, lng: -87.6687, indoor: true, venue_type: 'rec_center', address: '3333 N Marshfield Ave, Chicago, IL 60657' },
+    { key: 'ffcGoldCoast', create: true, name: 'FFC Gold Coast', city: 'Chicago, IL', lat: 41.9056, lng: -87.6310, indoor: true, venue_type: 'gym', address: '1030 N Clark St, Chicago, IL 60610' },
+    { key: 'hornerPark', create: true, name: 'Horner Park', city: 'Chicago, IL', lat: 41.9567, lng: -87.6970, indoor: true, venue_type: 'rec_center', address: '2741 W Montrose Ave, Chicago, IL 60618' },
+    { key: 'pingTomPark', create: true, name: 'Ping Tom Memorial Park', city: 'Chicago, IL', lat: 41.8576, lng: -87.6359, indoor: true, venue_type: 'rec_center', address: '1700 S Wentworth Ave, Chicago, IL 60616' },
+    // Actually, I'll inject the venues precisely.
+
+    // ── PACIFIC NORTHWEST (SEATTLE & PORTLAND) ────────────────────
+    { key: 'proClubBellevue', create: true, name: 'PRO Club', city: 'Bellevue, WA', lat: 47.6335, lng: -122.1481, indoor: true, venue_type: 'gym', address: '4455 148th Ave NE, Bellevue, WA 98007' },
+    { key: 'wacSeattle', create: true, name: 'Washington Athletic Club (WAC)', city: 'Seattle, WA', lat: 47.6105, lng: -122.3323, indoor: true, venue_type: 'gym', address: '1325 6th Ave, Seattle, WA 98101' },
+    { key: 'yeslerCC', create: true, name: 'Yesler Community Center', city: 'Seattle, WA', lat: 47.6019, lng: -122.3168, indoor: true, venue_type: 'rec_center', address: '917 E Yesler Way, Seattle, WA 98122' },
+    { key: 'garfieldCC', create: true, name: 'Garfield Community Center', city: 'Seattle, WA', lat: 47.6053, lng: -122.3023, indoor: true, venue_type: 'rec_center', address: '2323 E Cherry St, Seattle, WA 98122' },
+    { key: 'mattDishmanCC', create: true, name: 'Matt Dishman Community Center', city: 'Portland, OR', lat: 45.5414, lng: -122.6681, indoor: true, venue_type: 'rec_center', address: '77 NE Knott St, Portland, OR 97212' },
+    { key: 'southwestCC', create: true, name: 'Southwest Community Center', city: 'Portland, OR', lat: 45.4674, lng: -122.7214, indoor: true, venue_type: 'rec_center', address: '6820 SW 45th Ave, Portland, OR 97219' },
+    { key: 'northeastCC', create: true, name: 'Northeast Community Center', city: 'Portland, OR', lat: 45.5401, lng: -122.6186, indoor: true, venue_type: 'rec_center', address: '1630 NE 38th Ave, Portland, OR 97232' },
+    { key: 'bethanyAC', create: true, name: 'Bethany Athletic Club', city: 'Portland, OR', lat: 45.5683, lng: -122.8465, indoor: true, venue_type: 'gym', address: '15670 NW Central Dr, Portland, OR 97229' },
+    { key: 'hourFitnessMcLoughlin', create: true, name: '24 Hour Fitness McLoughlin', city: 'Portland, OR', lat: 45.4326, lng: -122.6184, indoor: true, venue_type: 'gym', address: '16155 SE McLoughlin Blvd, Milwaukie, OR 97267' },
+    { key: 'swimmingPool', create: true, name: 'Swimming Pool Basketball Court', city: 'Philadelphia, PA', lat: 39.9526, lng: -75.1652, indoor: true, venue_type: 'rec_center', address: 'Philadelphia, PA' }, // Just a placeholder if I need spacing
+
+    // ── PHILADELPHIA ──────────────────────────────────────────────
+    { key: 'sportingClubBellevue', create: true, name: 'The Sporting Club at the Bellevue', city: 'Philadelphia, PA', lat: 39.9482, lng: -75.1653, indoor: true, venue_type: 'gym', address: '224 S Broad St, Philadelphia, PA 19102' },
+    { key: 'drexelRec', create: true, name: 'Drexel Recreation Center', city: 'Philadelphia, PA', lat: 39.9576, lng: -75.1884, indoor: true, venue_type: 'university', address: '3301 Market St, Philadelphia, PA 19104' },
+    { key: 'christianStreetY', create: true, name: 'Christian Street YMCA', city: 'Philadelphia, PA', lat: 39.9409, lng: -75.1706, indoor: true, venue_type: 'rec_center', address: '1724 Christian St, Philadelphia, PA 19146' },
+    { key: 'fusionGymsGrant', create: true, name: 'Fusion Gyms (Grant Ave)', city: 'Philadelphia, PA', lat: 40.0632, lng: -75.0343, indoor: true, venue_type: 'gym', address: '2801 Grant Ave, Philadelphia, PA 19114' },
+    { key: 'palumboRec', create: true, name: 'Palumbo Recreation Center', city: 'Philadelphia, PA', lat: 39.9388, lng: -75.1578, indoor: true, venue_type: 'rec_center', address: '700 S 9th St, Philadelphia, PA 19147' },
+    { key: 'phieldHouse', create: true, name: 'Phield House', city: 'Philadelphia, PA', lat: 39.9613, lng: -75.1506, indoor: true, venue_type: 'gym', address: '814 Spring Garden St, Philadelphia, PA 19123' },
+    { key: 'lloydHall', create: true, name: 'Lloyd Hall Recreation Center', city: 'Philadelphia, PA', lat: 39.9691, lng: -75.1873, indoor: true, venue_type: 'rec_center', address: '1 Boathouse Row, Philadelphia, PA 19130' },
+    { key: 'afcFitnessBala', create: true, name: 'AFC Fitness (Bala Cynwyd)', city: 'Bala Cynwyd, PA', lat: 40.0076, lng: -75.2141, indoor: true, venue_type: 'gym', address: '601 Righters Ferry Rd, Bala Cynwyd, PA 19004' }
 ];
 
 // Continued in run_data_venues2.js... NO — all in one file.
@@ -138,19 +183,55 @@ const venues2 = [
 
     // ── ICONIC (create-only) ─────────────────────────────────────
     { key: 'barryFarm', create: true, name: 'Barry Farm Recreation Center', city: 'Washington, DC', lat: 38.8487, lng: -76.9901, indoor: true, venue_type: 'rec_center', address: '1230 Sumner Rd SE, Washington, DC 20020' },
+    { key: 'riggsLaSalle', create: true, name: 'Riggs LaSalle Recreation Center', city: 'Washington, DC', lat: 38.9554, lng: -77.0033, indoor: true, venue_type: 'rec_center', address: '501 Riggs Rd NE, Washington, DC 20011' },
+    { key: 'raymondRec', create: true, name: 'Raymond Recreation Center', city: 'Washington, DC', lat: 38.9348, lng: -77.0279, indoor: true, venue_type: 'rec_center', address: '3725 10th St NW, Washington, DC 20010' },
+    { key: 'kennedyRec', create: true, name: 'Kennedy Recreation Center', city: 'Washington, DC', lat: 38.9079, lng: -77.0207, indoor: false, venue_type: 'rec_center', address: '1401 7th St NW, Washington, DC 20001' },
+    { key: 'randallRec', create: true, name: 'Randall Recreation Center', city: 'Washington, DC', lat: 38.8803, lng: -77.0101, indoor: false, venue_type: 'rec_center', address: '820 South Capitol St SW, Washington, DC 20024' },
     { key: 'hankGathers', create: true, name: 'Hank Gathers Recreation Center', city: 'Philadelphia, PA', lat: 39.9731, lng: -75.1583, indoor: true, venue_type: 'rec_center', address: '2501 W Diamond St, Philadelphia, PA 19121' },
     { key: 'joeDumars', create: true, name: 'Joe Dumars Fieldhouse', city: 'Shelby Township, MI', lat: 42.6614, lng: -83.0340, indoor: true, venue_type: 'gym', address: '45300 Mound Rd, Shelby Township, MI 48317' },
     { key: 'mandelJCC', create: true, name: 'Mandel Jewish Community Center', city: 'Beachwood, OH', lat: 41.4683, lng: -81.5080, indoor: true, venue_type: 'rec_center', address: '26001 S Woodland Rd, Beachwood, OH 44122' },
     { key: 'atlasLV', create: true, name: 'Atlas Basketball (The Loop)', city: 'Las Vegas, NV', lat: 36.1150, lng: -115.1720, indoor: true, venue_type: 'gym', address: '6485 S Rainbow Blvd #100, Las Vegas, NV 89118' },
     { key: 'flamingoPark', create: true, name: 'Flamingo Park Basketball Courts', city: 'Miami Beach, FL', lat: 25.7770, lng: -80.1350, indoor: false, venue_type: 'park', address: '1200 Meridian Ave, Miami Beach, FL 33139' },
     { key: 'ltCoralGables', create: true, name: 'Life Time - Coral Gables', city: 'Coral Gables, FL', lat: 25.7500, lng: -80.2600, indoor: true, venue_type: 'gym', address: '4000 SW 57th Ave, Coral Gables, FL 33155' },
+
+    // ── ATLANTA ───────────────────────────────────────────────────
+    { key: 'decaturRec', create: true, name: 'Decatur Recreation Center', city: 'Decatur, GA', lat: 33.7745, lng: -84.2968, indoor: true, venue_type: 'rec_center', address: '231 Sycamore St, Decatur, GA 30030' },
+    { key: 'core4AC', create: true, name: 'CORE4 Athletic Complex', city: 'Chamblee, GA', lat: 33.8860, lng: -84.2995, indoor: true, venue_type: 'gym', address: '2050 DeFoor Hills Rd NW, Atlanta, GA 30318' },
+    { key: 'atlSilverbacksIndoor', create: true, name: 'Atlanta Silverbacks Indoor', city: 'Suwanee, GA', lat: 34.0536, lng: -84.0955, indoor: true, venue_type: 'gym', address: '4285 Brogdon Exchange, Suwanee, GA 30024' },
+    { key: 'mlkRecCenter', create: true, name: 'Martin Luther King Jr. Recreation Center', city: 'Atlanta, GA', lat: 33.7545, lng: -84.3739, indoor: true, venue_type: 'rec_center', address: '110 Hilliard St SE, Atlanta, GA 30312' },
+    { key: 'ltSandySprings', create: true, name: 'Life Time - Sandy Springs', city: 'Atlanta, GA', lat: 33.9161, lng: -84.3822, indoor: true, venue_type: 'gym', address: '5580 Roswell Rd, Atlanta, GA 30342' },
+    { key: 'laFitnessPiedmont', create: true, name: 'LA Fitness (Piedmont)', city: 'Atlanta, GA', lat: 33.8239, lng: -84.3688, indoor: true, venue_type: 'gym', address: '3232 Peachtree Rd NE, Atlanta, GA 30305' },
+    { key: 'eastLakeYMCA', create: true, name: 'East Lake Family YMCA', city: 'Atlanta, GA', lat: 33.7516, lng: -84.3146, indoor: true, venue_type: 'rec_center', address: '275 E Lake Blvd SE, Atlanta, GA 30317' },
     { key: 'ltBuckhead', create: true, name: 'Life Time - Buckhead', city: 'Atlanta, GA', lat: 33.8480, lng: -84.3560, indoor: true, venue_type: 'gym', address: '3445 Peachtree Rd NE, Atlanta, GA 30326' },
+
+    // ── MIAMI & SOUTH FLORIDA ─────────────────────────────────────
+    { key: 'joseMartiGym', create: true, name: 'Jose Marti Gym', city: 'Miami, FL', lat: 25.7684, lng: -80.2014, indoor: true, venue_type: 'rec_center', address: '434 SW 3rd Ave, Miami, FL 33130' },
+    { key: 'adaptNorthMiami', create: true, name: 'ADAPT', city: 'North Miami, FL', lat: 25.9088, lng: -80.1706, indoor: true, venue_type: 'gym', address: '14901 NE 20th Ave, North Miami, FL 33181' },
+    { key: 'scottRakowYC', create: true, name: 'Scott Rakow Youth Center', city: 'Miami Beach, FL', lat: 25.8033, lng: -80.1340, indoor: true, venue_type: 'rec_center', address: '2700 Sheridan Ave, Miami Beach, FL 33140' },
+    { key: 'laFitnessMiami', create: true, name: 'LA Fitness (Miami)', city: 'Miami, FL', lat: 25.8078, lng: -80.1983, indoor: true, venue_type: 'gym', address: 'Various Locations, Miami, FL' },
+
+    // ── DENVER, COLORADO ──────────────────────────────────────────
+    { key: 'washPark', create: true, name: 'Washington Park (Wash Park)', city: 'Denver, CO', lat: 39.6997, lng: -104.9658, indoor: false, venue_type: 'park', address: '701 S Franklin St, Denver, CO 80209' },
+    { key: 'clubGreenwood', create: true, name: 'Club Greenwood', city: 'Greenwood Village, CO', lat: 39.6133, lng: -104.9126, indoor: true, venue_type: 'gym', address: '5801 S Quebec St, Greenwood Village, CO 80111' },
+    { key: 'ltCherryCreek', create: true, name: 'Life Time - Cherry Creek', city: 'Denver, CO', lat: 39.7136, lng: -104.9366, indoor: true, venue_type: 'gym', address: '1001 E Bayaud Ave, Denver, CO 80209' },
+    { key: 'carlaMadisonRec', create: true, name: 'Carla Madison Recreation Center', city: 'Denver, CO', lat: 39.7397, lng: -104.9587, indoor: true, venue_type: 'rec_center', address: '2401 E Colfax Ave, Denver, CO 80206' },
+    { key: 'pickupUSADenver', create: true, name: 'PickUp USA Fitness (Denver)', city: 'Denver, CO', lat: 39.7610, lng: -104.9950, indoor: true, venue_type: 'gym', address: 'Denver, CO' },
+
+    // ── PHOENIX, ARIZONA ──────────────────────────────────────────
+    { key: 'kiwanisRecTempe', create: true, name: 'Kiwanis Recreation Center', city: 'Tempe, AZ', lat: 33.3670, lng: -111.9360, indoor: true, venue_type: 'rec_center', address: '6111 S All America Way, Tempe, AZ 85283' },
+    { key: 'mgSportsPlex', create: true, name: 'MG SportsPlex', city: 'Glendale, AZ', lat: 33.5386, lng: -112.1859, indoor: true, venue_type: 'gym', address: 'Glendale, AZ' },
+    { key: 'ltNorthScottsdale', create: true, name: 'Life Time - North Scottsdale', city: 'Scottsdale, AZ', lat: 33.6294, lng: -111.9287, indoor: true, venue_type: 'gym', address: '6850 E Chauncey Ln, Phoenix, AZ 85054' },
+    { key: 'laFitnessTatumCactus', create: true, name: 'LA Fitness', city: 'Phoenix, AZ', lat: 33.5975, lng: -111.9774, indoor: true, venue_type: 'gym', address: '12222 N Tatum Blvd, Phoenix, AZ 85032' },
+    { key: 'swyshDen', create: true, name: 'Swysh Den', city: 'Scottsdale, AZ', lat: 33.6276, lng: -111.9080, indoor: true, venue_type: 'gym', address: 'Scottsdale, AZ' },
+    { key: 'lincolnFamilyY', create: true, name: 'Lincoln Family Downtown YMCA', city: 'Phoenix, AZ', lat: 33.4533, lng: -112.0747, indoor: true, venue_type: 'rec_center', address: '350 N 1st Ave, Phoenix, AZ 85003' },
 
     // ── BOSTON / CAMBRIDGE (MA) ───────────────────────────────────
     { key: 'cambridgeAC', courtId: '88d10e48-e8f1-be9b-a172-3c39add2eddc', name: 'Cambridge Athletic Club', city: 'Cambridge, MA' },
     { key: 'wangYmca', courtId: 'e159bd8f-dcd3-752f-d77d-cd32f28671ae', name: 'Wang YMCA of Chinatown', city: 'Boston, MA' },
     { key: 'trackNB', courtId: 'f7513df1-c4d0-1a8d-334b-c88015290088', name: 'The TRACK at New Balance', city: 'Boston, MA' },
     { key: 'oakSquareY', courtId: '2a2d7110-86dc-8575-3c87-2128062f674c', name: 'Oak Square YMCA', city: 'Brighton, MA' },
+    { key: 'huntingtonYMCA', create: true, name: 'Huntington Avenue YMCA', city: 'Boston, MA', lat: 42.3414, lng: -71.0877, indoor: true, venue_type: 'gym', address: '316 Huntington Ave, Boston, MA 02115' },
+    { key: 'reggieLewisTrack', create: true, name: 'Reggie Lewis Track & Athletic Center', city: 'Boston, MA', lat: 42.3314, lng: -71.0927, indoor: true, venue_type: 'rec_center', address: '1350 Tremont St, Boston, MA 02120' },
     { key: 'nazzaroCC', courtId: '7fa07283-9deb-fa98-42b9-e0027ad837e0', name: 'BCYF Nazzaro Community Center', city: 'Boston, MA' },
     { key: 'pinoCC', courtId: '029efc5f-a812-9099-a035-6e4d948539cc', name: 'BCYF Pino Community Center', city: 'Boston, MA' },
     { key: 'tobinCC', create: true, name: 'BCYF Tobin Community Center', city: 'Boston, MA', lat: 42.3243, lng: -71.0572, indoor: true, access: 'public', venue_type: 'rec_center', address: '1481 Tremont St, Boston, MA 02120' },
@@ -158,8 +239,24 @@ const venues2 = [
     { key: 'robertoClementeField', create: true, name: 'Roberto Clemente Field', city: 'Boston, MA', lat: 42.3448, lng: -71.0800, indoor: false, access: 'public', venue_type: 'park', address: '155 Tremont St, Boston, MA 02111' },
     { key: 'smithPlayground', create: true, name: 'Smith Playground', city: 'Boston, MA', lat: 42.3325, lng: -71.0915, indoor: false, access: 'public', venue_type: 'park', address: '235 Western Ave, Boston, MA 02134' },
     { key: 'ringerPark', create: true, name: 'Ringer Park', city: 'Boston, MA', lat: 42.3526, lng: -71.1350, indoor: false, access: 'public', venue_type: 'park', address: 'Allston St & Gordon St, Boston, MA 02134' },
-    { key: 'hoytField', create: true, name: 'Hoyt Field', city: 'Cambridge, MA', lat: 42.3806, lng: -71.1334, indoor: false, access: 'public', venue_type: 'park', address: '1 Western Ave, Cambridge, MA 02139' },
     { key: 'buckleyPlayground', create: true, name: 'Buckley Playground', city: 'Boston, MA', lat: 42.3460, lng: -71.0530, indoor: false, access: 'public', venue_type: 'park', address: 'M St & E 5th St, Boston, MA 02127' },
+
+    // ── MINNEAPOLIS, MINNESOTA (TWIN CITIES) ──────────────────────
+    { key: 'minneapolis_mlk_park', create: true, name: 'Rev. Dr. Martin Luther King, Jr. Park Gym', city: 'Minneapolis, MN', lat: 44.9126, lng: -93.2736, indoor: true, venue_type: 'rec_center', address: '4055 Nicollet Ave, Minneapolis, MN 55409' },
+    { key: 'minneapolis_central_gym', create: true, name: 'Central Gym', city: 'Minneapolis, MN', lat: 44.9255, lng: -93.2683, indoor: true, venue_type: 'rec_center', address: '3400 4th Ave S, Minneapolis, MN 55408' },
+    { key: 'minneapolis_stewart', create: true, name: 'Stewart Recreation Center', city: 'Minneapolis, MN', lat: 44.9520, lng: -93.2625, indoor: true, venue_type: 'rec_center', address: '2700 12th Ave S, Minneapolis, MN 55407' },
+    { key: 'minneapolis_umn', create: true, name: 'University of Minnesota RecWell Center', city: 'Minneapolis, MN', lat: 44.9748, lng: -93.2327, indoor: true, venue_type: 'university', address: '123 Harvard St SE, Minneapolis, MN 55455' },
+    { key: 'minneapolis_ywca', create: true, name: 'YWCA Minneapolis Sports Center', city: 'Minneapolis, MN', lat: 44.9483, lng: -93.2435, indoor: true, venue_type: 'rec_center', address: '2121 E Lake St, Minneapolis, MN 55407' },
+    { key: 'minneapolis_target_center', create: true, name: 'Life Time Fitness (Target Center)', city: 'Minneapolis, MN', lat: 44.9796, lng: -93.2764, indoor: true, venue_type: 'gym', address: '600 N 1st Ave, Minneapolis, MN 55403' },
+    { key: 'minneapolis_van_cleve', create: true, name: 'Van Cleve Recreation Center', city: 'Minneapolis, MN', lat: 44.9856, lng: -93.2289, indoor: true, venue_type: 'rec_center', address: '901 15th Ave SE, Minneapolis, MN 55414' },
+
+    // ── DETROIT, MICHIGAN (METRO AREA) ────────────────────────────
+    { key: 'joeDumarsDetroit', create: true, name: "Joe Dumars' Fieldhouse (Detroit)", city: 'Detroit, MI', lat: 42.4410, lng: -83.1118, indoor: true, venue_type: 'gym', address: '1120 W State Fair Ave, Detroit, MI 48203' },
+    { key: 'bollFamilyYMCA', create: true, name: 'Boll Family YMCA', city: 'Detroit, MI', lat: 42.3359, lng: -83.0469, indoor: true, venue_type: 'gym', address: '1401 Broadway St, Detroit, MI 48226' },
+    { key: 'annArborYMCA', create: true, name: 'Ann Arbor YMCA', city: 'Ann Arbor, MI', lat: 42.2801, lng: -83.7533, indoor: true, venue_type: 'gym', address: '400 W Washington St, Ann Arbor, MI 48103' },
+    { key: 'meriLouMurrayRec', create: true, name: 'Meri Lou Murray Recreation Center', city: 'Ann Arbor, MI', lat: 42.2562, lng: -83.7126, indoor: true, venue_type: 'rec_center', address: '2960 Washtenaw Ave, Ann Arbor, MI 48104' },
+    { key: 'lawsonPark', create: true, name: 'Lawson Park', city: 'Royal Oak, MI', lat: 42.4920, lng: -83.1360, indoor: false, venue_type: 'park', address: '1300 E 11 Mile Rd, Royal Oak, MI 48067' },
+    { key: 'a2Sportsplex', create: true, name: 'A2 Sportsplex', city: 'Ann Arbor, MI', lat: 42.2829, lng: -83.8290, indoor: true, venue_type: 'gym', address: '119 Jackson Industrial Dr, Ann Arbor, MI 48103' },
 
     // ── PENINSULA (San Mateo County / South Bay) ─────────────────
     { key: 'sanMateoHS', courtId: '64288e25-f7be-078b-4f1a-1a98d1f7cf39', name: 'San Mateo High School Gym', city: 'San Mateo, CA' },
@@ -188,6 +285,15 @@ const venues2 = [
     { key: 'wickhamParkCC', create: true, name: 'Wickham Park Community Center', city: 'Melbourne, FL', lat: 28.1217, lng: -80.6430, indoor: true, access: 'public', venue_type: 'rec_center', address: '2815 Leisure Way, Melbourne, FL 32935' },
     { key: 'firstBaptistMI', create: true, name: 'First Baptist Church of Merritt Island', city: 'Merritt Island, FL', lat: 28.3530, lng: -80.6830, indoor: false, access: 'public', venue_type: 'church', address: 'Merritt Island, FL 32952' },
     { key: 'miChristianSchool', create: true, name: 'Merritt Island Christian School', city: 'Merritt Island, FL', lat: 28.3560, lng: -80.6760, indoor: true, access: 'private', venue_type: 'school', address: 'Merritt Island, FL 32952' },
+
+    // ── SAN DIEGO, CA (METRO AREA) ────────────────────────────────
+    { key: 'balboaMuniSD', create: true, name: 'Balboa Municipal Gym', city: 'San Diego, CA' },
+    { key: 'doyleRec', create: true, name: 'Doyle Recreation Center', city: 'San Diego, CA' },
+    { key: 'fitness24Balboa', create: true, name: '24 Hour Fitness Balboa', city: 'San Diego, CA' },
+    { key: 'goldenHillRec', create: true, name: 'Golden Hill Recreation Center', city: 'San Diego, CA' },
+    { key: 'krocCenterSD', create: true, name: 'The Salvation Army Kroc Center', city: 'San Diego, CA' },
+    { key: 'ranchoYmcaSD', create: true, name: 'Rancho Family YMCA', city: 'San Diego, CA' },
+    { key: 'ucsdRimac', create: true, name: 'RIMAC Arena UCSD', city: 'La Jolla, CA' }
 ];
 
 // Merge all venues
@@ -303,6 +409,19 @@ const allRuns = [
 
     // ── NEW YORK CITY ────────────────────────────────────────────
     r('chelseaRec', 'Sunday Morning — Chelsea Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Consistent Sunday morning run. Medium-high reliability. Low cost.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Sun], hour: 8, minute: 0 }] }),
+    r('mcburney', 'Morning Run — McBurney YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Classic NYC indoor run. Free with YMCA membership. Highly competitive; waitlist rotation.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 6, minute: 0 }] }),
+    r('mcburney', 'Evening Run — McBurney YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Classic NYC indoor run. Free with YMCA membership. Highly competitive.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 18, minute: 30 }] }),
+    r('mcburney', 'Weekend Run — McBurney YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Classic NYC indoor run. Highly competitive; waitlist rotation.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat, D.Sun], hour: 10, minute: 0 }] }),
+    r('majorOwens', 'Member Open Play — Major Owens', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Premium indoor courts. Requires Community Board 9 or Standard Membership.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Wed], hour: 18, minute: 0 }] }),
+    r('chelseaPiers', 'Adult Open Play — Chelsea Piers', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Premium facility. Adult Open Play sessions run daily but must be booked in advance.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri, D.Sat, D.Sun], hour: 12, minute: 0 }] }),
+    r('chelseaPiers', 'Evening Leagues — Chelsea Piers', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'ZogSports leagues dominate weekday evenings. High competition.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed], hour: 19, minute: 0 }] }),
+    r('artisticSports', 'Friday Open Court — Artistic Sports', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '$20 per person for Friday all-day Open Court (subject to availability).', durationMinutes: 240, maxPlayers: 20, schedule: [{ days: [D.Fri], hour: 15, minute: 0 }] }),
+    r('artisticSports', 'Weekday Drop-In — Artistic Sports', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '$20/hr drop-ins when courts aren\'t rented.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 18, minute: 0 }] }),
+    r('fastbreakStaten', 'Friday Night Drop-In — Fastbreak', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '$20 drop-in fee for 3 hours of play. ID required.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Fri], hour: 19, minute: 0 }] }),
+    r('fastbreakStaten', 'Saturday Night Drop-In — Fastbreak', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '$20 drop-in fee for 3 hours of play. ID required. Adult slots.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat], hour: 20, minute: 0 }] }),
+    r('parksRecManhattan', 'Dawn Patrol — Constance Baker Motley', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Requires NYC Parks Membership ($150/year). Intense early-morning local runs.', durationMinutes: 225, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 6, minute: 0 }] }),
+    r('parksRecQueens', 'Dawn Patrol — Al Oerter Rec Center', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Requires NYC Parks Membership ($150/year). Intense early-morning local runs.', durationMinutes: 225, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 6, minute: 0 }] }),
+    r('lifeTimeSky', 'Member Pickup — Life Time Sky', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Sleek, official-sized hardwood courts with scheduled pickup play throughout the week.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri, D.Sat, D.Sun], hour: 17, minute: 0 }] }),
     r('thePost', 'Friday Night — The Post BK', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '"Dedicated/Hardcore." Friday night elite run in Brooklyn. ~$15-20.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Fri], hour: 21, minute: 0 }] }),
     r('bballCity', 'Evening League — Basketball City', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '"Data Calibration." Mon-Thu league play. Stats tracked.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 18, minute: 30 }] }),
     r('crossIslandY', 'Dawn Run — Cross Island YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '"Dedicated Regulars." M-Th 5:30 AM. Membership required.', durationMinutes: 90, maxPlayers: 12, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 5, minute: 30 }] }),
@@ -315,30 +434,28 @@ const allRuns = [
     r('austinRec', 'Thursday Open Gym (Prime) — Austin Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Prime open gym. Thu 9a-11:30p. Free / low cost.', durationMinutes: 150, maxPlayers: 16, schedule: [{ days: [D.Thu], hour: 9, minute: 0 }] }),
     r('austinRec', 'Tuesday Open Gym — Austin Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Tuesday open gym session. Tue 9a-5p. Free / low cost.', durationMinutes: 480, maxPlayers: 16, schedule: [{ days: [D.Tue], hour: 9, minute: 0 }] }),
     r('southAustinRec', 'Thursday Evening — South Austin Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Thu 6-9pm open gym. Free / low cost.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Thu], hour: 18, minute: 0 }] }),
+    r('mi3Center', 'Evening Open Gym — MI3 Center', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Massive 6-court facility. High volume of players.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+    r('churchillRec', 'Churchill Midday Open Gym', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Classic Dallas Parks midday open gym. $15 yearly pass or $5 drop-in.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Mon], hour: 12, minute: 30 }] }),
+    r('nashDavisRec', 'Nash-Davis Lunch Run', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Reliable lunch run in West Dallas.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Wed], hour: 12, minute: 0 }] }),
+    r('smuDedmanRec', 'SMU Evening Campus Run', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'High traffic university court. Intense collegiate and community play.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 17, minute: 0 }] }),
     r('southAustinRec', 'Saturday Midday — South Austin Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Sat 12-3pm open gym. Free / low cost.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Sat], hour: 12, minute: 0 }] }),
     r('northwestRec', '"Nooners" — Northwest Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '"Nooners." Standing game. Tue/Thu 11:30a-1:15p. Free / low cost.', durationMinutes: 105, maxPlayers: 12, schedule: [{ days: [D.Tue, D.Thu], hour: 11, minute: 30 }] }),
     r('fondeRec', 'Elite Lunch Run — Fonde Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '"Legend." The premier Houston run. Elite pickup. M-F 11a-1p. Free.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 11, minute: 0 }] }),
-    r('fondeRec', 'Saturday Morning — Fonde Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '"Legend." Saturday morning session. Free.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Sat], hour: 9, minute: 0 }] }),
-    r('fondeRec', 'Evening Run — Fonde Rec ("No Excuses")', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: '"No Excuses" culture. Elite intensity. Mon–Thu evenings.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 18, minute: 0 }] }),
-    r('reverchonPark', 'After-Work Run — Reverchon Park', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Legendary after-work outdoor run. Lit courts. Peak 6–7pm. Free.', durationMinutes: 90, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 18, minute: 0 }] }),
+    r('fondeRec', 'Saturday Morning — Fonde Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Competitive weekend tip-off.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat], hour: 9, minute: 0 }] }),
+    r('fondeRec', 'Evening Run — Fonde Rec ("No Excuses")', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Fonde evening runs.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 18, minute: 0 }] }),
+    r('reverchonPark', 'After-Work Run — Reverchon Park', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Outdoor park runs under the lights. High volume block.', durationMinutes: 150, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 18, minute: 0 }] }),
+
+    // ── WASHINGTON D.C. (DMV) ──────────────────────────────────────────────────
+    r('barryFarm', 'Summer Evening Pickup — Barry Farm', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Historic Goodman League grounds. Elite competitive pickup when leagues aren\'t active.', durationMinutes: 150, maxPlayers: 20, schedule: [{ days: [D.Sun, D.Mon, D.Tue, D.Wed, D.Thu], hour: 18, minute: 30 }] }),
+    r('tjCC', 'Evening Open Gym — Thomas Jefferson CC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Massive suburban Arlington hub. Three courts. $7-$9 drop-in fee.', durationMinutes: 255, maxPlayers: 30, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 16, minute: 30 }] }),
+    r('tjCC', 'Adults Only Intense Pickup — Thomas Jefferson CC', { gameMode: '5v5', courtType: 'full', ageRange: 'Adults', notes: '"Adults Only" run. High-intensity 18+.', durationMinutes: 135, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 30 }] }),
+    r('riggsLaSalle', 'Indoor Hoops Night — Riggs LaSalle Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Northeast D.C. Free, air-conditioned indoor runs. Highly sought after in summer.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 19, minute: 0 }] }),
+    r('raymondRec', 'Petworth Wednesday Run — Raymond Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Petworth community run. Free.', durationMinutes: 90, maxPlayers: 15, schedule: [{ days: [D.Wed], hour: 19, minute: 0 }] }),
+    r('kennedyRec', 'Evening Court Action — Kennedy Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Shaw neighborhood. Popular lighted outdoor courts for evening summer action.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri, D.Sat, D.Sun], hour: 18, minute: 0 }] }),
+    r('randallRec', 'Weekend Tipoff — Randall Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Southwest D.C. Iconic refurbished courts. Heavy weekend traffic.', durationMinutes: 240, maxPlayers: 20, schedule: [{ days: [D.Sat, D.Sun], hour: 12, minute: 0 }] }),
 
     // ── VIRGINIA ──────────────────────────────────────────────────
     r('tjCC', 'Competitive Run — Thomas Jefferson CC', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Adults Only. 3 courts. Premier competitive run in NOVA.', durationMinutes: 135, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 30 }] }),
-    r('tjCC', 'Drop-in Run — Thomas Jefferson CC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'General drop-in. 2 courts. Mixed competition.', durationMinutes: 255, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 16, minute: 30 }] }),
-    r('lubberRun', 'Lunch Run — Lubber Run CC', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Adult full court. High-efficiency lunch run.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 12, minute: 0 }] }),
-    r('charlesDrew', 'Evening Run — Charles Drew CC', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Adults Only. Alternative to TJ.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
-    r('langstonBrown', 'Monday Night — Langston-Brown CC', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Adult drop-in. Best Monday nights in Arlington.', durationMinutes: 165, maxPlayers: 14, schedule: [{ days: [D.Mon], hour: 18, minute: 0 }] }),
-    r('walterReed', 'Friday Night — Walter Reed CC', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Adult drop-in. End-of-week run.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Fri], hour: 18, minute: 0 }] }),
-    r('walterReed', 'Senior Run — Walter Reed CC', { gameMode: '5v5', courtType: 'full', ageRange: '55+', notes: '55+ Only. Senior seeding run.', durationMinutes: 135, maxPlayers: 12, schedule: [{ days: [D.Wed], hour: 12, minute: 0 }] }),
-    r('gmuActivities', 'Evening Run — GMU Activities Bldg', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Gym A. 18+ only. Protected time. Community membership req.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Tue, D.Fri], hour: 18, minute: 0 }] }),
-    r('stJames', 'League Play — The St. James', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Premium facility. Organized leagues. Rental fees apply.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Sat], hour: 10, minute: 0 }] }),
-    r('bellemeade', 'Saturday Morning — Bellemeade CC', { gameMode: '5v5', courtType: 'full', ageRange: '30+', notes: '30+ Only. Mature run, organized play. Free.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Sat], hour: 8, minute: 0 }] }),
-    r('easternHenrico', 'Evening Run — Eastern Henrico Rec', { gameMode: '5v5', courtType: 'full', ageRange: '30+', notes: '30+ Only. Suburban mature run. Free.', durationMinutes: 150, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Wed], hour: 17, minute: 30 }] }),
-    r('deepRun', 'Sunday Afternoon — Deep Run Rec', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: '18+ Only. Weekend afternoon. Free.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Sun], hour: 15, minute: 0 }] }),
-    r('powhatanHill', 'Lunch Run — Powhatan Hill CC', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: '18+ lunch run. Free.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Fri], hour: 12, minute: 0 }] }),
-    r('tbSmith', 'Lunch Run — T.B. Smith CC', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: '18+ lunch run. Strict 1-hr window. Free.', durationMinutes: 60, maxPlayers: 12, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 12, minute: 0 }] }),
-    r('vcuCarySt', 'Open Gym — VCU Cary St Gym', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Student/Community mix. High volume. Membership required.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri, D.Sat, D.Sun], hour: 10, minute: 0 }] }),
-    r('swiftCreekY', 'Sunrise Ball — Swift Creek YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Sunrise ball. Informal group. YMCA membership required.', durationMinutes: 60, maxPlayers: 12, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 5, minute: 0 }] }),
     r('kempsvilleRec', 'Sunrise Ball — Kempsville Rec', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Sunrise ball. 18+. Committed crowd.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 5, minute: 0 }] }),
     r('kempsvilleRec', 'Evening Run — Kempsville Rec', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Adult evening run. Pass required. High demand.', durationMinutes: 165, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Wed], hour: 18, minute: 0 }] }),
     r('princessAnne', 'Breakfast Ball — Princess Anne Rec', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Breakfast ball. 18+.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Mon, D.Wed], hour: 5, minute: 0 }] }),
@@ -374,6 +491,66 @@ const allRuns = [
     r('ringerPark', 'Weekend Afternoon — Ringer Park', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Consistent outdoor runs; student/young-pro mix; seasonal.', durationMinutes: 180, maxPlayers: 16, schedule: [{ days: [D.Sat, D.Sun], hour: 14, minute: 0 }] }),
     r('hoytField', 'Weekend Morning — Hoyt Field', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Outdoor overflow; "decent activity"; seasonal.', durationMinutes: 180, maxPlayers: 14, schedule: [{ days: [D.Sat, D.Sun], hour: 10, minute: 0 }] }),
 
+    // ── ATLANTA ───────────────────────────────────────────────────
+    r('decaturRec', 'Lunch Hoops — Decatur Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Consistent midday block. $5-$10 drop-in.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 12, minute: 0 }] }),
+    r('decaturRec', 'Thursday Night Run — Decatur Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Adult evening open gym block.', durationMinutes: 195, maxPlayers: 20, schedule: [{ days: [D.Thu], hour: 17, minute: 30 }] }),
+    r('decaturRec', 'Sunday Run — Decatur Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Sunday adult run.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sun], hour: 11, minute: 0 }] }),
+    r('core4AC', 'Conquer the Court — CORE4', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Premium private facility. High-level "Conquer the Court" pickup.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+    r('atlSilverbacksIndoor', 'Evening Run — Silverbacks Indoor', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Huge 48k sq ft facility in Suwanee. Organized pickup via GoodRec/facility blocks.', durationMinutes: 180, maxPlayers: 30, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 18, minute: 0 }] }),
+    r('mlkRecCenter', 'Weekend Runs — MLK Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Full 5-on-5 weekend runs. Very popular local hub.', durationMinutes: 240, maxPlayers: 25, schedule: [{ days: [D.Sat, D.Sun], hour: 12, minute: 0 }] }),
+    r('ltSandySprings', 'Evening Hoops — Life Time Sandy Springs', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'High-traffic private gym runs. Consistent evening runs.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 17, minute: 0 }] }),
+    r('laFitnessPiedmont', 'Elite Evening Pickup — LA Fitness Piedmont', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Highly competitive Atlanta LA Fitness run. Draws high-level talent.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 17, minute: 0 }] }),
+    r('eastLakeYMCA', 'Morning Run — East Lake Y', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Regular consistent morning runs.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 6, minute: 0 }] }),
+
+    // ── MIAMI & SOUTH FLORIDA ─────────────────────────────────────
+    r('joseMartiGym', 'Evening Competitive Run — Jose Marti', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'City of Miami Parks. Organized/competitive evening run.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Thu], hour: 18, minute: 30 }] }),
+    r('joseMartiGym', 'Weekend Morning Pickup — Jose Marti', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Consistent weekend morning pickup.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat, D.Sun], hour: 9, minute: 0 }] }),
+    r('adaptNorthMiami', 'Indoor Run — ADAPT', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Premium climate-controlled facility. High-level pickup.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed], hour: 19, minute: 0 }] }),
+    r('scottRakowYC', 'Midday Open Play — Scott Rakow', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Miami Beach drop-in open play. Runs year-round.', durationMinutes: 150, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 10, minute: 30 }] }),
+    r('scottRakowYC', 'Sunday Open Play — Scott Rakow', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Deep Sunday window. Year-round availability.', durationMinutes: 240, maxPlayers: 24, schedule: [{ days: [D.Sun], hour: 9, minute: 30 }] }),
+    r('flamingoPark', 'Daylight Runs — Flamingo Park', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Iconic South Beach outdoor court. Consistent daylight runs. Free.', durationMinutes: 420, maxPlayers: 30, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri, D.Sat, D.Sun], hour: 7, minute: 0 }] }),
+    r('ltCoralGables', 'Executive Pickup — Life Time Coral Gables', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Premium "executive" pickup. Highly structured group. Membership required.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 5, minute: 0 }] }),
+    r('laFitnessMiami', 'Evening Run — LA Fitness Miami', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Broad network play. Very active evening runs.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+
+    // ── DENVER, COLORADO ──────────────────────────────────────────
+    r('washPark', 'Weekend Runs — Wash Park', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Most famous outdoor pickup spot in Denver. Busy on weekends. Free.', durationMinutes: 360, maxPlayers: 30, schedule: [{ days: [D.Sat, D.Sun], hour: 10, minute: 0 }] }),
+    r('clubGreenwood', 'Midday Drop-in — Club Greenwood', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'NBA regulation court. Consistent midday drop-in.', durationMinutes: 120, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 11, minute: 0 }] }),
+    r('clubGreenwood', 'Early Bird Run — Club Greenwood', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Early morning run.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Tue], hour: 6, minute: 0 }] }),
+    r('clubGreenwood', 'Evening Adult Drop-in — Club Greenwood', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Evening adult drop-in game.', durationMinutes: 120, maxPlayers: 20, schedule: [{ days: [D.Thu], hour: 18, minute: 0 }] }),
+    r('clubGreenwood', 'Saturday Morning Run — Club Greenwood', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Saturday morning run.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat], hour: 9, minute: 0 }] }),
+    r('ltCherryCreek', 'Evening Runs — Life Time Cherry Creek', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'High-traffic private gym runs. Consistent evening presence.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+    r('carlaMadisonRec', 'Early Morning Runs — Carla Madison Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Consistent early morning rec center runs.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 6, minute: 0 }] }),
+    r('carlaMadisonRec', 'Sunday Morning — Carla Madison Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Sunday morning basketball.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sun], hour: 10, minute: 0 }] }),
+    r('pickupUSADenver', 'Daily Officiated Games — PickUp USA Denver', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Officiated pickup games daily. Paid facility.', durationMinutes: 180, maxPlayers: 25, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 18, minute: 0 }] }),
+
+    // ── PHOENIX, ARIZONA ──────────────────────────────────────────
+    r('kiwanisRecTempe', 'Evening Drop-in — Kiwanis Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Tempe. Large 2-court gym. Consistent evening drop-ins.', durationMinutes: 180, maxPlayers: 24, schedule: [{ days: [D.Mon, D.Wed], hour: 18, minute: 0 }] }),
+    r('kiwanisRecTempe', 'Weekend Morning Drop-in — Kiwanis Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Weekend morning drop-in window.', durationMinutes: 180, maxPlayers: 24, schedule: [{ days: [D.Sat, D.Sun], hour: 9, minute: 0 }] }),
+    r('mgSportsPlex', 'Evening Open Gym — MG SportsPlex', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Glendale. Massive 8 NBA-court facility. Open gym & leagues.', durationMinutes: 240, maxPlayers: 40, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+    r('ltNorthScottsdale', 'Premium Indoor Runs — Life Time North Scottsdale', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Scottsdale. Premium indoor runs. Membership required.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed], hour: 17, minute: 0 }] }),
+    r('laFitnessTatumCactus', 'Evening Run — LA Fitness Tatum & Cactus', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Highly active LA Fitness location known for deep runs.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 17, minute: 0 }] }),
+    r('swyshDen', 'Early Morning Officiated Run — Swysh Den', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Scottsdale. Organized, officiated runs.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Fri], hour: 6, minute: 0 }] }),
+    r('lincolnFamilyY', 'Early Morning Downtown Run — Lincoln Family YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Early morning downtown runs.', durationMinutes: 90, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 5, minute: 45 }] }),
+
+    // ── BOSTON / CAMBRIDGE (MA) ───────────────────────────────────
+    r('cambridgeAC', 'Pick-Up Runs — CAC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Cambridge (Putnam Ave/First St). Official "Pick-Up Runs". Registration required.', durationMinutes: 60, maxPlayers: 20, schedule: [{ days: [D.Thu], hour: 18, minute: 0 }] }),
+    r('cambridgeAC', 'Evening Open Play — CAC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'General evening open play/pickup for members and day-pass users.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed], hour: 17, minute: 0 }] }),
+    r('oakSquareY', 'Evening Pickup — Oak Square YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Brighton. Very active adult leagues and pickup window.', durationMinutes: 180, maxPlayers: 24, schedule: [{ days: [D.Mon, D.Tue, D.Wed], hour: 18, minute: 0 }] }),
+    r('oakSquareY', 'Co-ed Run — Oak Square YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Brighton. Co-ed specific run/league window.', durationMinutes: 180, maxPlayers: 24, schedule: [{ days: [D.Thu], hour: 18, minute: 0 }] }),
+    r('huntingtonYMCA', 'Early Morning Runs — Huntington Ave YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Prime downtown Boston venue. Consistent early morning runs.', durationMinutes: 120, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 6, minute: 0 }] }),
+    r('tobinCC', 'Evening Open Gym — BCYF Tobin', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Boston. Consistent evening open gym for adult play.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 17, minute: 0 }] }),
+    r('nazzaroCC', 'Evening Indoor Run — BCYF Nazzaro', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'North End. Indoor community center runs.', durationMinutes: 150, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed], hour: 18, minute: 0 }] }),
+    r('reggieLewisTrack', 'Weekend Pickup Window — Reggie Lewis Center', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Roxbury. Massive indoor facility. Weekend pickup window.', durationMinutes: 180, maxPlayers: 25, schedule: [{ days: [D.Sat, D.Sun], hour: 10, minute: 0 }] }),
+
+    // ── DETROIT, MICHIGAN (METRO AREA) ────────────────────────────
+    r('joeDumarsDetroit', 'Evening Pickup — Joe Dumars Fieldhouse', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Massive Detroit fieldhouse. Consistent evening pickup window.', durationMinutes: 240, maxPlayers: 40, schedule: [{ days: [D.Wed, D.Thu, D.Fri], hour: 15, minute: 0 }] }),
+    r('joeDumarsDetroit', 'Weekend Deep Runs — Joe Dumars Fieldhouse', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Weekend deep runs. Very popular spot.', durationMinutes: 300, maxPlayers: 40, schedule: [{ days: [D.Sat, D.Sun], hour: 12, minute: 0 }] }),
+    r('bollFamilyYMCA', 'Weekend Morning Runs — Boll Family YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Downtown Detroit YMCA. Consistent weekend morning runs.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat, D.Sun], hour: 9, minute: 0 }] }),
+    r('annArborYMCA', 'Midday Adult Pickup — Ann Arbor YMCA', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Ann Arbor. Midday adult pickup window.', durationMinutes: 120, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 12, minute: 0 }] }),
+    r('meriLouMurrayRec', 'Evening Drop-in — Meri Lou Murray Rec', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Ann Arbor. Popular rec center for scheduled adult drop-in play.', durationMinutes: 180, maxPlayers: 24, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+    r('lawsonPark', 'Saturday Meetup — Lawson Park', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Royal Oak. Active weekend outdoor meetup spot.', durationMinutes: 120, maxPlayers: 20, schedule: [{ days: [D.Sat], hour: 10, minute: 0 }] }),
+    r('a2Sportsplex', 'Evening Runs — A2 Sportsplex', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: "Ann Arbor's newest indoor facility. Evening open runs.", durationMinutes: 180, maxPlayers: 24, schedule: [{ days: [D.Wed, D.Fri], hour: 18, minute: 0 }] }),
+
     // ── PENINSULA (San Mateo County / South Bay) ─────────────────
     r('sanMateoHS', 'Monday Night Run — San Mateo HS', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: '$4 drop-in fee for adults, $3 for youth (with HS ID). Ages 18+ for adult play.', durationMinutes: 180, maxPlayers: 16, schedule: [{ days: [D.Mon], hour: 19, minute: 0 }] }),
     r('kingCC', 'Evening Drop-in — King Community Center', { gameMode: '5v5', courtType: 'full', ageRange: '18+', notes: 'Free. Ages 18+. All skill levels welcome, teams formed on a drop-in basis.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 30 }] }),
@@ -399,7 +576,57 @@ const allRuns = [
     r('wickhamParkCC', 'Monday Morning — Wickham Park CC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Mainland indoor fallback; tight 2-hour windows—punctuality matters.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Mon], hour: 9, minute: 0 }] }),
     r('wickhamParkCC', 'Friday Afternoon — Wickham Park CC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Mainland indoor fallback; tight 2-hour windows—punctuality matters.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Fri], hour: 13, minute: 0 }] }),
     r('wickhamParkCC', 'Sunday Midday — Wickham Park CC', { gameMode: '5v5', courtType: 'full', ageRange: 'open', notes: 'Mainland indoor fallback; tight 2-hour windows—punctuality matters.', durationMinutes: 120, maxPlayers: 14, schedule: [{ days: [D.Sun], hour: 12, minute: 0 }] }),
+
+    // ── LOS ANGELES RUNS ────────────────────────────────────────────
+    r('la_crosscourt', 'Crosscourt DTLA Open Club Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Premium pick-up with refs. Crosscourt membership required.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 18, minute: 0 }] }),
+    r('la_laac', 'LAAC Member Pickup', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'John R. Wooden Award Court. Competitive LAAC members only.', durationMinutes: 150, maxPlayers: 20, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 30 }] }),
+    r('la_ymca_hollywood', 'Hollywood YMCA Open Gym', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Community drop-in. Winners stay on.', durationMinutes: 120, maxPlayers: 20, schedule: [{ days: [D.Sat], hour: 10, minute: 0 }] }),
+    r('la_equinox_weho', 'Equinox WeHo Early Bird', { gameMode: '4v4', courtType: 'indoor', ageRange: 'Adults', notes: 'Morning cardio run for Equinox members. Fast paced.', durationMinutes: 90, maxPlayers: 12, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 6, minute: 30 }] }),
+    r('la_lafitness_universal', 'LA Fitness Evening Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'High volume standard full-court pick-up. Guard your man.', durationMinutes: 180, maxPlayers: 25, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 17, minute: 30 }] }),
+
+    // ── CHICAGO ───────────────────────────────────────────────────
+    r('lakeshoreSF', 'Supervised Open Play', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Scoreboards and shot clocks used. Premium run.', durationMinutes: 180, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 17, minute: 0 }] }),
+    r('rayMeyerFitness', 'DePaul Evening Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Highly active university rec center. Community memberships available.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 17, minute: 0 }] }),
+    r('lifeTimeRiverNorth', 'Early Bird Pickup', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Adult 18+ Early Bird pickup play. Fast-paced, intense runs.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 6, minute: 0 }] }),
+    r('lifeTimeRiverNorth', 'Weekend Warrior Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'High volume of players, winner stays on.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat], hour: 8, minute: 0 }] }),
+    r('ratnerAthletics', 'Afternoon Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Active student and local community play. Court rotation enforced.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed], hour: 16, minute: 0 }] }),
+    r('lakeViewYMCA', 'Noon Hoops', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Classic noon-hoop lunch break crowd.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 12, minute: 0 }] }),
+    r('ffcGoldCoast', 'Evening Pickup', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'High-traffic private club pickup in the Gold Coast.', durationMinutes: 180, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+    r('hornerPark', 'Saturday Open Play', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Free/low-cost Park District open play.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat], hour: 12, minute: 0 }] }),
+    r('pingTomPark', 'After-School Drop-in', { gameMode: '4v4', courtType: 'indoor', ageRange: 'All Ages', notes: 'South Loop/Chinatown location constraint. Often half-court or 4v4 depending on turnout.', durationMinutes: 150, maxPlayers: 12, schedule: [{ days: [D.Tue, D.Thu], hour: 16, minute: 0 }] }),
+
+    // ── PHILADELPHIA ──────────────────────────────────────────────
+    r('sportingClubBellevue', 'Exec Lunch Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'NBA-regulation court. High-end Center City membership required.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 12, minute: 0 }] }),
+    r('sportingClubBellevue', 'Member Evening Pickup', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Evening pickup for members. Highly competitive.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+    r('drexelRec', 'Campus Evening Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Massive courts. University students and community passes. High volume.', durationMinutes: 210, maxPlayers: 25, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 17, minute: 0 }] }),
+    r('christianStreetY', 'Classic South Philly Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Classic South Philly indoor run. Consistent regulars.', durationMinutes: 150, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 18, minute: 0 }] }),
+    r('fusionGymsGrant', 'Northeast Night Hoops', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Northeast Philly destination. Premium courts, intense pickup culture.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 19, minute: 0 }] }),
+    r('palumboRec', 'After-School Local Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'South Philly staple. Highly physical, local hoops hub.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 16, minute: 0 }] }),
+    r('phieldHouse', 'Lunch Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Center City Lunch Run. Fast-paced sessions.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 12, minute: 0 }] }),
+    r('lloydHall', 'Weekend Drop-in', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Boathouse Row. Often mixed with league play, but weekend afternoons have open runs.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat, D.Sun], hour: 13, minute: 0 }] }),
+    r('afcFitnessBala', 'Dawn Patrol', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Early morning games just off the City Line.', durationMinutes: 90, maxPlayers: 12, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 6, minute: 30 }] }),
+
+    // ── MINNEAPOLIS, MINNESOTA ────────────────────────────────────
+    r('minneapolis_mlk_park', 'Midday Rec Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Popular adult open pickup. $5 entry.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Tue], hour: 12, minute: 0 }] }),
+    r('minneapolis_central_gym', 'Evening Adult Open Gym', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Free entry. Pickup games form organically during evening peak hours.', durationMinutes: 180, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 17, minute: 0 }] }),
+    r('minneapolis_stewart', 'After-Work Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Major indoor facility. High afternoon/evening traffic.', durationMinutes: 180, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 17, minute: 30 }] }),
+    r('minneapolis_umn', 'RecWell Campus Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Massive footprint spanning MAC and North/South gyms. High student/alumni traffic.', durationMinutes: 180, maxPlayers: 25, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu], hour: 18, minute: 0 }] }),
+    r('minneapolis_ywca', 'Midtown Pickup', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Largest indoor sports center in the Twin Cities. Multiple full hardwood courts. Membership base.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 18, minute: 0 }] }),
+    r('minneapolis_target_center', 'Professional Lunch Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Premier athletic club. Aggressive semi-organized 5v5 drop-in runs.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 12, minute: 0 }] }),
+    r('minneapolis_van_cleve', 'Neighborhood Evening Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Neighborhood fallback gym. Steady, localized neighborhood 5v5 runs.', durationMinutes: 150, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 18, minute: 0 }] }),
+
+    // ── SAN DIEGO, CA ─────────────────────────────────────────────
+    r('balboaMuniSD', 'Lunch Run — Balboa Muni Gym', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Reliable midday lunch runs. Very popular.', durationMinutes: 120, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 12, minute: 0 }] }),
+    r('balboaMuniSD', 'After-Work Run — Balboa Muni Gym', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Prime after-work evening run on Thursdays.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Thu], hour: 17, minute: 0 }] }),
+    r('doyleRec', 'Midday Run — Doyle Rec Center', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Solid midday run in the UTC area.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Tue, D.Thu], hour: 12, minute: 0 }] }),
+    r('doyleRec', 'Afternoon Run — Doyle Rec Center', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Late afternoon / post-school run.', durationMinutes: 120, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 16, minute: 0 }] }),
+    r('fitness24Balboa', 'Prime Time Run — 24 Hour Fitness', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Best daily commercial gym run. Peak time is 4:00 PM - 7:00 PM.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri, D.Sat, D.Sun], hour: 16, minute: 0 }] }),
+    r('goldenHillRec', 'Tuesday Competitive Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Competitive evening runs.', durationMinutes: 150, maxPlayers: 15, schedule: [{ days: [D.Tue], hour: 17, minute: 0 }] }),
+    r('krocCenterSD', 'Weekend Morning Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'All Ages', notes: 'Excellent facility. Requires day pass ($20) or membership.', durationMinutes: 180, maxPlayers: 20, schedule: [{ days: [D.Sat, D.Sun], hour: 10, minute: 0 }] }),
+    r('ranchoYmcaSD', 'Early Morning Run', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Early morning dedicated group.', durationMinutes: 120, maxPlayers: 15, schedule: [{ days: [D.Mon, D.Wed, D.Fri], hour: 6, minute: 0 }] }),
+    r('ucsdRimac', 'Evening Run — RIMAC Arena', { gameMode: '5v5', courtType: 'indoor', ageRange: 'Adults', notes: 'Excellent college/alumni runs. High competition level.', durationMinutes: 240, maxPlayers: 25, schedule: [{ days: [D.Mon, D.Tue, D.Wed, D.Thu, D.Fri], hour: 17, minute: 0 }] })
 ];
+
 
 // Export everything
 module.exports = { venues: allVenues, runs: allRuns, D };

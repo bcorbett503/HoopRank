@@ -22,6 +22,13 @@ class _ChecklistItemConfig {
 
 const _items = [
   _ChecklistItemConfig(
+    key: OnboardingItems.setupProfile,
+    icon: Icons.person,
+    label: 'Complete your profile',
+    color: Colors.purple,
+    route: '/profile/setup',
+  ),
+  _ChecklistItemConfig(
     key: OnboardingItems.followCourt,
     icon: Icons.location_on,
     label: 'Follow a court',
@@ -38,7 +45,7 @@ const _items = [
   _ChecklistItemConfig(
     key: OnboardingItems.scheduleRun,
     icon: Icons.schedule,
-    label: 'Schedule a run',
+    label: 'Schedule a run at a court',
     color: Colors.deepOrange,
     route: '/courts', // pick a court to schedule
   ),
@@ -218,8 +225,8 @@ class _OnboardingChecklistCardState extends State<OnboardingChecklistCard>
                       onTap: () => state.dismiss(),
                       child: const Padding(
                         padding: EdgeInsets.all(4),
-                        child: Icon(Icons.close,
-                            color: Colors.white54, size: 18),
+                        child:
+                            Icon(Icons.close, color: Colors.white54, size: 18),
                       ),
                     ),
                     const SizedBox(width: 4),

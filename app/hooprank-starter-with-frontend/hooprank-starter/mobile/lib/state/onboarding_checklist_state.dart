@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 
 /// Keys for each onboarding checklist item.
 class OnboardingItems {
+  static const String setupProfile = 'setup_profile';
   static const String followCourt = 'follow_court';
   static const String followPlayer = 'follow_player';
   static const String scheduleRun = 'schedule_run';
@@ -12,6 +13,7 @@ class OnboardingItems {
   static const String challengePlayer = 'challenge_player';
 
   static const List<String> all = [
+    setupProfile,
     followCourt,
     followPlayer,
     scheduleRun,
@@ -107,7 +109,8 @@ class OnboardingChecklistState extends ChangeNotifier {
           }
         }
         if (changed) {
-          debugPrint('ONBOARDING: Merged ${remote.entries.where((e) => e.value).length} items from backend');
+          debugPrint(
+              'ONBOARDING: Merged ${remote.entries.where((e) => e.value).length} items from backend');
           notifyListeners();
         }
 
@@ -129,7 +132,8 @@ class OnboardingChecklistState extends ChangeNotifier {
 
   /// Mark a single item as complete and persist to both local + backend.
   Future<void> completeItem(String key) async {
-    debugPrint('ONBOARDING: completeItem called for key=$key, already=${_completed[key]}');
+    debugPrint(
+        'ONBOARDING: completeItem called for key=$key, already=${_completed[key]}');
     if (_completed[key] == true) return; // already done
     _completed[key] = true;
     debugPrint('ONBOARDING: ✅ Marked $key as complete');
@@ -179,4 +183,3 @@ class OnboardingChecklistState extends ChangeNotifier {
     ApiService.updateOnboardingProgress({});
   }
 }
-

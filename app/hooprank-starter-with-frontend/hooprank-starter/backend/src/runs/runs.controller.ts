@@ -58,12 +58,23 @@ export class RunsController {
                     sr.duration_minutes as "durationMinutes",
                     sr.max_players as "maxPlayers",
                     sr.notes,
+                    sr.is_recurring as "isRecurring",
+                    sr.recurrence_rule as "recurrenceRule",
                     COALESCE((SELECT COUNT(*) FROM run_attendees WHERE run_id = sr.id), 0)::INTEGER as "attendeeCount"
                 FROM scheduled_runs sr
                 LEFT JOIN courts c ON sr.court_id::TEXT = c.id::TEXT
                 LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
-                WHERE sr.scheduled_at >= $1
-                  AND sr.is_recurring = false
+                WHERE (
+                     sr.is_recurring = true 
+                     OR 
+                     (sr.scheduled_at >= $1 AND sr.is_recurring = false AND NOT EXISTS (
+                         SELECT 1 FROM scheduled_runs parent 
+                         WHERE parent.is_recurring = true 
+                           AND parent.court_id = sr.court_id 
+                           AND parent.title = sr.title
+                           AND parent.duration_minutes = sr.duration_minutes
+                     ))
+                  )
                 ORDER BY sr.scheduled_at ASC
                 LIMIT 50
             `, [now]);

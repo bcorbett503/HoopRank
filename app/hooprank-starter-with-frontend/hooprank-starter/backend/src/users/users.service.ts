@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { User } from './user.entity';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
+import { User } from "./user.entity";
 
 @Injectable()
 export class UsersService {
@@ -9,7 +9,7 @@ export class UsersService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * Find user by auth provider ID or create a new one.
@@ -22,7 +22,7 @@ export class UsersService {
       // Check if user exists by id (which is the Firebase UID)
       const existing = await this.dataSource.query(
         `SELECT * FROM users WHERE id = $1 LIMIT 1`,
-        [authToken]
+        [authToken],
       );
 
       if (existing.length > 0) {
@@ -31,11 +31,14 @@ export class UsersService {
 
       // Create new user with correct production column names
       // Production table has: id, email, name, avatar_url, hoop_rank, created_at, updated_at, fcm_token
-      const result = await this.dataSource.query(`
+      const result = await this.dataSource.query(
+        `
         INSERT INTO users (id, email, name, hoop_rank, created_at, updated_at)
         VALUES ($1, $2, 'New Player', 3.0, NOW(), NOW())
         RETURNING *
-      `, [authToken, email]);
+      `,
+        [authToken, email],
+      );
 
       return result[0];
     }
@@ -47,7 +50,7 @@ export class UsersService {
         id: authToken, // Use authToken as ID for consistency
         authToken,
         email,
-        name: 'New Player',
+        name: "New Player",
         hoopRank: 3.0,
         reputation: 5.0,
       } as Partial<User>);
@@ -60,7 +63,8 @@ export class UsersService {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
-      const result = await this.dataSource.query(`
+      const result = await this.dataSource.query(
+        `
         SELECT
           id,
           email,
@@ -78,12 +82,15 @@ export class UsersService {
           games_played,
           games_contested,
           onboarding_progress,
+          badges,
           created_at,
           updated_at
         FROM users
         WHERE id = $1
         LIMIT 1
-      `, [id]);
+      `,
+        [id],
+      );
       return result.length > 0 ? result[0] : null;
     }
 
@@ -104,6 +111,7 @@ export class UsersService {
           hoop_rank,
           position,
           city,
+          badges,
           games_played,
           created_at,
           updated_at
@@ -114,7 +122,7 @@ export class UsersService {
     }
 
     const users = await this.usersRepository.find({
-      order: { hoopRank: 'DESC' },
+      order: { hoopRank: "DESC" },
       take: 100,
     });
     return users.map((user) => this.sanitizeUser(user) as User);
@@ -133,19 +141,28 @@ export class UsersService {
    * Reverse geocode lat/lng to a "City, ST" string using OpenStreetMap Nominatim.
    * Returns null if lookup fails (non-blocking).
    */
-  private async reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  private async reverseGeocode(
+    lat: number,
+    lng: number,
+  ): Promise<string | null> {
     try {
       const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`;
       const response = await fetch(url, {
-        headers: { 'User-Agent': 'HoopRank/1.0' },
+        headers: { "User-Agent": "HoopRank/1.0" },
         signal: AbortSignal.timeout(5000),
       });
       if (!response.ok) return null;
       const json = await response.json();
       const addr = json.address;
       if (!addr) return null;
-      const city = addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
-      const state = addr.state || '';
+      const city =
+        addr.city ||
+        addr.town ||
+        addr.village ||
+        addr.hamlet ||
+        addr.county ||
+        "";
+      const state = addr.state || "";
       // Convert state to abbreviation if US
       const stateAbbr = this.getStateAbbreviation(state) || state;
       if (city && stateAbbr) return `${city}, ${stateAbbr}`;
@@ -158,19 +175,57 @@ export class UsersService {
 
   private getStateAbbreviation(state: string): string | null {
     const stateMap: Record<string, string> = {
-      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-      'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-      'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-      'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-      'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-      'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-      'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-      'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-      'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-      'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-      'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-      'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-      'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC',
+      Alabama: "AL",
+      Alaska: "AK",
+      Arizona: "AZ",
+      Arkansas: "AR",
+      California: "CA",
+      Colorado: "CO",
+      Connecticut: "CT",
+      Delaware: "DE",
+      Florida: "FL",
+      Georgia: "GA",
+      Hawaii: "HI",
+      Idaho: "ID",
+      Illinois: "IL",
+      Indiana: "IN",
+      Iowa: "IA",
+      Kansas: "KS",
+      Kentucky: "KY",
+      Louisiana: "LA",
+      Maine: "ME",
+      Maryland: "MD",
+      Massachusetts: "MA",
+      Michigan: "MI",
+      Minnesota: "MN",
+      Mississippi: "MS",
+      Missouri: "MO",
+      Montana: "MT",
+      Nebraska: "NE",
+      Nevada: "NV",
+      "New Hampshire": "NH",
+      "New Jersey": "NJ",
+      "New Mexico": "NM",
+      "New York": "NY",
+      "North Carolina": "NC",
+      "North Dakota": "ND",
+      Ohio: "OH",
+      Oklahoma: "OK",
+      Oregon: "OR",
+      Pennsylvania: "PA",
+      "Rhode Island": "RI",
+      "South Carolina": "SC",
+      "South Dakota": "SD",
+      Tennessee: "TN",
+      Texas: "TX",
+      Utah: "UT",
+      Vermont: "VT",
+      Virginia: "VA",
+      Washington: "WA",
+      "West Virginia": "WV",
+      Wisconsin: "WI",
+      Wyoming: "WY",
+      "District of Columbia": "DC",
     };
     return stateMap[state] || null;
   }
@@ -198,29 +253,30 @@ export class UsersService {
 
       // Map camelCase to snake_case for production columns
       const columnMap: Record<string, string> = {
-        name: 'name',
-        displayName: 'name',
-        email: 'email',
-        avatarUrl: 'avatar_url',
-        photoUrl: 'avatar_url',
-        hoopRank: 'hoop_rank',
-        rating: 'hoop_rank',
-        position: 'position',
-        height: 'height',
-        weight: 'weight',
-        zip: 'zip',
-        birthdate: 'birthdate',
-        dob: 'dob',
-        city: 'city',
-        fcmToken: 'fcm_token',
-        lat: 'lat',
-        lng: 'lng',
-        onboardingProgress: 'onboarding_progress',
-        onboarding_progress: 'onboarding_progress',
+        name: "name",
+        displayName: "name",
+        email: "email",
+        avatarUrl: "avatar_url",
+        photoUrl: "avatar_url",
+        hoopRank: "hoop_rank",
+        rating: "hoop_rank",
+        position: "position",
+        height: "height",
+        weight: "weight",
+        zip: "zip",
+        birthdate: "birthdate",
+        dob: "dob",
+        city: "city",
+        fcmToken: "fcm_token",
+        lat: "lat",
+        lng: "lng",
+        onboardingProgress: "onboarding_progress",
+        onboarding_progress: "onboarding_progress",
+        badges: "badges",
       };
 
       // Columns that are JSONB and need special handling
-      const jsonbColumns = new Set(['onboarding_progress']);
+      const jsonbColumns = new Set(["onboarding_progress", "badges"]);
 
       for (const [key, value] of Object.entries(data)) {
         const column = columnMap[key];
@@ -239,20 +295,23 @@ export class UsersService {
         updates.push(`updated_at = NOW()`);
         values.push(id);
         await this.dataSource.query(
-          `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
-          values
+          `UPDATE users SET ${updates.join(", ")} WHERE id = $${paramIndex}`,
+          values,
         );
       }
 
-      const result = await this.dataSource.query(`SELECT * FROM users WHERE id = $1`, [id]);
-      if (result.length === 0) throw new Error('User not found');
+      const result = await this.dataSource.query(
+        `SELECT * FROM users WHERE id = $1`,
+        [id],
+      );
+      if (result.length === 0) throw new Error("User not found");
       return result[0];
     }
 
-    // SQLite fallback  
+    // SQLite fallback
     await this.usersRepository.update(id, data);
     const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user) throw new Error('User not found');
+    if (!user) throw new Error("User not found");
     return user;
   }
 
@@ -266,7 +325,7 @@ export class UsersService {
     if (isPostgres) {
       await this.dataSource.query(
         `UPDATE users SET hoop_rank = $1, updated_at = NOW() WHERE id = $2`,
-        [rating, id]
+        [rating, id],
       );
     } else {
       await this.usersRepository.update(id, { hoopRank: rating });
@@ -277,14 +336,22 @@ export class UsersService {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
-      await this.dataSource.query(`
+      await this.dataSource.query(
+        `
         INSERT INTO friendships (user_id, friend_id, created_at)
         VALUES ($1, $2, NOW())
         ON CONFLICT (user_id, friend_id) DO NOTHING
-      `, [userId, friendId]);
+      `,
+        [userId, friendId],
+      );
     } else {
-      const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });
-      const friend = await this.usersRepository.findOne({ where: { id: friendId } });
+      const user = await this.usersRepository.findOne({
+        where: { id: userId },
+        relations: ["friends"],
+      });
+      const friend = await this.usersRepository.findOne({
+        where: { id: friendId },
+      });
       if (user && friend) {
         user.friends = [...(user.friends || []), friend];
         await this.usersRepository.save(user);
@@ -298,12 +365,15 @@ export class UsersService {
     if (isPostgres) {
       await this.dataSource.query(
         `DELETE FROM friendships WHERE user_id = $1 AND friend_id = $2`,
-        [userId, friendId]
+        [userId, friendId],
       );
     } else {
-      const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });
+      const user = await this.usersRepository.findOne({
+        where: { id: userId },
+        relations: ["friends"],
+      });
       if (user) {
-        user.friends = user.friends.filter(f => f.id !== friendId);
+        user.friends = user.friends.filter((f) => f.id !== friendId);
         await this.usersRepository.save(user);
       }
     }
@@ -314,19 +384,28 @@ export class UsersService {
 
     if (isPostgres) {
       try {
-        return await this.dataSource.query(`
+        return await this.dataSource.query(
+          `
           SELECT u.id, u.name, u.avatar_url, u.hoop_rank, u.position, u.city
           FROM users u
           JOIN friendships f ON f.friend_id = u.id
           WHERE f.user_id = $1
-        `, [userId]);
+        `,
+          [userId],
+        );
       } catch (error) {
-        console.warn(`getFriends: DB error for userId=${userId}:`, error.message);
+        console.warn(
+          `getFriends: DB error for userId=${userId}:`,
+          error.message,
+        );
         return [];
       }
     }
 
-    const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['friends'] });
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: ["friends"],
+    });
     return user?.friends || [];
   }
 
@@ -334,7 +413,8 @@ export class UsersService {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
-      return await this.dataSource.query(`
+      return await this.dataSource.query(
+        `
         SELECT m.*,
           c.name as court_name, c.city as court_city,
           u_creator.name as creator_name, u_creator.avatar_url as creator_photo,
@@ -346,12 +426,19 @@ export class UsersService {
         WHERE m.creator_id = $1 OR m.opponent_id = $1
         ORDER BY m.created_at DESC
         LIMIT 20
-      `, [userId]);
+      `,
+        [userId],
+      );
     }
 
     const user = await this.usersRepository.findOne({
       where: { id: userId },
-      relations: ['createdMatches', 'opponentMatches', 'createdMatches.court', 'opponentMatches.court']
+      relations: [
+        "createdMatches",
+        "opponentMatches",
+        "createdMatches.court",
+        "opponentMatches.court",
+      ],
     });
     if (!user) return [];
     return [...(user.createdMatches || []), ...(user.opponentMatches || [])];
@@ -366,7 +453,8 @@ export class UsersService {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (isPostgres) {
-      return await this.dataSource.query(`
+      return await this.dataSource.query(
+        `
         SELECT m.*,
           c.name as court_name, c.city as court_city,
           u_creator.name as creator_name, u_creator.avatar_url as creator_photo,
@@ -379,13 +467,15 @@ export class UsersService {
           AND m.status IN ('completed', 'ended')
         ORDER BY COALESCE(m.updated_at, m.created_at) DESC
         LIMIT 20
-      `, [userId]);
+      `,
+        [userId],
+      );
     }
 
     const allMatches = await this.getMatches(userId);
     return (allMatches || []).filter((m: any) => {
-      const status = (m?.status || '').toString().toLowerCase();
-      return status === 'completed' || status === 'ended';
+      const status = (m?.status || "").toString().toLowerCase();
+      return status === "completed" || status === "ended";
     });
   }
 
@@ -394,7 +484,8 @@ export class UsersService {
 
     if (isPostgres) {
       // Count wins and losses from completed matches
-      const result = await this.dataSource.query(`
+      const result = await this.dataSource.query(
+        `
         SELECT
           COUNT(*) FILTER (WHERE winner_id = $1) as wins,
           COUNT(*) FILTER (WHERE winner_id IS NOT NULL AND winner_id != $1) as losses,
@@ -402,10 +493,16 @@ export class UsersService {
         FROM matches
         WHERE (creator_id = $1 OR opponent_id = $1)
           AND status IN ('completed', 'ended')
-      `, [userId]);
+      `,
+        [userId],
+      );
 
-      const user = await this.dataSource.query(`SELECT hoop_rank FROM users WHERE id = $1`, [userId]);
-      const hoopRank = user.length > 0 ? parseFloat(user[0].hoop_rank) || 3.0 : 3.0;
+      const user = await this.dataSource.query(
+        `SELECT hoop_rank FROM users WHERE id = $1`,
+        [userId],
+      );
+      const hoopRank =
+        user.length > 0 ? parseFloat(user[0].hoop_rank) || 3.0 : 3.0;
 
       const wins = parseInt(result[0]?.wins) || 0;
       const losses = parseInt(result[0]?.losses) || 0;
@@ -415,7 +512,8 @@ export class UsersService {
         wins,
         losses,
         matchesPlayed,
-        winRate: matchesPlayed > 0 ? Math.round((wins / matchesPlayed) * 100) : 0,
+        winRate:
+          matchesPlayed > 0 ? Math.round((wins / matchesPlayed) * 100) : 0,
         hoopRank,
       };
     }
@@ -489,19 +587,25 @@ export class UsersService {
     const isPostgres = !!process.env.DATABASE_URL;
     try {
       if (isPostgres) {
-        await this.dataSource.query(`
+        await this.dataSource.query(
+          `
           INSERT INTO user_followed_courts (user_id, court_id)
           VALUES ($1, $2)
           ON CONFLICT (user_id, court_id) DO NOTHING
-        `, [userId, courtId]);
+        `,
+          [userId, courtId],
+        );
       } else {
-        await this.dataSource.query(`
+        await this.dataSource.query(
+          `
           INSERT OR IGNORE INTO user_followed_courts (user_id, court_id)
           VALUES (?, ?)
-        `, [userId, courtId]);
+        `,
+          [userId, courtId],
+        );
       }
     } catch (error) {
-      console.error('followCourt service error:', error);
+      console.error("followCourt service error:", error);
       throw error;
     }
   }
@@ -517,16 +621,22 @@ export class UsersService {
   async followPlayer(followerId: string, followedId: string): Promise<void> {
     const isPostgres = !!process.env.DATABASE_URL;
     if (isPostgres) {
-      await this.dataSource.query(`
+      await this.dataSource.query(
+        `
         INSERT INTO user_followed_players (follower_id, followed_id)
         VALUES ($1, $2)
         ON CONFLICT (follower_id, followed_id) DO NOTHING
-      `, [followerId, followedId]);
+      `,
+        [followerId, followedId],
+      );
     } else {
-      await this.dataSource.query(`
+      await this.dataSource.query(
+        `
         INSERT OR IGNORE INTO user_followed_players (follower_id, followed_id)
         VALUES (?, ?)
-      `, [followerId, followedId]);
+      `,
+        [followerId, followedId],
+      );
     }
   }
 
@@ -541,16 +651,22 @@ export class UsersService {
   async followTeam(userId: string, teamId: string): Promise<void> {
     const isPostgres = !!process.env.DATABASE_URL;
     if (isPostgres) {
-      await this.dataSource.query(`
+      await this.dataSource.query(
+        `
         INSERT INTO user_followed_teams (user_id, team_id)
         VALUES ($1, $2)
         ON CONFLICT (user_id, team_id) DO NOTHING
-      `, [userId, teamId]);
+      `,
+        [userId, teamId],
+      );
     } else {
-      await this.dataSource.query(`
+      await this.dataSource.query(
+        `
         INSERT OR IGNORE INTO user_followed_teams (user_id, team_id)
         VALUES (?, ?)
-      `, [userId, teamId]);
+      `,
+        [userId, teamId],
+      );
     }
   }
 
@@ -562,18 +678,24 @@ export class UsersService {
     await this.dataSource.query(query, [userId, teamId]);
   }
 
-  async getFollows(userId: string): Promise<{ courts: any[]; players: any[]; teams: any[] }> {
-
+  async getFollows(
+    userId: string,
+  ): Promise<{ courts: any[]; players: any[]; teams: any[] }> {
     // Query courts
     let courts: any[] = [];
     try {
       courts = await this.dataSource.query(
         `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`,
-        [userId]
+        [userId],
       );
     } catch (courtError) {
-      console.error('getFollows courts ERROR:', courtError.message);
-      return { courts: [], players: [], teams: [], courtsError: courtError.message } as any;
+      console.error("getFollows courts ERROR:", courtError.message);
+      return {
+        courts: [],
+        players: [],
+        teams: [],
+        courtsError: courtError.message,
+      } as any;
     }
 
     // Query players - separate try-catch
@@ -581,11 +703,16 @@ export class UsersService {
     try {
       players = await this.dataSource.query(
         `SELECT followed_id as "playerId" FROM user_followed_players WHERE follower_id = $1`,
-        [userId]
+        [userId],
       );
     } catch (playerError) {
-      console.error('getFollows players ERROR:', playerError.message);
-      return { courts, players: [], teams: [], playersError: playerError.message } as any;
+      console.error("getFollows players ERROR:", playerError.message);
+      return {
+        courts,
+        players: [],
+        teams: [],
+        playersError: playerError.message,
+      } as any;
     }
 
     // Query teams - only return teams that still exist (JOIN against teams table)
@@ -596,20 +723,19 @@ export class UsersService {
          FROM user_followed_teams uft
          JOIN teams t ON t.id = uft.team_id
          WHERE uft.user_id = $1`,
-        [userId]
+        [userId],
       );
     } catch (teamError) {
-      console.error('getFollows teams ERROR:', teamError.message);
+      console.error("getFollows teams ERROR:", teamError.message);
       // Don't fail - just return empty teams
     }
 
     return { courts, players, teams };
   }
 
-
-
-
-  async getFollowedActivity(userId: string): Promise<{ courtActivity: any[]; playerActivity: any[] }> {
+  async getFollowedActivity(
+    userId: string,
+  ): Promise<{ courtActivity: any[]; playerActivity: any[] }> {
     return { courtActivity: [], playerActivity: [] };
   }
 
@@ -617,37 +743,39 @@ export class UsersService {
    * Delete a single user and all their related data
    * Used for testing/admin purposes
    */
-  async deleteUser(userId: string): Promise<{ success: boolean; deletedFrom: string[] }> {
+  async deleteUser(
+    userId: string,
+  ): Promise<{ success: boolean; deletedFrom: string[] }> {
     const deletedFrom: string[] = [];
 
     try {
       // Delete in order respecting foreign keys
       const tables = [
-        { table: 'status_likes', col: 'user_id' },
-        { table: 'status_comments', col: 'user_id' },
-        { table: 'event_attendees', col: 'user_id' },
-        { table: 'player_statuses', col: 'user_id' },
-        { table: 'check_ins', col: 'user_id' },
-        { table: 'user_followed_courts', col: 'user_id' },
-        { table: 'user_followed_players', col: 'follower_id' },
-        { table: 'user_followed_players', col: 'followed_id' },
-        { table: 'user_court_alerts', col: 'user_id' },
-        { table: 'friendships', col: 'user_id' },
-        { table: 'friendships', col: 'friend_id' },
-        { table: 'team_members', col: 'user_id' },
-        { table: 'messages', col: 'from_id' },
-        { table: 'messages', col: 'to_id' },
-        { table: 'matches', col: 'creator_id' },
-        { table: 'matches', col: 'opponent_id' },
-        { table: 'challenges', col: 'challenger_id' },
-        { table: 'challenges', col: 'challenged_id' },
+        { table: "status_likes", col: "user_id" },
+        { table: "status_comments", col: "user_id" },
+        { table: "event_attendees", col: "user_id" },
+        { table: "player_statuses", col: "user_id" },
+        { table: "check_ins", col: "user_id" },
+        { table: "user_followed_courts", col: "user_id" },
+        { table: "user_followed_players", col: "follower_id" },
+        { table: "user_followed_players", col: "followed_id" },
+        { table: "user_court_alerts", col: "user_id" },
+        { table: "friendships", col: "user_id" },
+        { table: "friendships", col: "friend_id" },
+        { table: "team_members", col: "user_id" },
+        { table: "messages", col: "from_id" },
+        { table: "messages", col: "to_id" },
+        { table: "matches", col: "creator_id" },
+        { table: "matches", col: "opponent_id" },
+        { table: "challenges", col: "challenger_id" },
+        { table: "challenges", col: "challenged_id" },
       ];
 
       for (const t of tables) {
         try {
           const result = await this.dataSource.query(
             `DELETE FROM ${t.table} WHERE ${t.col} = $1`,
-            [userId]
+            [userId],
           );
           if (result[1] > 0) {
             deletedFrom.push(`${t.table} (${result[1]} rows)`);
@@ -659,12 +787,14 @@ export class UsersService {
 
       // Finally delete the user
       const userResult = await this.dataSource.query(
-        'DELETE FROM users WHERE id = $1 RETURNING name, email',
-        [userId]
+        "DELETE FROM users WHERE id = $1 RETURNING name, email",
+        [userId],
       );
 
       if (userResult[0]?.length > 0) {
-        deletedFrom.push(`users (${userResult[0][0].name} - ${userResult[0][0].email})`);
+        deletedFrom.push(
+          `users (${userResult[0][0].name} - ${userResult[0][0].email})`,
+        );
       }
 
       return { success: true, deletedFrom };
@@ -678,7 +808,10 @@ export class UsersService {
    * Uses Haversine formula to calculate distance between coordinates.
    * Falls back to zip code geocoding if lat/lng not available.
    */
-  async getNearbyUsers(userId: string, radiusMiles: number = 25): Promise<any[]> {
+  async getNearbyUsers(
+    userId: string,
+    radiusMiles: number = 25,
+  ): Promise<any[]> {
     const isPostgres = !!process.env.DATABASE_URL;
 
     if (!isPostgres) {
@@ -688,31 +821,31 @@ export class UsersService {
     // Simple zip code to lat/lng lookup (approximate center of zip code area)
     const zipCoords: Record<string, { lat: number; lng: number }> = {
       // Oregon
-      '97027': { lat: 45.3762, lng: -122.5967 }, // Gladstone, OR
-      '97034': { lat: 45.4206, lng: -122.6706 }, // Lake Oswego, OR
-      '97201': { lat: 45.5152, lng: -122.6784 }, // Portland, OR
-      '97202': { lat: 45.4829, lng: -122.6515 }, // Portland, OR
-      '97206': { lat: 45.4765, lng: -122.6001 }, // Portland, OR
-      '97045': { lat: 45.3542, lng: -122.5765 }, // Oregon City, OR
+      "97027": { lat: 45.3762, lng: -122.5967 }, // Gladstone, OR
+      "97034": { lat: 45.4206, lng: -122.6706 }, // Lake Oswego, OR
+      "97201": { lat: 45.5152, lng: -122.6784 }, // Portland, OR
+      "97202": { lat: 45.4829, lng: -122.6515 }, // Portland, OR
+      "97206": { lat: 45.4765, lng: -122.6001 }, // Portland, OR
+      "97045": { lat: 45.3542, lng: -122.5765 }, // Oregon City, OR
       // California - Bay Area
-      '94102': { lat: 37.7786, lng: -122.4159 }, // San Francisco, CA
-      '94103': { lat: 37.7726, lng: -122.4110 }, // San Francisco, CA
-      '94107': { lat: 37.7649, lng: -122.3955 }, // San Francisco, CA
-      '94501': { lat: 37.7652, lng: -122.2416 }, // Alameda, CA
-      '94541': { lat: 37.6688, lng: -122.0860 }, // Hayward, CA
-      '94542': { lat: 37.6338, lng: -122.0469 }, // Hayward, CA
-      '94544': { lat: 37.6332, lng: -122.0971 }, // Hayward, CA
-      '94545': { lat: 37.6336, lng: -122.1092 }, // Hayward, CA
+      "94102": { lat: 37.7786, lng: -122.4159 }, // San Francisco, CA
+      "94103": { lat: 37.7726, lng: -122.411 }, // San Francisco, CA
+      "94107": { lat: 37.7649, lng: -122.3955 }, // San Francisco, CA
+      "94501": { lat: 37.7652, lng: -122.2416 }, // Alameda, CA
+      "94541": { lat: 37.6688, lng: -122.086 }, // Hayward, CA
+      "94542": { lat: 37.6338, lng: -122.0469 }, // Hayward, CA
+      "94544": { lat: 37.6332, lng: -122.0971 }, // Hayward, CA
+      "94545": { lat: 37.6336, lng: -122.1092 }, // Hayward, CA
       // Washington
-      '98362': { lat: 48.1181, lng: -123.4307 }, // Port Angeles, WA
-      '98363': { lat: 48.0633, lng: -123.8859 }, // Port Angeles, WA
+      "98362": { lat: 48.1181, lng: -123.4307 }, // Port Angeles, WA
+      "98363": { lat: 48.0633, lng: -123.8859 }, // Port Angeles, WA
     };
 
     try {
       // Get the requesting user's location (with zip fallback)
       const currentUser = await this.dataSource.query(
         `SELECT lat, lng, zip, city FROM users WHERE id = $1`,
-        [userId]
+        [userId],
       );
 
       if (!currentUser[0]) {
@@ -767,7 +900,8 @@ export class UsersService {
       // Query users within radius using Haversine formula
       // Use COALESCE to fall back to zip coordinates for other users too
       // 3959 = Earth's radius in miles
-      const nearbyUsers = await this.dataSource.query(`
+      const nearbyUsers = await this.dataSource.query(
+        `
         WITH user_locations AS (
           SELECT 
             id,
@@ -872,38 +1006,53 @@ export class UsersService {
           ) <= $4
         ORDER BY rating DESC
         LIMIT 100
-      `, [userId, lat, lng, radiusMiles]);
+      `,
+        [userId, lat, lng, radiusMiles],
+      );
 
       return nearbyUsers;
     } catch (error) {
-      console.error('getNearbyUsers error:', error.message);
+      console.error("getNearbyUsers error:", error.message);
       return [];
     }
   }
 
   // ==================== REPORT & BLOCK (Guideline 1.2) ====================
 
-
-
-  async reportUser(reporterId: string, reportedUserId: string, reason: string): Promise<{ success: boolean }> {
+  async reportUser(
+    reporterId: string,
+    reportedUserId: string,
+    reason: string,
+  ): Promise<{ success: boolean }> {
     await this.dataSource.query(
       `INSERT INTO user_reports (reporter_id, reported_user_id, reason) VALUES ($1, $2, $3)`,
       [reporterId, reportedUserId, reason],
     );
-    console.log(`[REPORT] User ${reporterId} reported user ${reportedUserId}: ${reason}`);
+    console.log(
+      `[REPORT] User ${reporterId} reported user ${reportedUserId}: ${reason}`,
+    );
     return { success: true };
   }
 
-  async reportStatus(reporterId: string, statusId: number, reason: string): Promise<{ success: boolean }> {
+  async reportStatus(
+    reporterId: string,
+    statusId: number,
+    reason: string,
+  ): Promise<{ success: boolean }> {
     await this.dataSource.query(
       `INSERT INTO content_reports (reporter_id, status_id, reason) VALUES ($1, $2, $3)`,
       [reporterId, statusId, reason],
     );
-    console.log(`[REPORT] User ${reporterId} reported status ${statusId}: ${reason}`);
+    console.log(
+      `[REPORT] User ${reporterId} reported status ${statusId}: ${reason}`,
+    );
     return { success: true };
   }
 
-  async blockUser(userId: string, targetId: string): Promise<{ success: boolean }> {
+  async blockUser(
+    userId: string,
+    targetId: string,
+  ): Promise<{ success: boolean }> {
     await this.dataSource.query(
       `INSERT INTO blocked_users (user_id, blocked_user_id) VALUES ($1, $2) ON CONFLICT (user_id, blocked_user_id) DO NOTHING`,
       [userId, targetId],
@@ -912,7 +1061,10 @@ export class UsersService {
     return { success: true };
   }
 
-  async unblockUser(userId: string, targetId: string): Promise<{ success: boolean }> {
+  async unblockUser(
+    userId: string,
+    targetId: string,
+  ): Promise<{ success: boolean }> {
     await this.dataSource.query(
       `DELETE FROM blocked_users WHERE user_id = $1 AND blocked_user_id = $2`,
       [userId, targetId],
@@ -940,18 +1092,23 @@ export class UsersService {
    * Delete the authenticated user's own account and all related data.
    * Also deletes the Firebase Auth record.
    */
-  async deleteMyAccount(userId: string): Promise<{ success: boolean; deletedFrom: string[] }> {
+  async deleteMyAccount(
+    userId: string,
+  ): Promise<{ success: boolean; deletedFrom: string[] }> {
     const result = await this.deleteUser(userId);
 
     // Also delete from Firebase Auth
     try {
-      const admin = require('firebase-admin');
+      const admin = require("firebase-admin");
       if (admin.apps.length > 0) {
         await admin.auth().deleteUser(userId);
-        result.deletedFrom.push('firebase-auth');
+        result.deletedFrom.push("firebase-auth");
       }
     } catch (e) {
-      console.warn('[DELETE_ACCOUNT] Firebase Auth deletion failed:', e.message);
+      console.warn(
+        "[DELETE_ACCOUNT] Firebase Auth deletion failed:",
+        e.message,
+      );
     }
 
     return result;

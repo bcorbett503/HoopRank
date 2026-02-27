@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { CacheService } from './common/cache.service';
 
 import { MatchesModule } from './matches/matches.module';
@@ -81,6 +82,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     RankingsModule,
     RunsModule,
     SubscriptionModule,
+    ScheduleModule.forRoot(),
     // Global rate limit: 100 requests per 60 seconds per IP
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
   ],

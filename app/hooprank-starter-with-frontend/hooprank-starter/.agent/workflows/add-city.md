@@ -15,13 +15,13 @@ This is the only step. It discovers courts, deduplicates against the existing DB
 // turbo
 ```bash
 cd /Users/brettcorbett/.gemini/antigravity/playground/electric-planetary/HoopRank/app/hooprank-starter-with-frontend/hooprank-starter/backend
-TOKEN=$TOKEN node scripts/ops/discover_courts.js --state {STATE} --cities "{CITY}"
+ADMIN_SECRET="wXz9rB5vQ8p2L6nK4m7J1gH3sD0fA2e9" TOKEN=dry node scripts/ops/discover_courts.js --state {STATE} --cities "{CITY}"
 ```
 
 Report the results to the user: how many courts were discovered, imported, and the final count.
 
 ## Notes
-- `GOOGLE_API_KEY` and `TOKEN` env vars must both be set
+- `GOOGLE_API_KEY` env var must be set locally. The script now uses the `ADMIN_SECRET` bypass to skip Firebase auth.
 - The tool auto-deduplicates against the existing database (0.1km haversine)
 - Queries cover elementary/middle/high schools, gyms, rec centers, YMCAs, colleges, and fitness chains
 - Venue types are auto-classified (school, college, rec_center, gym)

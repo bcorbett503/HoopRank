@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../services/profile_service.dart';
 import '../services/api_service.dart';
+import '../state/onboarding_checklist_state.dart';
+import '../utils/image_utils.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -20,7 +21,22 @@ class ProfileSetupScreen extends StatefulWidget {
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController _firstNameCtrl = TextEditingController();
   final TextEditingController _lastNameCtrl = TextEditingController();
-  final TextEditingController _zipCtrl = TextEditingController();
+  final TextEditingController _cityCtrl = TextEditingController();
+  List<String> _selectedBadges = [];
+
+  final List<String> _availableBadges = const [
+    // Scorers & Shooters
+    'Bucket', 'Sniper', 'Middy', 'Deep Bag', 'Slasher', 'Microwave', 'Clutch',
+    // Playmakers & Handlers
+    'Handles', 'Dimes', 'Floor General', 'Ankle Breaker', 'Pace Pusher',
+    // Defenders & Hustlers
+    'Lock Down', 'Shot Blocker', 'Pick Pocket', 'Hustle', 'Glue Guy', 'Pest',
+    // Bigs & Rebounders
+    'Big', 'Glass Cleaner', 'Paint Beast', 'Stretch Big', 'Lob Threat',
+    // Hybrids
+    '3&D', 'Two-Way', 'Point Forward', 'Combo Guard',
+  ];
+
   DateTime? _birthdate;
   int _ft = 6;
   int _inch = 0;
@@ -33,7 +49,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // Track if fields have been touched for validation UI
   bool _firstNameTouched = false;
   bool _lastNameTouched = false;
-  bool _zipTouched = false;
+  bool _cityTouched = false;
 
   @override
   void initState() {
@@ -45,7 +61,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   void dispose() {
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
-    _zipCtrl.dispose();
+    _cityCtrl.dispose();
     super.dispose();
   }
 
@@ -62,11 +78,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       // have to delete random values), while still benefiting from their
       // provider avatar if available.
       if (existing != null && !isFirstTimeSetup) {
+        var fName = existing.firstName;
+        var lName = existing.lastName;
+        if ((fName == 'New' && lName == 'Player') || fName == 'Unknown') {
+          fName = '';
+          lName = '';
+        }
         setState(() {
-          _firstNameCtrl.text = existing.firstName;
-          _lastNameCtrl.text = existing.lastName;
+          _firstNameCtrl.text = fName;
+          _lastNameCtrl.text = lName;
           _birthdate = existing.birthdate;
-          _zipCtrl.text = existing.zip;
+          _cityCtrl.text = existing.city;
+          _selectedBadges = List.from(existing.badges);
           _ft = existing.heightFt.clamp(4, 7);
           _inch = existing.heightIn.clamp(0, 11);
           _pos = existing.position;
@@ -77,15 +100,35 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         return;
       }
 
-      // First-time setup defaults: keep inputs empty so hintText appears.
+      // First-time setup: pre-fill name from the auth provider (Apple/Google)
+      // so the user doesn't have to re-type what they already provided.
+      final fullName = auth.currentUser?.name ?? '';
+      final nameParts = fullName.trim().split(RegExp(r'\s+'));
+      var firstName = nameParts.isNotEmpty ? nameParts.first : '';
+      var lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+      if ((firstName == 'New' && lastName == 'Player') ||
+          firstName == 'Unknown') {
+        firstName = '';
+        lastName = '';
+      }
+      final existingHeightFt =
+          existing != null ? existing.heightFt.clamp(4, 7) : 6;
+      final existingHeightIn =
+          existing != null ? existing.heightIn.clamp(0, 11) : 0;
+      final existingPosition = (existing?.position.trim().isNotEmpty == true)
+          ? existing!.position
+          : 'G';
+
       setState(() {
-        _firstNameCtrl.text = '';
-        _lastNameCtrl.text = '';
-        _birthdate = null;
-        _zipCtrl.text = '';
-        _ft = 6;
-        _inch = 0;
-        _pos = 'G';
+        _firstNameCtrl.text = firstName;
+        _lastNameCtrl.text = lastName;
+        _birthdate = existing?.birthdate;
+        _cityCtrl.text = existing?.city ?? '';
+        _selectedBadges = existing != null ? List.from(existing.badges) : [];
+        _ft = existingHeightFt;
+        _inch = existingHeightIn;
+        _pos = existingPosition;
         _profilePictureUrl =
             auth.currentUser?.photoUrl ?? existing?.profilePictureUrl;
         _loading = false;
@@ -180,6 +223,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         // Save profile data including avatar via API
         final profileUpdates = <String, dynamic>{
           'name': '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}',
+          'city': _cityCtrl.text.trim(),
+          'badges': _selectedBadges,
           'position': _pos,
           'height': "$_ft'$_inch\"",
         };
@@ -207,7 +252,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           firstName: _firstNameCtrl.text.trim(),
           lastName: _lastNameCtrl.text.trim(),
           birthdate: _birthdate,
-          zip: _zipCtrl.text.trim(),
+          city: _cityCtrl.text.trim(),
+          badges: _selectedBadges,
           heightFt: _ft,
           heightIn: _inch,
           position: _pos,
@@ -224,12 +270,27 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           debugPrint('Refresh user failed (continuing anyway): $e');
         }
 
-        // CRITICAL: Update local user position to ensure isProfileComplete returns true
-        // This is needed because refreshUser might fail but we know the profile was saved
-        await auth.updateUserPosition(_pos);
+        // Keep local user profile coherent even when the refresh endpoint is stale/unavailable.
+        final fullName =
+            '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}'.trim();
+        final effectivePhotoUrl = avatarUrl ?? _profilePictureUrl;
+        await auth.updateUserPosition(
+          _pos,
+          height: "$_ft'$_inch\"",
+          name: fullName.isNotEmpty ? fullName : null,
+          photoUrl: effectivePhotoUrl,
+          city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
+          badges: _selectedBadges,
+        );
         debugPrint('Local user position updated to: $_pos');
 
-        if (mounted) context.go('/play');
+        // Mark the checklist item as complete if they edit their profile.
+        if (mounted) {
+          context
+              .read<OnboardingChecklistState>()
+              .completeItem(OnboardingItems.setupProfile);
+          context.go('/play');
+        }
       }
     } catch (e) {
       debugPrint('Profile save error: $e');
@@ -304,13 +365,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (_loading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    // Trim and strip any invisible chars iPad keyboard may insert
-    final zipText = _zipCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
-    final zipValid = zipText.isEmpty || RegExp(r'^[0-9]{5}$').hasMatch(zipText);
+    // City is optional. If provided, it accepts any text.
+    final cityValid = true; // City is optional
     final nameValid = _firstNameCtrl.text.trim().isNotEmpty &&
         _lastNameCtrl.text.trim().isNotEmpty;
-    // Only name is required — ZIP is optional (GPS provides location)
-    final canSave = nameValid && zipValid;
+    // Only name is required — City is optional (GPS provides location)
+    final canSave = nameValid && cityValid;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Setup Profile')),
@@ -360,16 +420,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                 fit: BoxFit.cover, width: 110, height: 110)
                             : (_profilePictureUrl != null &&
                                     !_profilePictureUrl!.startsWith('/'))
-                                ? (_profilePictureUrl!.startsWith('data:')
-                                    ? Image.memory(
-                                        Uri.parse(_profilePictureUrl!).data!.contentAsBytes(),
-                                        fit: BoxFit.cover, width: 110, height: 110,
-                                        errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.grey.shade600, size: 40),
-                                      )
-                                    : Image.network(_profilePictureUrl!,
-                                        fit: BoxFit.cover, width: 110, height: 110,
-                                        errorBuilder: (_, __, ___) => Icon(Icons.person, color: Colors.grey.shade600, size: 40),
-                                      ))
+                                ? Image(
+                                    image:
+                                        safeImageProvider(_profilePictureUrl!),
+                                    fit: BoxFit.cover,
+                                    width: 110,
+                                    height: 110,
+                                    errorBuilder: (_, __, ___) => Icon(
+                                      Icons.person,
+                                      color: Colors.grey.shade600,
+                                      size: 40,
+                                    ),
+                                  )
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
@@ -496,27 +558,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
             const SizedBox(height: 16),
 
-            // ZIP - Optional, GPS handles location (App Store Guidelines 5.1.1 & 2.1)
-            _buildFieldLabel('ZIP Code', zipText.length == 5, _zipTouched,
+            // City - Optional, GPS handles location (App Store Guidelines 5.1.1 & 2.1)
+            _buildFieldLabel(
+                'City', _cityCtrl.text.trim().isNotEmpty, _cityTouched,
                 required: false, optional: true),
             TextField(
-              controller: _zipCtrl,
-              decoration: InputDecoration(
-                hintText: 'e.g. 94103',
+              controller: _cityCtrl,
+              decoration: const InputDecoration(
+                hintText: 'e.g. San Francisco, CA',
                 helperText: 'Optional — we can use your GPS location instead',
-                helperStyle: const TextStyle(color: Colors.grey, fontSize: 11),
-                errorText:
-                    _zipTouched && zipText.isNotEmpty && zipText.length != 5
-                        ? 'ZIP code must be 5 digits'
-                        : null,
-                border: const OutlineInputBorder(),
+                helperStyle: TextStyle(color: Colors.grey, fontSize: 11),
+                border: OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(5),
-              ],
-              onChanged: (_) => setState(() => _zipTouched = true),
+              textCapitalization: TextCapitalization.words,
+              onChanged: (_) => setState(() => _cityTouched = true),
             ),
             const SizedBox(height: 16),
 
@@ -582,6 +637,52 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       if (s) setState(() => _pos = p);
                     },
                   ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 32),
+
+            // Badges
+            const Text('Player Badges',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text(
+              'Select up to 3 badges that define your playstyle.',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: _availableBadges.map((badge) {
+                final isSelected = _selectedBadges.contains(badge);
+                return FilterChip(
+                  label: Text(badge),
+                  selected: isSelected,
+                  selectedColor: Colors.deepOrange.withOpacity(0.2),
+                  checkmarkColor: Colors.deepOrange,
+                  side: BorderSide(
+                    color:
+                        isSelected ? Colors.deepOrange : Colors.grey.shade300,
+                  ),
+                  onSelected: (bool selected) {
+                    setState(() {
+                      if (selected) {
+                        if (_selectedBadges.length < 3) {
+                          _selectedBadges.add(badge);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('You can only select up to 3 badges.'),
+                                duration: Duration(seconds: 2)),
+                          );
+                        }
+                      } else {
+                        _selectedBadges.remove(badge);
+                      }
+                    });
+                  },
                 );
               }).toList(),
             ),

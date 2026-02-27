@@ -91,14 +91,25 @@ export class RunsService {
                 sr.tagged_player_ids as "taggedPlayerIds",
                 sr.tag_mode as "tagMode",
                 sr.created_at as "createdAt",
+                sr.is_recurring as "isRecurring",
+                sr.recurrence_rule as "recurrenceRule",
                 COALESCE((SELECT COUNT(*) FROM run_attendees WHERE run_id = sr.id), 0)::INTEGER as "attendeeCount",
                 EXISTS(SELECT 1 FROM run_attendees WHERE run_id = sr.id AND user_id = $2) as "isAttending"
             FROM scheduled_runs sr
             LEFT JOIN courts c ON sr.court_id::TEXT = c.id::TEXT
             LEFT JOIN users u ON sr.created_by::TEXT = u.id::TEXT
             WHERE sr.court_id::TEXT = $1::TEXT
-              AND sr.scheduled_at >= $3
-              AND sr.is_recurring = false
+              AND (
+                 sr.is_recurring = true 
+                 OR 
+                 (sr.scheduled_at >= $3 AND sr.is_recurring = false AND NOT EXISTS (
+                     SELECT 1 FROM scheduled_runs parent 
+                     WHERE parent.is_recurring = true 
+                       AND parent.court_id = sr.court_id 
+                       AND parent.title = sr.title
+                       AND parent.duration_minutes = sr.duration_minutes
+                 ))
+              )
             ORDER BY sr.scheduled_at ASC
         `, [courtId, userId || '', now]);
 

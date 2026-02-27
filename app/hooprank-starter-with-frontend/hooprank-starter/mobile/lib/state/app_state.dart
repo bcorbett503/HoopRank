@@ -258,18 +258,38 @@ class AuthState extends ChangeNotifier {
     }
   }
 
-  /// Update the user's position locally (used after profile setup to ensure isProfileComplete works)
-  Future<void> updateUserPosition(String position) async {
+  /// Update the cached user after profile setup.
+  Future<void> updateUserPosition(
+    String position, {
+    String? name,
+    String? photoUrl,
+    String? height,
+    String? city,
+    List<String>? badges,
+  }) async {
     if (_currentUser == null) return;
-    debugPrint('Updating user position locally to: $position (current photoUrl=${_currentUser!.photoUrl})');
+    final current = _currentUser!;
+    final nextName =
+        (name != null && name.trim().isNotEmpty) ? name.trim() : current.name;
+    debugPrint(
+        'Updating user position locally to: $position (current photoUrl=${current.photoUrl})');
     _currentUser = User(
-      id: _currentUser!.id,
-      name: _currentUser!.name,
-      photoUrl: _currentUser!.photoUrl,
-      team: _currentUser!.team,
+      id: current.id,
+      name: nextName,
+      photoUrl: photoUrl ?? current.photoUrl,
+      team: current.team,
       position: position,
-      rating: _currentUser!.rating,
-      matchesPlayed: _currentUser!.matchesPlayed,
+      rating: current.rating,
+      matchesPlayed: current.matchesPlayed,
+      height: height ?? current.height,
+      wins: current.wins,
+      losses: current.losses,
+      city: city ?? current.city,
+      gamesPlayed: current.gamesPlayed,
+      gamesContested: current.gamesContested,
+      contestRate: current.contestRate,
+      age: current.age,
+      badges: badges ?? current.badges,
     );
     notifyListeners();
 
@@ -285,6 +305,15 @@ class AuthState extends ChangeNotifier {
           'position': _currentUser!.position,
           'rating': _currentUser!.rating,
           'matchesPlayed': _currentUser!.matchesPlayed,
+          'height': _currentUser!.height,
+          'wins': _currentUser!.wins,
+          'losses': _currentUser!.losses,
+          'city': _currentUser!.city,
+          'gamesPlayed': _currentUser!.gamesPlayed,
+          'gamesContested': _currentUser!.gamesContested,
+          'contestRate': _currentUser!.contestRate,
+          'age': _currentUser!.age,
+          'badges': _currentUser!.badges,
         }));
   }
 
