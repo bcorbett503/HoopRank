@@ -14,7 +14,7 @@ const crypto = require('crypto');
 
 const BASE = 'https://heartfelt-appreciation-production-65f1.up.railway.app';
 const BASE_HOST = 'heartfelt-appreciation-production-65f1.up.railway.app';
-const BRETT_ID = 'Nb6UhM5ExOeUMWIRMeaxswVnLQl2';
+const BRETT_ID = '4ODZUrySRUhFDC5wVW6dCySBprD2'; // Re-mapped to Admin System UUID to prevent UI leakage
 const DAY = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 const STATE_NAMES = { NY: 'New York', IL: 'Illinois', FL: 'Florida', PA: 'Pennsylvania', OH: 'Ohio', MI: 'Michigan', GA: 'Georgia', NC: 'North Carolina', NJ: 'New Jersey', VA: 'Virginia', IN: 'Indiana', TN: 'Tennessee', MD: 'Maryland', MO: 'Missouri', WI: 'Wisconsin', MN: 'Minnesota', AL: 'Alabama', SC: 'South Carolina', LA: 'Louisiana', KY: 'Kentucky', CO: 'Colorado', AZ: 'Arizona', CT: 'Connecticut', OK: 'Oklahoma', MS: 'Mississippi', NV: 'Nevada', KS: 'Kansas', IA: 'Iowa', UT: 'Utah', NE: 'Nebraska', NM: 'New Mexico', WV: 'West Virginia', HI: 'Hawaii', DC: 'District of Columbia', DE: 'Delaware', ME: 'Maine', VT: 'Vermont', ID: 'Idaho', MT: 'Montana', WY: 'Wyoming', ND: 'North Dakota', SD: 'South Dakota', AK: 'Alaska', CA: 'California', TX: 'Texas', WA: 'Washington', OR: 'Oregon' };
 

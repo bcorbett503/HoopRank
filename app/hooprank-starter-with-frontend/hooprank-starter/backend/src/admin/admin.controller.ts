@@ -449,4 +449,29 @@ export class AdminController {
             return { success: false, error: error.message };
         }
     }
+
+    /**
+     * Transfer authorship of all scheduled runs from a testing ID to the main HoopRank ID
+     */
+    @Post('cleanup/transfer-authorship')
+    async transferAuthorship() {
+        try {
+            const BrettId = 'Nb6UhM5ExOeUMWIRMeaxswVnLQl2';
+            const HoopRankAdminId = '4ODZUrySRUhFDC5wVW6dCySBprD2';
+
+            const result = await this.dataSource.query(`
+                UPDATE scheduled_runs 
+                SET created_by = $1 
+                WHERE created_by = $2
+            `, [HoopRankAdminId, BrettId]);
+
+            return {
+                success: true,
+                message: 'Successfully transferred authorship to HoopRank system.',
+                migratedCount: result[1] !== undefined ? result[1] : 'unknown'
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }
