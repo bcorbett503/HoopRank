@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
-import '../state/onboarding_checklist_state.dart';
+import 'onboarding_checklist_card.dart';
 import '../utils/image_utils.dart';
 
 /// Shared HoopRank app bar widget for consistent top bar across all screens
@@ -67,12 +67,13 @@ class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
                 child: CircleAvatar(
                   radius: 16,
                   backgroundColor: Colors.deepOrange,
-                  backgroundImage: photoUrl != null &&
-                          !isPlaceholderImage(photoUrl)
-                      ? safeImageProvider(photoUrl)
-                      : null,
+                  backgroundImage:
+                      photoUrl != null && !isPlaceholderImage(photoUrl)
+                          ? safeImageProvider(photoUrl)
+                          : null,
                   onBackgroundImageError: photoUrl != null
-                      ? (_, __) => debugPrint('App bar avatar failed to load: $photoUrl')
+                      ? (_, __) =>
+                          debugPrint('App bar avatar failed to load: $photoUrl')
                       : null,
                   child: (photoUrl == null || isPlaceholderImage(photoUrl))
                       ? const Icon(Icons.person, size: 18, color: Colors.white)
@@ -87,12 +88,7 @@ class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
           icon: const Icon(Icons.help_outline),
           tooltip: 'Show Checklist',
           onPressed: () async {
-            final onboarding =
-                  Provider.of<OnboardingChecklistState>(context, listen: false);
-              await onboarding.undismiss();
-              if (context.mounted) {
-                context.go('/play');
-              }
+            await showOnboardingChecklistSheet(context);
           },
         ),
         // Logout button

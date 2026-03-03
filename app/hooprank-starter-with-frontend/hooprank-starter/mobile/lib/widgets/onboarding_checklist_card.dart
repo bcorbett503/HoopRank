@@ -3,6 +3,28 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../state/onboarding_checklist_state.dart';
 
+Future<void> showOnboardingChecklistSheet(BuildContext context) async {
+  final onboarding =
+      Provider.of<OnboardingChecklistState>(context, listen: false);
+  await onboarding.undismiss();
+  if (!context.mounted) return;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: OnboardingChecklistCard(
+          forceVisible: true,
+          onCloseRequested: () => Navigator.of(sheetContext).pop(),
+        ),
+      ),
+    ),
+  );
+}
+
 /// Metadata for a single checklist row.
 class _ChecklistItemConfig {
   final String key;
@@ -75,7 +97,14 @@ const _items = [
 /// Compact onboarding checklist card shown between the status composer and the
 /// feed on the home screen. Automatically hides when all items are complete.
 class OnboardingChecklistCard extends StatefulWidget {
-  const OnboardingChecklistCard({super.key});
+  final bool forceVisible;
+  final VoidCallback? onCloseRequested;
+
+  const OnboardingChecklistCard({
+    super.key,
+    this.forceVisible = false,
+    this.onCloseRequested,
+  });
 
   @override
   State<OnboardingChecklistCard> createState() =>
@@ -117,7 +146,7 @@ class _OnboardingChecklistCardState extends State<OnboardingChecklistCard>
   Widget build(BuildContext context) {
     final state = context.watch<OnboardingChecklistState>();
 
-    if (!state.shouldShow) {
+    if (!state.shouldShow && !widget.forceVisible) {
       // Show celebration briefly before hiding
       if (_showCelebration) {
         return ScaleTransition(
@@ -222,7 +251,13 @@ class _OnboardingChecklistCardState extends State<OnboardingChecklistCard>
                     ),
                     // X dismiss button
                     GestureDetector(
-                      onTap: () => state.dismiss(),
+                      onTap: () {
+                        if (widget.onCloseRequested != null) {
+                          widget.onCloseRequested!();
+                          return;
+                        }
+                        state.dismiss();
+                      },
                       child: const Padding(
                         padding: EdgeInsets.all(4),
                         child:

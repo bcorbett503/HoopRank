@@ -2165,9 +2165,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.help_outline),
             tooltip: 'Show Checklist',
             onPressed: () async {
-              final onboarding =
-                  Provider.of<OnboardingChecklistState>(context, listen: false);
-              await onboarding.undismiss();
+              await showOnboardingChecklistSheet(context);
             },
           ),
           IconButton(
