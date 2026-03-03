@@ -26,10 +26,10 @@ export class TeamEvent {
   @Column({ type: "text" })
   title: string;
 
-  @Column({ name: "event_date", type: "datetime" })
+  @Column({ name: "event_date", type: process.env.DATABASE_URL ? "timestamp" : "datetime" })
   eventDate: Date;
 
-  @Column({ name: "end_date", type: "datetime", nullable: true })
+  @Column({ name: "end_date", type: process.env.DATABASE_URL ? "timestamp" : "datetime", nullable: true })
   endDate: Date | null;
 
   @Column({ name: "location_name", type: "text", nullable: true })

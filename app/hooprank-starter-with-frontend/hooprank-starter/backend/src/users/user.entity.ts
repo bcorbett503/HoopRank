@@ -108,7 +108,7 @@ export class User {
   })
   subscriptionTier: string; // 'free' | 'pro' | 'elite'
 
-  @Column({ name: "subscription_expires_at", type: "datetime", nullable: true })
+  @Column({ name: "subscription_expires_at", type: process.env.DATABASE_URL ? "timestamp" : "datetime", nullable: true })
   subscriptionExpiresAt: Date;
 
   @Column({ name: "fcm_token", type: "text", nullable: true })

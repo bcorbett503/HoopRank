@@ -59,7 +59,7 @@ export class Match {
   @Column({ name: "score_opponent", type: "int", nullable: true })
   scoreOpponent: number;
 
-  @Column({ name: "timer_start", type: "datetime", nullable: true })
+  @Column({ name: "timer_start", type: process.env.DATABASE_URL ? "timestamp" : "datetime", nullable: true })
   timerStart: Date;
 
   @Column({ type: "simple-json", nullable: true })
@@ -84,7 +84,7 @@ export class Match {
   @Column({ name: "opponent_team_id", type: "uuid", nullable: true })
   opponentTeamId: string;
 
-  @Column({ name: "completed_at", type: "datetime", nullable: true })
+  @Column({ name: "completed_at", type: process.env.DATABASE_URL ? "timestamp" : "datetime", nullable: true })
   completedAt: Date;
 
   @CreateDateColumn({ name: "created_at" })
