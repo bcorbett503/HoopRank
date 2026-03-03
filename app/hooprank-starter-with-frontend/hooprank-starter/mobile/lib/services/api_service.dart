@@ -203,7 +203,8 @@ class ApiService {
       debugPrint('AUTHENTICATE: raw response.body = ${response.body}');
       final data = jsonDecode(response.body);
       debugPrint('AUTHENTICATE: parsed json position = ${data['position']}');
-      debugPrint('AUTHENTICATE: parsed json photoUrl = ${data['photoUrl']}, avatar_url = ${data['avatar_url']}');
+      debugPrint(
+          'AUTHENTICATE: parsed json photoUrl = ${data['photoUrl']}, avatar_url = ${data['avatar_url']}');
       return User.fromJson(data);
     } else {
       throw Exception('Failed to authenticate');
@@ -252,7 +253,8 @@ class ApiService {
   }
 
   /// Push updated onboarding progress to the backend
-  static Future<void> updateOnboardingProgress(Map<String, bool> progress) async {
+  static Future<void> updateOnboardingProgress(
+      Map<String, bool> progress) async {
     if (_userId == null || _userId!.isEmpty) return;
 
     try {
@@ -267,6 +269,38 @@ class ApiService {
     } catch (e) {
       debugPrint('ONBOARDING: Failed to push progress to backend: $e');
     }
+  }
+
+  /// Get current privacy/discovery settings.
+  /// Falls back to sane defaults when offline or missing.
+  static Future<Map<String, dynamic>> getPrivacySettings() async {
+    if (_userId == null || _userId!.isEmpty) {
+      return {
+        'discoverRadiusMi': 25.0,
+        'discoverMode': 'open',
+      };
+    }
+
+    try {
+      final response = await authedGet(
+        Uri.parse('$baseUrl/me/privacy'),
+        headers: {'x-user-id': _userId!},
+      );
+
+      if (response.statusCode == 200) {
+        final parsed = jsonDecode(response.body);
+        if (parsed is Map<String, dynamic>) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to get privacy settings: $e');
+    }
+
+    return {
+      'discoverRadiusMi': 25.0,
+      'discoverMode': 'open',
+    };
   }
 
   /// Generic GET request to any endpoint
@@ -518,6 +552,42 @@ class ApiService {
       throw Exception(errorMessage);
     }
     return jsonDecode(response.body);
+  }
+
+  /// Create an app invite token with deep-link URLs.
+  /// Returns null on failure so callers can fall back to static store URLs.
+  static Future<Map<String, dynamic>?> createInvite({
+    int ttlSeconds = 604800,
+  }) async {
+    final response = await authedPost(
+      Uri.parse('$baseUrl/invites'),
+      headers: {
+        'x-user-id': _userId ?? '',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'type': 'match',
+        'ttlSec': ttlSeconds,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final parsed = jsonDecode(response.body);
+      if (parsed is Map<String, dynamic>) {
+        final appUrl = parsed['appUrl']?.toString().trim();
+        final joinUrl = parsed['joinUrl']?.toString().trim();
+        return {
+          ...parsed,
+          if (appUrl != null && appUrl.isNotEmpty) 'appUrl': appUrl,
+          if (joinUrl != null && joinUrl.isNotEmpty) 'joinUrl': joinUrl,
+        };
+      }
+    }
+
+    debugPrint(
+      'Failed to create invite: ${response.statusCode} ${response.body}',
+    );
+    return null;
   }
 
   /// Get pending challenges for the current user

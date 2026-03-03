@@ -35,6 +35,7 @@ class User {
   final String? team; // Used as zipcode/location fallback
   final String? position; // 'G', 'F', 'C'
   final double rating;
+  final double? distanceMi;
   final int matchesPlayed;
   final String? height;
   final int wins;
@@ -54,6 +55,7 @@ class User {
     this.team,
     this.position,
     this.rating = 3.0,
+    this.distanceMi,
     this.matchesPlayed = 0,
     this.height,
     this.wins = 0,
@@ -98,6 +100,14 @@ class User {
       team: json['team']?.toString(),
       position: position,
       rating: _parseDouble(json['rating'] ?? json['hoop_rank'], fallback: 3.0),
+      distanceMi: (() {
+        final rawDistance = json['distanceMi'] ??
+            json['distance_mi'] ??
+            json['distanceMiles'] ??
+            json['distance_miles'];
+        if (rawDistance == null) return null;
+        return _parseDouble(rawDistance);
+      })(),
       matchesPlayed: _parseInt(json['matchesPlayed'] ?? json['matches_played']),
       height: json['height']?.toString(),
       wins: _parseInt(json['wins']),
@@ -523,7 +533,15 @@ class ScheduledRun {
     final localScheduled = scheduledAt.toLocal();
 
     if (isRecurring) {
-      final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][localScheduled.weekday - 1];
+      final dayName = [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday'
+      ][localScheduled.weekday - 1];
       return 'Every $dayName ${_formatTime(localScheduled)}';
     }
 

@@ -5,12 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app_config.dart';
 import '../services/location_service.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
 import '../services/notification_service.dart';
 import '../services/analytics_service.dart';
+import '../services/recommended_matchup_engine.dart';
 import '../state/app_state.dart';
 import '../state/onboarding_checklist_state.dart';
 import '../widgets/onboarding_checklist_card.dart';
@@ -23,10 +27,11 @@ import '../widgets/hooprank_feed.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
 import 'status_composer_screen.dart';
 import 'package:video_player/video_player.dart';
-import '../widgets/court_details_sheet.dart';
 import '../widgets/team_selection_sheet.dart';
 import '../widgets/status_composer_sheet.dart';
-import '../widgets/recurrence_dialog.dart';
+import '../widgets/challenge_composer_sheet.dart';
+import '../widgets/home_primary_action_section.dart';
+import '../widgets/player_profile_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,6 +73,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // Status bar expansion state
   bool _isStatusBarExpanded = false;
   int _feedReloadVersion = 0;
+  HomePrimaryActionState _primaryActionState = HomePrimaryActionState.loading;
+  RecommendedMatchup? _recommendedMatchup;
+  bool _isPrimaryActionSubmitting = false;
+  List<User> _primaryActionCandidates = [];
+  final Set<String> _skippedSuggestedMatchupIds = <String>{};
+  String? _loadedSkippedMatchupsUserId;
+  String _primaryDiscoverMode = 'open';
+  double _primaryDiscoverRadiusMi = 25.0;
+  bool _primarySuggestionSkippedThisSession = false;
+
+  String _skippedSuggestedMatchupsPrefsKey(String userId) =>
+      'user_${userId}_skipped_suggested_matchups';
+
+  Future<void> _loadSkippedSuggestedMatchupsForUser(String userId) async {
+    if (_loadedSkippedMatchupsUserId == userId) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved =
+          prefs.getStringList(_skippedSuggestedMatchupsPrefsKey(userId));
+      _skippedSuggestedMatchupIds
+        ..clear()
+        ..addAll(saved ?? const <String>[]);
+    } catch (e) {
+      debugPrint('PRIMARY_ACTION: failed loading skipped suggestions: $e');
+      _skippedSuggestedMatchupIds.clear();
+    } finally {
+      _loadedSkippedMatchupsUserId = userId;
+    }
+  }
+
+  Future<void> _persistSkippedSuggestedMatchupsForUser(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        _skippedSuggestedMatchupsPrefsKey(userId),
+        _skippedSuggestedMatchupIds.toList(),
+      );
+    } catch (e) {
+      debugPrint('PRIMARY_ACTION: failed saving skipped suggestions: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -83,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadMyTeams(); // Load user's teams for ratings
     _loadTeamInvites(); // Load pending team invites
     _loadTeamChallenges(); // Load pending team challenges
+    _loadPrimaryAction(); // Load suggested matchup/invite fallback
     _statusController
         .addListener(_onStatusTextChanged); // Court tagging listener
   }
@@ -168,7 +215,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
 
       if (mounted) {
-        debugPrint('ONBOARDING: _submitStatus completed, _scheduledTime=$_scheduledTime');
+        debugPrint(
+            'ONBOARDING: _submitStatus completed, _scheduledTime=$_scheduledTime');
         String message = 'Status updated!';
         if (_scheduledTime != null) {
           message = 'Game scheduled!';
@@ -616,6 +664,301 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  bool _isValidShareTarget(String? value) {
+    if (value == null) return false;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return false;
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed == null) return false;
+    if (parsed.scheme == 'hooprank') return true;
+    return parsed.hasScheme && parsed.hasAuthority;
+  }
+
+  String _resolveShareUrl(Map<String, dynamic>? invite) {
+    final appUrl = invite?['appUrl']?.toString().trim();
+    final joinUrl = invite?['joinUrl']?.toString().trim();
+
+    if (_isValidShareTarget(appUrl)) return appUrl!;
+    if (_isValidShareTarget(joinUrl)) return joinUrl!;
+    return AppConfig.appStoreUrl.toString();
+  }
+
+  Future<({String? id, String? name})> _resolveSuggestedVenue(
+      User player) async {
+    final checkInState = context.read<CheckInState>();
+    final courtService = CourtService();
+    await courtService.loadCourts();
+
+    Court? _courtById(String id) => courtService.getCourtById(id);
+
+    for (final courtId in checkInState.userCheckedInCourts) {
+      final court = _courtById(courtId);
+      if (court != null) {
+        return (id: court.id, name: court.name);
+      }
+    }
+
+    final followedCourtIds = checkInState.followedCourts.toList();
+    if (followedCourtIds.isNotEmpty) {
+      final city = player.city?.trim();
+      if (city != null && city.isNotEmpty) {
+        final cityLower = city.toLowerCase();
+        Court? cityMatch;
+        int cityMatchFollowers = -1;
+        for (final courtId in followedCourtIds) {
+          final court = _courtById(courtId);
+          if (court == null) continue;
+          final haystack = '${court.name} ${court.address ?? ''}'.toLowerCase();
+          if (!haystack.contains(cityLower)) continue;
+
+          final followerCount = checkInState.getFollowerCount(courtId);
+          if (cityMatch == null || followerCount > cityMatchFollowers) {
+            cityMatch = court;
+            cityMatchFollowers = followerCount;
+          }
+        }
+        if (cityMatch != null) {
+          return (id: cityMatch.id, name: cityMatch.name);
+        }
+      }
+
+      for (final courtId in followedCourtIds) {
+        final court = _courtById(courtId);
+        if (court != null) {
+          return (id: court.id, name: court.name);
+        }
+      }
+    }
+
+    final cityFallback = player.city?.trim();
+    if (cityFallback != null && cityFallback.isNotEmpty) {
+      return (id: null, name: 'Any court in $cityFallback');
+    }
+    return (id: null, name: null);
+  }
+
+  Future<void> _recomputePrimaryActionFromCandidates() async {
+    if (_primarySuggestionSkippedThisSession) {
+      if (!mounted) return;
+      setState(() {
+        _recommendedMatchup = null;
+        _primaryActionState = HomePrimaryActionState.inviteFallback;
+      });
+      return;
+    }
+
+    final authUser = context.read<AuthState>().currentUser;
+    if (authUser == null) {
+      if (!mounted) return;
+      setState(() {
+        _recommendedMatchup = null;
+        _primaryActionState = HomePrimaryActionState.inviteFallback;
+      });
+      return;
+    }
+
+    final candidatePool = _primaryActionCandidates
+        .where((user) => !_skippedSuggestedMatchupIds.contains(user.id))
+        .toList();
+
+    final recommended = RecommendedMatchupEngine.pickBest(
+      currentUser: authUser,
+      candidates: candidatePool,
+      discoverMode: _primaryDiscoverMode,
+      searchRadiusMiles: _primaryDiscoverRadiusMi,
+    );
+
+    RecommendedMatchup? enriched = recommended;
+    if (recommended != null) {
+      final venue = await _resolveSuggestedVenue(recommended.player);
+      enriched = recommended.copyWith(
+        suggestedVenueId: venue.id,
+        suggestedVenueName: venue.name,
+      );
+    }
+
+    if (!mounted) return;
+    if (_primarySuggestionSkippedThisSession) {
+      setState(() {
+        _recommendedMatchup = null;
+        _primaryActionState = HomePrimaryActionState.inviteFallback;
+      });
+      return;
+    }
+    setState(() {
+      _recommendedMatchup = enriched;
+      _primaryActionState = enriched == null
+          ? HomePrimaryActionState.inviteFallback
+          : HomePrimaryActionState.recommended;
+    });
+  }
+
+  Future<void> _loadPrimaryAction() async {
+    if (!mounted) return;
+
+    final authUser = context.read<AuthState>().currentUser;
+    if (authUser == null) {
+      if (mounted) {
+        setState(() {
+          _recommendedMatchup = null;
+          _primaryActionCandidates = [];
+          _skippedSuggestedMatchupIds.clear();
+          _loadedSkippedMatchupsUserId = null;
+          _primarySuggestionSkippedThisSession = false;
+          _primaryActionState = HomePrimaryActionState.inviteFallback;
+        });
+      }
+      return;
+    }
+
+    await _loadSkippedSuggestedMatchupsForUser(authUser.id);
+
+    if (_primarySuggestionSkippedThisSession) {
+      setState(() {
+        _recommendedMatchup = null;
+        _primaryActionState = HomePrimaryActionState.inviteFallback;
+      });
+      return;
+    }
+
+    setState(() => _primaryActionState = HomePrimaryActionState.loading);
+
+    try {
+      final privacy = await ApiService.getPrivacySettings();
+      final discoverMode =
+          (privacy['discoverMode']?.toString() ?? 'open').toLowerCase();
+      final discoverRadiusMi = (() {
+        final value = privacy['discoverRadiusMi'];
+        if (value is num) return value.toDouble();
+        return double.tryParse(value?.toString() ?? '') ?? 25.0;
+      })();
+
+      final nearby = await ApiService.getNearbyPlayers(
+        radiusMiles: discoverRadiusMi.round().clamp(1, 100),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _primaryActionCandidates = nearby;
+        _primaryDiscoverMode = discoverMode;
+        _primaryDiscoverRadiusMi = discoverRadiusMi;
+      });
+      await _recomputePrimaryActionFromCandidates();
+    } catch (e) {
+      debugPrint('PRIMARY_ACTION: Failed to load recommendation: $e');
+      if (!mounted) return;
+      setState(() {
+        _recommendedMatchup = null;
+        _primaryActionCandidates = [];
+        _primaryActionState = HomePrimaryActionState.inviteFallback;
+      });
+    }
+  }
+
+  Future<void> _handleSkipSuggestion() async {
+    if (_isPrimaryActionSubmitting) return;
+    final current = _recommendedMatchup;
+    if (current == null) return;
+    _primarySuggestionSkippedThisSession = true;
+    _skippedSuggestedMatchupIds.add(current.player.id);
+    final authUserId = context.read<AuthState>().currentUser?.id;
+    if (authUserId != null && authUserId.isNotEmpty) {
+      await _persistSkippedSuggestedMatchupsForUser(authUserId);
+    }
+    if (mounted) {
+      setState(() {
+        _recommendedMatchup = null;
+        _primaryActionState = HomePrimaryActionState.inviteFallback;
+      });
+    }
+    await _handleInviteFriends();
+  }
+
+  void _handleOpenSuggestedProfile() {
+    final current = _recommendedMatchup;
+    if (current == null) return;
+    PlayerProfileSheet.showById(context, current.player.id);
+  }
+
+  void _handleOpenSuggestedVenue() {
+    final venueId = _recommendedMatchup?.suggestedVenueId;
+    if (venueId == null || venueId.isEmpty) return;
+    context.go('/courts?courtId=${Uri.encodeComponent(venueId)}');
+  }
+
+  Future<void> _handlePrimaryChallenge() async {
+    if (_isPrimaryActionSubmitting) return;
+    final matchup = _recommendedMatchup;
+    if (matchup == null) return;
+
+    final note = await showChallengeComposerSheet(
+      context: context,
+      player: matchup.player,
+      initialMessage: 'Want to run 1v1?',
+    );
+    if (!mounted || note == null) return;
+
+    setState(() => _isPrimaryActionSubmitting = true);
+    try {
+      await ApiService.createChallenge(
+        toUserId: matchup.player.id,
+        message: note.isEmpty ? 'Want to run 1v1?' : note,
+      );
+
+      if (!mounted) return;
+      context
+          .read<OnboardingChecklistState>()
+          .completeItem(OnboardingItems.challengePlayer);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Challenge sent to ${matchup.player.name}!')),
+      );
+      _loadChallenges();
+      _loadPrimaryAction();
+      ScaffoldWithNavBar.refreshBadge?.call();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send challenge: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isPrimaryActionSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _handleInviteFriends() async {
+    if (_isPrimaryActionSubmitting) return;
+    setState(() => _isPrimaryActionSubmitting = true);
+
+    String shareUrl = AppConfig.appStoreUrl.toString();
+    try {
+      final invite = await ApiService.createInvite(ttlSeconds: 604800);
+      shareUrl = _resolveShareUrl(invite);
+    } catch (e) {
+      debugPrint('PRIMARY_ACTION: invite API failed, using App Store URL: $e');
+    }
+
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: 'I want to play you 1v1 on HoopRank: $shareUrl',
+          subject: 'Invite someone you want to play 1v1',
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open share sheet: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPrimaryActionSubmitting = false);
+      }
+    }
+  }
+
   @override
   void dispose() {
     NotificationService.removeOnNotificationListener(_refreshAll);
@@ -635,6 +978,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _loadChallenges();
       _loadPendingConfirmations();
       _loadLocalActivity();
+      _loadPrimaryAction();
       _refreshEmbeddedFeed();
       CourtService().forceRefresh(); // Refresh court data from cloud
     }
@@ -656,6 +1000,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadTeamInvites();
     _loadTeamChallenges();
     _loadCurrentRating();
+    _loadPrimaryAction();
     _refreshEmbeddedFeed();
   }
 
@@ -693,8 +1038,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (mounted) {
         setState(() => _pendingConfirmations = confirmations);
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _loadLocalActivity() async {
@@ -990,8 +1334,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           'locEnabled': true,
         });
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   String _getRankLabel(double rating) {
@@ -1842,253 +2185,274 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: ClipRect(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Static header: STATUS composer ──
-            const SizedBox(height: 16),
-            Consumer<AuthState>(
-              builder: (context, auth, _) {
-                return Column(
-                  children: [
-                    // === Status Section Header (Single Line) ===
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 8),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.edit_note,
-                                size: 14, color: Colors.blue),
-                          ),
-                          const SizedBox(width: 10),
-                          const Text(
-                            'STATUS',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.0,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Status Update Bar - Tappable with User Avatar
-                    GestureDetector(
-                      onTap: () async {
-                        final result = await Navigator.push<bool>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const StatusComposerScreen(),
-                            fullscreenDialog: true,
-                          ),
-                        );
-                        if (result == true) {
-                          setState(() {}); // Refresh feed
-                        }
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Static header: STATUS composer ──
+              const SizedBox(height: 16),
+              Consumer<AuthState>(
+                builder: (context, auth, _) {
+                  return Column(
+                    children: [
+                      // === Status Section Header (Single Line) ===
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 8),
                         child: Row(
                           children: [
-                            // User Avatar
-                            Consumer<AuthState>(
-                                builder: (context, authState, _) {
-                              final user = authState.currentUser;
-                              final photoUrl = user?.photoUrl;
-                              final name = user?.name ?? '?';
-
-                              return CircleAvatar(
-                                radius: 18,
-                                backgroundColor: Colors.deepOrange,
-                                backgroundImage: photoUrl != null &&
-                                        !isPlaceholderImage(photoUrl)
-                                    ? safeImageProvider(photoUrl)
-                                    : null,
-                                onBackgroundImageError: photoUrl != null
-                                    ? (_, __) => debugPrint('Status avatar failed to load: $photoUrl')
-                                    : null,
-                                child: (photoUrl == null || isPlaceholderImage(photoUrl))
-                                    ? Text(
-                                        name.isNotEmpty
-                                            ? name[0].toUpperCase()
-                                            : '?',
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold),
-                                      )
-                                    : null,
-                              );
-                            }),
-                            const SizedBox(width: 12),
-                            // Placeholder Text
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'What\'s on your mind?',
-                                    style: TextStyle(
-                                        color: Colors.grey.shade800,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Share a status, schedule a run, or post a highlight',
-                                    style: TextStyle(
-                                        color: Colors.grey.shade500,
-                                        fontSize: 11),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.edit_note,
+                                  size: 14, color: Colors.blue),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'STATUS',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                                color: Colors.white70,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      // Status Update Bar - Tappable with User Avatar
+                      GestureDetector(
+                        onTap: () async {
+                          final result = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const StatusComposerScreen(),
+                              fullscreenDialog: true,
+                            ),
+                          );
+                          if (result == true) {
+                            setState(() {}); // Refresh feed
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              // User Avatar
+                              Consumer<AuthState>(
+                                  builder: (context, authState, _) {
+                                final user = authState.currentUser;
+                                final photoUrl = user?.photoUrl;
+                                final name = user?.name ?? '?';
+
+                                return CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Colors.deepOrange,
+                                  backgroundImage: photoUrl != null &&
+                                          !isPlaceholderImage(photoUrl)
+                                      ? safeImageProvider(photoUrl)
+                                      : null,
+                                  onBackgroundImageError: photoUrl != null
+                                      ? (_, __) => debugPrint(
+                                          'Status avatar failed to load: $photoUrl')
+                                      : null,
+                                  child: (photoUrl == null ||
+                                          isPlaceholderImage(photoUrl))
+                                      ? Text(
+                                          name.isNotEmpty
+                                              ? name[0].toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold),
+                                        )
+                                      : null,
+                                );
+                              }),
+                              const SizedBox(width: 12),
+                              // Placeholder Text
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'What\'s on your mind?',
+                                      style: TextStyle(
+                                          color: Colors.grey.shade800,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Share a status, schedule a run, or post a highlight',
+                                      style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              // Primary action slot: onboarding checklist first, then suggested matchup.
+              Consumer<OnboardingChecklistState>(
+                builder: (context, onboarding, _) {
+                  if (!onboarding.allComplete) {
+                    return const OnboardingChecklistCard();
+                  }
+
+                  return HomePrimaryActionSection(
+                    state: _primaryActionState,
+                    recommended: _recommendedMatchup,
+                    isSubmitting: _isPrimaryActionSubmitting,
+                    onChallengePressed: _handlePrimaryChallenge,
+                    onInvitePressed: _handleInviteFriends,
+                    onProfilePressed: _handleOpenSuggestedProfile,
+                    onSkipPressed: _handleSkipSuggestion,
+                    onVenuePressed: _handleOpenSuggestedVenue,
+                  );
+                },
+              ),
+
+              if (_pendingConfirmations.isNotEmpty) ...[
+                _buildPendingConfirmationsSection(),
+                const SizedBox(height: 12),
+              ],
+
+              // Team Invites (compact, above feed)
+              if (_teamInvites.isNotEmpty) ...[
+                SizedBox(
+                  height: 48,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _teamInvites.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final invite = _teamInvites[index];
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border:
+                              Border.all(color: Colors.blue.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.group_add, color: Colors.blue, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              invite['name'] ?? 'Team',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () async {
+                                try {
+                                  await ApiService.declineTeamInvite(
+                                      invite['id']);
+                                  _loadTeamInvites();
+                                } catch (_) {}
+                              },
+                              child: const Icon(Icons.close,
+                                  color: Colors.red, size: 18),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () async {
+                                try {
+                                  await ApiService.acceptTeamInvite(
+                                      invite['id']);
+                                  _loadTeamInvites();
+                                  _loadMyTeams();
+                                  // Complete onboarding item
+                                  if (mounted) {
+                                    context
+                                        .read<OnboardingChecklistState>()
+                                        .completeItem(
+                                            OnboardingItems.joinOrCreateTeam);
+                                  }
+                                } catch (_) {}
+                              },
+                              child: const Icon(Icons.check,
+                                  color: Colors.green, size: 18),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+
+              // ── Static header: FEED label ──
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.deepOrange.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.dynamic_feed,
+                          size: 16, color: Colors.deepOrange),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'FEED',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: Colors.white70,
+                      ),
                     ),
                   ],
-                );
-              },
-            ),
-
-            // Onboarding checklist (shown until all items complete)
-            const OnboardingChecklistCard(),
-
-            if (_pendingConfirmations.isNotEmpty) ...[
-              _buildPendingConfirmationsSection(),
-              const SizedBox(height: 12),
-            ],
-
-            // Team Invites (compact, above feed)
-            if (_teamInvites.isNotEmpty) ...[
-              SizedBox(
-                height: 48,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _teamInvites.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final invite = _teamInvites[index];
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.group_add, color: Colors.blue, size: 16),
-                          const SizedBox(width: 6),
-                          Text(
-                            invite['name'] ?? 'Team',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () async {
-                              try {
-                                await ApiService.declineTeamInvite(
-                                    invite['id']);
-                                _loadTeamInvites();
-                              } catch (_) {}
-                            },
-                            child: const Icon(Icons.close,
-                                color: Colors.red, size: 18),
-                          ),
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () async {
-                              try {
-                                await ApiService.acceptTeamInvite(invite['id']);
-                                _loadTeamInvites();
-                                _loadMyTeams();
-                                // Complete onboarding item
-                                if (mounted) {
-                                  context
-                                      .read<OnboardingChecklistState>()
-                                      .completeItem(OnboardingItems.joinOrCreateTeam);
-                                }
-                              } catch (_) {}
-                            },
-                            child: const Icon(Icons.check,
-                                color: Colors.green, size: 18),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
                 ),
               ),
-              const SizedBox(height: 8),
-            ],
 
-            // ── Static header: FEED label ──
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 12),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.deepOrange.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.dynamic_feed,
-                        size: 16, color: Colors.deepOrange),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'FEED',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
+              // ── Scrollable: Feed fills remaining space ──
+              Expanded(
+                child: HoopRankFeed(
+                    key: ValueKey('hooprank-feed-$_feedReloadVersion')),
               ),
-            ),
-
-            // ── Scrollable: Feed fills remaining space ──
-            Expanded(
-              child: HoopRankFeed(
-                  key: ValueKey('hooprank-feed-$_feedReloadVersion')),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-

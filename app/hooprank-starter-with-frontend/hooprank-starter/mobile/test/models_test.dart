@@ -99,6 +99,15 @@ void main() {
         });
         expect(user.contestRate, 0.33);
       });
+
+      test('parses optional distanceMi from backend', () {
+        final user = User.fromJson({
+          'id': 'user123',
+          'name': 'Nearby Player',
+          'distanceMi': 6.4,
+        });
+        expect(user.distanceMi, 6.4);
+      });
     });
 
     test('toPlayer creates valid Player', () {
