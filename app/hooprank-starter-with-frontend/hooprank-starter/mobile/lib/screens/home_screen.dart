@@ -2047,6 +2047,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         matchState.setMatchId(matchId);
       }
 
+      context
+          .read<OnboardingChecklistState>()
+          .completeItem(OnboardingItems.acceptChallenge);
+
       // Refresh badge count now that challenge is accepted
       ScaffoldWithNavBar.refreshBadge?.call();
 

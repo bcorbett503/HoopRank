@@ -1612,6 +1612,10 @@ class _HoopRankFeedState extends State<HoopRankFeed>
           matchState.setCourt(court);
         }
 
+        context
+            .read<OnboardingChecklistState>()
+            .completeItem(OnboardingItems.acceptChallenge);
+
         // Navigate to match setup (opponent will be pre-populated)
         context.go('/match/setup');
       }
@@ -2458,7 +2462,9 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       // User just clicked IN — auto-expand and fetch attendee list
       _loadAttendees(statusId, autoExpand: true);
       // Complete onboarding item
-      context.read<OnboardingChecklistState>().completeItem('join_run');
+      context
+          .read<OnboardingChecklistState>()
+          .completeItem(OnboardingItems.joinRun);
     }
   }
 

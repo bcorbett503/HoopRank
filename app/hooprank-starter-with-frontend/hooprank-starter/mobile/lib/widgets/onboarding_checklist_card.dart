@@ -67,28 +67,14 @@ const _items = [
   _ChecklistItemConfig(
     key: OnboardingItems.scheduleRun,
     icon: Icons.schedule,
-    label: 'Schedule a run at a court',
+    label: 'Schedule a run or join a scheduled run',
     color: Colors.deepOrange,
-    route: '/courts', // pick a court to schedule
-  ),
-  _ChecklistItemConfig(
-    key: OnboardingItems.joinRun,
-    icon: Icons.directions_run,
-    label: 'Join a scheduled run',
-    color: Colors.teal,
-    route: '/courts', // Find Runs
-  ),
-  _ChecklistItemConfig(
-    key: OnboardingItems.joinOrCreateTeam,
-    icon: Icons.groups,
-    label: 'Create or join a team',
-    color: Colors.orange,
-    route: '/teams',
+    route: '/courts', // schedule or join from court pages
   ),
   _ChecklistItemConfig(
     key: OnboardingItems.challengePlayer,
     icon: Icons.sports_basketball,
-    label: 'Challenge a player',
+    label: 'Challenge a player or accept a challenge',
     color: Colors.red,
     route: '/rankings?region=local',
   ),
