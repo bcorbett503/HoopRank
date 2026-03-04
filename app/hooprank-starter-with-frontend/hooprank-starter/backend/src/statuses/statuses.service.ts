@@ -556,6 +556,49 @@ export class StatusesService {
         return score;
     }
 
+    private distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+        const earthMiles = 3958.8;
+        const dLat = toRad(lat2 - lat1);
+        const dLng = toRad(lng2 - lng1);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthMiles * c;
+    }
+
+    private calculateProximityScore(item: any, lat: number, lng: number): number {
+        if (item?.courtLat === null || item?.courtLat === undefined || item?.courtLng === null || item?.courtLng === undefined) {
+            // If a scheduled run can't be geo-ranked, de-prioritize it for location-based feeds.
+            return item?.scheduledAt ? -25 : 0;
+        }
+
+        const courtLat = Number(item.courtLat);
+        const courtLng = Number(item.courtLng);
+        if (!Number.isFinite(courtLat) || !Number.isFinite(courtLng)) {
+            return item?.scheduledAt ? -25 : 0;
+        }
+
+        const miles = this.distanceMiles(lat, lng, courtLat, courtLng);
+        item._distanceMiles = miles;
+
+        // Heavily favor nearby scheduled runs in the For You feed.
+        if (item?.scheduledAt) {
+            if (miles <= 10) return 120;
+            if (miles <= 25) return 120 - ((miles - 10) * 4); // 120 -> 60
+            if (miles <= 50) return 60 - ((miles - 25) * 2);  // 60 -> 10
+            if (miles <= 100) return 10 - ((miles - 50) * 0.2); // 10 -> 0
+            return -20;
+        }
+
+        // Non-event content gets a lighter locality boost.
+        if (miles <= 10) return 25;
+        if (miles <= 50) return 25 - ((miles - 10) * (25 / 40));
+        return 0;
+    }
+
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50, lat?: number, lng?: number): Promise<any[]> {
         try {
             // Ensure status_id column exists on matches before querying
@@ -863,10 +906,16 @@ export class StatusesService {
                 const scoredItems = allItems.map(item => ({
                     ...item,
                     _score: this.calculateFeedScore(item, userId, followedPlayerIds, followedCourtIds, now)
+                        + (lat !== undefined && lng !== undefined ? this.calculateProximityScore(item, lat, lng) : 0)
                 }));
 
-                // Sort by score (highest first)
-                scoredItems.sort((a, b) => b._score - a._score);
+                // Sort by score first, then by proximity when score ties.
+                scoredItems.sort((a, b) => {
+                    if (b._score !== a._score) return b._score - a._score;
+                    const aDist = typeof a._distanceMiles === 'number' ? a._distanceMiles : Number.MAX_VALUE;
+                    const bDist = typeof b._distanceMiles === 'number' ? b._distanceMiles : Number.MAX_VALUE;
+                    return aDist - bDist;
+                });
 
                 // Ensure discovery items are mixed in (at least 20% of feed)
                 const discoveryItems = scoredItems.filter(i => i._isDiscovery);
@@ -897,6 +946,7 @@ export class StatusesService {
                 finalFeed.forEach(item => {
                     delete item._score;
                     delete item._isDiscovery;
+                    delete item._distanceMiles;
                 });
 
                 return finalFeed.slice(0, limit);

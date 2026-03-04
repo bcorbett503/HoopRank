@@ -8,6 +8,78 @@ export class RunsService {
 
     constructor(private dataSource: DataSource) { }
 
+    private async recurringStatusExists(statusId?: number | null): Promise<boolean> {
+        if (!statusId) return false;
+        const rows = await this.dataSource.query(
+            `SELECT id FROM player_statuses WHERE id = $1 LIMIT 1`,
+            [statusId],
+        );
+        return Array.isArray(rows) && rows.length > 0;
+    }
+
+    private async ensureRecurringTemplateStatus(template: any): Promise<number | null> {
+        try {
+            const existingStatusId = template?.status_id ?? template?.statusId;
+            if (await this.recurringStatusExists(existingStatusId)) {
+                await this.dataSource.query(
+                    `
+                    INSERT INTO event_attendees (status_id, user_id, created_at)
+                    VALUES ($1, $2, NOW())
+                    ON CONFLICT (status_id, user_id) DO NOTHING
+                    `,
+                    [existingStatusId, template.created_by],
+                ).catch(() => { });
+                return existingStatusId;
+            }
+
+            const title = (template?.title || 'Open Run').trim();
+            const content = title.toLowerCase().startsWith('standing run')
+                ? title
+                : `Standing Run · ${title}`;
+
+            const statusRows = await this.dataSource.query(
+                `
+                INSERT INTO player_statuses (
+                    user_id, content, scheduled_at, court_id, game_mode, court_type, age_range, created_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                RETURNING id
+                `,
+                [
+                    template.created_by,
+                    content,
+                    template.scheduled_at ? new Date(template.scheduled_at) : null,
+                    template.court_id || null,
+                    template.game_mode || null,
+                    template.court_type || null,
+                    template.age_range || null,
+                ],
+            );
+
+            const newStatusId = statusRows?.[0]?.id;
+            if (!newStatusId) return null;
+
+            await this.dataSource.query(
+                `UPDATE scheduled_runs SET status_id = $1 WHERE id = $2`,
+                [newStatusId, template.id],
+            );
+
+            await this.dataSource.query(
+                `
+                INSERT INTO event_attendees (status_id, user_id, created_at)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT (status_id, user_id) DO NOTHING
+                `,
+                [newStatusId, template.created_by],
+            ).catch(() => { });
+
+            return newStatusId;
+        } catch (error: any) {
+            this.logger.warn(`Failed to ensure recurring status for run ${template?.id}: ${error?.message || error}`);
+            return null;
+        }
+    }
+
     // ========== Create ==========
 
     async createRun(userId: string, data: {
@@ -53,6 +125,14 @@ export class RunsService {
         ]);
 
         const run = result[0];
+
+        if (isRecur) {
+            const statusId = await this.ensureRecurringTemplateStatus(run);
+            if (statusId) {
+                run.status_id = statusId;
+                run.statusId = statusId;
+            }
+        }
 
         // Auto-join creator
         try {
@@ -255,7 +335,7 @@ export class RunsService {
                 SELECT 
                     id, court_id, created_by, title, game_mode, court_type, 
                     age_range, duration_minutes, max_players, notes, 
-                    tagged_player_ids, tag_mode, recurrence_rule, scheduled_at 
+                    tagged_player_ids, tag_mode, recurrence_rule, scheduled_at, status_id
                 FROM scheduled_runs 
                 WHERE is_recurring = true AND recurrence_rule = 'weekly'
             `);
@@ -269,6 +349,7 @@ export class RunsService {
             let spawnedCount = 0;
 
             for (const template of templates) {
+                const ensuredStatusId = await this.ensureRecurringTemplateStatus(template);
                 const originalDate = new Date(template.scheduled_at);
                 const targetDayOfWeek = originalDate.getUTCDay();
                 const targetHours = originalDate.getUTCHours();
@@ -300,12 +381,12 @@ export class RunsService {
                             INSERT INTO scheduled_runs (
                                 court_id, created_by, title, game_mode, court_type, 
                                 age_range, duration_minutes, max_players, notes, 
-                                tagged_player_ids, tag_mode, scheduled_at, is_recurring, created_at
-                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, false, NOW())
+                                tagged_player_ids, tag_mode, scheduled_at, status_id, is_recurring, created_at
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, false, NOW())
                         `, [
                             template.court_id, template.created_by, template.title, template.game_mode, template.court_type,
                             template.age_range, template.duration_minutes, template.max_players, template.notes,
-                            template.tagged_player_ids, template.tag_mode, upcomingInstance
+                            template.tagged_player_ids, template.tag_mode, upcomingInstance, ensuredStatusId
                         ]);
 
                         spawnedCount++;
@@ -324,4 +405,3 @@ export class RunsService {
     }
 
 }
-
