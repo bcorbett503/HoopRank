@@ -237,6 +237,9 @@ PODS:
   - libwebp/sharpyuv (1.5.0)
   - libwebp/webp (1.5.0):
     - libwebp/sharpyuv
+  - mobile_scanner (7.0.0):
+    - Flutter
+    - FlutterMacOS
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -280,6 +283,7 @@ DEPENDENCIES:
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/ios`)
   - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/darwin`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
+  - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -352,6 +356,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/google_sign_in_ios/darwin"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
+  mobile_scanner:
+    :path: ".symlinks/plugins/mobile_scanner/darwin"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
   share_plus:
@@ -410,6 +416,7 @@ SPEC CHECKSUMS:
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
   image_picker_ios: 7fe1ff8e34c1790d6fff70a32484959f563a928a
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
+  mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47

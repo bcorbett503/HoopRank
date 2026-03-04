@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -51,6 +50,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool _lastNameTouched = false;
   bool _cityTouched = false;
 
+  bool _isPlaceholderName(String firstName, String lastName) {
+    final full = '$firstName $lastName'.trim();
+    if ((firstName == 'New' && lastName == 'Player') ||
+        firstName == 'Unknown') {
+      return true;
+    }
+    return full.startsWith('HoopRank Player');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +88,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (existing != null && !isFirstTimeSetup) {
         var fName = existing.firstName;
         var lName = existing.lastName;
-        if ((fName == 'New' && lName == 'Player') || fName == 'Unknown') {
+        if (_isPlaceholderName(fName, lName)) {
           fName = '';
           lName = '';
         }
@@ -107,8 +115,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       var firstName = nameParts.isNotEmpty ? nameParts.first : '';
       var lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
 
-      if ((firstName == 'New' && lastName == 'Player') ||
-          firstName == 'Unknown') {
+      if (_isPlaceholderName(firstName, lastName)) {
         firstName = '';
         lastName = '';
       }

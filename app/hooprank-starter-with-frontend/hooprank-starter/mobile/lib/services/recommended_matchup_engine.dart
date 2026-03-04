@@ -6,6 +6,7 @@ class RecommendedMatchup {
   final List<String> reasons;
   final String? suggestedVenueId;
   final String? suggestedVenueName;
+  final String? suggestedVenueRationale;
 
   const RecommendedMatchup({
     required this.player,
@@ -13,6 +14,7 @@ class RecommendedMatchup {
     required this.reasons,
     this.suggestedVenueId,
     this.suggestedVenueName,
+    this.suggestedVenueRationale,
   });
 
   RecommendedMatchup copyWith({
@@ -21,6 +23,7 @@ class RecommendedMatchup {
     List<String>? reasons,
     String? suggestedVenueId,
     String? suggestedVenueName,
+    String? suggestedVenueRationale,
   }) {
     return RecommendedMatchup(
       player: player ?? this.player,
@@ -28,12 +31,16 @@ class RecommendedMatchup {
       reasons: reasons ?? this.reasons,
       suggestedVenueId: suggestedVenueId ?? this.suggestedVenueId,
       suggestedVenueName: suggestedVenueName ?? this.suggestedVenueName,
+      suggestedVenueRationale:
+          suggestedVenueRationale ?? this.suggestedVenueRationale,
     );
   }
 }
 
 class RecommendedMatchupEngine {
   static const double qualityGate = 58.0;
+  static const int minAdultAge = 18;
+  static const int likelyYouthHeightInches = 62; // 5'2"
 
   static RecommendedMatchup? pickBest({
     required User currentUser,
@@ -49,6 +56,9 @@ class RecommendedMatchupEngine {
 
     for (final candidate in candidates) {
       if (candidate.id == currentUser.id) {
+        continue;
+      }
+      if (_isLikelyYouthCandidate(candidate)) {
         continue;
       }
 
@@ -68,6 +78,7 @@ class RecommendedMatchupEngine {
 
       final reasons = _buildReasons(
         candidate: candidate,
+        currentUser: currentUser,
         ratingDiff: ratingDiff,
         isEloScale: isEloScale,
       );
@@ -143,10 +154,16 @@ class RecommendedMatchupEngine {
 
     final contestRate = candidate.contestRate.clamp(0.0, 1.0);
     final gamesVolume = (candidate.gamesPlayed / 20.0).clamp(0.0, 1.0);
-    final reliability =
-        (((1.0 - contestRate) * 0.6) + (gamesVolume * 0.4)) * 20.0;
+    final reliability = ((1.0 - contestRate) * gamesVolume) * 20.0;
 
     final activityConfidence = gamesVolume * 10.0;
+    double profileDepth = 0.0;
+    if (candidate.age != null && candidate.age! >= minAdultAge) {
+      profileDepth += 3.0;
+    }
+    if (_parseHeightInches(candidate.height) != null) {
+      profileDepth += 2.0;
+    }
 
     double positionAffinity = 0.0;
     final myPosition = currentUser.position;
@@ -162,7 +179,14 @@ class RecommendedMatchupEngine {
         proximity +
         reliability +
         activityConfidence +
+        profileDepth +
         positionAffinity;
+
+    if (candidate.gamesPlayed == 0) {
+      total -= 10.0;
+    } else if (candidate.gamesPlayed < 3) {
+      total -= 6.0;
+    }
 
     if (candidate.contestRate >= 0.25 && candidate.gamesPlayed >= 5) {
       total -= 15.0;
@@ -189,6 +213,7 @@ class RecommendedMatchupEngine {
 
   static List<String> _buildReasons({
     required User candidate,
+    required User currentUser,
     required double ratingDiff,
     required bool isEloScale,
   }) {
@@ -210,6 +235,18 @@ class RecommendedMatchupEngine {
       reasons.add('Position: ${candidate.position}');
     }
 
+    final myHeight = _parseHeightInches(currentUser.height);
+    final candidateHeight = _parseHeightInches(candidate.height);
+    if (myHeight != null &&
+        candidateHeight != null &&
+        (myHeight - candidateHeight).abs() <= 4) {
+      reasons.add('Comparable size');
+    }
+
+    if (candidate.age != null && candidate.age! >= minAdultAge) {
+      reasons.add('Adult player');
+    }
+
     if (candidate.contestRate <= 0.1 && candidate.gamesPlayed >= 5) {
       reasons.add('Reliable game reports');
     } else if (candidate.gamesPlayed >= 10) {
@@ -217,6 +254,80 @@ class RecommendedMatchupEngine {
     }
 
     return reasons.take(3).toList();
+  }
+
+  static bool _isLikelyYouthCandidate(User candidate) {
+    final age = candidate.age;
+    if (age != null && age > 0 && age < minAdultAge) {
+      return true;
+    }
+
+    final heightInches = _parseHeightInches(candidate.height);
+    if (heightInches != null &&
+        heightInches <= likelyYouthHeightInches &&
+        (age == null || age < 21)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  static int? _parseHeightInches(String? rawHeight) {
+    if (rawHeight == null) return null;
+    var normalized = rawHeight.trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+
+    normalized = normalized
+        .replaceAll('’', '\'')
+        .replaceAll('`', '\'')
+        .replaceAll('′', '\'')
+        .replaceAll('″', '"')
+        .replaceAll('“', '"')
+        .replaceAll('”', '"');
+
+    final feetInchesMatch =
+        RegExp(r"(\d)\s*(?:ft|feet|')\s*(\d{1,2})?").firstMatch(normalized);
+    if (feetInchesMatch != null) {
+      final feet = int.tryParse(feetInchesMatch.group(1) ?? '');
+      final inches = int.tryParse(feetInchesMatch.group(2) ?? '0') ?? 0;
+      if (feet != null) {
+        final total = (feet * 12) + inches;
+        if (total >= 48 && total <= 90) return total;
+      }
+    }
+
+    final dashedMatch =
+        RegExp(r'^(\d)\s*-\s*(\d{1,2})$').firstMatch(normalized);
+    if (dashedMatch != null) {
+      final feet = int.tryParse(dashedMatch.group(1) ?? '');
+      final inches = int.tryParse(dashedMatch.group(2) ?? '');
+      if (feet != null && inches != null) {
+        final total = (feet * 12) + inches;
+        if (total >= 48 && total <= 90) return total;
+      }
+    }
+
+    final centimetersMatch = RegExp(r'(\d{3})\s*cm').firstMatch(normalized);
+    if (centimetersMatch != null) {
+      final cm = int.tryParse(centimetersMatch.group(1) ?? '');
+      if (cm != null) {
+        final inches = (cm / 2.54).round();
+        if (inches >= 48 && inches <= 90) return inches;
+      }
+    }
+
+    final inchesMatch =
+        RegExp(r'^(\d{2,3})(?:\s*(?:in|inch|inches|\"))?$').firstMatch(
+      normalized,
+    );
+    if (inchesMatch != null) {
+      final inches = int.tryParse(inchesMatch.group(1) ?? '');
+      if (inches != null && inches >= 48 && inches <= 90) {
+        return inches;
+      }
+    }
+
+    return null;
   }
 }
 

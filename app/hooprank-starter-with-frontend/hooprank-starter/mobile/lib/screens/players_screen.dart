@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../models.dart';
 import '../services/api_service.dart';
-import '../services/messages_service.dart';
 import '../services/analytics_service.dart';
 import '../utils/image_utils.dart';
+import '../widgets/challenge_composer_sheet.dart';
 import 'chat_screen.dart';
 
 class PlayersScreen extends StatefulWidget {
@@ -33,7 +33,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
   Future<void> _loadPlayers() async {
     try {
       // Load players based on proximity filter
-      final players = _isLocal 
+      final players = _isLocal
           ? await ApiService.getNearbyPlayers(radiusMiles: 25)
           : await ApiService.getPlayers();
       setState(() {
@@ -54,7 +54,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
       final rating = player.rating;
       return rating >= _rankRange.start && rating <= _rankRange.end;
     }).toList();
-    
+
     // Sort by rating descending
     _filteredPlayers.sort((a, b) => b.rating.compareTo(a.rating));
   }
@@ -86,58 +86,19 @@ class _PlayersScreenState extends State<PlayersScreen> {
   }
 
   Future<void> _showChallengeDialog(User player) async {
-    final TextEditingController messageController = TextEditingController();
-    
-    return showDialog<void>(
+    final message = await showChallengeComposerSheet(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Challenge ${player.name}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Send a message to start the challenge:'),
-              const SizedBox(height: 10),
-              TextField(
-                controller: messageController,
-                decoration: const InputDecoration(
-                  hintText: 'Let\'s play 1v1!',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: const Text('Challenge'),
-              onPressed: () async {
-                final message = messageController.text.trim();
-                if (message.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a message')),
-                  );
-                  return;
-                }
-                
-                Navigator.of(context).pop();
-                await _sendChallenge(player, message);
-              },
-            ),
-          ],
-        );
-      },
+      player: player,
+      initialMessage: 'Want to run 1v1?',
     );
+    if (!mounted || message == null) return;
+    await _sendChallenge(
+        player, message.isEmpty ? 'Want to run 1v1?' : message);
   }
 
   Future<void> _sendChallenge(User player, String message) async {
-    final currentUser = Provider.of<AuthState>(context, listen: false).currentUser;
+    final currentUser =
+        Provider.of<AuthState>(context, listen: false).currentUser;
     if (currentUser == null) return;
 
     try {
@@ -151,7 +112,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Challenge sent to ${player.name}!')),
         );
-        
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -170,7 +131,8 @@ class _PlayersScreenState extends State<PlayersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = Provider.of<AuthState>(context, listen: false).currentUser;
+    final currentUser =
+        Provider.of<AuthState>(context, listen: false).currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -193,7 +155,8 @@ class _PlayersScreenState extends State<PlayersScreen> {
                 // Proximity Toggle
                 Row(
                   children: [
-                    const Text('Location:', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const Text('Location:',
+                        style: TextStyle(fontWeight: FontWeight.w500)),
                     const SizedBox(width: 16),
                     ToggleButtons(
                       isSelected: [!_isLocal, _isLocal],
@@ -202,7 +165,8 @@ class _PlayersScreenState extends State<PlayersScreen> {
                       selectedColor: Colors.white,
                       fillColor: Colors.deepOrange,
                       color: Colors.grey,
-                      constraints: const BoxConstraints(minWidth: 80, minHeight: 36),
+                      constraints:
+                          const BoxConstraints(minWidth: 80, minHeight: 36),
                       children: const [
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12),
@@ -217,16 +181,18 @@ class _PlayersScreenState extends State<PlayersScreen> {
                     if (_isLocal)
                       const Padding(
                         padding: EdgeInsets.only(left: 8),
-                        child: Text('(25 mi)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        child: Text('(25 mi)',
+                            style: TextStyle(color: Colors.grey, fontSize: 12)),
                       ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Rank Range Slider
                 Row(
                   children: [
-                    const Text('Rank:', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const Text('Rank:',
+                        style: TextStyle(fontWeight: FontWeight.w500)),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -237,11 +203,13 @@ class _PlayersScreenState extends State<PlayersScreen> {
                             children: [
                               Text(
                                 '${_getRankLabel(_rankRange.start)} (${_rankRange.start.toStringAsFixed(1)})',
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey),
                               ),
                               Text(
                                 '${_getRankLabel(_rankRange.end)} (${_rankRange.end.toStringAsFixed(1)})',
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey),
                               ),
                             ],
                           ),
@@ -263,7 +231,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
                     ),
                   ],
                 ),
-                
+
                 // Results count
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -275,7 +243,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
               ],
             ),
           ),
-          
+
           // Players List
           Expanded(
             child: _isLoading
@@ -285,16 +253,19 @@ class _PlayersScreenState extends State<PlayersScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.search_off, size: 48, color: Colors.grey[600]),
+                            Icon(Icons.search_off,
+                                size: 48, color: Colors.grey[600]),
                             const SizedBox(height: 16),
                             Text(
                               'No players found',
-                              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                              style: TextStyle(
+                                  color: Colors.grey[600], fontSize: 16),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Try adjusting your filters',
-                              style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                              style: TextStyle(
+                                  color: Colors.grey[700], fontSize: 14),
                             ),
                           ],
                         ),
@@ -303,26 +274,32 @@ class _PlayersScreenState extends State<PlayersScreen> {
                         itemCount: _filteredPlayers.length,
                         itemBuilder: (context, index) {
                           final player = _filteredPlayers[index];
-                          if (player.id == currentUser?.id) return const SizedBox.shrink();
+                          if (player.id == currentUser?.id)
+                            return const SizedBox.shrink();
 
                           return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                             child: ListTile(
                               leading: CircleAvatar(
                                 backgroundImage: player.photoUrl != null
                                     ? safeImageProvider(player.photoUrl!)
                                     : null,
                                 child: player.photoUrl == null
-                                    ? Text(player.name.isNotEmpty ? player.name[0] : '?')
+                                    ? Text(player.name.isNotEmpty
+                                        ? player.name[0]
+                                        : '?')
                                     : null,
                               ),
                               title: Text(player.name),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('⭐ ${player.rating.toStringAsFixed(1)} • ${_getRankLabel(player.rating)}'),
+                                  Text(
+                                      '⭐ ${player.rating.toStringAsFixed(1)} • ${_getRankLabel(player.rating)}'),
                                   if (player.city != null)
-                                    Text('📍 ${player.city}', style: const TextStyle(fontSize: 12)),
+                                    Text('📍 ${player.city}',
+                                        style: const TextStyle(fontSize: 12)),
                                 ],
                               ),
                               isThreeLine: player.city != null,

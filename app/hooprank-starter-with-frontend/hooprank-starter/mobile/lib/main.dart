@@ -21,6 +21,8 @@ import 'screens/profile_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/teams_screen.dart';
 import 'screens/team_chat_screen.dart';
+import 'screens/quick_play_screen.dart';
+import 'screens/scan_match_screen.dart';
 import 'screens/match_setup_screen.dart';
 import 'screens/match_map_screen.dart';
 import 'screens/match_live_screen.dart';
@@ -253,6 +255,14 @@ class _HoopRankAppState extends State<HoopRankApp> {
                 GoRoute(
                   path: '/play',
                   builder: (context, state) => const HomeScreen(),
+                ),
+                GoRoute(
+                  path: '/quick-play',
+                  builder: (context, state) => const QuickPlayScreen(),
+                ),
+                GoRoute(
+                  path: '/quick-play/scan',
+                  builder: (context, state) => const ScanMatchScreen(),
                 ),
                 GoRoute(
                   path: '/match/setup',

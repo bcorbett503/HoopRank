@@ -493,7 +493,28 @@ class ApiService {
     required String guestId,
     String? message,
   }) async {
-    if (_userId == null) throw Exception('Not authenticated');
+    await createQuickPlayMatch(
+      opponentId: guestId,
+      hostId: hostId,
+      message: message,
+      autoAccept: false,
+    );
+  }
+
+  /// Create a 1v1 match immediately and return the created match payload.
+  /// Used by Quick Play scan flow to jump directly into the live timer.
+  static Future<Map<String, dynamic>> createQuickPlayMatch({
+    required String opponentId,
+    String? hostId,
+    String? message,
+    bool autoAccept = true,
+  }) async {
+    if (_userId == null || _userId!.isEmpty) {
+      throw Exception('Not authenticated');
+    }
+
+    final effectiveHostId =
+        (hostId != null && hostId.isNotEmpty) ? hostId : _userId!;
 
     final response = await authedPost(
       Uri.parse('$baseUrl/api/v1/matches'),
@@ -501,15 +522,22 @@ class ApiService {
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'hostId': hostId,
-        'guestId': guestId,
-        'message': message,
+        'hostId': effectiveHostId,
+        'guestId': opponentId,
+        if (autoAccept) 'autoAccept': true,
+        if (message != null && message.trim().isNotEmpty) 'message': message,
       }),
     );
 
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to create match');
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final parsed = jsonDecode(response.body);
+      if (parsed is Map<String, dynamic>) return parsed;
+      throw Exception('Unexpected match response payload');
     }
+
+    throw Exception(
+      'Failed to create match: ${response.statusCode} ${response.body}',
+    );
   }
 
   /// Creates a challenge (NOT a match). Match is created when challenge is accepted.

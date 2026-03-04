@@ -56,7 +56,12 @@ export class MatchesController {
       throw new ForbiddenException('hostId must match authenticated user');
     }
     const opponentId = body.guestId || (body as any).opponentId;
-    const match = await this.matches.create(creatorId, opponentId, body.courtId);
+    const match = await this.matches.create(
+      creatorId,
+      opponentId,
+      body.courtId,
+      body.autoAccept === true,
+    );
 
     if (body.message && opponentId) {
       await this.messages.sendMessage(creatorId, opponentId, body.message, match.id);

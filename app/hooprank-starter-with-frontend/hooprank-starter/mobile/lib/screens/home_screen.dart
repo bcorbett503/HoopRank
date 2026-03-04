@@ -40,7 +40,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final MessagesService _messagesService = MessagesService();
   List<ChallengeRequest> _challenges = []; // Used in _loadChallenges
   List<Map<String, dynamic>> _pendingConfirmations = [];
@@ -82,6 +83,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _primaryDiscoverMode = 'open';
   double _primaryDiscoverRadiusMi = 25.0;
   bool _primarySuggestionSkippedThisSession = false;
+  late final AnimationController _quickPlayPulseController;
+  late final Animation<double> _quickPlayPulse;
 
   String _skippedSuggestedMatchupsPrefsKey(String userId) =>
       'user_${userId}_skipped_suggested_matchups';
@@ -118,6 +121,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _quickPlayPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+    _quickPlayPulse = CurvedAnimation(
+      parent: _quickPlayPulseController,
+      curve: Curves.easeInOut,
+    );
     WidgetsBinding.instance.addObserver(this);
     // Register for push notification refresh
     NotificationService.addOnNotificationListener(_refreshAll);
@@ -683,8 +694,190 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return AppConfig.appStoreUrl.toString();
   }
 
-  Future<({String? id, String? name})> _resolveSuggestedVenue(
-      User player) async {
+  Widget _buildQuickPlayActionRow() {
+    return AnimatedBuilder(
+      animation: _quickPlayPulse,
+      child: _buildQuickPlayActionContent(),
+      builder: (context, child) {
+        final pulse = _quickPlayPulse.value;
+        final borderColor = Color.lerp(
+              const Color(0xFFF97316),
+              const Color(0xFF2DD4BF),
+              pulse,
+            ) ??
+            const Color(0xFFF97316);
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: borderColor.withValues(alpha: 0.24 + (pulse * 0.16)),
+                blurRadius: 18 + (pulse * 10),
+                spreadRadius: 0.8 + (pulse * 0.8),
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 14,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF1F2937),
+                  Color(0xFF111827),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: borderColor.withValues(alpha: 0.9),
+                width: 1.4 + (pulse * 0.6),
+              ),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQuickPlayActionContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Text(
+              'Quick Play',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            Spacer(),
+            Icon(Icons.flash_on_rounded, size: 16),
+          ],
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'Challenge an opponent and start a match instantly.',
+          style: TextStyle(color: Colors.white, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => context.push('/quick-play'),
+                icon: const Icon(Icons.flash_on, size: 16),
+                label: const Text('Start'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFFC2410C),
+                  minimumSize: const Size.fromHeight(36),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/quick-play/scan'),
+                icon: const Icon(Icons.qr_code_scanner, size: 16),
+                label: const Text('Scan Match'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white70, width: 1.1),
+                  minimumSize: const Size.fromHeight(36),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _firstNameOrFallback(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'They';
+    return trimmed.split(RegExp(r'\s+')).first;
+  }
+
+  Future<bool> _doesPlayerFollowCourt({
+    required String playerId,
+    required String courtId,
+  }) async {
+    try {
+      final followers = await ApiService.getCourtFollowers(courtId, limit: 200);
+      return followers.any((follower) => follower.id == playerId);
+    } catch (e) {
+      debugPrint(
+          'PRIMARY_ACTION: failed to load court followers for rationale: $e');
+      return false;
+    }
+  }
+
+  Future<String?> _buildSuggestedVenueRationale({
+    required Court court,
+    required User player,
+    required CheckInState checkInState,
+    required bool matchedPlayerCity,
+  }) async {
+    final userCheckedIn = checkInState.userCheckedInCourts.contains(court.id);
+    final userFollows = checkInState.followedCourts.contains(court.id);
+    final playerFollows = await _doesPlayerFollowCourt(
+      playerId: player.id,
+      courtId: court.id,
+    );
+
+    if (userCheckedIn && playerFollows) {
+      final firstName = _firstNameOrFallback(player.name);
+      return 'You recently checked in here, and $firstName follows this court.';
+    }
+
+    if (userFollows && playerFollows) {
+      return 'Both of you follow this court.';
+    }
+
+    if (userCheckedIn) {
+      return 'You recently checked in here.';
+    }
+
+    if (matchedPlayerCity &&
+        player.city != null &&
+        player.city!.trim().isNotEmpty) {
+      if (userFollows) {
+        return 'Near ${player.city} and in your followed courts.';
+      }
+      return 'Near ${player.city}.';
+    }
+
+    if (userFollows) {
+      return 'From courts you follow.';
+    }
+
+    if (playerFollows) {
+      final firstName = _firstNameOrFallback(player.name);
+      return '$firstName follows this court.';
+    }
+
+    return null;
+  }
+
+  Future<({String? id, String? name, String? rationale})>
+      _resolveSuggestedVenue(User player) async {
     final checkInState = context.read<CheckInState>();
     final courtService = CourtService();
     await courtService.loadCourts();
@@ -694,7 +887,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     for (final courtId in checkInState.userCheckedInCourts) {
       final court = _courtById(courtId);
       if (court != null) {
-        return (id: court.id, name: court.name);
+        final rationale = await _buildSuggestedVenueRationale(
+          court: court,
+          player: player,
+          checkInState: checkInState,
+          matchedPlayerCity: false,
+        );
+        return (id: court.id, name: court.name, rationale: rationale);
       }
     }
 
@@ -718,23 +917,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           }
         }
         if (cityMatch != null) {
-          return (id: cityMatch.id, name: cityMatch.name);
+          final rationale = await _buildSuggestedVenueRationale(
+            court: cityMatch,
+            player: player,
+            checkInState: checkInState,
+            matchedPlayerCity: true,
+          );
+          return (id: cityMatch.id, name: cityMatch.name, rationale: rationale);
         }
       }
 
       for (final courtId in followedCourtIds) {
         final court = _courtById(courtId);
         if (court != null) {
-          return (id: court.id, name: court.name);
+          final rationale = await _buildSuggestedVenueRationale(
+            court: court,
+            player: player,
+            checkInState: checkInState,
+            matchedPlayerCity: false,
+          );
+          return (id: court.id, name: court.name, rationale: rationale);
         }
       }
     }
 
     final cityFallback = player.city?.trim();
     if (cityFallback != null && cityFallback.isNotEmpty) {
-      return (id: null, name: 'Any court in $cityFallback');
+      return (
+        id: null,
+        name: 'Any court in $cityFallback',
+        rationale: 'Suggested for proximity to $cityFallback.'
+      );
     }
-    return (id: null, name: null);
+    return (id: null, name: null, rationale: null);
   }
 
   Future<void> _recomputePrimaryActionFromCandidates() async {
@@ -774,6 +989,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       enriched = recommended.copyWith(
         suggestedVenueId: venue.id,
         suggestedVenueName: venue.name,
+        suggestedVenueRationale: venue.rationale,
       );
     }
 
@@ -871,7 +1087,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _primaryActionState = HomePrimaryActionState.inviteFallback;
       });
     }
-    await _handleInviteFriends();
   }
 
   void _handleOpenSuggestedProfile() {
@@ -965,6 +1180,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (ScaffoldWithNavBar.refreshFeedTab == _refreshEmbeddedFeed) {
       ScaffoldWithNavBar.refreshFeedTab = null;
     }
+    _quickPlayPulseController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _statusController.dispose();
     super.dispose();
@@ -2046,7 +2262,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (matchId != null) {
         matchState.setMatchId(matchId);
       }
-
       context
           .read<OnboardingChecklistState>()
           .completeItem(OnboardingItems.acceptChallenge);
@@ -2168,9 +2383,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           IconButton(
             icon: const Icon(Icons.help_outline),
             tooltip: 'Show Checklist',
-            onPressed: () async {
-              await showOnboardingChecklistSheet(context);
-            },
+            onPressed: () => showOnboardingChecklistModal(context),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -2191,7 +2404,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Static header: STATUS composer ──
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Consumer<AuthState>(
                 builder: (context, auth, _) {
                   return Column(
@@ -2324,7 +2537,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               // Primary action slot: onboarding checklist first, then suggested matchup.
               Consumer<OnboardingChecklistState>(
                 builder: (context, onboarding, _) {
-                  if (!onboarding.allComplete) {
+                  if (onboarding.shouldShow) {
                     return const OnboardingChecklistCard();
                   }
 
@@ -2340,6 +2553,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   );
                 },
               ),
+              _buildQuickPlayActionRow(),
 
               if (_pendingConfirmations.isNotEmpty) ...[
                 _buildPendingConfirmationsSection(),

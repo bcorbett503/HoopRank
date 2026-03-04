@@ -3,4 +3,5 @@ export class CreateMatchDto {
     guestId?: string;
     scheduledAt?: string;
     courtId?: string;
+    autoAccept?: boolean;
 }

@@ -18,16 +18,22 @@ export class MatchesService {
     private notificationsService: NotificationsService,
   ) { }
 
-  async create(creatorId: string, opponentId?: string, courtId?: string): Promise<Match> {
+  async create(
+    creatorId: string,
+    opponentId?: string,
+    courtId?: string,
+    autoAccept: boolean = false,
+  ): Promise<Match> {
     // Use raw SQL for production compatibility
     const isPostgres = !!process.env.DATABASE_URL;
+    const initialStatus = autoAccept && opponentId ? 'accepted' : 'pending';
 
     if (isPostgres) {
       const result = await this.dataSource.query(`
         INSERT INTO matches (id, status, match_type, creator_id, opponent_id, court_id, started_by, created_at, updated_at)
-        VALUES (gen_random_uuid(), 'pending', '1v1', $1, $2, $3, '{}', NOW(), NOW())
+        VALUES (gen_random_uuid(), $1, '1v1', $2, $3, $4, '{}', NOW(), NOW())
         RETURNING *
-      `, [creatorId, opponentId || null, courtId || null]);
+      `, [initialStatus, creatorId, opponentId || null, courtId || null]);
       return result[0];
     }
 
@@ -35,7 +41,7 @@ export class MatchesService {
     const match = this.matchesRepository.create({
       creatorId,
       opponentId,
-      status: 'pending',
+      status: initialStatus,
       matchType: '1v1',
       courtId
     } as any);

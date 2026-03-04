@@ -3,8 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
-import 'onboarding_checklist_card.dart';
 import '../utils/image_utils.dart';
+import './onboarding_checklist_card.dart';
 
 /// Shared HoopRank app bar widget for consistent top bar across all screens
 class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -87,9 +87,7 @@ class HoopRankAppBar extends StatelessWidget implements PreferredSizeWidget {
         IconButton(
           icon: const Icon(Icons.help_outline),
           tooltip: 'Show Checklist',
-          onPressed: () async {
-            await showOnboardingChecklistSheet(context);
-          },
+          onPressed: () => showOnboardingChecklistModal(context),
         ),
         // Logout button
         IconButton(

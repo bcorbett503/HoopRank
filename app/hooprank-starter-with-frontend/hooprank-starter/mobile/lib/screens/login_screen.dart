@@ -21,6 +21,15 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
+  String _fallbackPlayerName(String seed) {
+    var hash = 0;
+    for (final codeUnit in seed.codeUnits) {
+      hash = (hash * 31 + codeUnit) % 100000;
+    }
+    final suffix = hash.toString().padLeft(5, '0');
+    return 'HoopRank Player$suffix';
+  }
+
   Future<void> _loginWithProvider(String provider) async {
     setState(() => _isLoading = true);
 
@@ -104,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Create a temporary user object with incomplete profile
         final user = User(
           id: userId,
-          name: firebaseUser.displayName ?? 'New User',
+          name: firebaseUser.displayName ?? _fallbackPlayerName(userId),
           photoUrl: firebaseUser.photoURL,
           // position is null, so isProfileComplete will be false
         );

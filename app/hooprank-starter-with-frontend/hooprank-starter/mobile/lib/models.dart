@@ -26,6 +26,17 @@ int _parseInt(dynamic value, {int fallback = 0}) {
   return fallback;
 }
 
+String? _firstNonEmptyString(List<dynamic> values) {
+  for (final value in values) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty || text.toLowerCase() == 'null') {
+      continue;
+    }
+    return text;
+  }
+  return null;
+}
+
 /// Base identity model representing an authenticated user
 /// This is the primary model returned by API endpoints
 class User {
@@ -96,7 +107,15 @@ class User {
       name: json['name']?.toString() ??
           json['display_name']?.toString() ??
           'Unknown',
-      photoUrl: json['photoUrl']?.toString() ?? json['avatar_url']?.toString(),
+      photoUrl: _firstNonEmptyString([
+        json['photoUrl'],
+        json['photo_url'],
+        json['avatarUrl'],
+        json['avatar_url'],
+        json['avatar'],
+        json['profilePictureUrl'],
+        json['profile_picture_url'],
+      ]),
       team: json['team']?.toString(),
       position: position,
       rating: _parseDouble(json['rating'] ?? json['hoop_rank'], fallback: 3.0),

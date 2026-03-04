@@ -699,8 +699,21 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     final regularPosts =
         activePosts.where((post) => post['scheduledAt'] == null).toList();
 
-    // Sort scheduled runs by time (soonest first)
+    // Sort scheduled runs by proximity first (if location is available),
+    // then by soonest time.
     scheduledRuns.sort((a, b) {
+      final aDistanceMi = _distanceMilesFromPost(a);
+      final bDistanceMi = _distanceMilesFromPost(b);
+
+      if (aDistanceMi != null && bDistanceMi != null) {
+        final byDistance = aDistanceMi.compareTo(bDistanceMi);
+        if (byDistance != 0) return byDistance;
+      } else if (aDistanceMi != null) {
+        return -1;
+      } else if (bDistanceMi != null) {
+        return 1;
+      }
+
       final aTime = DateTime.tryParse(a['scheduledAt']?.toString() ?? '');
       final bTime = DateTime.tryParse(b['scheduledAt']?.toString() ?? '');
       if (aTime != null && bTime != null) {
@@ -721,6 +734,34 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
     // Combine: scheduled runs first, then regular posts
     return [...scheduledRuns, ...regularPosts];
+  }
+
+  double? _distanceMilesFromPost(Map<String, dynamic> post) {
+    final feedDistance = _asDouble(post['distance_miles']) ??
+        _asDouble(post['distanceMiles']) ??
+        _asDouble(post['distanceMi']);
+    if (feedDistance != null) return feedDistance;
+
+    final userLocation = _userLocation;
+    if (userLocation == null) return null;
+
+    final lat = _asDouble(post['courtLat']);
+    final lng = _asDouble(post['courtLng']);
+    if (lat == null || lng == null) return null;
+
+    final meters = Geolocator.distanceBetween(
+      userLocation.latitude,
+      userLocation.longitude,
+      lat,
+      lng,
+    );
+    return meters / 1609.344;
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 
   /// Show modal with list of followed players
@@ -2151,7 +2192,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
   /// Build a card for new player registration activity
   Widget _buildNewPlayerCard(Map<String, dynamic> item) {
     final player = item['player'] ?? {};
-    final playerName = player['name'] ?? 'New Player';
+    final playerName = player['name'] ?? 'HoopRank Player';
     final photoUrl = player['photoUrl'];
     final rating = (player['rating'] is num
             ? player['rating'].toDouble()
@@ -2691,7 +2732,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
   Widget _buildAttributeBadge(String label, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(6),
@@ -2700,12 +2741,12 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 3),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
               color: color,
             ),
@@ -2761,6 +2802,9 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     final isAttending = _attendingStates[statusId] ?? serverIsAttending;
 
     final isScheduledEvent = scheduledAt != null;
+    final hasRunDetails = post['gameMode'] != null ||
+        post['courtType'] != null ||
+        post['ageRange'] != null;
 
     // Hide expired scheduled runs (real-time check)
     if (isScheduledEvent) {
@@ -2859,7 +2903,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12), // Slightly more spacing
+      margin: EdgeInsets.only(bottom: isScheduledEvent ? 10 : 12),
       decoration: isScheduledEvent
           ? BoxDecoration(
               // Distinct modern look for Scheduled Runs
@@ -2915,7 +2959,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
               ),
 
             Padding(
-              padding: const EdgeInsets.all(16), // More breathing room
+              padding: EdgeInsets.all(isScheduledEvent ? 12 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2942,7 +2986,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                           ),
                         ),
                         child: CircleAvatar(
-                          radius: 20,
+                          radius: isScheduledEvent ? 18 : 20,
                           backgroundColor: Colors.grey[900],
                           backgroundImage: userPhotoUrl != null
                               ? safeImageProvider(userPhotoUrl)
@@ -2959,7 +3003,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                               : null,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: isScheduledEvent ? 10 : 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2974,9 +3018,9 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                         : null,
                                     child: Text(
                                       userName,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 15,
+                                        fontSize: isScheduledEvent ? 14 : 15,
                                         color: Colors.white,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -2984,10 +3028,10 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                   ),
                                 ),
                                 if (isScheduledEvent) ...[
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
+                                        horizontal: 7, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF00C853)
                                           .withOpacity(0.15),
@@ -2998,7 +3042,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                     ),
                                     child: const Text('SCHEDULED RUN',
                                         style: TextStyle(
-                                          fontSize: 9,
+                                          fontSize: 8,
                                           fontWeight: FontWeight.w700,
                                           color:
                                               Color(0xFF00C853), // Green text
@@ -3013,7 +3057,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                               timeAgo,
                               style: TextStyle(
                                   color: Colors.white.withOpacity(0.4),
-                                  fontSize: 12),
+                                  fontSize: isScheduledEvent ? 11 : 12),
                             ),
                           ],
                         ),
@@ -3025,12 +3069,12 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                               statusId, isAttending, attendeeCount),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
+                                horizontal: 11, vertical: 6),
                             decoration: BoxDecoration(
                               color: isAttending
                                   ? const Color(0xFF00C853).withOpacity(0.15)
                                   : const Color(0xFF00C853),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(18),
                               border: isAttending
                                   ? Border.all(color: const Color(0xFF00C853))
                                   : null,
@@ -3043,9 +3087,9 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                   color: isAttending
                                       ? const Color(0xFF00C853)
                                       : Colors.black,
-                                  size: 16,
+                                  size: 14,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 3),
                                 Text(
                                   isAttending
                                       ? "IN ($attendeeCount)"
@@ -3055,7 +3099,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                                         ? const Color(0xFF00C853)
                                         : Colors.black,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ],
@@ -3108,10 +3152,10 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                   if (isScheduledEvent)
                     Container(
                       width: double.infinity,
-                      margin: const EdgeInsets.only(top: 16, bottom: 4),
+                      margin: const EdgeInsets.only(top: 10, bottom: 2),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border:
                             Border.all(color: Colors.white.withOpacity(0.08)),
                       ),
@@ -3119,37 +3163,37 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                         children: [
                           // Time Section
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                             child: Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.08),
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Icon(
                                       Icons.calendar_today_rounded,
-                                      size: 18,
+                                      size: 15,
                                       color: Colors.white),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 8),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       scheduledDayStr,
                                       style: const TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.w500,
                                         color: Colors.white70,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
+                                    const SizedBox(height: 1),
                                     Text(
                                       scheduledTimeStr,
                                       style: const TextStyle(
-                                        fontSize: 18,
+                                        fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
                                         letterSpacing: -0.5,
@@ -3161,20 +3205,102 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                             ),
                           ),
 
-                          // Run Attribute Badges
-                          if (post['gameMode'] != null ||
-                              post['courtType'] != null ||
-                              post['ageRange'] != null) ...[
+                          if (courtName != null) ...[
+                            // Divider
+                            Divider(
+                                height: 1,
+                                color: Colors.white.withOpacity(0.08)),
+
+                            // Court Location Button
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: (courtId != null || courtName != null)
+                                    ? () {
+                                        final params = <String, String>{};
+                                        if (courtId != null)
+                                          params['courtId'] = courtId;
+                                        if (courtName != null)
+                                          params['courtName'] =
+                                              Uri.encodeComponent(courtName);
+                                        final queryString = params.entries
+                                            .map((e) => '${e.key}=${e.value}')
+                                            .join('&');
+                                        context.go('/courts?$queryString');
+                                      }
+                                    : null,
+                                borderRadius: hasRunDetails
+                                    ? BorderRadius.zero
+                                    : const BorderRadius.vertical(
+                                        bottom: Radius.circular(10)),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF00C853)
+                                              .withOpacity(0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                            Icons.location_on_rounded,
+                                            size: 14,
+                                            color: Color(0xFF00C853)),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (courtId !=
+                                                null) // Only show label if it's a real linked court
+                                              Text(
+                                                "LOCATION",
+                                                style: TextStyle(
+                                                  fontSize: 8,
+                                                  color: const Color(0xFF00C853)
+                                                      .withOpacity(0.8),
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                            Text(
+                                              courtName,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white
+                                                    .withOpacity(0.95),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(Icons.chevron_right,
+                                          size: 18,
+                                          color: Colors.white.withOpacity(0.3)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          // Run Attribute Badges (after location)
+                          if (hasRunDetails) ...[
                             Divider(
                                 height: 1,
                                 color: Colors.white.withOpacity(0.08)),
                             Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                               child: Wrap(
                                 alignment: WrapAlignment.start,
-                                spacing: 6,
-                                runSpacing: 6,
+                                spacing: 5,
+                                runSpacing: 5,
                                 children: [
                                   if (post['gameMode'] != null)
                                     _buildAttributeBadge(
@@ -3206,96 +3332,13 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                               ),
                             ),
                           ],
-
-                          if (courtName != null) ...[
-                            // Divider
-                            Divider(
-                                height: 1,
-                                color: Colors.white.withOpacity(0.08)),
-
-                            // Court Location Button
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: (courtId != null || courtName != null)
-                                    ? () {
-                                        final params = <String, String>{};
-                                        if (courtId != null)
-                                          params['courtId'] = courtId;
-                                        if (courtName != null)
-                                          params['courtName'] =
-                                              Uri.encodeComponent(courtName);
-                                        final queryString = params.entries
-                                            .map((e) => '${e.key}=${e.value}')
-                                            .join('&');
-                                        context.go('/courts?$queryString');
-                                      }
-                                    : null,
-                                borderRadius: const BorderRadius.vertical(
-                                    bottom: Radius.circular(12)),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF00C853)
-                                              .withOpacity(0.15),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                            Icons.location_on_rounded,
-                                            size: 16,
-                                            color: Color(0xFF00C853)),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            if (courtId !=
-                                                null) // Only show label if it's a real linked court
-                                              Text(
-                                                "LOCATION",
-                                                style: TextStyle(
-                                                  fontSize: 9,
-                                                  color: const Color(0xFF00C853)
-                                                      .withOpacity(0.8),
-                                                  fontWeight: FontWeight.w700,
-                                                  letterSpacing: 0.5,
-                                                ),
-                                              ),
-                                            Text(
-                                              courtName,
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white
-                                                    .withOpacity(0.95),
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Icon(Icons.chevron_right,
-                                          size: 20,
-                                          color: Colors.white.withOpacity(0.3)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ]
                         ],
                       ),
                     ),
 
                   // Attendee Visibility Row (for scheduled runs)
                   if (isScheduledEvent && isAttending) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     _buildAttendeeRow(statusId, attendeeCount),
                   ],
 
@@ -3412,7 +3455,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                     ),
 
                   // Interaction Bar
-                  const SizedBox(height: 14),
+                  SizedBox(height: isScheduledEvent ? 10 : 14),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Row(

@@ -13,8 +13,8 @@ class OnboardingItems {
   static const String challengePlayer = 'challenge_player';
   static const String acceptChallenge = 'accept_challenge';
 
-  /// Checklist tasks currently shown to users.
-  static const List<String> required = [
+  // Visible checklist tasks (5 total).
+  static const List<String> checklistTasks = [
     setupProfile,
     followCourt,
     followPlayer,
@@ -22,16 +22,16 @@ class OnboardingItems {
     challengePlayer,
   ];
 
-  /// Keys persisted locally / synced to backend (includes legacy/alternate keys).
-  static const List<String> stored = [
+  // Keys persisted to local/backend progress (includes OR alternatives + legacy).
+  static const List<String> persistedKeys = [
     setupProfile,
     followCourt,
     followPlayer,
     scheduleRun,
     joinRun,
-    joinOrCreateTeam,
     challengePlayer,
     acceptChallenge,
+    joinOrCreateTeam,
   ];
 }
 
@@ -62,19 +62,6 @@ class OnboardingChecklistState extends ChangeNotifier {
   /// True when the user has manually dismissed the checklist card.
   bool get dismissed => _dismissed;
 
-  /// True when every item has been completed.
-  bool get allComplete => OnboardingItems.required.every(_isTaskComplete);
-
-  /// Number of completed items.
-  int get completedCount =>
-      OnboardingItems.required.where(_isTaskComplete).length;
-
-  /// Total number of items.
-  int get totalCount => OnboardingItems.required.length;
-
-  /// Whether a specific item is complete.
-  bool isComplete(String key) => _isTaskComplete(key);
-
   bool _isTaskComplete(String key) {
     if (key == OnboardingItems.scheduleRun) {
       return (_completed[OnboardingItems.scheduleRun] == true) ||
@@ -86,6 +73,19 @@ class OnboardingChecklistState extends ChangeNotifier {
     }
     return _completed[key] == true;
   }
+
+  /// True when every item has been completed.
+  bool get allComplete => OnboardingItems.checklistTasks.every(_isTaskComplete);
+
+  /// Number of completed items.
+  int get completedCount =>
+      OnboardingItems.checklistTasks.where(_isTaskComplete).length;
+
+  /// Total number of items.
+  int get totalCount => OnboardingItems.checklistTasks.length;
+
+  /// Whether a specific item is complete.
+  bool isComplete(String key) => _isTaskComplete(key);
 
   /// Whether the checklist card should be visible.
   /// Shows even when all items are complete — user must explicitly dismiss.
@@ -112,7 +112,7 @@ class OnboardingChecklistState extends ChangeNotifier {
   Future<void> _loadState() async {
     // 1. Fast local read
     final prefs = await SharedPreferences.getInstance();
-    for (final key in OnboardingItems.stored) {
+    for (final key in OnboardingItems.persistedKeys) {
       _completed[key] = prefs.getBool('$_prefPrefix$key') ?? false;
     }
     _dismissed = prefs.getBool('${_prefPrefix}dismissed') ?? false;
@@ -124,7 +124,7 @@ class OnboardingChecklistState extends ChangeNotifier {
       final remote = await ApiService.getOnboardingProgress();
       if (remote.isNotEmpty) {
         bool changed = false;
-        for (final key in OnboardingItems.stored) {
+        for (final key in OnboardingItems.persistedKeys) {
           if (remote[key] == true && _completed[key] != true) {
             _completed[key] = true;
             await prefs.setBool('$_prefPrefix$key', true);
@@ -139,7 +139,7 @@ class OnboardingChecklistState extends ChangeNotifier {
 
         // Push local state back if local has items the backend doesn't
         final localMap = <String, bool>{};
-        for (final key in OnboardingItems.stored) {
+        for (final key in OnboardingItems.persistedKeys) {
           if (_completed[key] == true) localMap[key] = true;
         }
         if (localMap.length > remote.entries.where((e) => e.value).length) {
@@ -168,7 +168,7 @@ class OnboardingChecklistState extends ChangeNotifier {
 
     // Persist to backend (fire-and-forget)
     final progressMap = <String, bool>{};
-    for (final k in OnboardingItems.stored) {
+    for (final k in OnboardingItems.persistedKeys) {
       if (_completed[k] == true) progressMap[k] = true;
     }
     ApiService.updateOnboardingProgress(progressMap);
@@ -194,7 +194,7 @@ class OnboardingChecklistState extends ChangeNotifier {
   /// Reset all items (used by the "help" button to re-show the checklist).
   Future<void> reset() async {
     final prefs = await SharedPreferences.getInstance();
-    for (final key in OnboardingItems.stored) {
+    for (final key in OnboardingItems.persistedKeys) {
       _completed[key] = false;
       await prefs.setBool('$_prefPrefix$key', false);
     }

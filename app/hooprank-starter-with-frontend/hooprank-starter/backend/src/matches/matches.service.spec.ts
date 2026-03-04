@@ -59,6 +59,20 @@ describe('MatchesService', () => {
             expect(result).toHaveProperty('id');
         });
 
+        it('should auto-accept quick play match when opponent is provided', async () => {
+            const result = await service.create('user-a', 'user-b', undefined, true);
+
+            expect(mockRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    creatorId: 'user-a',
+                    opponentId: 'user-b',
+                    status: 'accepted',
+                    matchType: '1v1',
+                }),
+            );
+            expect(result).toHaveProperty('id');
+        });
+
         it('should handle missing opponentId', async () => {
             const result = await service.create('user-a');
 
@@ -71,12 +85,38 @@ describe('MatchesService', () => {
             expect(result).toHaveProperty('id');
         });
 
+        it('should stay pending when autoAccept=true but opponent is missing', async () => {
+            const result = await service.create('user-a', undefined, undefined, true);
+
+            expect(mockRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    creatorId: 'user-a',
+                    opponentId: undefined,
+                    status: 'pending',
+                }),
+            );
+            expect(result).toHaveProperty('id');
+        });
+
         it('should include courtId when provided', async () => {
             await service.create('user-a', 'user-b', 'court-1');
 
             expect(mockRepo.create).toHaveBeenCalledWith(
                 expect.objectContaining({ courtId: 'court-1' }),
             );
+        });
+
+        it('should send accepted status in PostgreSQL insert when autoAccept=true', async () => {
+            process.env.DATABASE_URL = 'postgres://test';
+            mockDataSource.query.mockResolvedValueOnce([{ id: 'match-pg', status: 'accepted' }]);
+
+            const result = await service.create('user-a', 'user-b', 'court-1', true);
+
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('INSERT INTO matches'),
+                ['accepted', 'user-a', 'user-b', 'court-1'],
+            );
+            expect((result as any).status).toBe('accepted');
         });
     });
 
