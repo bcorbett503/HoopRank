@@ -608,6 +608,31 @@ export class StatusesService {
             }
 
 
+            // Only expose scheduled-run statuses when there is an event in the next 48h.
+            // This prevents recurring templates (days ahead) from leaking into feed early.
+            const scheduledRunWindowHours = 48;
+            const scheduledRunRadiusMiles = 50;
+            const scheduledRunVisibilityClause = `
+                (
+                    ps.scheduled_at IS NULL
+                    OR EXISTS (
+                        SELECT 1
+                        FROM scheduled_runs srw
+                        WHERE srw.status_id = ps.id
+                          AND srw.is_recurring = false
+                          AND srw.scheduled_at >= NOW()
+                          AND srw.scheduled_at <= NOW() + INTERVAL '${scheduledRunWindowHours} hours'
+                    )
+                    OR (
+                        ps.scheduled_at >= NOW()
+                        AND ps.scheduled_at <= NOW() + INTERVAL '${scheduledRunWindowHours} hours'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM scheduled_runs srw2 WHERE srw2.status_id = ps.id
+                        )
+                    )
+                )
+            `;
+
             // Status SELECT clause with additional fields for scoring
             const statusSelectClause = `
                 SELECT 
@@ -623,14 +648,19 @@ export class StatusesService {
                     ps.video_url as "videoUrl",
                     ps.video_thumbnail_url as "videoThumbnailUrl",
                     ps.video_duration_ms as "videoDurationMs",
-                    -- For recurring scheduled runs, always expose the *next* upcoming instance so the feed
-                    -- doesn't disappear after the first occurrence.
                     COALESCE((
                         SELECT MIN(sr.scheduled_at)
                         FROM scheduled_runs sr
                         WHERE sr.status_id = ps.id
+                          AND sr.is_recurring = false
                           AND sr.scheduled_at >= NOW()
-                    ), ps.scheduled_at) as "scheduledAt",
+                          AND sr.scheduled_at <= NOW() + INTERVAL '${scheduledRunWindowHours} hours'
+                    ), CASE
+                        WHEN ps.scheduled_at >= NOW()
+                         AND ps.scheduled_at <= NOW() + INTERVAL '${scheduledRunWindowHours} hours'
+                        THEN ps.scheduled_at
+                        ELSE NULL
+                    END) as "scheduledAt",
                     ps.court_id::TEXT as "courtId",
                     c.name as "courtName",
                     ST_Y(c.geog::geometry) as "courtLat",
@@ -789,7 +819,9 @@ export class StatusesService {
                     // TIER 1: Own posts + followed content (no geo filter)
                     const tier1Query = `
                         (${statusSelectClause}
-                        WHERE shadow_m.id IS NULL AND (ps.user_id = $1
+                        WHERE shadow_m.id IS NULL
+                          AND ${scheduledRunVisibilityClause}
+                          AND (ps.user_id = $1
                            OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
                            OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)))
                         UNION ALL
@@ -810,6 +842,7 @@ export class StatusesService {
                     const discoveryQuery = `
                         (${statusSelectClause}
                         WHERE shadow_m.id IS NULL
+                          AND ${scheduledRunVisibilityClause}
                           AND c.geog IS NOT NULL 
                           AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
                           AND ps.user_id != $1
@@ -837,6 +870,7 @@ export class StatusesService {
                             const expandedQuery = `
                                 (${statusSelectClause}
                                 WHERE shadow_m.id IS NULL
+                                  AND ${scheduledRunVisibilityClause}
                                   AND c.geog IS NOT NULL 
                                   AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
                                 UNION ALL
@@ -861,7 +895,9 @@ export class StatusesService {
                     // No location - fall back to followed content + network-wide popular
                     const fallbackQuery = `
                         (${statusSelectClause}
-                        WHERE shadow_m.id IS NULL AND (ps.user_id = $1
+                        WHERE shadow_m.id IS NULL
+                          AND ${scheduledRunVisibilityClause}
+                          AND (ps.user_id = $1
                            OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
                            OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)))
                         UNION ALL
@@ -879,7 +915,9 @@ export class StatusesService {
                     // If not enough, add network-wide content
                     if (allItems.length < limit) {
                         const networkQuery = `
-                            (${statusSelectClause} WHERE shadow_m.id IS NULL)
+                            (${statusSelectClause}
+                              WHERE shadow_m.id IS NULL
+                                AND ${scheduledRunVisibilityClause})
                             UNION ALL
                             (${matchSelectClause})
                             UNION ALL
@@ -902,6 +940,27 @@ export class StatusesService {
                     return true;
                 });
 
+                // Location-based For You behavior:
+                // 1) scheduled runs must be inside configured radius
+                // 2) scheduled runs must be upcoming in the next 48h
+                if (lat !== undefined && lng !== undefined) {
+                    allItems = allItems.filter((item) => {
+                        if (!item.scheduledAt) return true;
+
+                        const scheduledAtMs = new Date(item.scheduledAt).getTime();
+                        if (!Number.isFinite(scheduledAtMs)) return false;
+                        const hoursUntil = (scheduledAtMs - now.getTime()) / (1000 * 60 * 60);
+                        if (hoursUntil < 0 || hoursUntil > scheduledRunWindowHours) return false;
+
+                        const courtLat = Number(item.courtLat);
+                        const courtLng = Number(item.courtLng);
+                        if (!Number.isFinite(courtLat) || !Number.isFinite(courtLng)) return false;
+
+                        const miles = this.distanceMiles(lat, lng, courtLat, courtLng);
+                        return Number.isFinite(miles) && miles <= scheduledRunRadiusMiles;
+                    });
+                }
+
                 // Score all items
                 const scoredItems = allItems.map(item => ({
                     ...item,
@@ -917,19 +976,35 @@ export class StatusesService {
                     return aDist - bDist;
                 });
 
-                // Ensure discovery items are mixed in (at least 20% of feed)
-                const discoveryItems = scoredItems.filter(i => i._isDiscovery);
-                const regularItems = scoredItems.filter(i => !i._isDiscovery);
+                // Always include all nearby, upcoming scheduled runs first.
+                const scheduledItems = scoredItems
+                    .filter(i => i.type === 'status' && i.scheduledAt)
+                    .sort((a, b) => {
+                        const aTime = new Date(a.scheduledAt).getTime();
+                        const bTime = new Date(b.scheduledAt).getTime();
+                        if (aTime !== bTime) return aTime - bTime;
+                        const aDist = typeof a._distanceMiles === 'number' ? a._distanceMiles : Number.MAX_VALUE;
+                        const bDist = typeof b._distanceMiles === 'number' ? b._distanceMiles : Number.MAX_VALUE;
+                        return aDist - bDist;
+                    });
+
+                const pinnedScheduled = scheduledItems.slice(0, limit);
+                const pinnedIds = new Set(pinnedScheduled.map(i => i.id));
+
+                // Ensure discovery items are mixed in for non-scheduled content.
+                const discoveryItems = scoredItems.filter(i => i._isDiscovery && !pinnedIds.has(i.id));
+                const regularItems = scoredItems.filter(i => !i._isDiscovery && !pinnedIds.has(i.id));
 
                 const discoverySlots = Math.max(2, Math.floor(limit * 0.2));
                 const regularSlots = limit - discoverySlots;
 
-                const finalFeed: any[] = [];
+                const finalFeed: any[] = [...pinnedScheduled];
                 let regularIdx = 0;
                 let discoveryIdx = 0;
 
                 // Interleave: every 4th item is a discovery item (if available)
-                for (let i = 0; i < limit && (regularIdx < regularItems.length || discoveryIdx < discoveryItems.length); i++) {
+                while (finalFeed.length < limit && (regularIdx < regularItems.length || discoveryIdx < discoveryItems.length)) {
+                    const i = finalFeed.length;
                     if (i % 5 === 4 && discoveryIdx < discoveryItems.length) {
                         // Discovery slot
                         finalFeed.push(discoveryItems[discoveryIdx++]);
@@ -955,7 +1030,9 @@ export class StatusesService {
                 // FOLLOWING: Only posts from followed players/courts (unchanged logic)
                 const statusQuery = `
                     ${statusSelectClause}
-                    WHERE shadow_m.id IS NULL AND (ps.user_id = $1
+                    WHERE shadow_m.id IS NULL
+                       AND ${scheduledRunVisibilityClause}
+                       AND (ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
                        OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
                     ORDER BY "createdAt" DESC
@@ -995,7 +1072,9 @@ export class StatusesService {
                 // ALL: Same as following but with scoring (default view)
                 const statusQuery = `
                     ${statusSelectClause}
-                    WHERE shadow_m.id IS NULL AND (ps.user_id = $1
+                    WHERE shadow_m.id IS NULL
+                       AND ${scheduledRunVisibilityClause}
+                       AND (ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
                        OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
                     ORDER BY "createdAt" DESC
