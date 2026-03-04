@@ -18,6 +18,7 @@ class HomePrimaryActionSection extends StatelessWidget {
   final VoidCallback? onProfilePressed;
   final VoidCallback? onSkipPressed;
   final VoidCallback? onVenuePressed;
+  final VoidCallback? onDismissInvitePressed;
 
   const HomePrimaryActionSection({
     super.key,
@@ -29,6 +30,7 @@ class HomePrimaryActionSection extends StatelessWidget {
     this.onProfilePressed,
     this.onSkipPressed,
     this.onVenuePressed,
+    this.onDismissInvitePressed,
   });
 
   @override
@@ -329,11 +331,12 @@ class HomePrimaryActionSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.group_add, color: Colors.lightBlueAccent, size: 16),
-              SizedBox(width: 6),
-              Expanded(
+              const Icon(Icons.group_add,
+                  color: Colors.lightBlueAccent, size: 16),
+              const SizedBox(width: 6),
+              const Expanded(
                 child: Text(
                   'Invite someone to play 1v1',
                   style: TextStyle(
@@ -343,6 +346,17 @@ class HomePrimaryActionSection extends StatelessWidget {
                   ),
                 ),
               ),
+              if (onDismissInvitePressed != null)
+                IconButton(
+                  onPressed: onDismissInvitePressed,
+                  tooltip: 'Hide',
+                  icon: const Icon(Icons.close, size: 16),
+                  color: Colors.white70,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 24, height: 24),
+                  splashRadius: 14,
+                ),
             ],
           ),
           const SizedBox(height: 4),

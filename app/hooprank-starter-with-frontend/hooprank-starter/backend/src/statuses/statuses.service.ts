@@ -816,6 +816,19 @@ export class StatusesService {
                 let allItems: any[] = [];
 
                 if (lat !== undefined && lng !== undefined) {
+                    const discoveryRadiusTiers = [
+                        { miles: 10, meters: 16093 }, // ~10 mi
+                        { miles: 25, meters: 40233 }, // ~25 mi
+                        { miles: 50, meters: 80467 }, // ~50 mi
+                    ];
+                    const hasUpcomingScheduledEvent = (item: any): boolean => {
+                        if (!item?.scheduledAt) return false;
+                        const scheduledAtMs = new Date(item.scheduledAt).getTime();
+                        if (!Number.isFinite(scheduledAtMs)) return false;
+                        const hoursUntil = (scheduledAtMs - now.getTime()) / (1000 * 60 * 60);
+                        return hoursUntil >= 0 && hoursUntil <= scheduledRunWindowHours;
+                    };
+
                     // TIER 1: Own posts + followed content (no geo filter)
                     const tier1Query = `
                         (${statusSelectClause}
@@ -837,58 +850,43 @@ export class StatusesService {
                     const tier1Results = await this.dataSource.query(tier1Query, [userId, userId, fetchLimit]);
                     allItems.push(...tier1Results);
 
-                    // TIER 2: Discovery - Nearby courts user doesn't follow (within 50mi / 80km)
-                    const discoveryRadius = 80467; // 50 miles in meters
-                    const discoveryQuery = `
-                        (${statusSelectClause}
-                        WHERE shadow_m.id IS NULL
-                          AND ${scheduledRunVisibilityClause}
-                          AND c.geog IS NOT NULL 
-                          AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
-                          AND ps.user_id != $1
-                          AND (ps.court_id IS NULL OR ps.court_id NOT IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $5))
-                          AND ps.user_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
-                        UNION ALL
-                        (${matchSelectClause}
-                        AND mc.geog IS NOT NULL
-                        AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
-                        AND m.creator_id != $1 AND m.opponent_id != $1
-                        AND m.creator_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5)
-                        AND m.opponent_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
-                        ORDER BY "createdAt" DESC
-                        LIMIT $6
-                    `;
-                    const discoveryResults = await this.dataSource.query(discoveryQuery, [userId, lng, lat, discoveryRadius, userId, fetchLimit]);
-                    // Mark these as discovery items
-                    discoveryResults.forEach((item: any) => item._isDiscovery = true);
-                    allItems.push(...discoveryResults);
-
-                    // TIER 3: Expanding radius if still not enough content
-                    if (allItems.length < limit) {
-                        const radiusTiers = [160934, 402336, 804672]; // 100mi, 250mi, 500mi
-                        for (const radius of radiusTiers) {
-                            const expandedQuery = `
+                    // TIER 2: Discovery radius expansion for local feed.
+                    // Widen 10 -> 25 -> 50 miles and stop once we find at least one upcoming scheduled event.
+                    let foundScheduledEvent = allItems.some(hasUpcomingScheduledEvent);
+                    if (!foundScheduledEvent) {
+                        for (const tier of discoveryRadiusTiers) {
+                            const discoveryQuery = `
                                 (${statusSelectClause}
                                 WHERE shadow_m.id IS NULL
                                   AND ${scheduledRunVisibilityClause}
                                   AND c.geog IS NOT NULL 
-                                  AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
+                                  AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
+                                  AND ps.user_id != $1
+                                  AND (ps.court_id IS NULL OR ps.court_id NOT IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $5))
+                                  AND ps.user_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
                                 UNION ALL
                                 (${matchSelectClause}
                                 AND mc.geog IS NOT NULL
-                                AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
+                                AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
+                                AND m.creator_id != $1 AND m.opponent_id != $1
+                                AND m.creator_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5)
+                                AND m.opponent_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
                                 ORDER BY "createdAt" DESC
-                                LIMIT $5
+                                LIMIT $6
                             `;
-                            const expandedResults = await this.dataSource.query(expandedQuery, [userId, lng, lat, radius, fetchLimit]);
+                            const discoveryResults = await this.dataSource.query(
+                                discoveryQuery,
+                                [userId, lng, lat, tier.meters, userId, fetchLimit],
+                            );
 
-                            // Add only new items
+                            discoveryResults.forEach((item: any) => item._isDiscovery = true);
+
                             const existingIds = new Set(allItems.map(i => i.id));
-                            const newItems = expandedResults.filter((item: any) => !existingIds.has(item.id));
+                            const newItems = discoveryResults.filter((item: any) => !existingIds.has(item.id));
                             allItems.push(...newItems);
 
-
-                            if (allItems.length >= limit) break;
+                            foundScheduledEvent = allItems.some(hasUpcomingScheduledEvent);
+                            if (foundScheduledEvent || allItems.length >= limit) break;
                         }
                     }
                 } else {
@@ -944,6 +942,33 @@ export class StatusesService {
                 // 1) scheduled runs must be inside configured radius
                 // 2) scheduled runs must be upcoming in the next 48h
                 if (lat !== undefined && lng !== undefined) {
+                    const scheduledRadiusTiers = [10, 25, scheduledRunRadiusMiles];
+                    const upcomingScheduledWithDistance = allItems
+                        .filter(item => item?.scheduledAt)
+                        .map(item => {
+                            const scheduledAtMs = new Date(item.scheduledAt).getTime();
+                            if (!Number.isFinite(scheduledAtMs)) return null;
+                            const hoursUntil = (scheduledAtMs - now.getTime()) / (1000 * 60 * 60);
+                            if (hoursUntil < 0 || hoursUntil > scheduledRunWindowHours) return null;
+
+                            const courtLat = Number(item.courtLat);
+                            const courtLng = Number(item.courtLng);
+                            if (!Number.isFinite(courtLat) || !Number.isFinite(courtLng)) return null;
+
+                            const miles = this.distanceMiles(lat, lng, courtLat, courtLng);
+                            if (!Number.isFinite(miles)) return null;
+                            return { id: item.id, miles };
+                        })
+                        .filter(Boolean) as Array<{ id: string; miles: number }>;
+
+                    let effectiveScheduledRadiusMiles = scheduledRunRadiusMiles;
+                    for (const tierMiles of scheduledRadiusTiers) {
+                        if (upcomingScheduledWithDistance.some(item => item.miles <= tierMiles)) {
+                            effectiveScheduledRadiusMiles = tierMiles;
+                            break;
+                        }
+                    }
+
                     allItems = allItems.filter((item) => {
                         if (!item.scheduledAt) return true;
 
@@ -957,7 +982,7 @@ export class StatusesService {
                         if (!Number.isFinite(courtLat) || !Number.isFinite(courtLng)) return false;
 
                         const miles = this.distanceMiles(lat, lng, courtLat, courtLng);
-                        return Number.isFinite(miles) && miles <= scheduledRunRadiusMiles;
+                        return Number.isFinite(miles) && miles <= effectiveScheduledRadiusMiles;
                     });
                 }
 

@@ -83,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen>
   String _primaryDiscoverMode = 'open';
   double _primaryDiscoverRadiusMi = 25.0;
   bool _primarySuggestionSkippedThisSession = false;
+  bool _isInviteFallbackDismissed = false;
   late final AnimationController _quickPlayPulseController;
   late final Animation<double> _quickPlayPulse;
 
@@ -1006,6 +1007,9 @@ class _HomeScreenState extends State<HomeScreen>
       _primaryActionState = enriched == null
           ? HomePrimaryActionState.inviteFallback
           : HomePrimaryActionState.recommended;
+      if (enriched != null) {
+        _isInviteFallbackDismissed = false;
+      }
     });
   }
 
@@ -1172,6 +1176,13 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() => _isPrimaryActionSubmitting = false);
       }
     }
+  }
+
+  void _handleDismissInviteFallback() {
+    if (!mounted) return;
+    setState(() {
+      _isInviteFallbackDismissed = true;
+    });
   }
 
   @override
@@ -2541,6 +2552,12 @@ class _HomeScreenState extends State<HomeScreen>
                     return const OnboardingChecklistCard();
                   }
 
+                  if (_primaryActionState ==
+                          HomePrimaryActionState.inviteFallback &&
+                      _isInviteFallbackDismissed) {
+                    return const SizedBox.shrink();
+                  }
+
                   return HomePrimaryActionSection(
                     state: _primaryActionState,
                     recommended: _recommendedMatchup,
@@ -2550,6 +2567,7 @@ class _HomeScreenState extends State<HomeScreen>
                     onProfilePressed: _handleOpenSuggestedProfile,
                     onSkipPressed: _handleSkipSuggestion,
                     onVenuePressed: _handleOpenSuggestedVenue,
+                    onDismissInvitePressed: _handleDismissInviteFallback,
                   );
                 },
               ),
