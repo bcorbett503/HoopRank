@@ -2376,6 +2376,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildHomeTopSections() {
     return Column(
       key: _preFeedContentKey,
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Static header: STATUS composer ──
@@ -2753,7 +2754,10 @@ class _HomeScreenState extends State<HomeScreen>
 
               return Stack(
                 children: [
-                  Positioned.fill(
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
                     child: _buildHomeTopSections(),
                   ),
                   AnimatedPositioned(
