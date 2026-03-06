@@ -11,12 +11,22 @@ export class UsersService {
     private dataSource: DataSource,
   ) {}
 
+  private buildGeneratedPlayerName(seed: string): string {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash * 31 + seed.charCodeAt(i)) % 100000;
+    }
+    const suffix = hash.toString().padStart(5, "0");
+    return `HoopRank Player${suffix}`;
+  }
+
   /**
    * Find user by auth provider ID or create a new one.
    * Production uses auth_provider + auth_token for authentication.
    */
   async findOrCreate(authToken: string, email: string): Promise<User> {
     const isPostgres = !!process.env.DATABASE_URL;
+    const generatedName = this.buildGeneratedPlayerName(authToken);
 
     if (isPostgres) {
       // Check if user exists by id (which is the Firebase UID)
@@ -34,10 +44,10 @@ export class UsersService {
       const result = await this.dataSource.query(
         `
         INSERT INTO users (id, email, name, hoop_rank, created_at, updated_at)
-        VALUES ($1, $2, 'New Player', 3.0, NOW(), NOW())
+        VALUES ($1, $2, $3, 3.0, NOW(), NOW())
         RETURNING *
       `,
-        [authToken, email],
+        [authToken, email, generatedName],
       );
 
       return result[0];
@@ -50,7 +60,7 @@ export class UsersService {
         id: authToken, // Use authToken as ID for consistency
         authToken,
         email,
-        name: "New Player",
+        name: generatedName,
         hoopRank: 3.0,
         reputation: 5.0,
       } as Partial<User>);
@@ -892,6 +902,8 @@ export class UsersService {
           WHERE name IS NOT NULL 
             AND name != ''
             AND name != 'New Player'
+            AND name != 'New User'
+            AND name NOT LIKE 'HoopRank Player%'
           ORDER BY hoop_rank DESC
           LIMIT 100
         `);
@@ -975,6 +987,8 @@ export class UsersService {
           WHERE name IS NOT NULL 
             AND name != ''
             AND name != 'New Player'
+            AND name != 'New User'
+            AND name NOT LIKE 'HoopRank Player%'
             AND id != $1
         )
         SELECT 

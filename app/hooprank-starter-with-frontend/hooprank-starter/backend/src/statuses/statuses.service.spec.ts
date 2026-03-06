@@ -154,4 +154,36 @@ describe('StatusesService', () => {
             expect(item._isDiscovery).toBe(false);
         });
     });
+
+    describe('getUnifiedFeed', () => {
+        it('projects match names from live users rows (winner/loser) for feed cards', async () => {
+            const mockDataSource: any = {
+                options: { type: 'postgres' },
+                query: jest.fn().mockResolvedValue([]),
+            };
+
+            const fullService = new StatusesService(
+                mockDataSource,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+            );
+
+            const result = await fullService.getUnifiedFeed('user-1', 'all', 10);
+            expect(Array.isArray(result)).toBe(true);
+
+            const executedQueries = mockDataSource.query.mock.calls
+                .map((call: any[]) => call[0])
+                .filter((q: unknown) => typeof q === 'string') as string[];
+            const combinedSql = executedQueries.join('\n');
+
+            expect(combinedSql).toContain('winner.name as "winnerName"');
+            expect(combinedSql).toContain('loser.name as "loserName"');
+            expect(combinedSql).toContain(
+                "COALESCE(winner.name, 'Player') || ' vs ' || COALESCE(loser.name, 'Opponent') as content",
+            );
+        });
+    });
 });

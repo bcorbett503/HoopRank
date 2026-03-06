@@ -89,14 +89,19 @@ export class UsersController {
     const user = await this.usersService.findOrCreate(uid, email);
 
     // Sync profile picture and display name from the auth provider.
-    // Update if the DB value is empty, a base64 placeholder, or 'New Player'.
+    // Update if DB value is empty, a base64 placeholder, or generated placeholder name.
     const u = user as any;
     const currentPhoto = u.avatar_url || u.avatarUrl || "";
     const currentName = u.name || "";
     const needsPhotoSync =
       photoUrl && (!currentPhoto || currentPhoto.startsWith("data:"));
+    const hasPlaceholderName =
+      !currentName ||
+      currentName === "New Player" ||
+      currentName === "New User" ||
+      currentName.startsWith("HoopRank Player");
     const needsNameSync =
-      displayName && (!currentName || currentName === "New Player");
+      displayName && hasPlaceholderName;
 
     if (needsPhotoSync || needsNameSync) {
       try {

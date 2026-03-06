@@ -272,6 +272,11 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
     _loadPlayerData();
   }
 
+  void _dismissSheetThen(VoidCallback action) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) => action());
+  }
+
   /// Load fresh profile, stats, and recent matches from API
   Future<void> _loadPlayerData() async {
     try {
@@ -510,23 +515,27 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                           onPressed: isSelf
                               ? null
                               : () {
-                                  final nav = Navigator.of(context,
-                                      rootNavigator: true);
-                                  nav.pop();
-
-                                  // Prefer injected behavior (Rankings), otherwise default to ChatScreen.
-                                  final handler = widget.onMessage;
-                                  if (handler != null) {
-                                    handler();
-                                    return;
-                                  }
-
-                                  nav.push(
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ChatScreen(userId: player.id),
-                                    ),
+                                  final rootNavigator = Navigator.of(
+                                    context,
+                                    rootNavigator: true,
                                   );
+
+                                  _dismissSheetThen(() {
+                                    // Prefer injected behavior (Rankings),
+                                    // otherwise default to ChatScreen.
+                                    final handler = widget.onMessage;
+                                    if (handler != null) {
+                                      handler();
+                                      return;
+                                    }
+
+                                    rootNavigator.push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            ChatScreen(userId: player.id),
+                                      ),
+                                    );
+                                  });
                                 },
                           icon: const Icon(Icons.message),
                           label: const Text('Message'),
@@ -545,20 +554,25 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                           onPressed: isSelf
                               ? null
                               : () {
-                                  final nav = Navigator.of(context,
-                                      rootNavigator: true);
-                                  final rootContext = nav.context;
-                                  nav.pop();
+                                  final rootNavigator = Navigator.of(
+                                    context,
+                                    rootNavigator: true,
+                                  );
 
-                                  // Prefer injected behavior (Rankings), otherwise show a default dialog.
-                                  final handler = widget.onChallenge;
-                                  if (handler != null) {
-                                    handler();
-                                    return;
-                                  }
+                                  _dismissSheetThen(() {
+                                    // Prefer injected behavior (Rankings),
+                                    // otherwise show a default dialog.
+                                    final handler = widget.onChallenge;
+                                    if (handler != null) {
+                                      handler();
+                                      return;
+                                    }
 
-                                  _showDefaultChallengeDialog(
-                                      rootContext, player);
+                                    _showDefaultChallengeDialog(
+                                      rootNavigator.context,
+                                      player,
+                                    );
+                                  });
                                 },
                           icon: const Icon(Icons.sports_basketball),
                           label: const Text('Challenge'),
@@ -579,8 +593,9 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          Navigator.pop(context);
-                          widget.onInviteToTeam?.call();
+                          _dismissSheetThen(() {
+                            widget.onInviteToTeam?.call();
+                          });
                         },
                         icon: const Icon(Icons.group_add),
                         label: const Text('Invite to Team'),

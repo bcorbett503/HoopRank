@@ -1,5 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, Unique } from "typeorm";
 
+const DATE_TIME_COLUMN_TYPE: "timestamp" | "datetime" = process.env.DATABASE_URL
+  ? "timestamp"
+  : "datetime";
+
 @Entity("scheduled_runs")
 export class ScheduledRun {
   @PrimaryGeneratedColumn("uuid")
@@ -23,7 +27,7 @@ export class ScheduledRun {
   @Column({ name: "age_range", type: "varchar", length: 20, nullable: true })
   ageRange?: string; // '18+', '21+', '30+', '40+', '50+', 'open'
 
-  @Column({ name: "scheduled_at", type: process.env.DATABASE_URL ? "timestamp" : "datetime" })
+  @Column({ name: "scheduled_at", type: DATE_TIME_COLUMN_TYPE })
   scheduledAt: Date;
 
   @Column({ name: "duration_minutes", type: "integer", default: 120 })
@@ -50,7 +54,7 @@ export class ScheduledRun {
 
   @Column({
     name: "created_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   createdAt: Date;
@@ -73,7 +77,7 @@ export class RunAttendee {
 
   @Column({
     name: "created_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   createdAt: Date;

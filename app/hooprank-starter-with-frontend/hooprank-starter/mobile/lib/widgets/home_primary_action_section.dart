@@ -15,10 +15,10 @@ class HomePrimaryActionSection extends StatelessWidget {
   final bool isSubmitting;
   final VoidCallback onChallengePressed;
   final VoidCallback onInvitePressed;
+  final VoidCallback? onDismissInvitePressed;
   final VoidCallback? onProfilePressed;
   final VoidCallback? onSkipPressed;
   final VoidCallback? onVenuePressed;
-  final VoidCallback? onDismissInvitePressed;
 
   const HomePrimaryActionSection({
     super.key,
@@ -27,10 +27,10 @@ class HomePrimaryActionSection extends StatelessWidget {
     required this.isSubmitting,
     required this.onChallengePressed,
     required this.onInvitePressed,
+    this.onDismissInvitePressed,
     this.onProfilePressed,
     this.onSkipPressed,
     this.onVenuePressed,
-    this.onDismissInvitePressed,
   });
 
   @override
@@ -349,13 +349,13 @@ class HomePrimaryActionSection extends StatelessWidget {
               if (onDismissInvitePressed != null)
                 IconButton(
                   onPressed: onDismissInvitePressed,
-                  tooltip: 'Hide',
-                  icon: const Icon(Icons.close, size: 16),
-                  color: Colors.white70,
+                  icon: const Icon(Icons.close, size: 18),
                   padding: EdgeInsets.zero,
                   constraints:
                       const BoxConstraints.tightFor(width: 24, height: 24),
                   splashRadius: 14,
+                  color: Colors.white70,
+                  tooltip: 'Dismiss',
                 ),
             ],
           ),

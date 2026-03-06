@@ -9,6 +9,10 @@ import {
 } from "typeorm";
 import { Team } from "./team.entity";
 
+const DATE_TIME_COLUMN_TYPE: "timestamp" | "datetime" = process.env.DATABASE_URL
+  ? "timestamp"
+  : "datetime";
+
 /**
  * Team event entity for practices and games
  */
@@ -26,10 +30,10 @@ export class TeamEvent {
   @Column({ type: "text" })
   title: string;
 
-  @Column({ name: "event_date", type: process.env.DATABASE_URL ? "timestamp" : "datetime" })
+  @Column({ name: "event_date", type: DATE_TIME_COLUMN_TYPE })
   eventDate: Date;
 
-  @Column({ name: "end_date", type: process.env.DATABASE_URL ? "timestamp" : "datetime", nullable: true })
+  @Column({ name: "end_date", type: DATE_TIME_COLUMN_TYPE, nullable: true })
   endDate: Date | null;
 
   @Column({ name: "location_name", type: "text", nullable: true })

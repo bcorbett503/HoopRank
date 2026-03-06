@@ -501,7 +501,15 @@ export class StatusesService {
      * Calculate a relevance score for feed items.
      * Higher score = more relevant to the user.
      */
-    private calculateFeedScore(item: any, userId: string, followedPlayerIds: Set<string>, followedCourtIds: Set<string>, now: Date): number {
+    private calculateFeedScore(
+        item: any,
+        userId: string,
+        followedPlayerIds: Set<string>,
+        followedCourtIds: Set<string>,
+        now: Date,
+        userLat?: number,
+        userLng?: number,
+    ): number {
         let score = 0;
 
         // 1. RECENCY: Decay factor - newer posts score higher (max 100 points, decays over 7 days)
@@ -544,6 +552,33 @@ export class StatusesService {
             }
         }
 
+        // 4b. PROXIMITY: Prefer nearby content (especially scheduled runs).
+        if (userLat !== undefined && userLng !== undefined) {
+            const distanceMiles = this.calculateDistanceMiles(
+                userLat,
+                userLng,
+                item.courtLat,
+                item.courtLng,
+            );
+            if (distanceMiles !== null) {
+                item.distance_miles = Number(distanceMiles.toFixed(2));
+
+                // General nearby bonus up to 25mi.
+                if (distanceMiles <= 25) {
+                    score += Math.max(0, 20 * (1 - distanceMiles / 25));
+                }
+
+                // Scheduled runs should strongly prefer nearby courts.
+                if (item.scheduledAt) {
+                    if (distanceMiles <= 10) {
+                        score += Math.max(0, 35 * (1 - distanceMiles / 10));
+                    } else if (distanceMiles > 30) {
+                        score -= Math.min(20, (distanceMiles - 30) * 0.5);
+                    }
+                }
+            }
+        }
+
         // 5. CONTENT TYPE: Matches are inherently interesting (10 points)
         if (item.type === 'match' || item.type === 'team_match') {
             score += 10;
@@ -556,47 +591,33 @@ export class StatusesService {
         return score;
     }
 
-    private distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
-        const toRad = (deg: number) => (deg * Math.PI) / 180;
-        const earthMiles = 3958.8;
-        const dLat = toRad(lat2 - lat1);
-        const dLng = toRad(lng2 - lng1);
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    private calculateDistanceMiles(
+        userLat: number,
+        userLng: number,
+        rawLat: unknown,
+        rawLng: unknown,
+    ): number | null {
+        const lat = this.asNumber(rawLat);
+        const lng = this.asNumber(rawLng);
+        if (lat === null || lng === null) return null;
+
+        const toRad = (deg: number) => deg * (Math.PI / 180);
+        const dLat = toRad(lat - userLat);
+        const dLng = toRad(lng - userLng);
+        const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(toRad(userLat)) * Math.cos(toRad(lat)) * Math.sin(dLng / 2) ** 2;
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return earthMiles * c;
+        const earthRadiusMiles = 3958.8;
+        return earthRadiusMiles * c;
     }
 
-    private calculateProximityScore(item: any, lat: number, lng: number): number {
-        if (item?.courtLat === null || item?.courtLat === undefined || item?.courtLng === null || item?.courtLng === undefined) {
-            // If a scheduled run can't be geo-ranked, de-prioritize it for location-based feeds.
-            return item?.scheduledAt ? -25 : 0;
+    private asNumber(value: unknown): number | null {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string') {
+            const parsed = Number.parseFloat(value);
+            return Number.isFinite(parsed) ? parsed : null;
         }
-
-        const courtLat = Number(item.courtLat);
-        const courtLng = Number(item.courtLng);
-        if (!Number.isFinite(courtLat) || !Number.isFinite(courtLng)) {
-            return item?.scheduledAt ? -25 : 0;
-        }
-
-        const miles = this.distanceMiles(lat, lng, courtLat, courtLng);
-        item._distanceMiles = miles;
-
-        // Heavily favor nearby scheduled runs in the For You feed.
-        if (item?.scheduledAt) {
-            if (miles <= 10) return 120;
-            if (miles <= 25) return 120 - ((miles - 10) * 4); // 120 -> 60
-            if (miles <= 50) return 60 - ((miles - 25) * 2);  // 60 -> 10
-            if (miles <= 100) return 10 - ((miles - 50) * 0.2); // 10 -> 0
-            return -20;
-        }
-
-        // Non-event content gets a lighter locality boost.
-        if (miles <= 10) return 25;
-        if (miles <= 50) return 25 - ((miles - 10) * (25 / 40));
-        return 0;
+        return null;
     }
 
     async getUnifiedFeed(userId: string, filter: string = 'all', limit: number = 50, lat?: number, lng?: number): Promise<any[]> {
@@ -607,31 +628,6 @@ export class StatusesService {
                 this.statusIdMigrated = true;
             }
 
-
-            // Only expose scheduled-run statuses when there is an event in the next 48h.
-            // This prevents recurring templates (days ahead) from leaking into feed early.
-            const scheduledRunWindowHours = 48;
-            const scheduledRunRadiusMiles = 50;
-            const scheduledRunVisibilityClause = `
-                (
-                    ps.scheduled_at IS NULL
-                    OR EXISTS (
-                        SELECT 1
-                        FROM scheduled_runs srw
-                        WHERE srw.status_id = ps.id
-                          AND srw.is_recurring = false
-                          AND srw.scheduled_at >= NOW()
-                          AND srw.scheduled_at <= NOW() + INTERVAL '${scheduledRunWindowHours} hours'
-                    )
-                    OR (
-                        ps.scheduled_at >= NOW()
-                        AND ps.scheduled_at <= NOW() + INTERVAL '${scheduledRunWindowHours} hours'
-                        AND NOT EXISTS (
-                            SELECT 1 FROM scheduled_runs srw2 WHERE srw2.status_id = ps.id
-                        )
-                    )
-                )
-            `;
 
             // Status SELECT clause with additional fields for scoring
             const statusSelectClause = `
@@ -648,19 +644,27 @@ export class StatusesService {
                     ps.video_url as "videoUrl",
                     ps.video_thumbnail_url as "videoThumbnailUrl",
                     ps.video_duration_ms as "videoDurationMs",
+                    -- For recurring scheduled runs, always expose the *next* upcoming instance so the feed
+                    -- doesn't disappear after the first occurrence.
                     COALESCE((
                         SELECT MIN(sr.scheduled_at)
                         FROM scheduled_runs sr
                         WHERE sr.status_id = ps.id
-                          AND sr.is_recurring = false
                           AND sr.scheduled_at >= NOW()
-                          AND sr.scheduled_at <= NOW() + INTERVAL '${scheduledRunWindowHours} hours'
-                    ), CASE
-                        WHEN ps.scheduled_at >= NOW()
-                         AND ps.scheduled_at <= NOW() + INTERVAL '${scheduledRunWindowHours} hours'
-                        THEN ps.scheduled_at
-                        ELSE NULL
-                    END) as "scheduledAt",
+                    ), (
+                        -- Legacy fallback: older seeded runs may miss scheduled_runs.status_id linkage.
+                        -- Match by creator + court + run title encoded in "Standing Run · {title}" content.
+                        SELECT MIN(sr2.scheduled_at)
+                        FROM scheduled_runs sr2
+                        WHERE ps.content LIKE 'Standing Run %'
+                          AND sr2.scheduled_at >= NOW()
+                          AND sr2.created_by::TEXT = ps.user_id::TEXT
+                          AND sr2.court_id::TEXT = ps.court_id::TEXT
+                          AND COALESCE(sr2.title, '') = COALESCE(
+                              NULLIF(regexp_replace(ps.content, '^Standing Run\\s*·\\s*', ''), ''),
+                              ''
+                          )
+                    ), ps.scheduled_at) as "scheduledAt",
                     ps.court_id::TEXT as "courtId",
                     c.name as "courtName",
                     ST_Y(c.geog::geometry) as "courtLat",
@@ -816,25 +820,10 @@ export class StatusesService {
                 let allItems: any[] = [];
 
                 if (lat !== undefined && lng !== undefined) {
-                    const discoveryRadiusTiers = [
-                        { miles: 10, meters: 16093 }, // ~10 mi
-                        { miles: 25, meters: 40233 }, // ~25 mi
-                        { miles: 50, meters: 80467 }, // ~50 mi
-                    ];
-                    const hasUpcomingScheduledEvent = (item: any): boolean => {
-                        if (!item?.scheduledAt) return false;
-                        const scheduledAtMs = new Date(item.scheduledAt).getTime();
-                        if (!Number.isFinite(scheduledAtMs)) return false;
-                        const hoursUntil = (scheduledAtMs - now.getTime()) / (1000 * 60 * 60);
-                        return hoursUntil >= 0 && hoursUntil <= scheduledRunWindowHours;
-                    };
-
                     // TIER 1: Own posts + followed content (no geo filter)
                     const tier1Query = `
                         (${statusSelectClause}
-                        WHERE shadow_m.id IS NULL
-                          AND ${scheduledRunVisibilityClause}
-                          AND (ps.user_id = $1
+                        WHERE shadow_m.id IS NULL AND (ps.user_id = $1
                            OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
                            OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)))
                         UNION ALL
@@ -850,52 +839,63 @@ export class StatusesService {
                     const tier1Results = await this.dataSource.query(tier1Query, [userId, userId, fetchLimit]);
                     allItems.push(...tier1Results);
 
-                    // TIER 2: Discovery radius expansion for local feed.
-                    // Widen 10 -> 25 -> 50 miles and stop once we find at least one upcoming scheduled event.
-                    let foundScheduledEvent = allItems.some(hasUpcomingScheduledEvent);
-                    if (!foundScheduledEvent) {
-                        for (const tier of discoveryRadiusTiers) {
-                            const discoveryQuery = `
+                    // TIER 2: Discovery - Nearby courts user doesn't follow (within 50mi / 80km)
+                    const discoveryRadius = 80467; // 50 miles in meters
+                    const discoveryQuery = `
+                        (${statusSelectClause}
+                        WHERE shadow_m.id IS NULL
+                          AND c.geog IS NOT NULL 
+                          AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
+                          AND ps.user_id != $1
+                          AND (ps.court_id IS NULL OR ps.court_id NOT IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $5))
+                          AND ps.user_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
+                        UNION ALL
+                        (${matchSelectClause}
+                        AND mc.geog IS NOT NULL
+                        AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
+                        AND m.creator_id != $1 AND m.opponent_id != $1
+                        AND m.creator_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5)
+                        AND m.opponent_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
+                        ORDER BY "createdAt" DESC
+                        LIMIT $6
+                    `;
+                    const discoveryResults = await this.dataSource.query(discoveryQuery, [userId, lng, lat, discoveryRadius, userId, fetchLimit]);
+                    // Mark these as discovery items
+                    discoveryResults.forEach((item: any) => item._isDiscovery = true);
+                    allItems.push(...discoveryResults);
+
+                    // TIER 3: Expanding radius if still not enough content
+                    if (allItems.length < limit) {
+                        const radiusTiers = [160934, 402336, 804672]; // 100mi, 250mi, 500mi
+                        for (const radius of radiusTiers) {
+                            const expandedQuery = `
                                 (${statusSelectClause}
                                 WHERE shadow_m.id IS NULL
-                                  AND ${scheduledRunVisibilityClause}
                                   AND c.geog IS NOT NULL 
-                                  AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
-                                  AND ps.user_id != $1
-                                  AND (ps.court_id IS NULL OR ps.court_id NOT IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $5))
-                                  AND ps.user_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
+                                  AND ST_DWithin(c.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
                                 UNION ALL
                                 (${matchSelectClause}
                                 AND mc.geog IS NOT NULL
-                                AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)
-                                AND m.creator_id != $1 AND m.opponent_id != $1
-                                AND m.creator_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5)
-                                AND m.opponent_id NOT IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $5))
+                                AND ST_DWithin(mc.geog, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4))
                                 ORDER BY "createdAt" DESC
-                                LIMIT $6
+                                LIMIT $5
                             `;
-                            const discoveryResults = await this.dataSource.query(
-                                discoveryQuery,
-                                [userId, lng, lat, tier.meters, userId, fetchLimit],
-                            );
+                            const expandedResults = await this.dataSource.query(expandedQuery, [userId, lng, lat, radius, fetchLimit]);
 
-                            discoveryResults.forEach((item: any) => item._isDiscovery = true);
-
+                            // Add only new items
                             const existingIds = new Set(allItems.map(i => i.id));
-                            const newItems = discoveryResults.filter((item: any) => !existingIds.has(item.id));
+                            const newItems = expandedResults.filter((item: any) => !existingIds.has(item.id));
                             allItems.push(...newItems);
 
-                            foundScheduledEvent = allItems.some(hasUpcomingScheduledEvent);
-                            if (foundScheduledEvent || allItems.length >= limit) break;
+
+                            if (allItems.length >= limit) break;
                         }
                     }
                 } else {
                     // No location - fall back to followed content + network-wide popular
                     const fallbackQuery = `
                         (${statusSelectClause}
-                        WHERE shadow_m.id IS NULL
-                          AND ${scheduledRunVisibilityClause}
-                          AND (ps.user_id = $1
+                        WHERE shadow_m.id IS NULL AND (ps.user_id = $1
                            OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $2)
                            OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)))
                         UNION ALL
@@ -913,9 +913,7 @@ export class StatusesService {
                     // If not enough, add network-wide content
                     if (allItems.length < limit) {
                         const networkQuery = `
-                            (${statusSelectClause}
-                              WHERE shadow_m.id IS NULL
-                                AND ${scheduledRunVisibilityClause})
+                            (${statusSelectClause} WHERE shadow_m.id IS NULL)
                             UNION ALL
                             (${matchSelectClause})
                             UNION ALL
@@ -938,98 +936,36 @@ export class StatusesService {
                     return true;
                 });
 
-                // Location-based For You behavior:
-                // 1) scheduled runs must be inside configured radius
-                // 2) scheduled runs must be upcoming in the next 48h
-                if (lat !== undefined && lng !== undefined) {
-                    const scheduledRadiusTiers = [10, 25, scheduledRunRadiusMiles];
-                    const upcomingScheduledWithDistance = allItems
-                        .filter(item => item?.scheduledAt)
-                        .map(item => {
-                            const scheduledAtMs = new Date(item.scheduledAt).getTime();
-                            if (!Number.isFinite(scheduledAtMs)) return null;
-                            const hoursUntil = (scheduledAtMs - now.getTime()) / (1000 * 60 * 60);
-                            if (hoursUntil < 0 || hoursUntil > scheduledRunWindowHours) return null;
-
-                            const courtLat = Number(item.courtLat);
-                            const courtLng = Number(item.courtLng);
-                            if (!Number.isFinite(courtLat) || !Number.isFinite(courtLng)) return null;
-
-                            const miles = this.distanceMiles(lat, lng, courtLat, courtLng);
-                            if (!Number.isFinite(miles)) return null;
-                            return { id: item.id, miles };
-                        })
-                        .filter(Boolean) as Array<{ id: string; miles: number }>;
-
-                    let effectiveScheduledRadiusMiles = scheduledRunRadiusMiles;
-                    for (const tierMiles of scheduledRadiusTiers) {
-                        if (upcomingScheduledWithDistance.some(item => item.miles <= tierMiles)) {
-                            effectiveScheduledRadiusMiles = tierMiles;
-                            break;
-                        }
-                    }
-
-                    allItems = allItems.filter((item) => {
-                        if (!item.scheduledAt) return true;
-
-                        const scheduledAtMs = new Date(item.scheduledAt).getTime();
-                        if (!Number.isFinite(scheduledAtMs)) return false;
-                        const hoursUntil = (scheduledAtMs - now.getTime()) / (1000 * 60 * 60);
-                        if (hoursUntil < 0 || hoursUntil > scheduledRunWindowHours) return false;
-
-                        const courtLat = Number(item.courtLat);
-                        const courtLng = Number(item.courtLng);
-                        if (!Number.isFinite(courtLat) || !Number.isFinite(courtLng)) return false;
-
-                        const miles = this.distanceMiles(lat, lng, courtLat, courtLng);
-                        return Number.isFinite(miles) && miles <= effectiveScheduledRadiusMiles;
-                    });
-                }
-
                 // Score all items
                 const scoredItems = allItems.map(item => ({
                     ...item,
-                    _score: this.calculateFeedScore(item, userId, followedPlayerIds, followedCourtIds, now)
-                        + (lat !== undefined && lng !== undefined ? this.calculateProximityScore(item, lat, lng) : 0)
+                    _score: this.calculateFeedScore(
+                        item,
+                        userId,
+                        followedPlayerIds,
+                        followedCourtIds,
+                        now,
+                        lat,
+                        lng,
+                    )
                 }));
 
-                // Sort by score first, then by proximity when score ties.
-                scoredItems.sort((a, b) => {
-                    if (b._score !== a._score) return b._score - a._score;
-                    const aDist = typeof a._distanceMiles === 'number' ? a._distanceMiles : Number.MAX_VALUE;
-                    const bDist = typeof b._distanceMiles === 'number' ? b._distanceMiles : Number.MAX_VALUE;
-                    return aDist - bDist;
-                });
+                // Sort by score (highest first)
+                scoredItems.sort((a, b) => b._score - a._score);
 
-                // Always include all nearby, upcoming scheduled runs first.
-                const scheduledItems = scoredItems
-                    .filter(i => i.type === 'status' && i.scheduledAt)
-                    .sort((a, b) => {
-                        const aTime = new Date(a.scheduledAt).getTime();
-                        const bTime = new Date(b.scheduledAt).getTime();
-                        if (aTime !== bTime) return aTime - bTime;
-                        const aDist = typeof a._distanceMiles === 'number' ? a._distanceMiles : Number.MAX_VALUE;
-                        const bDist = typeof b._distanceMiles === 'number' ? b._distanceMiles : Number.MAX_VALUE;
-                        return aDist - bDist;
-                    });
-
-                const pinnedScheduled = scheduledItems.slice(0, limit);
-                const pinnedIds = new Set(pinnedScheduled.map(i => i.id));
-
-                // Ensure discovery items are mixed in for non-scheduled content.
-                const discoveryItems = scoredItems.filter(i => i._isDiscovery && !pinnedIds.has(i.id));
-                const regularItems = scoredItems.filter(i => !i._isDiscovery && !pinnedIds.has(i.id));
+                // Ensure discovery items are mixed in (at least 20% of feed)
+                const discoveryItems = scoredItems.filter(i => i._isDiscovery);
+                const regularItems = scoredItems.filter(i => !i._isDiscovery);
 
                 const discoverySlots = Math.max(2, Math.floor(limit * 0.2));
                 const regularSlots = limit - discoverySlots;
 
-                const finalFeed: any[] = [...pinnedScheduled];
+                const finalFeed: any[] = [];
                 let regularIdx = 0;
                 let discoveryIdx = 0;
 
                 // Interleave: every 4th item is a discovery item (if available)
-                while (finalFeed.length < limit && (regularIdx < regularItems.length || discoveryIdx < discoveryItems.length)) {
-                    const i = finalFeed.length;
+                for (let i = 0; i < limit && (regularIdx < regularItems.length || discoveryIdx < discoveryItems.length); i++) {
                     if (i % 5 === 4 && discoveryIdx < discoveryItems.length) {
                         // Discovery slot
                         finalFeed.push(discoveryItems[discoveryIdx++]);
@@ -1046,7 +982,6 @@ export class StatusesService {
                 finalFeed.forEach(item => {
                     delete item._score;
                     delete item._isDiscovery;
-                    delete item._distanceMiles;
                 });
 
                 return finalFeed.slice(0, limit);
@@ -1055,9 +990,7 @@ export class StatusesService {
                 // FOLLOWING: Only posts from followed players/courts (unchanged logic)
                 const statusQuery = `
                     ${statusSelectClause}
-                    WHERE shadow_m.id IS NULL
-                       AND ${scheduledRunVisibilityClause}
-                       AND (ps.user_id = $1
+                    WHERE shadow_m.id IS NULL AND (ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
                        OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
                     ORDER BY "createdAt" DESC
@@ -1086,7 +1019,15 @@ export class StatusesService {
                 let merged = [...statusResults, ...matchResults, ...teamMatchResults];
                 merged = merged.map(item => ({
                     ...item,
-                    _score: this.calculateFeedScore(item, userId, followedPlayerIds, followedCourtIds, now)
+                    _score: this.calculateFeedScore(
+                        item,
+                        userId,
+                        followedPlayerIds,
+                        followedCourtIds,
+                        now,
+                        lat,
+                        lng,
+                    )
                 }));
                 merged.sort((a, b) => b._score - a._score);
                 merged.forEach(item => delete item._score);
@@ -1097,9 +1038,7 @@ export class StatusesService {
                 // ALL: Same as following but with scoring (default view)
                 const statusQuery = `
                     ${statusSelectClause}
-                    WHERE shadow_m.id IS NULL
-                       AND ${scheduledRunVisibilityClause}
-                       AND (ps.user_id = $1
+                    WHERE shadow_m.id IS NULL AND (ps.user_id = $1
                        OR ps.court_id IN (SELECT court_id FROM user_followed_courts WHERE user_id::TEXT = $2)
                        OR ps.user_id IN (SELECT followed_id FROM user_followed_players WHERE follower_id::TEXT = $3))
                     ORDER BY "createdAt" DESC
@@ -1128,7 +1067,15 @@ export class StatusesService {
                 let merged = [...statusResults, ...matchResults, ...teamMatchResults];
                 merged = merged.map(item => ({
                     ...item,
-                    _score: this.calculateFeedScore(item, userId, followedPlayerIds, followedCourtIds, now)
+                    _score: this.calculateFeedScore(
+                        item,
+                        userId,
+                        followedPlayerIds,
+                        followedCourtIds,
+                        now,
+                        lat,
+                        lng,
+                    )
                 }));
                 merged.sort((a, b) => b._score - a._score);
                 merged.forEach(item => delete item._score);

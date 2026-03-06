@@ -52,7 +52,7 @@ describe('UsersService', () => {
                     id: 'uid-new',
                     authToken: 'uid-new',
                     email: 'new@test.com',
-                    name: 'New Player',
+                    name: 'HoopRank Player93187',
                     hoopRank: 3.0,
                 }),
             );

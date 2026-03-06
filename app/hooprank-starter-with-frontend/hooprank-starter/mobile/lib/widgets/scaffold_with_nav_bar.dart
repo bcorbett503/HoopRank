@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import '../services/api_service.dart';
 import 'hooprank_app_bar.dart';
@@ -104,10 +103,11 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
       ScaffoldWithNavBar.refreshFeedTab?.call();
     }
 
-    // If navigating to messages tab, badge will be refreshed when they exit a chat
+    // Reset each branch to its root when selected so tab switches never strand
+    // the user inside a stale deep-link such as Scan Match or an old chat.
     widget.navigationShell.goBranch(
       index,
-      initialLocation: index == widget.navigationShell.currentIndex,
+      initialLocation: true,
     );
   }
 
@@ -170,14 +170,17 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
                   icon: Badge(
                     isLabelVisible: _teamInvitesCount > 0,
                     label: Text(
-                      _teamInvitesCount > 99 ? '99+' : _teamInvitesCount.toString(),
+                      _teamInvitesCount > 99
+                          ? '99+'
+                          : _teamInvitesCount.toString(),
                       style: const TextStyle(fontSize: 10),
                     ),
                     child: const Icon(Icons.groups),
                   ),
                   label: 'Teams',
                 ),
-                const NavigationDestination(icon: Icon(Icons.place), label: 'Courts'),
+                const NavigationDestination(
+                    icon: Icon(Icons.place), label: 'Courts'),
               ],
             ),
           );
