@@ -42,7 +42,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  static const double _feedPanelExpandedTop = 8.0;
+  static const double _feedPanelCollapsedVisibleHeight = 288.0;
+  static const double _feedPanelCollapsedGap = 8.0;
+
   final MessagesService _messagesService = MessagesService();
+  final GlobalKey _feedAnchorKey = GlobalKey();
   List<ChallengeRequest> _challenges = []; // Used in _loadChallenges
   List<Map<String, dynamic>> _pendingConfirmations = [];
   List<Map<String, dynamic>> _localActivity = []; // Used in _loadLocalActivity
@@ -83,14 +88,11 @@ class _HomeScreenState extends State<HomeScreen>
   String _primaryDiscoverMode = 'open';
   double _primaryDiscoverRadiusMi = 25.0;
   bool _primarySuggestionSkippedThisSession = false;
-  bool _isInviteFallbackDismissed = false;
+  double _feedPanelProgress = 0.0;
+  double _feedAnchorHeight = 0.0;
+  bool _isFeedAnchorMeasurementScheduled = false;
   late final AnimationController _quickPlayPulseController;
   late final Animation<double> _quickPlayPulse;
-  final GlobalKey _preFeedContentKey = GlobalKey();
-  double _feedPanelInitialTop = 0;
-  double? _feedPanelTop;
-  static const double _feedPanelMinTop = 0;
-  static const double _feedPanelMinHeight = 220;
 
   String _skippedSuggestedMatchupsPrefsKey(String userId) =>
       'user_${userId}_skipped_suggested_matchups';
@@ -122,6 +124,41 @@ class _HomeScreenState extends State<HomeScreen>
     } catch (e) {
       debugPrint('PRIMARY_ACTION: failed saving skipped suggestions: $e');
     }
+  }
+
+  void _scheduleFeedAnchorMeasurement() {
+    if (_isFeedAnchorMeasurementScheduled) return;
+    _isFeedAnchorMeasurementScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isFeedAnchorMeasurementScheduled = false;
+      if (!mounted) return;
+      final renderBox =
+          _feedAnchorKey.currentContext?.findRenderObject() as RenderBox?;
+      final nextHeight = renderBox?.size.height;
+      if (nextHeight == null) return;
+      if ((nextHeight - _feedAnchorHeight).abs() <= 0.5) return;
+      setState(() => _feedAnchorHeight = nextHeight);
+    });
+  }
+
+  void _updateFeedPanelProgress(double availableTravel, double deltaDy) {
+    if (availableTravel <= 0) return;
+    setState(() {
+      _feedPanelProgress =
+          (_feedPanelProgress - (deltaDy / availableTravel)).clamp(0.0, 1.0);
+    });
+  }
+
+  void _snapFeedPanel() {
+    setState(() {
+      _feedPanelProgress = _feedPanelProgress >= 0.5 ? 1.0 : 0.0;
+    });
+  }
+
+  void _toggleFeedPanel() {
+    setState(() {
+      _feedPanelProgress = _feedPanelProgress >= 0.5 ? 0.0 : 1.0;
+    });
   }
 
   @override
@@ -713,7 +750,7 @@ class _HomeScreenState extends State<HomeScreen>
             ) ??
             const Color(0xFFF97316);
         return Container(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
@@ -1012,9 +1049,6 @@ class _HomeScreenState extends State<HomeScreen>
       _primaryActionState = enriched == null
           ? HomePrimaryActionState.inviteFallback
           : HomePrimaryActionState.recommended;
-      if (enriched != null) {
-        _isInviteFallbackDismissed = false;
-      }
     });
   }
 
@@ -1181,13 +1215,6 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() => _isPrimaryActionSubmitting = false);
       }
     }
-  }
-
-  void _handleDismissInviteFallback() {
-    if (!mounted) return;
-    setState(() {
-      _isInviteFallbackDismissed = true;
-    });
   }
 
   @override
@@ -2297,321 +2324,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _syncFeedPanelLayout(double bodyHeight) {
-    if (!mounted || bodyHeight <= 0) return;
-    final context = _preFeedContentKey.currentContext;
-    if (context == null) return;
-    final renderObject = context.findRenderObject();
-    if (renderObject is! RenderBox || !renderObject.hasSize) return;
-
-    final measuredInitialTop = renderObject.size.height + 4;
-    final maxTopBound =
-        (bodyHeight - _feedPanelMinHeight).clamp(_feedPanelMinTop, bodyHeight);
-    final nextInitialTop =
-        measuredInitialTop.clamp(_feedPanelMinTop, maxTopBound).toDouble();
-    final previousInitialTop = _feedPanelInitialTop;
-    final previousTop = _feedPanelTop;
-    final wasDockedToInitial =
-        previousTop != null && (previousTop - previousInitialTop).abs() <= 1;
-    final nextTop =
-        (previousTop ?? nextInitialTop).clamp(_feedPanelMinTop, nextInitialTop);
-
-    if ((nextInitialTop - previousInitialTop).abs() <= 1 &&
-        previousTop != null &&
-        (nextTop - previousTop).abs() <= 1) {
-      return;
-    }
-
-    setState(() {
-      _feedPanelInitialTop = nextInitialTop;
-      if (previousTop == null || wasDockedToInitial) {
-        _feedPanelTop = nextInitialTop;
-      } else {
-        _feedPanelTop = nextTop.toDouble();
-      }
-    });
-  }
-
-  void _onFeedPanelDragUpdate(
-    DragUpdateDetails details,
-    double maxPanelTop,
-  ) {
-    final currentTop =
-        (_feedPanelTop ?? maxPanelTop).clamp(_feedPanelMinTop, maxPanelTop);
-    final nextTop =
-        (currentTop + details.delta.dy).clamp(_feedPanelMinTop, maxPanelTop);
-    if ((nextTop - currentTop).abs() < 0.1) return;
-    setState(() => _feedPanelTop = nextTop.toDouble());
-  }
-
-  void _onFeedPanelDragEnd(DragEndDetails details, double maxPanelTop) {
-    final currentTop =
-        (_feedPanelTop ?? maxPanelTop).clamp(_feedPanelMinTop, maxPanelTop);
-    final velocityY = details.primaryVelocity ?? 0;
-
-    const double snapVelocity = 350;
-    final double targetTop;
-    if (velocityY <= -snapVelocity) {
-      targetTop = _feedPanelMinTop;
-    } else if (velocityY >= snapVelocity) {
-      targetTop = maxPanelTop;
-    } else {
-      targetTop =
-          currentTop <= (maxPanelTop / 2) ? _feedPanelMinTop : maxPanelTop;
-    }
-
-    if ((targetTop - currentTop).abs() < 0.5) return;
-    setState(() => _feedPanelTop = targetTop);
-  }
-
-  void _toggleFeedPanelPosition() {
-    final currentTop = _feedPanelTop;
-    if (currentTop == null) return;
-    final isExpanded = currentTop <= 1;
-    setState(() {
-      _feedPanelTop = isExpanded ? _feedPanelInitialTop : _feedPanelMinTop;
-    });
-  }
-
-  Widget _buildHomeTopSections() {
-    return Column(
-      key: _preFeedContentKey,
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Static header: STATUS composer ──
-        const SizedBox(height: 14),
-        Consumer<AuthState>(
-          builder: (context, auth, _) {
-            return Column(
-              children: [
-                // === Status Section Header (Single Line) ===
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.edit_note,
-                            size: 14, color: Colors.blue),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'STATUS',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.0,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Status Update Bar - Tappable with User Avatar
-                GestureDetector(
-                  onTap: () async {
-                    final result = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const StatusComposerScreen(),
-                        fullscreenDialog: true,
-                      ),
-                    );
-                    if (result == true) {
-                      setState(() {}); // Refresh feed
-                    }
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        // User Avatar
-                        Consumer<AuthState>(builder: (context, authState, _) {
-                          final user = authState.currentUser;
-                          final photoUrl = user?.photoUrl;
-                          final name = user?.name ?? '?';
-
-                          return CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Colors.deepOrange,
-                            backgroundImage: photoUrl != null &&
-                                    !isPlaceholderImage(photoUrl)
-                                ? safeImageProvider(photoUrl)
-                                : null,
-                            onBackgroundImageError: photoUrl != null
-                                ? (_, __) => debugPrint(
-                                    'Status avatar failed to load: $photoUrl')
-                                : null,
-                            child: (photoUrl == null ||
-                                    isPlaceholderImage(photoUrl))
-                                ? Text(
-                                    name.isNotEmpty
-                                        ? name[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold),
-                                  )
-                                : null,
-                          );
-                        }),
-                        const SizedBox(width: 12),
-                        // Placeholder Text
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'What\'s on your mind?',
-                                style: TextStyle(
-                                    color: Colors.grey.shade800,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Share a status, schedule a run, or post a highlight',
-                                style: TextStyle(
-                                    color: Colors.grey.shade500, fontSize: 11),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-
-        // Primary action slot: onboarding checklist first, then suggested matchup.
-        Consumer<OnboardingChecklistState>(
-          builder: (context, onboarding, _) {
-            if (onboarding.shouldShow) {
-              return const OnboardingChecklistCard();
-            }
-
-            if (_primaryActionState == HomePrimaryActionState.inviteFallback &&
-                _isInviteFallbackDismissed) {
-              return const SizedBox.shrink();
-            }
-
-            return HomePrimaryActionSection(
-              state: _primaryActionState,
-              recommended: _recommendedMatchup,
-              isSubmitting: _isPrimaryActionSubmitting,
-              onChallengePressed: _handlePrimaryChallenge,
-              onInvitePressed: _handleInviteFriends,
-              onProfilePressed: _handleOpenSuggestedProfile,
-              onSkipPressed: _handleSkipSuggestion,
-              onVenuePressed: _handleOpenSuggestedVenue,
-              onDismissInvitePressed: _handleDismissInviteFallback,
-            );
-          },
-        ),
-        _buildQuickPlayActionRow(),
-
-        if (_pendingConfirmations.isNotEmpty) ...[
-          _buildPendingConfirmationsSection(),
-          const SizedBox(height: 12),
-        ],
-
-        // Team Invites (compact, above feed)
-        if (_teamInvites.isNotEmpty) ...[
-          SizedBox(
-            height: 48,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _teamInvites.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final invite = _teamInvites[index];
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.group_add, color: Colors.blue, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        invite['name'] ?? 'Team',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          try {
-                            await ApiService.declineTeamInvite(invite['id']);
-                            _loadTeamInvites();
-                          } catch (_) {}
-                        },
-                        child: const Icon(Icons.close,
-                            color: Colors.red, size: 18),
-                      ),
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () async {
-                          try {
-                            await ApiService.acceptTeamInvite(invite['id']);
-                            _loadTeamInvites();
-                            _loadMyTeams();
-                            // Complete onboarding item
-                            if (mounted) {
-                              context
-                                  .read<OnboardingChecklistState>()
-                                  .completeItem(
-                                      OnboardingItems.joinOrCreateTeam);
-                            }
-                          } catch (_) {}
-                        },
-                        child: const Icon(Icons.check,
-                            color: Colors.green, size: 18),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2728,149 +2440,399 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: ClipRect(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => _syncFeedPanelLayout(constraints.maxHeight));
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          _scheduleFeedAnchorMeasurement();
+          final viewportHeight = constraints.maxHeight;
+          final measuredCollapsedTop =
+              _feedAnchorHeight > 0 ? _feedAnchorHeight : viewportHeight * 0.42;
+          final collapsedTop = (measuredCollapsedTop + _feedPanelCollapsedGap)
+              .clamp(
+                _feedPanelExpandedTop + 200.0,
+                viewportHeight - _feedPanelCollapsedVisibleHeight,
+              )
+              .toDouble();
+          final panelTravel = collapsedTop - _feedPanelExpandedTop;
+          final panelTop =
+              collapsedTop - (panelTravel * _feedPanelProgress.clamp(0.0, 1.0));
+          final reservedFeedSpace = (viewportHeight - collapsedTop).clamp(
+            _feedPanelCollapsedVisibleHeight,
+            viewportHeight,
+          );
 
-              final fallbackInitialTop = (constraints.maxHeight * 0.44)
-                  .clamp(_feedPanelMinTop,
-                      constraints.maxHeight - _feedPanelMinHeight)
-                  .toDouble();
-              final maxPanelTop = (_feedPanelInitialTop > 0
-                      ? _feedPanelInitialTop
-                      : fallbackInitialTop)
-                  .clamp(_feedPanelMinTop,
-                      constraints.maxHeight - _feedPanelMinHeight)
-                  .toDouble();
-              final panelTop = (_feedPanelTop ?? maxPanelTop)
-                  .clamp(_feedPanelMinTop, maxPanelTop)
-                  .toDouble();
-              final panelExpanded = panelTop <= 1;
-              final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+          return Stack(
+            children: [
+              SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    KeyedSubtree(
+                      key: _feedAnchorKey,
+                      child: _buildHomeTopContent(),
+                    ),
+                    SizedBox(height: reservedFeedSpace + 16),
+                    _buildHomeSupplementalContent(),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                left: 16,
+                right: 16,
+                top: panelTop,
+                bottom: 0,
+                child: _buildFeedPanel(panelTravel),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
-              return Stack(
-                children: [
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: _buildHomeTopSections(),
+  Widget _buildHomeTopContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 14),
+        Consumer<AuthState>(
+          builder: (context, auth, _) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit_note,
+                          size: 14,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'STATUS',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
                   ),
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    top: panelTop,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: scaffoldBg.withValues(alpha: 0.98),
-                        borderRadius: panelExpanded
-                            ? BorderRadius.zero
-                            : const BorderRadius.vertical(
-                                top: Radius.circular(16)),
-                        boxShadow: panelExpanded
-                            ? null
-                            : [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.35),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, -3),
-                                ),
-                              ],
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    final result = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const StatusComposerScreen(),
+                        fullscreenDialog: true,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onVerticalDragUpdate: (details) =>
-                                _onFeedPanelDragUpdate(details, maxPanelTop),
-                            onVerticalDragEnd: (details) =>
-                                _onFeedPanelDragEnd(details, maxPanelTop),
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Center(
-                                    child: Container(
-                                      width: 40,
-                                      height: 4,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white24,
-                                        borderRadius:
-                                            BorderRadius.circular(999),
+                    );
+                    if (result == true) {
+                      setState(() {});
+                    }
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Consumer<AuthState>(
+                          builder: (context, authState, _) {
+                            final user = authState.currentUser;
+                            final photoUrl = user?.photoUrl;
+                            final name = user?.name ?? '?';
+
+                            return CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.deepOrange,
+                              backgroundImage: photoUrl != null &&
+                                      !isPlaceholderImage(photoUrl)
+                                  ? safeImageProvider(photoUrl)
+                                  : null,
+                              onBackgroundImageError: photoUrl != null
+                                  ? (_, __) => debugPrint(
+                                        'Status avatar failed to load: $photoUrl',
+                                      )
+                                  : null,
+                              child: (photoUrl == null ||
+                                      isPlaceholderImage(photoUrl))
+                                  ? Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                        left: 4, top: 8, bottom: 10),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.deepOrange
-                                                .withOpacity(0.1),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.dynamic_feed,
-                                              size: 16,
-                                              color: Colors.deepOrange),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        const Expanded(
-                                          child: Text(
-                                            'FEED',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              letterSpacing: 1.2,
-                                              color: Colors.white70,
-                                            ),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          onPressed: _toggleFeedPanelPosition,
-                                          tooltip: panelExpanded
-                                              ? 'Show quick actions'
-                                              : 'Expand feed',
-                                          icon: Icon(
-                                            panelExpanded
-                                                ? Icons.keyboard_arrow_down
-                                                : Icons.keyboard_arrow_up,
-                                            color: Colors.white70,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                                    )
+                                  : null,
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'What\'s on your mind?',
+                                style: TextStyle(
+                                  color: Colors.grey.shade800,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Share a status, schedule a run, or post a highlight',
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
-                          Expanded(
-                            child: HoopRankFeed(
-                              key:
-                                  ValueKey('hooprank-feed-$_feedReloadVersion'),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              );
-            },
-          ),
+                ),
+              ],
+            );
+          },
         ),
+        Consumer<OnboardingChecklistState>(
+          builder: (context, onboarding, _) {
+            return onboarding.shouldShow
+                ? const OnboardingChecklistCard()
+                : const SizedBox.shrink();
+          },
+        ),
+        _buildQuickPlayActionRow(),
+      ],
+    );
+  }
+
+  Widget _buildHomeSupplementalContent() {
+    if (_pendingConfirmations.isEmpty && _teamInvites.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_pendingConfirmations.isNotEmpty) ...[
+          _buildPendingConfirmationsSection(),
+          const SizedBox(height: 12),
+        ],
+        if (_teamInvites.isNotEmpty) ...[
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _teamInvites.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final invite = _teamInvites[index];
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.group_add, color: Colors.blue, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        invite['name'] ?? 'Team',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () async {
+                          try {
+                            await ApiService.declineTeamInvite(invite['id']);
+                            _loadTeamInvites();
+                          } catch (_) {}
+                        },
+                        child: const Icon(Icons.close,
+                            color: Colors.red, size: 18),
+                      ),
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () async {
+                          try {
+                            await ApiService.acceptTeamInvite(invite['id']);
+                            _loadTeamInvites();
+                            _loadMyTeams();
+                            if (mounted) {
+                              context
+                                  .read<OnboardingChecklistState>()
+                                  .completeItem(
+                                    OnboardingItems.joinOrCreateTeam,
+                                  );
+                            }
+                          } catch (_) {}
+                        },
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.green,
+                          size: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFeedPanel(double availableTravel) {
+    final isExpanded = _feedPanelProgress >= 0.5;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF13263A),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _toggleFeedPanel,
+            onVerticalDragUpdate: (details) =>
+                _updateFeedPanelProgress(availableTravel, details.delta.dy),
+            onVerticalDragEnd: (_) => _snapFeedPanel(),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 8),
+              child: SizedBox(
+                height: 38,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IgnorePointer(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: Colors.deepOrange.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.dynamic_feed,
+                            size: 15,
+                            color: Colors.deepOrange,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'FEED',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          isExpanded
+                              ? Icons.keyboard_arrow_down_rounded
+                              : Icons.keyboard_arrow_up_rounded,
+                          size: 28,
+                          color: Colors.white70,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+              child: HoopRankFeed(
+                key: ValueKey('hooprank-feed-$_feedReloadVersion'),
+                featuredMatchup:
+                    _primaryActionState == HomePrimaryActionState.recommended
+                        ? _recommendedMatchup
+                        : null,
+                isFeaturedMatchupSubmitting: _isPrimaryActionSubmitting,
+                onFeaturedMatchupChallengePressed: _handlePrimaryChallenge,
+                onFeaturedMatchupProfilePressed: _handleOpenSuggestedProfile,
+                onFeaturedMatchupVenuePressed: _handleOpenSuggestedVenue,
+                onFeaturedMatchupSkipPressed: _handleSkipSuggestion,
+                onRefreshFeaturedMatchup: _loadPrimaryAction,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

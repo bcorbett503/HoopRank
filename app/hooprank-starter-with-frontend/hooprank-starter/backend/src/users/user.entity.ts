@@ -10,6 +10,10 @@ import {
 } from "typeorm";
 import { Match } from "../matches/match.entity";
 
+const DATE_TIME_COLUMN_TYPE: "timestamp" | "datetime" = process.env.DATABASE_URL
+  ? "timestamp"
+  : "datetime";
+
 /**
  * User entity mapped to production PostgreSQL schema.
  * Production uses snake_case columns and text type for id.
@@ -108,7 +112,11 @@ export class User {
   })
   subscriptionTier: string; // 'free' | 'pro' | 'elite'
 
-  @Column({ name: "subscription_expires_at", type: process.env.DATABASE_URL ? "timestamp" : "datetime", nullable: true })
+  @Column({
+    name: "subscription_expires_at",
+    type: DATE_TIME_COLUMN_TYPE,
+    nullable: true,
+  })
   subscriptionExpiresAt: Date;
 
   @Column({ name: "fcm_token", type: "text", nullable: true })

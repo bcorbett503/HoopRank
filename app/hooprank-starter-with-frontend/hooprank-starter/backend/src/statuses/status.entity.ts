@@ -1,5 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, Index, Unique } from "typeorm";
 
+const DATE_TIME_COLUMN_TYPE: "timestamp" | "datetime" = process.env.DATABASE_URL
+  ? "timestamp"
+  : "datetime";
+
 // Note: We don't use @ManyToOne relations here to avoid enforcing FK constraints.
 // User info is joined only in queries where needed, allowing flexibility for dev testing.
 
@@ -17,7 +21,7 @@ export class PlayerStatus {
   @Column({ name: "image_url", type: "varchar", nullable: true })
   imageUrl?: string;
 
-  @Column({ name: "scheduled_at", type: process.env.DATABASE_URL ? "timestamp" : "datetime", nullable: true })
+  @Column({ name: "scheduled_at", type: DATE_TIME_COLUMN_TYPE, nullable: true })
   scheduledAt?: Date;
 
   @Column({ name: "court_id", type: "varchar", length: 255, nullable: true })
@@ -48,7 +52,7 @@ export class PlayerStatus {
 
   @Column({
     name: "created_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   createdAt: Date;
@@ -69,7 +73,7 @@ export class StatusLike {
 
   @Column({
     name: "created_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   createdAt: Date;
@@ -92,7 +96,7 @@ export class StatusComment {
 
   @Column({
     name: "created_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   createdAt: Date;
@@ -113,7 +117,7 @@ export class EventAttendee {
 
   @Column({
     name: "created_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   createdAt: Date;
@@ -137,7 +141,7 @@ export class UserFollowedCourt {
 
   @Column({
     name: "created_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   createdAt: Date;
@@ -157,7 +161,7 @@ export class UserFollowedPlayer {
 
   @Column({
     name: "created_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   createdAt: Date;
@@ -176,11 +180,15 @@ export class CheckIn {
 
   @Column({
     name: "checked_in_at",
-    type: process.env.DATABASE_URL ? "timestamp" : "datetime",
+    type: DATE_TIME_COLUMN_TYPE,
     default: () => "CURRENT_TIMESTAMP",
   })
   checkedInAt: Date;
 
-  @Column({ name: "checked_out_at", type: process.env.DATABASE_URL ? "timestamp" : "datetime", nullable: true })
+  @Column({
+    name: "checked_out_at",
+    type: DATE_TIME_COLUMN_TYPE,
+    nullable: true,
+  })
   checkedOutAt?: Date;
 }

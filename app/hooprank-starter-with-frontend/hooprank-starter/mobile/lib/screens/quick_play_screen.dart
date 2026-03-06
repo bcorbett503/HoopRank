@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -21,6 +22,20 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
   void initState() {
     super.initState();
     _generatedAtMs = DateTime.now().millisecondsSinceEpoch;
+  }
+
+  Future<void> _copyMatchCode(String matchQrData) async {
+    if (matchQrData.trim().isEmpty) return;
+
+    await Clipboard.setData(ClipboardData(text: matchQrData));
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+            'Quick Play code copied. Your opponent can paste it into Scan Match.'),
+      ),
+    );
   }
 
   @override
@@ -73,8 +88,30 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                   accentColor: const Color(0xFFF97316),
                   title: 'Step 2: Start This Match',
                   subtitle:
-                      'After they install/login, have them tap Scan Match and scan this QR.',
+                      'After they install/login, have them tap Scan Match and scan this QR or paste your copied code.',
                   qrData: matchQrData,
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _copyMatchCode(matchQrData),
+                    icon: const Icon(Icons.copy_all_outlined),
+                    label: const Text('Copy Match Code'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.24),
+                      ),
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'If scanning fails, copy Step 2 and have your opponent paste it into Scan Match.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 const SizedBox(height: 14),
                 SizedBox(
@@ -96,7 +133,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Tip: Keep Step 2 visible while your opponent scans.',
+                  'Tip: Keep Step 2 visible while your opponent scans, or send the copied code.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),

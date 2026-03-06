@@ -1,0 +1,13 @@
+# Keep Railway deploy payload small from this local scratch workspace.
+# Backend service deploys from app/.../backend only.
+app/hooprank-starter-with-frontend/hooprank-starter/mobile/
+app/hooprank-starter-with-frontend/hooprank-starter/mobile/**
+app/hooprank-starter-with-frontend/hooprank-starter/hooprank-frontend/
+app/hooprank-starter-with-frontend/hooprank-starter/hooprank-frontend/**
+
+# Exclude local caches and generated artifacts.
+**/.dart_tool/
+**/build/
+**/node_modules/
+**/*.db
+**/*.sqlite

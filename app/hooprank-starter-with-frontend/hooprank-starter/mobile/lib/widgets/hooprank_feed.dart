@@ -8,9 +8,11 @@ import '../state/app_state.dart';
 import '../state/onboarding_checklist_state.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
+import '../services/recommended_matchup_engine.dart';
 import '../models.dart';
 import '../utils/image_utils.dart';
 import 'feed_video_player.dart';
+import 'featured_matchup_feed_card.dart';
 import 'player_profile_sheet.dart';
 import 'shimmer_skeleton.dart';
 import 'animated_list_item.dart';
@@ -19,7 +21,24 @@ import 'dart:math' as math;
 
 /// Unified HoopRank Feed with For You/Following tabs
 class HoopRankFeed extends StatefulWidget {
-  const HoopRankFeed({super.key});
+  final RecommendedMatchup? featuredMatchup;
+  final bool isFeaturedMatchupSubmitting;
+  final VoidCallback? onFeaturedMatchupChallengePressed;
+  final VoidCallback? onFeaturedMatchupProfilePressed;
+  final VoidCallback? onFeaturedMatchupVenuePressed;
+  final VoidCallback? onFeaturedMatchupSkipPressed;
+  final Future<void> Function()? onRefreshFeaturedMatchup;
+
+  const HoopRankFeed({
+    super.key,
+    this.featuredMatchup,
+    this.isFeaturedMatchupSubmitting = false,
+    this.onFeaturedMatchupChallengePressed,
+    this.onFeaturedMatchupProfilePressed,
+    this.onFeaturedMatchupVenuePressed,
+    this.onFeaturedMatchupSkipPressed,
+    this.onRefreshFeaturedMatchup,
+  });
 
   @override
   State<HoopRankFeed> createState() => _HoopRankFeedState();
@@ -363,9 +382,11 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       return const FeedSkeletonLoader();
     }
 
+    final featuredMatchup = widget.featuredMatchup;
     if (_forYouPosts.isEmpty &&
         _pendingChallenges.isEmpty &&
-        _pendingTeamChallenges.isEmpty) {
+        _pendingTeamChallenges.isEmpty &&
+        featuredMatchup == null) {
       debugPrint('FEED: Showing empty state - no posts and no challenges');
       return _buildEmptyState(
         'No local activity yet',
@@ -396,34 +417,56 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
     // Pin scheduled runs to top
     final sortedPosts = _sortPostsWithScheduledFirst(_forYouPosts);
+    final featuredOffset = featuredMatchup == null ? 0 : 1;
     // Total items = team challenges + 1v1 challenges + posts
     final totalChallenges =
         _pendingTeamChallenges.length + _pendingChallenges.length;
-    final totalItems = totalChallenges + sortedPosts.length;
+    final totalItems = featuredOffset + totalChallenges + sortedPosts.length;
 
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.wait([
+        final futures = <Future<void>>[
           _loadForYouFeed(),
           _loadPendingChallenges(),
-          _loadPendingTeamChallenges()
-        ]);
+          _loadPendingTeamChallenges(),
+        ];
+        final refreshFeaturedMatchup = widget.onRefreshFeaturedMatchup;
+        if (refreshFeaturedMatchup != null) {
+          futures.add(refreshFeaturedMatchup());
+        }
+        await Future.wait(futures);
       },
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
         itemCount: totalItems,
         itemBuilder: (context, index) {
+          if (featuredMatchup != null && index == 0) {
+            return AnimatedListItem(
+              index: index,
+              child: FeaturedMatchupFeedCard(
+                matchup: featuredMatchup,
+                isSubmitting: widget.isFeaturedMatchupSubmitting,
+                onChallengePressed: widget.onFeaturedMatchupChallengePressed,
+                onProfilePressed: widget.onFeaturedMatchupProfilePressed,
+                onVenuePressed: widget.onFeaturedMatchupVenuePressed,
+                onSkipPressed: widget.onFeaturedMatchupSkipPressed,
+              ),
+            );
+          }
+
+          final contentIndex = index - featuredOffset;
           // First: team challenges
-          if (index < _pendingTeamChallenges.length) {
-            return _buildTeamChallengeCard(_pendingTeamChallenges[index]);
+          if (contentIndex < _pendingTeamChallenges.length) {
+            return _buildTeamChallengeCard(
+                _pendingTeamChallenges[contentIndex]);
           }
           // Then: 1v1 challenges
-          final challengeIndex = index - _pendingTeamChallenges.length;
+          final challengeIndex = contentIndex - _pendingTeamChallenges.length;
           if (challengeIndex < _pendingChallenges.length) {
             return _buildChallengeCard(_pendingChallenges[challengeIndex]);
           }
           // Finally: regular posts
-          final postIndex = index - totalChallenges;
+          final postIndex = contentIndex - totalChallenges;
           return AnimatedListItem(
             index: postIndex,
             child: _buildFeedItemCard(sortedPosts[postIndex]),
