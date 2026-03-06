@@ -87,9 +87,9 @@ class OnboardingChecklistState extends ChangeNotifier {
   /// Whether a specific item is complete.
   bool isComplete(String key) => _isTaskComplete(key);
 
-  /// Whether the checklist card should be visible.
-  /// Shows even when all items are complete — user must explicitly dismiss.
-  bool get shouldShow => _initialized && !_dismissed;
+  /// Whether the checklist card should be visible on the home surface.
+  /// Once all items are complete, it should only be reopened manually.
+  bool get shouldShow => _initialized && !_dismissed && !allComplete;
 
   // ── Lifecycle ──
 

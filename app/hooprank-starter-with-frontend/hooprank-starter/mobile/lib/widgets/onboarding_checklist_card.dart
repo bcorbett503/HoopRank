@@ -78,7 +78,7 @@ const _items = [
 ];
 
 /// Compact onboarding checklist card shown between the status composer and the
-/// feed on the home screen. Automatically hides when all items are complete.
+/// feed on the home screen until the onboarding flow is complete.
 class OnboardingChecklistCard extends StatefulWidget {
   final bool forceVisible;
   final VoidCallback? onDismissPressed;
