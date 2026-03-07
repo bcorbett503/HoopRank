@@ -14,6 +14,7 @@ import '../utils/image_utils.dart';
 import 'feed_video_player.dart';
 import 'featured_matchup_feed_card.dart';
 import 'player_profile_sheet.dart';
+import 'scaffold_with_nav_bar.dart';
 import 'shimmer_skeleton.dart';
 import 'animated_list_item.dart';
 import 'dart:async';
@@ -81,6 +82,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     // first frame is rendered, not during initState.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      unawaited(_loadPendingChallenges());
+      unawaited(_loadPendingTeamChallenges());
       _initLocation();
     });
   }
@@ -94,6 +97,8 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
   void _onTabChanged() {
     if (_tabController.indexIsChanging) return;
+    unawaited(_loadPendingChallenges());
+    unawaited(_loadPendingTeamChallenges());
     if (_tabController.index == 0 && _forYouPosts.isEmpty) {
       _loadForYouFeed();
     } else if (_tabController.index == 1 && _followingPosts.isEmpty) {
@@ -108,8 +113,6 @@ class _HoopRankFeedState extends State<HoopRankFeed>
   Future<void> _initLocation() async {
     // Load non-location-dependent data immediately.
     _loadFollowingFeed();
-    _loadPendingChallenges();
-    _loadPendingTeamChallenges();
 
     // Best-effort: fetch location (may trigger a system permission prompt),
     // then load For You once using whatever location is available.
@@ -218,6 +221,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
         final Position pos = position;
         _userLocation = pos;
         debugPrint('FEED: Got location: ${pos.latitude}, ${pos.longitude}');
+        if (!mounted) return false;
 
         // Persist location in the backend so "local" queries (nearby players,
         // local rankings, etc.) can work even when they don't send lat/lng.
@@ -257,10 +261,35 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
       await _fetchLocation(requestPermission: true);
       if (!mounted) return;
-      await _loadForYouFeed();
+      await _refreshForYouContent();
     } catch (e) {
       debugPrint('FEED: Enable location error: $e');
     }
+  }
+
+  Future<void> _refreshForYouContent() async {
+    await Future.wait([
+      _loadPendingChallenges(),
+      _loadPendingTeamChallenges(),
+      _loadForYouFeed(),
+      if (widget.onRefreshFeaturedMatchup != null)
+        widget.onRefreshFeaturedMatchup!(),
+    ]);
+  }
+
+  Future<void> _refreshFollowingContent() async {
+    await Future.wait([
+      _loadPendingChallenges(),
+      _loadPendingTeamChallenges(),
+      _loadFollowingFeed(),
+    ]);
+  }
+
+  List<Widget> _buildPinnedChallengeWidgets() {
+    return <Widget>[
+      ..._pendingTeamChallenges.map(_buildTeamChallengeCard),
+      ..._pendingChallenges.map(_buildChallengeCard),
+    ];
   }
 
   Future<void> _loadForYouFeed() async {
@@ -274,10 +303,11 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       );
       debugPrint('FEED: For You received ${feed.length} items');
 
-      final dedupedFeed = _deduplicateFeed(feed);
       if (!mounted || seq != _forYouLoadSeq) return; // Ignore stale responses.
       setState(() {
-        _forYouPosts = dedupedFeed;
+        _forYouPosts = feed
+            .where((item) => item['type']?.toString() != 'suggested_matchup')
+            .toList();
         _isLoadingForYou = false;
       });
     } catch (e) {
@@ -294,11 +324,13 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       final feed = await ApiService.getUnifiedFeed(filter: 'following');
       debugPrint('FEED: Following received ${feed.length} items');
 
-      final dedupedFeed = _deduplicateFeed(feed);
-      if (!mounted || seq != _followingLoadSeq)
+      if (!mounted || seq != _followingLoadSeq) {
         return; // Ignore stale responses.
+      }
       setState(() {
-        _followingPosts = dedupedFeed;
+        _followingPosts = feed
+            .where((item) => item['type']?.toString() != 'suggested_matchup')
+            .toList();
         _isLoadingFollowing = false;
       });
     } catch (e) {
@@ -310,12 +342,40 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
   List<Map<String, dynamic>> _deduplicateFeed(List<Map<String, dynamic>> feed) {
     final seenIds = <String>{};
+    final seenScheduledRunKeys = <String>{};
     return feed.where((item) {
       final id = item['id']?.toString();
-      if (id == null || seenIds.contains(id)) return false;
-      seenIds.add(id);
+      if (id != null) {
+        if (seenIds.contains(id)) return false;
+        seenIds.add(id);
+      }
+
+      final scheduledRunKey = _scheduledRunDedupKey(item);
+      if (scheduledRunKey != null) {
+        if (seenScheduledRunKeys.contains(scheduledRunKey)) return false;
+        seenScheduledRunKeys.add(scheduledRunKey);
+      }
+
       return true;
     }).toList();
+  }
+
+  String? _scheduledRunDedupKey(Map<String, dynamic> item) {
+    final scheduledRaw = item['scheduledAt']?.toString();
+    if (scheduledRaw == null || scheduledRaw.isEmpty) return null;
+
+    final scheduledAt = DateTime.tryParse(scheduledRaw);
+    if (scheduledAt == null) return null;
+
+    final courtKey =
+        (item['courtId']?.toString() ?? item['courtName']?.toString() ?? '')
+            .trim()
+            .toLowerCase();
+    if (courtKey.isEmpty) return null;
+
+    final scheduledKey = scheduledAt.toUtc().toIso8601String().substring(0, 16);
+
+    return [courtKey, scheduledKey].join('|');
   }
 
   // Legacy method for compatibility - uses For You posts
@@ -377,17 +437,18 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
   Widget _buildForYouFeed() {
     debugPrint(
-        'FEED: _buildForYouFeed called - _isLoadingForYou=$_isLoadingForYou, _forYouPosts.length=${_forYouPosts.length}, _pendingChallenges.length=${_pendingChallenges.length}, _pendingTeamChallenges.length=${_pendingTeamChallenges.length}');
+        'FEED: _buildForYouFeed called - _isLoadingForYou=$_isLoadingForYou, _forYouPosts.length=${_forYouPosts.length}');
     if (_isLoadingForYou) {
       return const FeedSkeletonLoader();
     }
 
     final featuredMatchup = widget.featuredMatchup;
+    final pinnedWidgets = _buildPinnedChallengeWidgets();
+
     if (_forYouPosts.isEmpty &&
-        _pendingChallenges.isEmpty &&
-        _pendingTeamChallenges.isEmpty &&
+        pinnedWidgets.isEmpty &&
         featuredMatchup == null) {
-      debugPrint('FEED: Showing empty state - no posts and no challenges');
+      debugPrint('FEED: Showing empty state - no server feed items');
       return _buildEmptyState(
         'No local activity yet',
         'Be the first to post at a court near you!',
@@ -415,34 +476,14 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       );
     }
 
-    // Pin scheduled runs to top
-    final sortedPosts = _sortPostsWithScheduledFirst(_forYouPosts);
-    final featuredOffset = featuredMatchup == null ? 0 : 1;
-    // Total items = team challenges + 1v1 challenges + posts
-    final totalChallenges =
-        _pendingTeamChallenges.length + _pendingChallenges.length;
-    final totalItems = featuredOffset + totalChallenges + sortedPosts.length;
-
     return RefreshIndicator(
-      onRefresh: () async {
-        final futures = <Future<void>>[
-          _loadForYouFeed(),
-          _loadPendingChallenges(),
-          _loadPendingTeamChallenges(),
-        ];
-        final refreshFeaturedMatchup = widget.onRefreshFeaturedMatchup;
-        if (refreshFeaturedMatchup != null) {
-          futures.add(refreshFeaturedMatchup());
-        }
-        await Future.wait(futures);
-      },
-      child: ListView.builder(
+      onRefresh: _refreshForYouContent,
+      child: ListView(
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: totalItems,
-        itemBuilder: (context, index) {
-          if (featuredMatchup != null && index == 0) {
-            return AnimatedListItem(
-              index: index,
+        children: [
+          if (featuredMatchup != null)
+            AnimatedListItem(
+              index: 0,
               child: FeaturedMatchupFeedCard(
                 matchup: featuredMatchup,
                 isSubmitting: widget.isFeaturedMatchupSubmitting,
@@ -451,27 +492,16 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                 onVenuePressed: widget.onFeaturedMatchupVenuePressed,
                 onSkipPressed: widget.onFeaturedMatchupSkipPressed,
               ),
+            ),
+          ...pinnedWidgets,
+          ..._forYouPosts.asMap().entries.map((entry) {
+            return AnimatedListItem(
+              index:
+                  (featuredMatchup == null ? 0 : 1) + pinnedWidgets.length + entry.key,
+              child: _buildFeedItemCard(entry.value),
             );
-          }
-
-          final contentIndex = index - featuredOffset;
-          // First: team challenges
-          if (contentIndex < _pendingTeamChallenges.length) {
-            return _buildTeamChallengeCard(
-                _pendingTeamChallenges[contentIndex]);
-          }
-          // Then: 1v1 challenges
-          final challengeIndex = contentIndex - _pendingTeamChallenges.length;
-          if (challengeIndex < _pendingChallenges.length) {
-            return _buildChallengeCard(_pendingChallenges[challengeIndex]);
-          }
-          // Finally: regular posts
-          final postIndex = contentIndex - totalChallenges;
-          return AnimatedListItem(
-            index: postIndex,
-            child: _buildFeedItemCard(sortedPosts[postIndex]),
-          );
-        },
+          }),
+        ],
       ),
     );
   }
@@ -481,6 +511,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       return const FeedSkeletonLoader();
     }
 
+    final pinnedWidgets = _buildPinnedChallengeWidgets();
     final checkInState = context.watch<CheckInState>();
     final courtCount = checkInState.followedCourtCount;
     final playerCount = checkInState.followedPlayerCount;
@@ -488,20 +519,15 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     final totalFollowing = courtCount + playerCount + teamCount;
 
     // No following anyone yet - show challenges first, then empty state with follow buttons
-    if (totalFollowing == 0) {
+    if (totalFollowing == 0 && _followingPosts.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _loadPendingChallenges,
+        onRefresh: _refreshFollowingContent,
         child: ListView(
           children: [
-            // Show challenges at the top even if not following anyone
-            ...(_pendingChallenges.map((c) => _buildChallengeCard(c)).toList()),
-            // Then show empty state to encourage following
+            ...pinnedWidgets,
             Padding(
-              padding: EdgeInsets.only(
-                  top: _pendingChallenges.isEmpty ? 40 : 16,
-                  left: 32,
-                  right: 32,
-                  bottom: 32),
+              padding: const EdgeInsets.only(
+                  top: 40, left: 32, right: 32, bottom: 32),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
@@ -658,9 +684,10 @@ class _HoopRankFeedState extends State<HoopRankFeed>
     // Has following but no activity
     if (_followingPosts.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _loadFollowingFeed,
+        onRefresh: _refreshFollowingContent,
         child: ListView(
           children: [
+            ...pinnedWidgets,
             followingHeader,
             Padding(
               padding: const EdgeInsets.all(32),
@@ -690,29 +717,15 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       );
     }
 
-    // Pin scheduled runs to top
-    final sortedPosts = _sortPostsWithScheduledFirst(_followingPosts);
-    // +1 for header, then challenges, then posts
-    final totalItems = 1 + _pendingChallenges.length + sortedPosts.length;
-
     return RefreshIndicator(
-      onRefresh: () async {
-        await Future.wait([_loadFollowingFeed(), _loadPendingChallenges()]);
-      },
-      child: ListView.builder(
+      onRefresh: _refreshFollowingContent,
+      child: ListView(
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: totalItems,
-        itemBuilder: (context, index) {
-          if (index == 0) return followingHeader;
-          // After header come challenges
-          final challengeOffset = index - 1;
-          if (challengeOffset < _pendingChallenges.length) {
-            return _buildChallengeCard(_pendingChallenges[challengeOffset]);
-          }
-          // Then regular posts
-          final postIndex = challengeOffset - _pendingChallenges.length;
-          return _buildFeedItemCard(sortedPosts[postIndex]);
-        },
+        children: [
+          ...pinnedWidgets,
+          followingHeader,
+          ..._followingPosts.map(_buildFeedItemCard),
+        ],
       ),
     );
   }
@@ -1676,6 +1689,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
 
       if (mounted) {
         _loadPendingChallenges(); // Refresh challenges
+        ScaffoldWithNavBar.refreshBadge?.call();
 
         // CRITICAL: Set opponent in MatchState from challenge data BEFORE navigating
         final matchState = Provider.of<MatchState>(context, listen: false);
@@ -1735,6 +1749,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
               backgroundColor: Colors.grey),
         );
         _loadPendingChallenges(); // Refresh challenges
+        ScaffoldWithNavBar.refreshBadge?.call();
       }
     } catch (e) {
       if (mounted) {
@@ -1762,6 +1777,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
               backgroundColor: Colors.grey),
         );
         _loadPendingChallenges(); // Refresh challenges
+        ScaffoldWithNavBar.refreshBadge?.call();
       }
     } catch (e) {
       if (mounted) {
