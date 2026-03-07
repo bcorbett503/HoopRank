@@ -1126,6 +1126,12 @@ class _HomeScreenState extends State<HomeScreen>
           radiusMiles: expandedRadiusMiles,
         );
       }
+      if (nearby.isEmpty) {
+        debugPrint(
+          'PRIMARY_ACTION: no nearby candidates available, retrying with global player pool',
+        );
+        nearby = await ApiService.getPlayers();
+      }
 
       if (!mounted) return;
       setState(() {

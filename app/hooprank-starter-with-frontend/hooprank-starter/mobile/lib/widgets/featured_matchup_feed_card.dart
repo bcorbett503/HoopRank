@@ -76,41 +76,54 @@ class FeaturedMatchupFeedCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(
-                        alpha: isHighConfidence ? 0.18 : 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isHighConfidence
-                            ? Icons.flash_on_rounded
-                            : Icons.recommend_rounded,
-                        size: 14,
-                        color: accentColor,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isHighConfidence ? 'HOT MATCHUP' : 'SUGGESTED MATCHUP',
-                        style: TextStyle(
-                          color: accentColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.9,
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(
+                              alpha: isHighConfidence ? 0.18 : 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: accentColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isHighConfidence
+                                  ? Icons.flash_on_rounded
+                                  : Icons.recommend_rounded,
+                              size: 14,
+                              color: accentColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isHighConfidence
+                                  ? 'HOT MATCHUP'
+                                  : 'SUGGESTED MATCHUP',
+                              style: TextStyle(
+                                color: accentColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.9,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
