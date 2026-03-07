@@ -476,12 +476,21 @@ export class UsersController {
   async getNearbyUsers(
     @Headers("x-user-id") userId: string,
     @Query("radiusMiles") radiusMiles?: string,
+    @Query("lat") lat?: string,
+    @Query("lng") lng?: string,
   ) {
     if (!userId) {
       return [];
     }
     const radius = parseInt(radiusMiles || "25", 10);
-    return this.usersService.getNearbyUsers(userId, radius);
+    const latitude = lat ? parseFloat(lat) : undefined;
+    const longitude = lng ? parseFloat(lng) : undefined;
+    return this.usersService.getNearbyUsers(
+      userId,
+      radius,
+      Number.isFinite(latitude) ? latitude : undefined,
+      Number.isFinite(longitude) ? longitude : undefined,
+    );
   }
 
   @Get(":id/stats")

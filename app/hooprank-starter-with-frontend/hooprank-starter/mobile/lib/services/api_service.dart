@@ -696,12 +696,22 @@ class ApiService {
   }
 
   /// Get nearby players within specified radius
-  static Future<List<User>> getNearbyPlayers({int radiusMiles = 25}) async {
+  static Future<List<User>> getNearbyPlayers({
+    int radiusMiles = 25,
+    double? lat,
+    double? lng,
+  }) async {
     debugPrint(
-        '>>> getNearbyPlayers() called, userId: $_userId, radius: $radiusMiles');
+        '>>> getNearbyPlayers() called, userId: $_userId, radius: $radiusMiles, lat: $lat, lng: $lng');
 
     try {
-      final uri = Uri.parse('$baseUrl/users/nearby?radiusMiles=$radiusMiles');
+      final queryParams = <String, String>{
+        'radiusMiles': '$radiusMiles',
+        if (lat != null) 'lat': '$lat',
+        if (lng != null) 'lng': '$lng',
+      };
+      final uri = Uri.parse('$baseUrl/users/nearby')
+          .replace(queryParameters: queryParams);
       final response =
           await authedGet(uri, headers: {'x-user-id': _userId ?? ''});
 
@@ -1794,7 +1804,7 @@ class ApiService {
   }
 
   /// Get unified feed (statuses + check-ins + matches for followed players/courts)
-  /// filter: 'foryou' (local 50mi), 'following' (followed only), 'all' (default)
+  /// filter: 'foryou' (10/25/50mi discovery), 'following' (followed only), 'all' (default)
   static Future<List<Map<String, dynamic>>> getUnifiedFeed({
     String filter = 'all',
     double? lat,

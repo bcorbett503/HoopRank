@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   static const double _feedPanelExpandedTop = 8.0;
   static const double _feedPanelCollapsedVisibleHeight = 288.0;
-  static const double _feedPanelCollapsedGap = 8.0;
+  static const double _feedPanelCollapsedGap = 2.0;
 
   final MessagesService _messagesService = MessagesService();
   final GlobalKey _feedAnchorKey = GlobalKey();
@@ -750,7 +750,7 @@ class _HomeScreenState extends State<HomeScreen>
             ) ??
             const Color(0xFFF97316);
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: EdgeInsets.zero,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
@@ -1091,9 +1091,12 @@ class _HomeScreenState extends State<HomeScreen>
         if (value is num) return value.toDouble();
         return double.tryParse(value?.toString() ?? '') ?? 25.0;
       })();
+      final position = await LocationService.getCurrentLocation();
 
       final nearby = await ApiService.getNearbyPlayers(
         radiusMiles: discoverRadiusMi.round().clamp(1, 100),
+        lat: position?.latitude,
+        lng: position?.longitude,
       );
 
       if (!mounted) return;

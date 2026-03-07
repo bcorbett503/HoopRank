@@ -202,6 +202,26 @@ describe('UsersService', () => {
     });
 
     // ------------------------------------------------------------------
+    //  getNearbyUsers
+    // ------------------------------------------------------------------
+    describe('getNearbyUsers', () => {
+        it('should prefer provided coordinates over stored profile coordinates', async () => {
+            process.env.DATABASE_URL = 'postgres://test';
+            mockDataSource.query
+                .mockResolvedValueOnce([{ lat: 37.1, lng: -122.1, zip: null }])
+                .mockResolvedValueOnce([]);
+
+            await service.getNearbyUsers('uid-1', 25, 38.0198, -122.5566);
+
+            expect(mockDataSource.query).toHaveBeenNthCalledWith(
+                2,
+                expect.stringContaining('WITH user_locations AS'),
+                ['uid-1', 38.0198, -122.5566, 25],
+            );
+        });
+    });
+
+    // ------------------------------------------------------------------
     //  sanitizeUser
     // ------------------------------------------------------------------
     describe('sanitizeUser', () => {

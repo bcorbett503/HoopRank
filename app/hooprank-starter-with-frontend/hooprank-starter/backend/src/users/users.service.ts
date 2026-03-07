@@ -821,6 +821,8 @@ export class UsersService {
   async getNearbyUsers(
     userId: string,
     radiusMiles: number = 25,
+    overrideLat?: number,
+    overrideLng?: number,
   ): Promise<any[]> {
     const isPostgres = !!process.env.DATABASE_URL;
 
@@ -862,7 +864,17 @@ export class UsersService {
         return [];
       }
 
-      let { lat, lng, zip, city } = currentUser[0];
+      let { lat, lng, zip } = currentUser[0];
+
+      if (
+        overrideLat !== undefined &&
+        overrideLng !== undefined &&
+        Number.isFinite(overrideLat) &&
+        Number.isFinite(overrideLng)
+      ) {
+        lat = overrideLat;
+        lng = overrideLng;
+      }
 
       // Fallback to zip code coordinates if no GPS
       if ((!lat || !lng) && zip && zipCoords[zip]) {

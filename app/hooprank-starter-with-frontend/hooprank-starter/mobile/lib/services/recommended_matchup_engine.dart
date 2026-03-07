@@ -38,7 +38,6 @@ class RecommendedMatchup {
 }
 
 class RecommendedMatchupEngine {
-  static const double qualityGate = 58.0;
   static const int minAdultAge = 18;
   static const int likelyYouthHeightInches = 62; // 5'2"
 
@@ -106,7 +105,9 @@ class RecommendedMatchupEngine {
     });
 
     final top = eligible.first;
-    if (top.score < qualityGate) {
+    // Surface the best available nearby player. The card styling already
+    // differentiates strong matches from weaker recommendations.
+    if (top.score <= 0) {
       return null;
     }
 
