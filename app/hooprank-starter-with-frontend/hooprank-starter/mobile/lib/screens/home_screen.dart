@@ -1091,13 +1091,41 @@ class _HomeScreenState extends State<HomeScreen>
         if (value is num) return value.toDouble();
         return double.tryParse(value?.toString() ?? '') ?? 25.0;
       })();
+      final baseRadiusMiles = discoverRadiusMi.round().clamp(1, 100);
+      final expandedRadiusMiles = baseRadiusMiles < 100 ? 100 : baseRadiusMiles;
       final position = await LocationService.getCurrentLocation();
 
-      final nearby = await ApiService.getNearbyPlayers(
-        radiusMiles: discoverRadiusMi.round().clamp(1, 100),
+      var nearby = await ApiService.getNearbyPlayers(
+        radiusMiles: baseRadiusMiles,
         lat: position?.latitude,
         lng: position?.longitude,
       );
+      if (nearby.isEmpty && expandedRadiusMiles > baseRadiusMiles) {
+        debugPrint(
+          'PRIMARY_ACTION: no base-radius live candidates, retrying with expanded live radius',
+        );
+        nearby = await ApiService.getNearbyPlayers(
+          radiusMiles: expandedRadiusMiles,
+          lat: position?.latitude,
+          lng: position?.longitude,
+        );
+      }
+      if (nearby.isEmpty && position != null) {
+        debugPrint(
+          'PRIMARY_ACTION: no live-location candidates, retrying with profile location fallback',
+        );
+        nearby = await ApiService.getNearbyPlayers(
+          radiusMiles: baseRadiusMiles,
+        );
+      }
+      if (nearby.isEmpty && expandedRadiusMiles > baseRadiusMiles) {
+        debugPrint(
+          'PRIMARY_ACTION: no profile-location candidates, retrying with expanded profile radius',
+        );
+        nearby = await ApiService.getNearbyPlayers(
+          radiusMiles: expandedRadiusMiles,
+        );
+      }
 
       if (!mounted) return;
       setState(() {
