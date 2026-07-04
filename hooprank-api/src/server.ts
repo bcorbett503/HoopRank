@@ -205,6 +205,173 @@ function getUserId(req: express.Request): string {
   return uid;
 }
 
+function getOptionalUserId(req: express.Request): string | null {
+  const uid = req.header("x-user-id")?.trim();
+  return uid && uid.length > 0 ? uid : null;
+}
+
+function firstQueryValue(value: unknown): unknown {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function toFiniteNumber(value: unknown): number | undefined {
+  const raw = firstQueryValue(value);
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  const text = String(value).trim().toLowerCase();
+  if (["true", "1", "yes", "on", "public"].includes(text)) return true;
+  if (["false", "0", "no", "off", "private"].includes(text)) return false;
+  return fallback;
+}
+
+function clampNumber(value: number | undefined, min: number, max: number, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(value, min), max);
+}
+
+function milesToMeters(miles: number): number {
+  return miles * 1609.344;
+}
+
+function parseJsonObject(value: unknown): Record<string, any> | null {
+  if (!value) return null;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, any>;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed
+        : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function normalizePrivacy(row: any = {}) {
+  return {
+    pushEnabled: toBoolean(row.pushEnabled ?? row.push_enabled, true),
+    publicProfile: toBoolean(row.publicProfile ?? row.public_profile, true),
+    publicLocation: toBoolean(row.publicLocation ?? row.public_location, false),
+    mapVisibilityEnabled: toBoolean(
+      row.mapVisibilityEnabled ?? row.map_visibility_enabled,
+      false
+    ),
+    discoverRadiusMi: clampNumber(
+      toFiniteNumber(row.discoverRadiusMi ?? row.discover_radius_mi),
+      1,
+      100,
+      25
+    ),
+    discoverMode: String(row.discoverMode ?? row.discover_mode ?? "open"),
+    updatedAt: row.updatedAt ?? row.updated_at ?? null,
+  };
+}
+
+async function ensureMapHubSchema() {
+  await pool.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS avatar_config JSONB DEFAULT '{}'::jsonb,
+      ADD COLUMN IF NOT EXISTS accepting_challenges BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS loc_enabled BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION,
+      ADD COLUMN IF NOT EXISTS games_played INTEGER DEFAULT 0
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_privacy (
+      user_id VARCHAR(255) PRIMARY KEY,
+      push_enabled BOOLEAN DEFAULT TRUE,
+      public_profile BOOLEAN DEFAULT TRUE,
+      public_location BOOLEAN DEFAULT FALSE,
+      map_visibility_enabled BOOLEAN DEFAULT FALSE,
+      discover_radius_mi NUMERIC(5,1) DEFAULT 25.0,
+      discover_mode TEXT DEFAULT 'open',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await pool.query(`
+    ALTER TABLE user_privacy
+      ADD COLUMN IF NOT EXISTS push_enabled BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS public_profile BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS public_location BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS map_visibility_enabled BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS discover_radius_mi NUMERIC(5,1) DEFAULT 25.0,
+      ADD COLUMN IF NOT EXISTS discover_mode TEXT DEFAULT 'open',
+      ADD COLUMN IF NOT EXISTS discover_window NUMERIC DEFAULT 0.5,
+      ADD COLUMN IF NOT EXISTS discover_min_reputation NUMERIC DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS check_ins (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id TEXT NOT NULL,
+      court_id TEXT NOT NULL,
+      checked_in_at TIMESTAMPTZ DEFAULT NOW(),
+      checked_out_at TIMESTAMPTZ
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS player_statuses (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id TEXT NOT NULL,
+      court_id TEXT,
+      content TEXT,
+      scheduled_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS scheduled_runs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      court_id TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      title TEXT,
+      game_mode TEXT DEFAULT '5v5',
+      scheduled_at TIMESTAMPTZ NOT NULL,
+      duration_minutes INTEGER DEFAULT 120,
+      max_players INTEGER DEFAULT 10,
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS scheduled_run_attendees (
+      run_id UUID NOT NULL,
+      user_id TEXT NOT NULL,
+      status TEXT DEFAULT 'going',
+      joined_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (run_id, user_id)
+    )
+  `);
+
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_map_lat_lng ON users (lat, lng)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_privacy_map_visibility ON user_privacy (map_visibility_enabled, public_location)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_check_ins_active ON check_ins (user_id, checked_out_at, checked_in_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_player_statuses_recent ON player_statuses (user_id, created_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_scheduled_runs_court_time ON scheduled_runs (court_id, scheduled_at)`);
+}
+
+async function ensurePrivacyRow(userId: string) {
+  await ensureMapHubSchema();
+  await pool.query(
+    `INSERT INTO user_privacy (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`,
+    [userId]
+  );
+}
+
 
 
 
@@ -233,6 +400,7 @@ app.post(
     if (!IS_DEV) {
       return res.status(403).json({ error: "dev_auth_disabled" });
     }
+    await ensureMapHubSchema();
     const body = DevAuthSchema.parse(req.body);
     const { id, name } = body;
 
@@ -258,8 +426,19 @@ app.post(
       id: u.id,
       name: u.name,
       photoUrl: u.avatar_url,
+      avatarUrl: u.avatar_url,
+      avatar_url: u.avatar_url,
+      avatarConfig: parseJsonObject(u.avatar_config) ?? {},
+      avatar_config: parseJsonObject(u.avatar_config) ?? {},
       rating: Number(u.hoop_rank),
+      hoop_rank: Number(u.hoop_rank),
       position: u.position,
+      acceptingChallenges: toBoolean(u.accepting_challenges, true),
+      accepting_challenges: toBoolean(u.accepting_challenges, true),
+      locEnabled: toBoolean(u.loc_enabled, false),
+      loc_enabled: toBoolean(u.loc_enabled, false),
+      lat: u.lat == null ? null : Number(u.lat),
+      lng: u.lng == null ? null : Number(u.lng),
       matchesPlayed: 0, // TODO: count matches
     });
   })
@@ -269,6 +448,7 @@ app.post(
 app.post(
   "/users/auth",
   asyncH(async (req, res) => {
+    await ensureMapHubSchema();
     const { id, email, name, photoUrl, provider } = req.body;
     const authHeader = req.headers.authorization;
     const authToken = authHeader ? authHeader.split(' ')[1] : null;
@@ -313,8 +493,20 @@ app.post(
       id: u.id,
       name: u.name,
       photoUrl: u.avatar_url,
+      avatarUrl: u.avatar_url,
+      avatar_url: u.avatar_url,
+      photo_url: u.avatar_url,
+      avatarConfig: parseJsonObject(u.avatar_config) ?? {},
+      avatar_config: parseJsonObject(u.avatar_config) ?? {},
       rating: Number(u.hoop_rank),
+      hoop_rank: Number(u.hoop_rank),
       position: u.position,
+      acceptingChallenges: toBoolean(u.accepting_challenges, true),
+      accepting_challenges: toBoolean(u.accepting_challenges, true),
+      locEnabled: toBoolean(u.loc_enabled, false),
+      loc_enabled: toBoolean(u.loc_enabled, false),
+      lat: u.lat == null ? null : Number(u.lat),
+      lng: u.lng == null ? null : Number(u.lng),
       matchesPlayed: 0,
     });
   })
@@ -402,6 +594,7 @@ app.get(
 app.get(
   "/users/me",
   asyncH(async (req, res) => {
+    await ensureMapHubSchema();
     const userId = getUserId(req);
 
     // Single optimized query combining user data + match stats
@@ -444,13 +637,27 @@ app.get(
       id: u.id,
       name: u.name,
       photoUrl: u.avatar_url,
+      avatarUrl: u.avatar_url,
+      avatar_url: u.avatar_url,
+      photo_url: u.avatar_url,
+      avatarConfig: parseJsonObject(u.avatar_config) ?? {},
+      avatar_config: parseJsonObject(u.avatar_config) ?? {},
       rating: Number(u.hoop_rank),
+      hoop_rank: Number(u.hoop_rank),
       position: u.position,
       height: u.height,
       weight: u.weight,
       city: u.city,
       zip: u.zip,
       team: teamName,
+      acceptingChallenges: toBoolean(u.accepting_challenges, true),
+      accepting_challenges: toBoolean(u.accepting_challenges, true),
+      locEnabled: toBoolean(u.loc_enabled, false),
+      loc_enabled: toBoolean(u.loc_enabled, false),
+      lat: u.lat == null ? null : Number(u.lat),
+      lng: u.lng == null ? null : Number(u.lng),
+      gamesPlayed: Number(u.games_played || 0),
+      games_played: Number(u.games_played || 0),
       matchesPlayed,
       wins,
       losses,
@@ -461,6 +668,7 @@ app.get(
 app.get(
   "/users/:userId",
   asyncH(async (req, res) => {
+    await ensureMapHubSchema();
     const { userId } = req.params;
 
     // Single optimized query combining user data + match stats
@@ -503,13 +711,27 @@ app.get(
       id: u.id,
       name: u.name,
       photoUrl: u.avatar_url,
+      avatarUrl: u.avatar_url,
+      avatar_url: u.avatar_url,
+      photo_url: u.avatar_url,
+      avatarConfig: parseJsonObject(u.avatar_config) ?? {},
+      avatar_config: parseJsonObject(u.avatar_config) ?? {},
       rating: Number(u.hoop_rank),
+      hoop_rank: Number(u.hoop_rank),
       position: u.position,
       height: u.height,
       weight: u.weight,
       city: u.city,
       zip: u.zip,
       team: teamName,
+      acceptingChallenges: toBoolean(u.accepting_challenges, true),
+      accepting_challenges: toBoolean(u.accepting_challenges, true),
+      locEnabled: toBoolean(u.loc_enabled, false),
+      loc_enabled: toBoolean(u.loc_enabled, false),
+      lat: u.lat == null ? null : Number(u.lat),
+      lng: u.lng == null ? null : Number(u.lng),
+      gamesPlayed: Number(u.games_played || 0),
+      games_played: Number(u.games_played || 0),
       matchesPlayed,
       wins,
       losses,
@@ -548,8 +770,28 @@ app.post(
 app.post(
   "/users/:userId/profile",
   asyncH(async (req, res) => {
+    await ensureMapHubSchema();
     const { userId } = req.params;
-    const { name, position, height, weight, zip, lat, lng, locEnabled, age, birthdate } = req.body;
+    const {
+      name,
+      position,
+      height,
+      weight,
+      zip,
+      lat,
+      lng,
+      locEnabled,
+      age,
+      birthdate,
+      avatarConfig,
+      avatar_config,
+      avatarUrl,
+      avatar_url,
+      photoUrl,
+      photo_url,
+      acceptingChallenges,
+      accepting_challenges,
+    } = req.body;
 
     // Verify user exists
     const check = await pool.query(`select 1 from users where id = $1`, [userId]);
@@ -617,7 +859,42 @@ app.post(
       ]
     );
 
-    res.json({ success: true, city, lat: zipLat, lng: zipLng });
+    const optionalSets: string[] = [];
+    const optionalValues: any[] = [userId];
+    const profileAvatarUrl = avatarUrl ?? avatar_url ?? photoUrl ?? photo_url;
+    const profileAvatarConfig = avatarConfig ?? avatar_config;
+    const profileAcceptingChallenges =
+      acceptingChallenges ?? accepting_challenges;
+
+    if (profileAvatarUrl !== undefined) {
+      optionalValues.push(profileAvatarUrl);
+      optionalSets.push(`avatar_url = $${optionalValues.length}`);
+    }
+    if (profileAvatarConfig !== undefined) {
+      optionalValues.push(JSON.stringify(profileAvatarConfig ?? {}));
+      optionalSets.push(`avatar_config = $${optionalValues.length}::jsonb`);
+    }
+    if (profileAcceptingChallenges !== undefined) {
+      optionalValues.push(toBoolean(profileAcceptingChallenges, true));
+      optionalSets.push(`accepting_challenges = $${optionalValues.length}`);
+    }
+
+    if (optionalSets.length > 0) {
+      await pool.query(
+        `UPDATE users SET ${optionalSets.join(", ")}, updated_at = NOW() WHERE id = $1`,
+        optionalValues
+      );
+    }
+
+    res.json({
+      success: true,
+      city,
+      lat: zipLat,
+      lng: zipLng,
+      avatarUrl: profileAvatarUrl,
+      avatarConfig: profileAvatarConfig,
+      acceptingChallenges: toBoolean(profileAcceptingChallenges, true),
+    });
   })
 );
 
@@ -625,80 +902,434 @@ app.post(
  * Privacy
  * =======================*/
 const PrivacySchema = z.object({
-  pushEnabled: z.boolean(),
-  publicProfile: z.boolean(),
-  publicLocation: z.boolean(),
-  discoverRadiusMi: z.number().min(0.25).max(25),
-  discoverMode: z.enum(["open", "similar"]),
-  discoverWindow: z.number().min(0.1).max(1.5).optional(),
-  discoverMinReputation: z.number().min(0).max(5).optional(),
+  pushEnabled: z.boolean().optional(),
+  publicProfile: z.boolean().optional(),
+  profileVisibility: z.enum(["public", "friends", "private"]).optional(),
+  publicLocation: z.boolean().optional(),
+  showLocation: z.boolean().optional(),
+  mapVisibilityEnabled: z.boolean().optional(),
+  discoverRadiusMi: z.coerce.number().min(0.25).max(100).optional(),
+  discoverMode: z.enum(["open", "similar", "friends", "private"]).optional(),
+  discoverWindow: z.coerce.number().min(0.1).max(1.5).optional(),
+  discoverMinReputation: z.coerce.number().min(0).max(5).optional(),
 });
 
-app.get(
-  "/me/privacy",
-  asyncH(async (req, res) => {
-    const uid = getUserId(req);
-    const q = `
+async function readPrivacySettings(userId: string) {
+  await ensurePrivacyRow(userId);
+  const q = `
       select
         push_enabled as "pushEnabled",
-      public_profile as "publicProfile",
-      public_location as "publicLocation",
-      discover_radius_mi as "discoverRadiusMi",
-      discover_mode as "discoverMode",
-      discover_window as "discoverWindow",
-      discover_min_reputation as "discoverMinReputation"
+        public_profile as "publicProfile",
+        public_location as "publicLocation",
+        map_visibility_enabled as "mapVisibilityEnabled",
+        discover_radius_mi as "discoverRadiusMi",
+        discover_mode as "discoverMode",
+        discover_window as "discoverWindow",
+        discover_min_reputation as "discoverMinReputation",
+        updated_at as "updatedAt"
       from user_privacy where user_id = $1
       `;
-    const r = await pool.query(q, [uid]);
-    if (r.rowCount === 0) {
-      await pool.query(`insert into user_privacy(user_id) values($1) on conflict do nothing`, [uid]);
-      const r2 = await pool.query(q, [uid]);
-      return res.json(r2.rows[0]);
+  const r = await pool.query(q, [userId]);
+  return normalizePrivacy(r.rows[0]);
+}
+
+async function writePrivacySettings(userId: string, body: unknown) {
+  const parsed = PrivacySchema.safeParse(body ?? {});
+  if (!parsed.success) {
+    throw Object.assign(new Error("invalid_privacy_settings"), {
+      http: 400,
+      details: parsed.error.flatten(),
+    });
+  }
+  const p = parsed.data;
+  await ensurePrivacyRow(userId);
+
+  const sets: string[] = [];
+  const values: any[] = [];
+  const add = (column: string, value: any, cast = "") => {
+    values.push(value);
+    sets.push(`${column} = $${values.length}${cast}`);
+  };
+
+  if (p.pushEnabled !== undefined) add("push_enabled", p.pushEnabled);
+  if (p.publicProfile !== undefined) add("public_profile", p.publicProfile);
+  if (p.profileVisibility !== undefined) {
+    add("public_profile", p.profileVisibility !== "private");
+  }
+  if (p.publicLocation !== undefined) add("public_location", p.publicLocation);
+  if (p.showLocation !== undefined) add("public_location", p.showLocation);
+  if (p.mapVisibilityEnabled !== undefined) {
+    add("map_visibility_enabled", p.mapVisibilityEnabled);
+    if (p.mapVisibilityEnabled && p.publicLocation === undefined && p.showLocation === undefined) {
+      add("public_location", true);
     }
-    res.json(r.rows[0]);
-  })
-);
+  }
+  if (p.discoverRadiusMi !== undefined) add("discover_radius_mi", p.discoverRadiusMi, "::numeric");
+  if (p.discoverMode !== undefined) add("discover_mode", p.discoverMode);
+  if (p.discoverWindow !== undefined) add("discover_window", p.discoverWindow, "::numeric");
+  if (p.discoverMinReputation !== undefined) {
+    add("discover_min_reputation", p.discoverMinReputation, "::numeric");
+  }
 
-app.put(
-  "/me/privacy",
-  asyncH(async (req, res) => {
-    const uid = getUserId(req);
-    const parsed = PrivacySchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const p = parsed.data;
-
+  if (sets.length > 0) {
+    values.push(userId);
     await pool.query(
-      `
-      insert into user_privacy
-      (user_id, push_enabled, public_profile, public_location, discover_radius_mi, discover_mode, discover_window, discover_min_reputation)
-    values($1, $2, $3, $4, $5, $6, coalesce($7:: numeric, 0.5), coalesce($8:: numeric, 0))
-      on conflict(user_id) do update set
-        push_enabled = $2, public_profile = $3, public_location = $4, discover_radius_mi = $5,
-      discover_mode = $6, discover_window = coalesce($7, 0.5), discover_min_reputation = coalesce($8, 0)
-        `,
-      [
-        uid,
-        p.pushEnabled,
-        p.publicProfile,
-        p.publicLocation,
-        p.discoverRadiusMi,
-        p.discoverMode,
-        p.discoverWindow,
-        p.discoverMinReputation,
-      ]
+      `UPDATE user_privacy SET ${sets.join(", ")}, updated_at = NOW() WHERE user_id = $${values.length}`,
+      values
     );
+  }
 
-    const out = await pool.query(
-      `
-      select push_enabled as "pushEnabled", public_profile as "publicProfile",
-      public_location as "publicLocation", discover_radius_mi as "discoverRadiusMi",
-      discover_mode as "discoverMode", discover_window as "discoverWindow",
-      discover_min_reputation as "discoverMinReputation"
-      from user_privacy where user_id = $1
-      `,
-      [uid]
+  return readPrivacySettings(userId);
+}
+
+const getPrivacyHandler = asyncH(async (req, res) => {
+  const uid = getUserId(req);
+  res.json(await readPrivacySettings(uid));
+});
+
+const putPrivacyHandler = asyncH(async (req, res) => {
+  const uid = getUserId(req);
+  try {
+    res.json({ success: true, ...(await writePrivacySettings(uid, req.body)) });
+  } catch (e: any) {
+    if (e.http === 400 && e.details) {
+      return res.status(400).json({ error: e.details });
+    }
+    throw e;
+  }
+});
+
+app.get("/me/privacy", getPrivacyHandler);
+app.get("/users/me/privacy", getPrivacyHandler);
+app.put("/me/privacy", putPrivacyHandler);
+app.put("/users/me/privacy", putPrivacyHandler);
+
+/* =========================
+ * Map Hub
+ * =======================*/
+type MapHubArgs = {
+  userId: string | null;
+  lat?: number;
+  lng?: number;
+  radiusMiles: number;
+  minLat?: number;
+  maxLat?: number;
+  minLng?: number;
+  maxLng?: number;
+};
+
+function hasMapCenter(args: MapHubArgs): args is MapHubArgs & { lat: number; lng: number } {
+  return Number.isFinite(args.lat) && Number.isFinite(args.lng);
+}
+
+function hasMapBounds(args: MapHubArgs) {
+  return (
+    Number.isFinite(args.minLat) &&
+    Number.isFinite(args.maxLat) &&
+    Number.isFinite(args.minLng) &&
+    Number.isFinite(args.maxLng)
+  );
+}
+
+function mapHubCourtStatus(row: any) {
+  const activeCheckInCount = Number(row.activeCheckInCount || 0);
+  const followerCount = Number(row.followerCount || 0);
+  const nextRun = row.nextRun ?? null;
+  if (activeCheckInCount > 0) {
+    return activeCheckInCount === 1
+      ? "1 player here"
+      : `${activeCheckInCount} players here`;
+  }
+  if (nextRun) {
+    const mode = nextRun.gameMode || nextRun.game_mode || "Run";
+    return `${mode} scheduled`;
+  }
+  if (followerCount > 0) {
+    return `${followerCount} following`;
+  }
+  return null;
+}
+
+function normalizeMapHubCourt(row: any) {
+  const nextRun = row.nextRun ?? null;
+  const activeCheckInCount = Number(row.activeCheckInCount || 0);
+  const hasUpcomingRun = row.hasUpcomingRun === true || !!nextRun;
+  return {
+    id: String(row.id ?? ""),
+    name: row.name ?? "Court",
+    lat: Number(row.lat ?? 0),
+    lng: Number(row.lng ?? 0),
+    address: row.address ?? row.city ?? null,
+    city: row.city ?? null,
+    indoor: row.indoor === true,
+    access: row.access ?? "public",
+    venueType: row.venueType ?? null,
+    signature: row.signature === true,
+    followerCount: Number(row.followerCount || 0),
+    activeCheckInCount,
+    hasUpcomingRun,
+    hasUpcomingActivity: activeCheckInCount > 0 || hasUpcomingRun,
+    statusLabel: mapHubCourtStatus(row),
+    nextRun,
+    topFollower: row.topFollower ?? null,
+  };
+}
+
+function normalizeMapHubPlayer(row: any, currentUserId: string | null) {
+  const customStatus = row.customStatus ?? null;
+  const checkedInCourtName = row.checkedInCourtName ?? null;
+  const acceptingChallenges = toBoolean(row.acceptingChallenges, true);
+  const isNewPlayer = Number(row.gamesPlayed || 0) === 0;
+  const statusLabel =
+    customStatus ||
+    (checkedInCourtName
+      ? `At ${checkedInCourtName}`
+      : isNewPlayer
+        ? "New to HoopRank"
+        : acceptingChallenges
+          ? "Accepting challenges"
+          : "Available nearby");
+
+  return {
+    id: String(row.id ?? ""),
+    name: row.name ?? "Player",
+    avatarUrl: row.avatarUrl ?? null,
+    avatarConfig: parseJsonObject(row.avatarConfig) ?? null,
+    rating: Number(row.rating ?? 3.0),
+    position: row.position ?? null,
+    acceptingChallenges,
+    isNewPlayer,
+    city: row.city ?? null,
+    lat: Number(row.lat ?? 0),
+    lng: Number(row.lng ?? 0),
+    customStatus,
+    statusLabel,
+    checkedInCourtId: row.checkedInCourtId ?? null,
+    checkedInCourtName,
+    isCurrentUser: !!currentUserId && String(row.id) === currentUserId,
+  };
+}
+
+async function getMapHubCourts(args: MapHubArgs) {
+  const values: any[] = [];
+  const param = (value: any) => {
+    values.push(value);
+    return `$${values.length}`;
+  };
+  const where = [`c.geog IS NOT NULL`];
+  let orderBy = `c.signature DESC, c.name ASC`;
+
+  if (hasMapCenter(args)) {
+    const lngParam = param(args.lng);
+    const latParam = param(args.lat);
+    const radiusParam = param(milesToMeters(args.radiusMiles));
+    const center = `ST_SetSRID(ST_MakePoint(${lngParam}, ${latParam}), 4326)::geography`;
+    where.push(`ST_DWithin(c.geog, ${center}, ${radiusParam})`);
+    orderBy = `ST_Distance(c.geog, ${center}) ASC`;
+  } else if (hasMapBounds(args)) {
+    where.push(`ST_Y(c.geog::geometry) BETWEEN ${param(args.minLat)} AND ${param(args.maxLat)}`);
+    where.push(`ST_X(c.geog::geometry) BETWEEN ${param(args.minLng)} AND ${param(args.maxLng)}`);
+  }
+
+  const r = await pool.query(
+    `
+    SELECT
+      c.id,
+      c.name,
+      c.city AS address,
+      c.city,
+      c.indoor,
+      'public'::text AS "access",
+      NULL::text AS "venueType",
+      c.signature,
+      ST_Y(c.geog::geometry) AS lat,
+      ST_X(c.geog::geometry) AS lng,
+      (
+        SELECT COUNT(*)::int
+        FROM check_ins ci
+        WHERE ci.court_id::text = c.id::text
+          AND ci.checked_out_at IS NULL
+      ) AS "activeCheckInCount",
+      (
+        SELECT COUNT(*)::int
+        FROM user_followed_courts ufc
+        WHERE ufc.court_id::text = c.id::text
+      ) AS "followerCount",
+      EXISTS (
+        SELECT 1
+        FROM scheduled_runs sr
+        WHERE sr.court_id::text = c.id::text
+          AND sr.scheduled_at >= NOW()
+      ) AS "hasUpcomingRun",
+      (
+        SELECT json_build_object(
+          'id', sr.id,
+          'title', sr.title,
+          'gameMode', sr.game_mode,
+          'scheduledAt', sr.scheduled_at,
+          'maxPlayers', sr.max_players,
+          'attendeeCount', (
+            SELECT COUNT(*)::int
+            FROM scheduled_run_attendees sra
+            WHERE sra.run_id = sr.id
+              AND COALESCE(sra.status, 'going') = 'going'
+          )
+        )
+        FROM scheduled_runs sr
+        WHERE sr.court_id::text = c.id::text
+          AND sr.scheduled_at >= NOW()
+        ORDER BY sr.scheduled_at ASC
+        LIMIT 1
+      ) AS "nextRun",
+      (
+        SELECT json_build_object(
+          'id', u.id,
+          'name', u.name,
+          'photoUrl', u.avatar_url,
+          'avatarConfig', u.avatar_config,
+          'rating', u.hoop_rank
+        )
+        FROM user_followed_courts ufc
+        JOIN users u ON u.id::text = ufc.user_id::text
+        WHERE ufc.court_id::text = c.id::text
+        ORDER BY u.hoop_rank DESC NULLS LAST, u.name ASC
+        LIMIT 1
+      ) AS "topFollower"
+    FROM courts c
+    WHERE ${where.join(" AND ")}
+    ORDER BY ${orderBy}
+    LIMIT 350
+    `,
+    values
+  );
+
+  return r.rows.map(normalizeMapHubCourt);
+}
+
+async function getMapHubPlayers(args: MapHubArgs) {
+  if (!args.userId) return [];
+
+  const values: any[] = [];
+  const param = (value: any) => {
+    values.push(value);
+    return `$${values.length}`;
+  };
+  const userParam = param(args.userId);
+  const point = `ST_SetSRID(ST_MakePoint(COALESCE(u.lng, ST_X(cc.geog::geometry)), COALESCE(u.lat, ST_Y(cc.geog::geometry))), 4326)::geography`;
+  const where = [
+    `(
+      u.id::text = ${userParam}
+      OR (
+        COALESCE(up.map_visibility_enabled, FALSE) = TRUE
+        AND COALESCE(up.public_profile, TRUE) = TRUE
+        AND COALESCE(up.public_location, FALSE) = TRUE
+      )
+    )`,
+    `(u.id::text = ${userParam} OR COALESCE(u.loc_enabled, FALSE) = TRUE)`,
+    `COALESCE(u.lat, ST_Y(cc.geog::geometry)) IS NOT NULL`,
+    `COALESCE(u.lng, ST_X(cc.geog::geometry)) IS NOT NULL`,
+  ];
+  let orderBy = `u.name ASC`;
+
+  if (hasMapCenter(args)) {
+    const lngParam = param(args.lng);
+    const latParam = param(args.lat);
+    const radiusParam = param(milesToMeters(args.radiusMiles));
+    const center = `ST_SetSRID(ST_MakePoint(${lngParam}, ${latParam}), 4326)::geography`;
+    where.push(`ST_DWithin(${point}, ${center}, ${radiusParam})`);
+    orderBy = `ST_Distance(${point}, ${center}) ASC`;
+  } else if (hasMapBounds(args)) {
+    where.push(`COALESCE(u.lat, ST_Y(cc.geog::geometry)) BETWEEN ${param(args.minLat)} AND ${param(args.maxLat)}`);
+    where.push(`COALESCE(u.lng, ST_X(cc.geog::geometry)) BETWEEN ${param(args.minLng)} AND ${param(args.maxLng)}`);
+  }
+
+  const r = await pool.query(
+    `
+    WITH latest_status AS (
+      SELECT DISTINCT ON (ps.user_id)
+        ps.user_id,
+        ps.content,
+        ps.court_id,
+        ps.created_at
+      FROM player_statuses ps
+      WHERE ps.created_at >= NOW() - INTERVAL '24 hours'
+        AND ps.scheduled_at IS NULL
+      ORDER BY ps.user_id, ps.created_at DESC
+    ),
+    active_check_in AS (
+      SELECT DISTINCT ON (ci.user_id)
+        ci.user_id,
+        ci.court_id,
+        ci.checked_in_at
+      FROM check_ins ci
+      WHERE ci.checked_out_at IS NULL
+      ORDER BY ci.user_id, ci.checked_in_at DESC
+    )
+    SELECT
+      u.id,
+      u.name,
+      u.avatar_url AS "avatarUrl",
+      u.avatar_config AS "avatarConfig",
+      u.hoop_rank AS rating,
+      u.position,
+      COALESCE(u.accepting_challenges, TRUE) AS "acceptingChallenges",
+      COALESCE(u.games_played, 0) AS "gamesPlayed",
+      u.city,
+      COALESCE(u.lat, ST_Y(cc.geog::geometry)) AS lat,
+      COALESCE(u.lng, ST_X(cc.geog::geometry)) AS lng,
+      latest.content AS "customStatus",
+      aci.court_id AS "checkedInCourtId",
+      cc.name AS "checkedInCourtName"
+    FROM users u
+    LEFT JOIN user_privacy up ON up.user_id::text = u.id::text
+    LEFT JOIN latest_status latest ON latest.user_id::text = u.id::text
+    LEFT JOIN active_check_in aci ON aci.user_id::text = u.id::text
+    LEFT JOIN courts cc ON cc.id::text = aci.court_id::text
+    WHERE ${where.join(" AND ")}
+    ORDER BY ${orderBy}
+    LIMIT 120
+    `,
+    values
+  );
+
+  return r.rows.map((row) => normalizeMapHubPlayer(row, args.userId));
+}
+
+app.get(
+  "/map/hub",
+  asyncH(async (req, res) => {
+    await ensureMapHubSchema();
+    const userId = getOptionalUserId(req);
+    const privacy = userId ? await readPrivacySettings(userId) : normalizePrivacy();
+    const radiusMiles = clampNumber(
+      toFiniteNumber(req.query.radiusMiles),
+      1,
+      100,
+      privacy.discoverRadiusMi
     );
-    res.json(out.rows[0]);
+    const includePlayers = toBoolean(req.query.includePlayers, true);
+    const args: MapHubArgs = {
+      userId,
+      lat: toFiniteNumber(req.query.lat),
+      lng: toFiniteNumber(req.query.lng),
+      minLat: toFiniteNumber(req.query.minLat),
+      maxLat: toFiniteNumber(req.query.maxLat),
+      minLng: toFiniteNumber(req.query.minLng),
+      maxLng: toFiniteNumber(req.query.maxLng),
+      radiusMiles,
+    };
+
+    const [courts, players] = await Promise.all([
+      getMapHubCourts(args),
+      includePlayers ? getMapHubPlayers(args) : Promise.resolve([]),
+    ]);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      privacy,
+      courts,
+      players,
+    });
   })
 );
 
@@ -3491,6 +4122,8 @@ app.use(((err: any, _req, res, _next) => {
 // Ensure follow tables exist (auto-migration)
 async function ensureFollowTables() {
   try {
+    await ensureMapHubSchema();
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_followed_courts (
         user_id UUID REFERENCES users(id) ON DELETE CASCADE,
