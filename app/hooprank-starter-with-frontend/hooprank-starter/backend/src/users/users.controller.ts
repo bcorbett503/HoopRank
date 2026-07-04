@@ -135,6 +135,14 @@ export class UsersController {
       photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
       avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
       photo_url: u.avatarUrl ?? u.avatar_url ?? null,
+      avatarConfig: u.avatarConfig ?? u.avatar_config ?? {},
+      avatar_config: u.avatarConfig ?? u.avatar_config ?? {},
+      acceptingChallenges:
+        u.acceptingChallenges ?? u.accepting_challenges ?? true,
+      accepting_challenges:
+        u.acceptingChallenges ?? u.accepting_challenges ?? true,
+      locEnabled: u.locEnabled ?? u.loc_enabled ?? false,
+      loc_enabled: u.locEnabled ?? u.loc_enabled ?? false,
     };
   }
 
@@ -179,6 +187,14 @@ export class UsersController {
       photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
       avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
       photo_url: u.avatarUrl ?? u.avatar_url ?? null,
+      avatarConfig: u.avatarConfig ?? u.avatar_config ?? {},
+      avatar_config: u.avatarConfig ?? u.avatar_config ?? {},
+      acceptingChallenges:
+        u.acceptingChallenges ?? u.accepting_challenges ?? true,
+      accepting_challenges:
+        u.acceptingChallenges ?? u.accepting_challenges ?? true,
+      locEnabled: u.locEnabled ?? u.loc_enabled ?? false,
+      loc_enabled: u.locEnabled ?? u.loc_enabled ?? false,
       onboarding_progress: u.onboardingProgress ?? u.onboarding_progress ?? {},
     };
   }
@@ -395,23 +411,28 @@ export class UsersController {
     }
   }
 
-  /**
-   * Privacy settings stub — returns sensible defaults.
-   */
   @Get("me/privacy")
   async getPrivacy(@Headers("x-user-id") userId: string) {
-    return {
-      profileVisibility: "public",
-      showLocation: true,
-      showActivity: true,
-      allowMessages: "everyone",
-    };
+    if (!userId) {
+      return {
+        pushEnabled: true,
+        publicProfile: true,
+        publicLocation: false,
+        mapVisibilityEnabled: false,
+        discoverRadiusMi: 25.0,
+        discoverMode: "open",
+      };
+    }
+    return this.usersService.getPrivacySettings(userId);
   }
 
   @Put("me/privacy")
   async updatePrivacy(@Headers("x-user-id") userId: string, @Body() body: any) {
-    // Stub: accept the payload but don't persist yet
-    return { success: true, ...body };
+    if (!userId) {
+      return { success: false, error: "User ID required" };
+    }
+    const settings = await this.usersService.updatePrivacySettings(userId, body);
+    return { success: true, ...settings };
   }
 
   // ==================== REPORT & BLOCK (Guideline 1.2) ====================

@@ -5,6 +5,8 @@ import { User } from "./user.entity";
 
 @Injectable()
 export class UsersService {
+  private privacySchemaReady = false;
+
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
@@ -80,13 +82,16 @@ export class UsersService {
           email,
           name,
           avatar_url,
+          avatar_config,
           hoop_rank,
           position,
+          accepting_challenges,
           height,
           weight,
           zip,
           birthdate,
           city,
+          loc_enabled,
           lat,
           lng,
           games_played,
@@ -267,16 +272,24 @@ export class UsersService {
         displayName: "name",
         email: "email",
         avatarUrl: "avatar_url",
+        avatar_url: "avatar_url",
         photoUrl: "avatar_url",
+        photo_url: "avatar_url",
+        avatarConfig: "avatar_config",
+        avatar_config: "avatar_config",
         hoopRank: "hoop_rank",
         rating: "hoop_rank",
         position: "position",
+        acceptingChallenges: "accepting_challenges",
+        accepting_challenges: "accepting_challenges",
         height: "height",
         weight: "weight",
         zip: "zip",
         birthdate: "birthdate",
         dob: "dob",
         city: "city",
+        locEnabled: "loc_enabled",
+        loc_enabled: "loc_enabled",
         fcmToken: "fcm_token",
         lat: "lat",
         lng: "lng",
@@ -286,7 +299,11 @@ export class UsersService {
       };
 
       // Columns that are JSONB and need special handling
-      const jsonbColumns = new Set(["onboarding_progress", "badges"]);
+      const jsonbColumns = new Set([
+        "onboarding_progress",
+        "badges",
+        "avatar_config",
+      ]);
 
       for (const [key, value] of Object.entries(data)) {
         const column = columnMap[key];
@@ -327,6 +344,111 @@ export class UsersService {
 
   async get(id: string): Promise<User | null> {
     return this.findOne(id);
+  }
+
+  async getPrivacySettings(userId: string): Promise<any> {
+    await this.ensurePrivacySchema();
+    await this.ensurePrivacyRow(userId);
+
+    const isPostgres = !!process.env.DATABASE_URL;
+    if (isPostgres) {
+      const rows = await this.dataSource.query(
+        `
+        SELECT
+          push_enabled AS "pushEnabled",
+          public_profile AS "publicProfile",
+          public_location AS "publicLocation",
+          map_visibility_enabled AS "mapVisibilityEnabled",
+          discover_radius_mi AS "discoverRadiusMi",
+          discover_mode AS "discoverMode",
+          updated_at AS "updatedAt"
+        FROM user_privacy
+        WHERE user_id = $1
+        LIMIT 1
+        `,
+        [userId],
+      );
+      return this.normalizePrivacy(rows[0]);
+    }
+
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        push_enabled AS pushEnabled,
+        public_profile AS publicProfile,
+        public_location AS publicLocation,
+        map_visibility_enabled AS mapVisibilityEnabled,
+        discover_radius_mi AS discoverRadiusMi,
+        discover_mode AS discoverMode,
+        updated_at AS updatedAt
+      FROM user_privacy
+      WHERE user_id = ?
+      LIMIT 1
+      `,
+      [userId],
+    );
+    return this.normalizePrivacy(rows[0]);
+  }
+
+  async updatePrivacySettings(userId: string, body: any): Promise<any> {
+    await this.ensurePrivacySchema();
+    await this.ensurePrivacyRow(userId);
+
+    const updates: Record<string, any> = {};
+    if (body.pushEnabled !== undefined) {
+      updates.push_enabled = this.toBoolean(body.pushEnabled);
+    }
+    if (body.publicProfile !== undefined) {
+      updates.public_profile = this.toBoolean(body.publicProfile);
+    }
+    if (body.profileVisibility !== undefined) {
+      updates.public_profile = body.profileVisibility !== "private";
+    }
+    if (body.publicLocation !== undefined) {
+      updates.public_location = this.toBoolean(body.publicLocation);
+    }
+    if (body.showLocation !== undefined) {
+      updates.public_location = this.toBoolean(body.showLocation);
+    }
+    if (body.mapVisibilityEnabled !== undefined) {
+      updates.map_visibility_enabled = this.toBoolean(body.mapVisibilityEnabled);
+      if (updates.map_visibility_enabled && body.publicLocation === undefined) {
+        updates.public_location = true;
+      }
+    }
+    if (body.discoverRadiusMi !== undefined) {
+      const radius = Number(body.discoverRadiusMi);
+      if (Number.isFinite(radius)) {
+        updates.discover_radius_mi = Math.min(Math.max(radius, 1), 100);
+      }
+    }
+    if (body.discoverMode !== undefined) {
+      const mode = String(body.discoverMode);
+      updates.discover_mode = ["open", "friends", "private"].includes(mode)
+        ? mode
+        : "open";
+    }
+
+    if (Object.keys(updates).length > 0) {
+      const isPostgres = !!process.env.DATABASE_URL;
+      const values: any[] = [];
+      const sets = Object.entries(updates).map(([column, value], index) => {
+        values.push(value);
+        return isPostgres ? `${column} = $${index + 1}` : `${column} = ?`;
+      });
+      values.push(userId);
+      const userParam = isPostgres ? `$${values.length}` : "?";
+      await this.dataSource.query(
+        `
+        UPDATE user_privacy
+        SET ${sets.join(", ")}, updated_at = ${isPostgres ? "NOW()" : "CURRENT_TIMESTAMP"}
+        WHERE user_id = ${userParam}
+        `,
+        values,
+      );
+    }
+
+    return this.getPrivacySettings(userId);
   }
 
   async setRating(id: string, rating: number): Promise<void> {
@@ -1138,5 +1260,126 @@ export class UsersService {
     }
 
     return result;
+  }
+
+  private async ensurePrivacySchema() {
+    if (this.privacySchemaReady) return;
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      await this.dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_config JSONB DEFAULT '{}'::jsonb`);
+      await this.dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS accepting_challenges BOOLEAN DEFAULT TRUE`);
+      await this.dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS loc_enabled BOOLEAN DEFAULT FALSE`);
+      await this.dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`);
+      await this.dataSource.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION`);
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS user_privacy (
+          user_id VARCHAR(255) PRIMARY KEY,
+          push_enabled BOOLEAN DEFAULT TRUE,
+          public_profile BOOLEAN DEFAULT TRUE,
+          public_location BOOLEAN DEFAULT FALSE,
+          map_visibility_enabled BOOLEAN DEFAULT FALSE,
+          discover_radius_mi NUMERIC(5,1) DEFAULT 25.0,
+          discover_mode TEXT DEFAULT 'open',
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS map_visibility_enabled BOOLEAN DEFAULT FALSE`);
+      await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS discover_radius_mi NUMERIC(5,1) DEFAULT 25.0`);
+      await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS discover_mode TEXT DEFAULT 'open'`);
+      await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+      this.privacySchemaReady = true;
+      return;
+    }
+
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS user_privacy (
+        user_id TEXT PRIMARY KEY,
+        push_enabled INTEGER DEFAULT 1,
+        public_profile INTEGER DEFAULT 1,
+        public_location INTEGER DEFAULT 0,
+        map_visibility_enabled INTEGER DEFAULT 0,
+        discover_radius_mi REAL DEFAULT 25.0,
+        discover_mode TEXT DEFAULT 'open',
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await this.safeSqliteAlter(`ALTER TABLE users ADD COLUMN avatar_config TEXT`);
+    await this.safeSqliteAlter(`ALTER TABLE users ADD COLUMN accepting_challenges INTEGER DEFAULT 1`);
+    await this.safeSqliteAlter(`ALTER TABLE users ADD COLUMN loc_enabled INTEGER DEFAULT 0`);
+    await this.safeSqliteAlter(`ALTER TABLE users ADD COLUMN lat REAL`);
+    await this.safeSqliteAlter(`ALTER TABLE users ADD COLUMN lng REAL`);
+    this.privacySchemaReady = true;
+  }
+
+  private async ensurePrivacyRow(userId: string) {
+    const isPostgres = !!process.env.DATABASE_URL;
+    if (isPostgres) {
+      await this.dataSource.query(
+        `INSERT INTO user_privacy (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`,
+        [userId],
+      );
+      return;
+    }
+
+    await this.dataSource.query(
+      `INSERT OR IGNORE INTO user_privacy (user_id) VALUES (?)`,
+      [userId],
+    );
+  }
+
+  private normalizePrivacy(row: any) {
+    const defaults = {
+      pushEnabled: true,
+      publicProfile: true,
+      publicLocation: false,
+      mapVisibilityEnabled: false,
+      discoverRadiusMi: 25.0,
+      discoverMode: "open",
+    };
+    if (!row) return defaults;
+
+    return {
+      pushEnabled: this.toBoolean(
+        row.pushEnabled ?? row.push_enabled,
+        defaults.pushEnabled,
+      ),
+      publicProfile: this.toBoolean(
+        row.publicProfile ?? row.public_profile,
+        defaults.publicProfile,
+      ),
+      publicLocation: this.toBoolean(
+        row.publicLocation ?? row.public_location,
+        defaults.publicLocation,
+      ),
+      mapVisibilityEnabled: this.toBoolean(
+        row.mapVisibilityEnabled ?? row.map_visibility_enabled,
+        defaults.mapVisibilityEnabled,
+      ),
+      discoverRadiusMi:
+        Number(row.discoverRadiusMi ?? row.discover_radius_mi) ||
+        defaults.discoverRadiusMi,
+      discoverMode:
+        row.discoverMode ?? row.discover_mode ?? defaults.discoverMode,
+      updatedAt: row.updatedAt ?? row.updated_at,
+    };
+  }
+
+  private toBoolean(value: any, fallback = false): boolean {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+      return ["true", "1", "yes", "public"].includes(value.toLowerCase());
+    }
+    return fallback;
+  }
+
+  private async safeSqliteAlter(sql: string) {
+    try {
+      await this.dataSource.query(sql);
+    } catch (_) {
+      // SQLite has no ADD COLUMN IF NOT EXISTS; duplicate-column errors are safe here.
+    }
   }
 }

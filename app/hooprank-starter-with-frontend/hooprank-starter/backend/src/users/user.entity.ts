@@ -38,6 +38,9 @@ export class User {
   @Column({ name: "avatar_url", type: "text", nullable: true })
   avatarUrl: string;
 
+  @Column({ name: "avatar_config", type: "simple-json", nullable: true })
+  avatarConfig: Record<string, any>;
+
   @Column({
     name: "hoop_rank",
     type: "numeric",
@@ -59,6 +62,14 @@ export class User {
 
   @Column({ type: "text", nullable: true })
   position: string;
+
+  @Column({
+    name: "accepting_challenges",
+    type: "boolean",
+    nullable: true,
+    default: true,
+  })
+  acceptingChallenges: boolean;
 
   @Column({ type: "text", nullable: true })
   height: string;
