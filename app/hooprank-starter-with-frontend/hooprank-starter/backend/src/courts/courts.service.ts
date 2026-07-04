@@ -15,6 +15,34 @@ const COURT_IMAGE_SEEDS = [
     sourceLabel: "Bay Club official image",
   },
   {
+    id: "6b1b9162-842e-cb1d-23cc-577999cc3c15",
+    imageUrl:
+      "https://catholiccharitiessf.org/wp-content/uploads/elementor/thumbs/st-vincents-1-1-q3066x730ugy9jeti3zviomlx7a8rq336guafdvoug.jpg",
+    sourceUrl: "https://catholiccharitiessf.org/st-vincents-school-for-boys/",
+    sourceLabel: "Catholic Charities official image",
+  },
+  {
+    id: "88f85c04-8e09-3217-1818-6adc818c784b",
+    imageUrl:
+      "https://www.ci.gladstone.or.us/sites/g/files/vyhlif13701/files/media/publicworks/image/17061/08_25_17_senior_center.jpg",
+    sourceUrl: "https://www.ci.gladstone.or.us/publicworks/page/city-facilities",
+    sourceLabel: "City of Gladstone official venue image",
+  },
+  {
+    id: "9c3e1ca0-6200-281b-5f44-45b774f7b6f1",
+    imageUrl:
+      "https://bbk12e1-cdn.myschoolcdn.com/612/photo/2015/11/orig_photo319598_3280620.png?w=1920",
+    sourceUrl: "https://www.marincatholic.org/about/our-facilities",
+    sourceLabel: "Marin Catholic official gym image",
+  },
+  {
+    id: "9d0e8a13-fd3c-39b5-e765-82e765c7a3fd",
+    imageUrl:
+      "https://www.bayclubs.com/bc-cdn/w_800/https://cdn.prod.website-files.com/6881e0680b14937cf2a11855/6889f2e1a67beafa5961dca2_Marin_Basketball_3.jpg",
+    sourceUrl: "https://www.bayclubs.com/clubs/marin",
+    sourceLabel: "Bay Club Marin official basketball image",
+  },
+  {
     id: "b638a8a8-1df2-ec14-a864-6d4d3986e84b",
     imageUrl:
       "https://www.usfca.edu/sites/default/files/styles/3_4_960x1280/public/2025-12/Koret%20Basketball.jpg.jpeg?h=af525af9&itok=YuqiphiX",
@@ -22,11 +50,38 @@ const COURT_IMAGE_SEEDS = [
     sourceLabel: "USF Koret official image",
   },
   {
+    id: "cb4b8982-4f42-8c11-01f6-f46401069022",
+    imageUrl:
+      "https://www.bellevueclub.com/wp-content/uploads/2019/12/Recreation_basketball.jpg",
+    sourceUrl: "https://www.bellevueclub.com/move/recreation/",
+    sourceLabel: "Bellevue Club official basketball image",
+  },
+  {
+    id: "d6f0a3f1-8bed-13fa-5d3f-a12dc704cff0",
+    imageUrl:
+      "https://d2rzw8waxoxhv2.cloudfront.net/facilities/medium/2eda1609585525a9632a/1512329870699-690-66.jpg",
+    sourceUrl: "https://facilities.facilitron.com/5970cb8207238f0020f56f2b",
+    sourceLabel: "Hamilton gym facility image",
+  },
+  {
     id: "e72bb902-08f6-4dc0-acc3-fa85a6aa1b10",
     imageUrl:
       "https://www.olyclub.com/wp-content/uploads/2025/12/CC-4-scaled-e1764871526289-1024x685.jpg",
     sourceUrl: "https://www.olyclub.com/public-homepage/guest-info/",
     sourceLabel: "Olympic Club official image",
+  },
+  {
+    id: "ed6afa5f-f077-4868-9e50-8c71b3d703cf",
+    imageUrl: "https://www.instagram.com/p/DYbA2F9GSud/media/?size=l",
+    sourceUrl: "https://www.instagram.com/p/DYbA2F9GSud/",
+    sourceLabel: "Novato Parks open-gym image",
+  },
+  {
+    id: "f65ce342-6b75-7faa-7205-47ea5cc0ba43",
+    imageUrl:
+      "https://d2rzw8waxoxhv2.cloudfront.net/imagine/medium/mcms94903/1706148769819-834-33.jpg",
+    sourceUrl: "https://facilities.facilitron.com/65a97676438e4ad58f9926ea",
+    sourceLabel: "Miller Creek facility image",
   },
   {
     id: "fc74ef72-1ad1-0c4d-b7cc-019c010f1e68",
