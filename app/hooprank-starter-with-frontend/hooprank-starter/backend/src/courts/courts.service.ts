@@ -1,87 +1,154 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { Court } from './court.entity';
-import { MatchesService } from '../matches/matches.service';
-import { UsersService } from '../users/users.service';
-import { DbDialect } from '../common/db-utils';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
+import { Court } from "./court.entity";
+import { MatchesService } from "../matches/matches.service";
+import { UsersService } from "../users/users.service";
+import { DbDialect } from "../common/db-utils";
+
+const COURT_IMAGE_SEEDS = [
+  {
+    id: "39bbaf2e-7393-d1d4-e7b8-f90d1e53fadc",
+    imageUrl:
+      "https://www.bayclubs.com/bc-cdn/w_800/https%3A//cdn.prod.website-files.com/6881e0680b14937cf2a11855/68877a507f22eea742600ad5_BC_Hero_SanFrancisco-300x188.jpg",
+    sourceUrl: "https://www.bayclubs.com/amenity/basketball",
+    sourceLabel: "Bay Club official image",
+  },
+  {
+    id: "b638a8a8-1df2-ec14-a864-6d4d3986e84b",
+    imageUrl:
+      "https://www.usfca.edu/sites/default/files/styles/3_4_960x1280/public/2025-12/Koret%20Basketball.jpg.jpeg?h=af525af9&itok=YuqiphiX",
+    sourceUrl: "https://www.usfca.edu/koret",
+    sourceLabel: "USF Koret official image",
+  },
+  {
+    id: "e72bb902-08f6-4dc0-acc3-fa85a6aa1b10",
+    imageUrl:
+      "https://www.olyclub.com/wp-content/uploads/2025/12/CC-4-scaled-e1764871526289-1024x685.jpg",
+    sourceUrl: "https://www.olyclub.com/public-homepage/guest-info/",
+    sourceLabel: "Olympic Club official image",
+  },
+  {
+    id: "fc74ef72-1ad1-0c4d-b7cc-019c010f1e68",
+    imageUrl:
+      "https://images.ctfassets.net/drib7o8rcbyf/6wnKeePmucptvirOG8mvb/8923cb89403b898d5bb45374d46b6e7e/Equinox_ClubPage_Spaces_DT_ESCSanFran_3200x2133_____7.jpg",
+    sourceUrl:
+      "https://www.equinox.com/clubs/northern-california/sportsclubsanfrancisco",
+    sourceLabel: "Equinox official image",
+  },
+];
 
 @Injectable()
 export class CourtsService implements OnModuleInit {
-    private dialect: DbDialect;
+  private dialect: DbDialect;
 
-    constructor(
-        @InjectRepository(Court)
-        private courtsRepository: Repository<Court>,
-        private readonly matchesService: MatchesService,
-        private readonly usersService: UsersService,
-        private dataSource: DataSource,
-    ) {
-        this.dialect = new DbDialect(dataSource);
+  constructor(
+    @InjectRepository(Court)
+    private courtsRepository: Repository<Court>,
+    private readonly matchesService: MatchesService,
+    private readonly usersService: UsersService,
+    private dataSource: DataSource,
+  ) {
+    this.dialect = new DbDialect(dataSource);
+  }
+
+  async onModuleInit() {
+    // Auto-create venue_type and address columns if missing (production has synchronize: false)
+    if (this.dialect.isPostgres) {
+      try {
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS venue_type TEXT`,
+        );
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS address TEXT`,
+        );
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_url TEXT`,
+        );
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_source_url TEXT`,
+        );
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_source_label TEXT`,
+        );
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_updated_at TIMESTAMP`,
+        );
+        await this.seedCourtImages();
+      } catch (e) {
+        console.error("[CourtsService] Failed to add columns:", e.message);
+      }
     }
+  }
 
-    async onModuleInit() {
-        // Auto-create venue_type and address columns if missing (production has synchronize: false)
-        if (this.dialect.isPostgres) {
-            try {
-                await this.dataSource.query(`ALTER TABLE courts ADD COLUMN IF NOT EXISTS venue_type TEXT`);
-                await this.dataSource.query(`ALTER TABLE courts ADD COLUMN IF NOT EXISTS address TEXT`);
-            } catch (e) {
-                console.error('[CourtsService] Failed to add columns:', e.message);
-            }
-        }
-    }
+  // Note: Courts are seeded via scripts/seed-courts.ts
+  // Run: npx ts-node scripts/seed-courts.ts
+  // For production: DATABASE_URL="..." npx ts-node scripts/seed-courts.ts
 
-    // Note: Courts are seeded via scripts/seed-courts.ts
-    // Run: npx ts-node scripts/seed-courts.ts
-    // For production: DATABASE_URL="..." npx ts-node scripts/seed-courts.ts
-
-    async findAll(): Promise<Court[]> {
-        // Use raw query to extract lat/lng from PostGIS geog column for production
-        if (this.dialect.isPostgres) {
-            const courts = await this.dataSource.query(`
+  async findAll(): Promise<Court[]> {
+    // Use raw query to extract lat/lng from PostGIS geog column for production
+    if (this.dialect.isPostgres) {
+      const courts = await this.dataSource.query(`
                 SELECT 
                     id, name, city, indoor, rims, source, signature, access, venue_type, address,
+                    image_url as "imageUrl",
+                    image_source_url as "imageSourceUrl",
+                    image_source_label as "imageSourceLabel",
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng
                 FROM courts
                 ORDER BY name ASC
             `);
-            return courts;
-        }
-
-        // SQLite fallback for local development
-        const courts = await this.courtsRepository.find({
-            order: { name: 'ASC' }
-        });
-        return courts;
+      return courts;
     }
 
-    async findById(id: string): Promise<Court | undefined> {
-        if (this.dialect.isPostgres) {
-            const results = await this.dataSource.query(`
+    // SQLite fallback for local development
+    const courts = await this.courtsRepository.find({
+      order: { name: "ASC" },
+    });
+    return courts;
+  }
+
+  async findById(id: string): Promise<Court | undefined> {
+    if (this.dialect.isPostgres) {
+      const results = await this.dataSource.query(
+        `
                 SELECT 
                     id, name, city, indoor, rims, source, signature, access, venue_type, address,
+                    image_url as "imageUrl",
+                    image_source_url as "imageSourceUrl",
+                    image_source_label as "imageSourceLabel",
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng
                 FROM courts
                 WHERE id = $1
-            `, [id]);
-            if (results.length === 0) return undefined;
-            return { ...results[0], king: await this.calculateKing(id) } as any;
-        }
-
-        const court = await this.courtsRepository.findOne({ where: { id } });
-        if (!court) return undefined;
-        return { ...court, king: await this.calculateKing(id) } as any;
+            `,
+        [id],
+      );
+      if (results.length === 0) return undefined;
+      return { ...results[0], king: await this.calculateKing(id) } as any;
     }
 
-    async searchByLocation(minLat: number, maxLat: number, minLng: number, maxLng: number): Promise<Court[]> {
-        if (this.dialect.isPostgres) {
-            // Use PostGIS spatial query for production
-            const courts = await this.dataSource.query(`
+    const court = await this.courtsRepository.findOne({ where: { id } });
+    if (!court) return undefined;
+    return { ...court, king: await this.calculateKing(id) } as any;
+  }
+
+  async searchByLocation(
+    minLat: number,
+    maxLat: number,
+    minLng: number,
+    maxLng: number,
+  ): Promise<Court[]> {
+    if (this.dialect.isPostgres) {
+      // Use PostGIS spatial query for production
+      const courts = await this.dataSource.query(
+        `
                 SELECT 
 	                    id, name, city, indoor, rims, source, signature, access, venue_type, address,
+	                    image_url as "imageUrl",
+	                    image_source_url as "imageSourceUrl",
+	                    image_source_label as "imageSourceLabel",
 	                    ST_Y(geog::geometry) as lat,
 	                    ST_X(geog::geometry) as lng,
 	                    (SELECT COUNT(*) FROM user_followed_courts WHERE court_id = courts.id::text) as follower_count
@@ -89,81 +156,109 @@ export class CourtsService implements OnModuleInit {
 	                WHERE geog && ST_MakeEnvelope($1, $2, $3, $4, 4326)
 	                ORDER BY name ASC
 	                LIMIT 100
-            `, [minLng, minLat, maxLng, maxLat]);
-            return courts;
-        }
-
-
-        // SQLite fallback - use simple bounding box
-        return this.courtsRepository.createQueryBuilder('court')
-            .where('court.lat BETWEEN :latMin AND :latMax', {
-                latMin: minLat,
-                latMax: maxLat
-            })
-            .andWhere('court.lng BETWEEN :lngMin AND :lngMax', {
-                lngMin: minLng,
-                lngMax: maxLng
-            })
-            .orderBy('court.name', 'ASC')
-            .limit(100)
-            .getMany();
+            `,
+        [minLng, minLat, maxLng, maxLat],
+      );
+      return courts;
     }
 
-    private async calculateKing(courtId: string): Promise<string | undefined> {
-        // This logic needs to be updated to use DB queries instead of in-memory filtering
-        // For now, return undefined to avoid breaking
-        return undefined;
+    // SQLite fallback - use simple bounding box
+    return this.courtsRepository
+      .createQueryBuilder("court")
+      .where("court.lat BETWEEN :latMin AND :latMax", {
+        latMin: minLat,
+        latMax: maxLat,
+      })
+      .andWhere("court.lng BETWEEN :lngMin AND :lngMax", {
+        lngMin: minLng,
+        lngMax: maxLng,
+      })
+      .orderBy("court.name", "ASC")
+      .limit(100)
+      .getMany();
+  }
+
+  private async seedCourtImages(): Promise<void> {
+    for (const seed of COURT_IMAGE_SEEDS) {
+      await this.dataSource.query(
+        `
+                UPDATE courts
+                SET
+                    image_url = COALESCE(NULLIF(image_url, ''), $2),
+                    image_source_url = COALESCE(NULLIF(image_source_url, ''), $3),
+                    image_source_label = COALESCE(NULLIF(image_source_label, ''), $4),
+                    image_updated_at = COALESCE(image_updated_at, NOW())
+                WHERE id::text = $1
+            `,
+        [seed.id, seed.imageUrl, seed.sourceUrl, seed.sourceLabel],
+      );
     }
+  }
 
-    // ==================== CHECK-IN METHODS ====================
+  private async calculateKing(courtId: string): Promise<string | undefined> {
+    // This logic needs to be updated to use DB queries instead of in-memory filtering
+    // For now, return undefined to avoid breaking
+    return undefined;
+  }
 
-    async checkIn(userId: string, courtId: string): Promise<any> {
-        const d = this.dialect.reset();
+  // ==================== CHECK-IN METHODS ====================
 
-        // First check-out from any existing check-ins at other courts
-        await this.dataSource.query(`
+  async checkIn(userId: string, courtId: string): Promise<any> {
+    const d = this.dialect.reset();
+
+    // First check-out from any existing check-ins at other courts
+    await this.dataSource.query(
+      `
             UPDATE check_ins 
             SET checked_out_at = ${d.now()} 
-            WHERE ${d.cast('user_id', 'TEXT')} = ${d.param()} AND checked_out_at IS NULL
-        `, [userId]);
+            WHERE ${d.cast("user_id", "TEXT")} = ${d.param()} AND checked_out_at IS NULL
+        `,
+      [userId],
+    );
 
-        // Create new check-in
-        const insertQuery = d.isPostgres
-            ? `INSERT INTO check_ins (user_id, court_id, checked_in_at)
+    // Create new check-in
+    const insertQuery = d.isPostgres
+      ? `INSERT INTO check_ins (user_id, court_id, checked_in_at)
                VALUES ($1, $2, NOW())
                RETURNING id, checked_in_at as "checkedInAt"`
-            : `INSERT INTO check_ins (user_id, court_id, checked_in_at)
+      : `INSERT INTO check_ins (user_id, court_id, checked_in_at)
                VALUES (?, ?, datetime('now'))`;
 
-        const result = await this.dataSource.query(insertQuery, [userId, courtId]);
+    const result = await this.dataSource.query(insertQuery, [userId, courtId]);
 
-        if (!d.isPostgres) {
-            // SQLite doesn't support RETURNING, fetch the inserted record
-            const inserted = await this.dataSource.query(
-                `SELECT id, checked_in_at as "checkedInAt" FROM check_ins 
+    if (!d.isPostgres) {
+      // SQLite doesn't support RETURNING, fetch the inserted record
+      const inserted = await this.dataSource.query(
+        `SELECT id, checked_in_at as "checkedInAt" FROM check_ins 
                  WHERE user_id = ? AND court_id = ? ORDER BY id DESC LIMIT 1`,
-                [userId, courtId]
-            );
-            return inserted[0];
-        }
-
-        return result[0];
+        [userId, courtId],
+      );
+      return inserted[0];
     }
 
-    async checkOut(userId: string, courtId: string): Promise<void> {
-        const d = this.dialect.reset();
-        await this.dataSource.query(`
+    return result[0];
+  }
+
+  async checkOut(userId: string, courtId: string): Promise<void> {
+    const d = this.dialect.reset();
+    await this.dataSource.query(
+      `
             UPDATE check_ins 
             SET checked_out_at = ${d.now()} 
-            WHERE ${d.cast('user_id', 'TEXT')} = ${d.param()} 
-            AND ${d.cast('court_id', 'TEXT')} = ${d.param()} 
+            WHERE ${d.cast("user_id", "TEXT")} = ${d.param()} 
+            AND ${d.cast("court_id", "TEXT")} = ${d.param()} 
             AND checked_out_at IS NULL
-        `, [userId, courtId]);
-    }
+        `,
+      [userId, courtId],
+    );
+  }
 
-    async getCourtActivity(courtId: string, hoursBack: number = 24): Promise<any[]> {
-        const d = this.dialect.reset();
-        const query = `
+  async getCourtActivity(
+    courtId: string,
+    hoursBack: number = 24,
+  ): Promise<any[]> {
+    const d = this.dialect.reset();
+    const query = `
             SELECT 
                 ci.id,
                 ci.user_id as "userId",
@@ -172,18 +267,18 @@ export class CourtsService implements OnModuleInit {
                 ci.checked_in_at as "checkedInAt",
                 ci.checked_out_at as "checkedOutAt"
             FROM check_ins ci
-            LEFT JOIN users u ON ${d.cast('ci.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-            WHERE ${d.cast('ci.court_id', 'TEXT')} = ${d.param()} 
+            LEFT JOIN users u ON ${d.cast("ci.user_id", "TEXT")} = ${d.cast("u.id", "TEXT")}
+            WHERE ${d.cast("ci.court_id", "TEXT")} = ${d.param()} 
               AND ci.checked_in_at > ${d.interval(Math.ceil(hoursBack / 24))}
             ORDER BY ci.checked_in_at DESC
             LIMIT 50
         `;
-        return this.dataSource.query(query, [courtId]);
-    }
+    return this.dataSource.query(query, [courtId]);
+  }
 
-	async getActiveCheckIns(courtId: string): Promise<any[]> {
-		const d = this.dialect.reset();
-		const query = `
+  async getActiveCheckIns(courtId: string): Promise<any[]> {
+    const d = this.dialect.reset();
+    const query = `
             SELECT 
                 ci.id,
                 ci.user_id as "userId",
@@ -191,30 +286,30 @@ export class CourtsService implements OnModuleInit {
                 u.avatar_url as "userPhotoUrl",
                 ci.checked_in_at as "checkedInAt"
             FROM check_ins ci
-            LEFT JOIN users u ON ${d.cast('ci.user_id', 'TEXT')} = ${d.cast('u.id', 'TEXT')}
-            WHERE ${d.cast('ci.court_id', 'TEXT')} = ${d.param()} AND ci.checked_out_at IS NULL
+            LEFT JOIN users u ON ${d.cast("ci.user_id", "TEXT")} = ${d.cast("u.id", "TEXT")}
+            WHERE ${d.cast("ci.court_id", "TEXT")} = ${d.param()} AND ci.checked_out_at IS NULL
             ORDER BY ci.checked_in_at DESC
         `;
-		return this.dataSource.query(query, [courtId]);
-	}
+    return this.dataSource.query(query, [courtId]);
+  }
 
-	// ==================== FOLLOWERS ("Hearts") ====================
+  // ==================== FOLLOWERS ("Hearts") ====================
 
-	/**
-	 * Get users that follow (heart) a court, sorted by global 1v1 rank (best first).
-	 * Rank is computed from users.hoop_rank via a window function so we can return
-	 * a HoopRank # even for users outside the top-100 /rankings endpoint.
-	 */
-	async getCourtFollowers(courtId: string, limit: number = 50): Promise<any[]> {
-		const d = this.dialect.reset();
-		const safeLimit = Math.max(1, Math.min(limit || 50, 200));
+  /**
+   * Get users that follow (heart) a court, sorted by global 1v1 rank (best first).
+   * Rank is computed from users.hoop_rank via a window function so we can return
+   * a HoopRank # even for users outside the top-100 /rankings endpoint.
+   */
+  async getCourtFollowers(courtId: string, limit: number = 50): Promise<any[]> {
+    const d = this.dialect.reset();
+    const safeLimit = Math.max(1, Math.min(limit || 50, 200));
 
-		// SQLite doesn't support "NULLS LAST" but does support window functions.
-		const rankOrder = d.isPostgres
-			? 'hoop_rank DESC NULLS LAST'
-			: '(hoop_rank IS NULL) ASC, hoop_rank DESC';
+    // SQLite doesn't support "NULLS LAST" but does support window functions.
+    const rankOrder = d.isPostgres
+      ? "hoop_rank DESC NULLS LAST"
+      : "(hoop_rank IS NULL) ASC, hoop_rank DESC";
 
-		const query = `
+    const query = `
 			WITH ranked_users AS (
 				SELECT
 					id,
@@ -233,69 +328,76 @@ export class CourtsService implements OnModuleInit {
 				ru."rank"
 			FROM ranked_users ru
 			JOIN user_followed_courts ufc
-				ON ${d.cast('ufc.user_id', 'TEXT')} = ${d.cast('ru.id', 'TEXT')}
-			WHERE ${d.cast('ufc.court_id', 'TEXT')} = ${d.param()}
+				ON ${d.cast("ufc.user_id", "TEXT")} = ${d.cast("ru.id", "TEXT")}
+			WHERE ${d.cast("ufc.court_id", "TEXT")} = ${d.param()}
 			ORDER BY ru."rank" ASC
 			LIMIT ${d.param()}
 		`;
 
-		return this.dataSource.query(query, [courtId, safeLimit]);
-	}
+    return this.dataSource.query(query, [courtId, safeLimit]);
+  }
 
-	// ==================== FOLLOWER COUNTS ====================
+  // ==================== FOLLOWER COUNTS ====================
 
-	async getFollowerCounts(): Promise<{ courtId: string; count: number }[]> {
-		const d = this.dialect.reset();
-		const query = d.isPostgres
-			? `SELECT court_id as "courtId", COUNT(*) as count FROM user_followed_courts GROUP BY court_id`
-			: `SELECT court_id as "courtId", COUNT(*) as count FROM user_followed_courts GROUP BY court_id`;
+  async getFollowerCounts(): Promise<{ courtId: string; count: number }[]> {
+    const d = this.dialect.reset();
+    const query = d.isPostgres
+      ? `SELECT court_id as "courtId", COUNT(*) as count FROM user_followed_courts GROUP BY court_id`
+      : `SELECT court_id as "courtId", COUNT(*) as count FROM user_followed_courts GROUP BY court_id`;
 
-		const results = await this.dataSource.query(query);
-		return results.map((r: any) => ({
-			courtId: r.courtId,
-            count: parseInt(r.count, 10),
-        }));
-    }
+    const results = await this.dataSource.query(query);
+    return results.map((r: any) => ({
+      courtId: r.courtId,
+      count: parseInt(r.count, 10),
+    }));
+  }
 
-    // ==================== COURT STATS ====================
+  // ==================== COURT STATS ====================
 
-    async getCourtStats(courtId: string): Promise<any> {
-        const d = this.dialect.reset();
+  async getCourtStats(courtId: string): Promise<any> {
+    const d = this.dialect.reset();
 
-        const checkInCount = await this.dataSource.query(`
+    const checkInCount = await this.dataSource.query(
+      `
             SELECT COUNT(*) as count FROM check_ins 
-            WHERE ${d.cast('court_id', 'TEXT')} = ${d.param()}
+            WHERE ${d.cast("court_id", "TEXT")} = ${d.param()}
             AND checked_in_at > ${d.interval(30)}
-        `, [courtId]);
+        `,
+      [courtId],
+    );
 
-        const matchCount = await this.dataSource.query(`
+    const matchCount = await this.dataSource.query(
+      `
             SELECT COUNT(*) as count FROM matches 
-            WHERE ${d.cast('court_id', 'TEXT')} = ${d.param()}
-        `, [courtId]);
+            WHERE ${d.cast("court_id", "TEXT")} = ${d.param()}
+        `,
+      [courtId],
+    );
 
-        return {
-            checkInsLast30Days: parseInt(checkInCount[0]?.count || '0', 10),
-            totalMatches: parseInt(matchCount[0]?.count || '0', 10),
-        };
-    }
+    return {
+      checkInsLast30Days: parseInt(checkInCount[0]?.count || "0", 10),
+      totalMatches: parseInt(matchCount[0]?.count || "0", 10),
+    };
+  }
 
-    // ==================== COURT CREATION ====================
+  // ==================== COURT CREATION ====================
 
-    async createCourt(data: {
-        id: string;
-        name: string;
-        city: string;
-        lat: number;
-        lng: number;
-        indoor?: boolean;
-        rims?: number;
-        access?: string;
-        venue_type?: string;
-        address?: string;
-    }): Promise<any> {
-        try {
-            if (this.dialect.isPostgres) {
-                const result = await this.dataSource.query(`
+  async createCourt(data: {
+    id: string;
+    name: string;
+    city: string;
+    lat: number;
+    lng: number;
+    indoor?: boolean;
+    rims?: number;
+    access?: string;
+    venue_type?: string;
+    address?: string;
+  }): Promise<any> {
+    try {
+      if (this.dialect.isPostgres) {
+        const result = await this.dataSource.query(
+          `
                     INSERT INTO courts (id, name, city, indoor, rims, access, venue_type, address, source, geog)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'curated', ST_SetSRID(ST_MakePoint($9, $10), 4326)::geography)
                     ON CONFLICT (id) DO UPDATE SET
@@ -308,20 +410,46 @@ export class CourtsService implements OnModuleInit {
                         geog = EXCLUDED.geog,
                         source = EXCLUDED.source
                     RETURNING id, name, city, access, venue_type, address
-                `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.access ?? 'public', data.venue_type ?? null, data.address ?? null, data.lng, data.lat]);
+                `,
+          [
+            data.id,
+            data.name,
+            data.city,
+            data.indoor ?? false,
+            data.rims ?? 2,
+            data.access ?? "public",
+            data.venue_type ?? null,
+            data.address ?? null,
+            data.lng,
+            data.lat,
+          ],
+        );
 
-                return { success: true, court: result[0] };
-            }
+        return { success: true, court: result[0] };
+      }
 
-            // SQLite fallback
-            await this.dataSource.query(`
+      // SQLite fallback
+      await this.dataSource.query(
+        `
                 INSERT INTO courts (id, name, city, indoor, rims, lat, lng, venue_type, address, source)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user')
-            `, [data.id, data.name, data.city, data.indoor ?? false, data.rims ?? 2, data.lat, data.lng, data.venue_type ?? null, data.address ?? null]);
+            `,
+        [
+          data.id,
+          data.name,
+          data.city,
+          data.indoor ?? false,
+          data.rims ?? 2,
+          data.lat,
+          data.lng,
+          data.venue_type ?? null,
+          data.address ?? null,
+        ],
+      );
 
-            return { success: true, court: data };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
+      return { success: true, court: data };
+    } catch (error) {
+      return { success: false, error: error.message };
     }
+  }
 }
