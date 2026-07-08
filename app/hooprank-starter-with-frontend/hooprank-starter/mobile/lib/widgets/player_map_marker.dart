@@ -25,12 +25,18 @@ class PlayerMapMarker extends StatelessWidget {
   /// current user always shows full detail.
   final bool showDetails;
 
+  /// When false, ALL labels (name pill + status) are hidden — used by the
+  /// map's collision pass when this marker's labels would overlap a
+  /// higher-priority player's. The avatar itself always renders.
+  final bool showLabels;
+
   const PlayerMapMarker({
     super.key,
     required this.player,
     this.onTap,
     this.allowDevelopmentAvatarSprite = false,
     this.showDetails = true,
+    this.showLabels = true,
   });
 
   /// The current user hasn't customized a flat avatar yet: show the neutral
@@ -70,16 +76,17 @@ class PlayerMapMarker extends StatelessWidget {
         child: Stack(
           alignment: Alignment.topCenter,
           children: [
-            Positioned(
-              top: 0,
-              // Current user keeps the rank badge ("ELITE 4.67"); other
-              // players lead with WHO they are: "FirstName · 3.4".
-              child: _RankBadge(
-                rating: player.rating,
-                accent: accent,
-                name: player.isCurrentUser ? null : player.name,
+            if (showLabels || player.isCurrentUser)
+              Positioned(
+                top: 0,
+                // Current user keeps the rank badge ("ELITE 4.67"); other
+                // players lead with WHO they are: "FirstName · 3.4".
+                child: _RankBadge(
+                  rating: player.rating,
+                  accent: accent,
+                  name: player.isCurrentUser ? null : player.name,
+                ),
               ),
-            ),
             Positioned(
               top: figureTop,
               child: flatSvg != null
@@ -112,67 +119,68 @@ class PlayerMapMarker extends StatelessWidget {
                 left: 26,
                 child: _SetupNudgeBadge(),
               ),
-            if (showDetails || player.isCurrentUser)
+            if ((showDetails && showLabels) || player.isCurrentUser)
               Positioned(
                 top: statusTop,
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 160),
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (player.acceptingChallenges) ...[
-                      Icon(
-                        Icons.flash_on_rounded,
-                        size: 13,
-                        color: accent,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
                       ),
-                      const SizedBox(width: 4),
                     ],
-                    if (player.isCurrentUser) ...[
-                      const Text(
-                        'Me',
-                        style: TextStyle(
-                          color: Color(0xFF111827),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (player.acceptingChallenges) ...[
+                        Icon(
+                          Icons.flash_on_rounded,
+                          size: 13,
+                          color: accent,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if (player.isCurrentUser) ...[
+                        const Text(
+                          'Me',
+                          style: TextStyle(
+                            color: Color(0xFF111827),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      Flexible(
+                        child: Text(
+                          player.statusLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: player.isCurrentUser
+                                ? const Color(0xFF15803D)
+                                : player.acceptingChallenges
+                                    ? const Color(0xFFEA580C)
+                                    : player.isNewPlayer
+                                        ? const Color(0xFF15803D)
+                                        : const Color(0xFF374151),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 5),
                     ],
-                    Flexible(
-                      child: Text(
-                        player.statusLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: player.isCurrentUser
-                              ? const Color(0xFF15803D)
-                              : player.acceptingChallenges
-                                  ? const Color(0xFFEA580C)
-                                  : player.isNewPlayer
-                                      ? const Color(0xFF15803D)
-                                      : const Color(0xFF374151),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

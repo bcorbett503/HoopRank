@@ -217,6 +217,79 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     );
   }
 
+  /// Frosted chip styling for the top filter row — matches the floating map
+  /// buttons (frosted white + navy ink; brand orange when a filter is on).
+  BoxDecoration _topChipDecoration({required bool active}) => BoxDecoration(
+        color: active ? const Color(0xFFFF6B35) : const Color(0xF2FFFFFF),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: active ? Colors.white : const Color(0x0F000000),
+          width: active ? 1.5 : 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: active
+                ? const Color(0xFFF0490F).withValues(alpha: 0.35)
+                : Colors.black.withValues(alpha: 0.16),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      );
+
+  Color _topChipInk(bool active) => active ? Colors.white : kMapControlInk;
+
+  /// Collision-aware labels: project every player marker to screen space and
+  /// suppress the labels (name pill + status) of LOWER-priority players whose
+  /// pills would overlap an already-accepted player's. Priority: the current
+  /// user (always wins), then players accepting challenges, then by rating.
+  /// Avatars always render — only the text is dropped. Because all player
+  /// markers share the same box/alignment, only relative offsets matter, so
+  /// this is robust to how flutter_map anchors the marker.
+  Set<String> _computeLabelSuppression(
+    List<MapHubPlayer> others,
+    MapHubPlayer? me,
+    bool statusesVisible,
+  ) {
+    if (!_mapReady || others.isEmpty) return const {};
+    try {
+      final camera = _mapController.camera;
+      List<Rect> rectsFor(double x, double y, {required bool withStatus}) => [
+            // Name/rank pill zone at the marker top.
+            Rect.fromCenter(center: Offset(x, y + 13), width: 150, height: 34),
+            // Status pill zone under the figure.
+            if (withStatus)
+              Rect.fromCenter(
+                  center: Offset(x, y + 182), width: 165, height: 34),
+          ];
+
+      final accepted = <Rect>[];
+      final suppressed = <String>{};
+      if (me != null) {
+        final pt = camera.latLngToScreenPoint(LatLng(me.lat, me.lng));
+        accepted.addAll(rectsFor(pt.x, pt.y, withStatus: true));
+      }
+      final ordered = [...others]..sort((a, b) {
+          if (a.acceptingChallenges != b.acceptingChallenges) {
+            return a.acceptingChallenges ? -1 : 1;
+          }
+          return b.rating.compareTo(a.rating);
+        });
+      for (final p in ordered) {
+        final pt = camera.latLngToScreenPoint(LatLng(p.lat, p.lng));
+        final rects = rectsFor(pt.x, pt.y, withStatus: statusesVisible);
+        if (rects.any((r) => accepted.any((a) => a.overlaps(r)))) {
+          suppressed.add(p.id);
+        } else {
+          accepted.addAll(rects);
+        }
+      }
+      return suppressed;
+    } catch (_) {
+      return const {};
+    }
+  }
+
   /// Whether a court at [lat],[lng] sits under the current-user marker on
   /// screen. Used to hide that court's status bubble so the large "Me" avatar
   /// reads cleanly instead of colliding with nearby "5v5 scheduled" pills.
@@ -1864,6 +1937,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     // Below this zoom the map is at metro scale: drop status bubbles and
     // court labels so only avatars, name pills and pins remain.
     final showMapLabels = _currentZoom >= 11.5;
+    final otherMapPlayers = _mapHubPlayers
+        .where((player) => player.lat != 0 || player.lng != 0)
+        .where((player) => myPlayerId == null || player.id.trim() != myPlayerId)
+        .toList();
+    final suppressedLabelIds = _computeLabelSuppression(
+      otherMapPlayers,
+      currentUserMapPlayer,
+      showMapLabels,
+    );
     final topOverlayOffset =
         widget.showCourtList ? 16.0 : MediaQuery.of(context).padding.top + 10.0;
 
@@ -2005,10 +2087,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
             ),
             if (widget.showPlayers && _hubPlayersVisible)
               MarkerLayer(
-                markers: _mapHubPlayers
-                    .where((player) => player.lat != 0 || player.lng != 0)
-                    .where((player) =>
-                        myPlayerId == null || player.id.trim() != myPlayerId)
+                markers: otherMapPlayers
                     .map(
                       (player) => Marker(
                         point: LatLng(player.lat, player.lng),
@@ -2018,6 +2097,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                         child: PlayerMapMarker(
                           player: player,
                           showDetails: showMapLabels,
+                          showLabels: !suppressedLabelIds.contains(player.id),
                           onTap: () => widget.onPlayerSelected?.call(player),
                         ),
                       ),
@@ -2056,19 +2136,38 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Search bar
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+              // Search bar — frosted pill matching the floating map buttons.
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xF2FFFFFF),
+                  borderRadius: BorderRadius.circular(999),
+                  border:
+                      Border.all(color: const Color(0x0F000000), width: 0.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
                 child: TextField(
                   controller: _searchController,
-                  decoration: const InputDecoration(
+                  style: const TextStyle(
+                    color: kMapControlInk,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  cursorColor: kMapControlInk,
+                  decoration: InputDecoration(
                     hintText: 'Search courts...',
-                    prefixIcon: Icon(Icons.search),
+                    hintStyle: TextStyle(
+                      color: kMapControlInk.withValues(alpha: 0.45),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    prefixIcon: const Icon(Icons.search, color: kMapControlInk),
                     border: InputBorder.none,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
                   ),
                   onChanged: _onSearchChanged,
                 ),
@@ -2155,21 +2254,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                       ],
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _runsFilter != null
-                              ? const Color(0xFFFF5722)
-                              : Colors.grey[800],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        decoration:
+                            _topChipDecoration(active: _runsFilter != null),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.calendar_today,
                               size: 16,
-                              color: _runsFilter != null
-                                  ? Colors.white
-                                  : Colors.grey[400],
+                              color: _topChipInk(_runsFilter != null),
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -2179,10 +2272,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                                       ? 'All Runs'
                                       : 'Find Runs'),
                               style: TextStyle(
-                                color: _runsFilter != null
-                                    ? Colors.white
-                                    : Colors.grey[400],
-                                fontWeight: FontWeight.w600,
+                                color: _topChipInk(_runsFilter != null),
+                                fontWeight: FontWeight.w800,
                                 fontSize: 13,
                               ),
                             ),
@@ -2190,9 +2281,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                             Icon(
                               Icons.arrow_drop_down,
                               size: 16,
-                              color: _runsFilter != null
-                                  ? Colors.white
-                                  : Colors.grey[400],
+                              color: _topChipInk(_runsFilter != null),
                             ),
                             if (_courtsWithRuns.isNotEmpty) ...[
                               const SizedBox(width: 2),
@@ -2200,13 +2289,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 5, vertical: 1),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: _runsFilter != null
+                                      ? Colors.white.withValues(alpha: 0.25)
+                                      : kMapControlInk.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   '${_courtsWithRuns.length}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: _topChipInk(_runsFilter != null),
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -2321,17 +2412,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: _filterIndoor != null
-                                    ? kCourtFilterAccentColor
-                                    : Colors.grey[800],
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: _filterIndoor != null
-                                      ? kCourtFilterAccentBorderColor
-                                      : Colors.white.withValues(alpha: 0.08),
-                                ),
-                              ),
+                              decoration: _topChipDecoration(
+                                  active: _filterIndoor != null),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -2342,10 +2424,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                                             ? 'Outdoor'
                                             : 'All'),
                                     style: TextStyle(
-                                      color: _filterIndoor != null
-                                          ? Colors.white
-                                          : Colors.grey[400],
-                                      fontWeight: FontWeight.w700,
+                                      color: _topChipInk(_filterIndoor != null),
+                                      fontWeight: FontWeight.w800,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -2353,9 +2433,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                                   Icon(
                                     Icons.filter_alt_rounded,
                                     size: 15,
-                                    color: _filterIndoor != null
-                                        ? Colors.white
-                                        : Colors.grey[400],
+                                    color: _topChipInk(_filterIndoor != null),
                                   ),
                                 ],
                               ),
@@ -2496,71 +2574,61 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                                     ),
                                   ),
                                 ],
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 10, horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    color: _followFilterMode !=
-                                            CourtFollowFilterMode.all
-                                        ? kCourtFilterAccentColor
-                                        : Colors.grey[800],
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: _followFilterMode !=
-                                              CourtFollowFilterMode.all
-                                          ? kCourtFilterAccentBorderColor
-                                          : Colors.white
-                                              .withValues(alpha: 0.08),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        _followFilterMode !=
-                                                CourtFollowFilterMode.all
-                                            ? Icons.favorite
-                                            : Icons.favorite_border,
-                                        size: 18,
-                                        color: _followFilterMode !=
-                                                CourtFollowFilterMode.all
-                                            ? Colors.white
-                                            : Colors.grey[400],
-                                      ),
-                                      if (followedCount > 0) ...[
-                                        const SizedBox(width: 4),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 5, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.2),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            '$followedCount',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
+                                child: Builder(builder: (context) {
+                                  final followActive = _followFilterMode !=
+                                      CourtFollowFilterMode.all;
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 10, horizontal: 12),
+                                    decoration: _topChipDecoration(
+                                        active: followActive),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          followActive
+                                              ? Icons.favorite
+                                              : Icons.favorite_border,
+                                          size: 18,
+                                          color: _topChipInk(followActive),
+                                        ),
+                                        if (followedCount > 0) ...[
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: followActive
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.25)
+                                                  : kMapControlInk.withValues(
+                                                      alpha: 0.08),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              '$followedCount',
+                                              style: TextStyle(
+                                                color:
+                                                    _topChipInk(followActive),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
+                                        ],
+                                        const SizedBox(width: 2),
+                                        Icon(
+                                          Icons.filter_alt_rounded,
+                                          size: 15,
+                                          color: _topChipInk(followActive),
                                         ),
                                       ],
-                                      const SizedBox(width: 2),
-                                      Icon(
-                                        Icons.filter_alt_rounded,
-                                        size: 15,
-                                        color: _followFilterMode !=
-                                                CourtFollowFilterMode.all
-                                            ? Colors.white
-                                            : Colors.grey[400],
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
+                                  );
+                                }),
                               );
                             },
                           ),
