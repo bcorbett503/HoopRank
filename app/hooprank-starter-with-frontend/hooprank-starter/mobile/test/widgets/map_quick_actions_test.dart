@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:hooprank/state/app_state.dart';
-import 'package:hooprank/widgets/map_control_buttons.dart';
 import 'package:hooprank/widgets/map_quick_actions.dart';
 
 Widget _harness() {
@@ -22,7 +21,7 @@ Widget _harness() {
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 88, 14),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                 child: RepaintBoundary(
                   key: const ValueKey('qa_capture'),
                   child: Container(
@@ -55,15 +54,10 @@ void main() {
     expect(find.byKey(const ValueKey('quick_action_profile')), findsOneWidget);
     expect(find.byKey(const ValueKey('quick_action_play')), findsOneWidget);
     expect(find.byKey(const ValueKey('quick_action_share')), findsOneWidget);
-    // Quick Play is now a stylized orb with a hand-painted basketball, and
-    // share is a hand-painted glyph — assert the painters, not text/icons.
+    // Quick Play is a stylized orb with a hand-painted basketball; sharing
+    // is the teal "Invite" pill next to the profile circle.
     expect(find.byKey(const ValueKey('quick_play_ball')), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is ShareIconPainter,
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Invite'), findsOneWidget);
 
     // Dump a real PNG so the bar can be eyeballed without a device.
     final dump = Platform.environment['QA_DUMP'];

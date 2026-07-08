@@ -30,35 +30,104 @@ class MapQuickActions extends StatelessWidget {
     final avatarSvg = flatAvatarSvg(user?.avatarConfig);
     final needsSetup = avatarSvg == null;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _ProfileCircle(
-          key: const ValueKey('quick_action_profile'),
-          svg: avatarSvg ?? defaultAvatarSvgForId(user?.id),
-          showNudge: needsSetup,
-          // Setup uses go() (it carries returnTo=/play and returns to the map
-          // on save); the plain profile route must push() so the map stays
-          // underneath and back returns to it.
-          onTap: () => needsSetup
-              ? context.go('/profile/setup?returnTo=/play')
-              : context.push('/profile'),
-        ),
-        QuickPlayOrb(
-          key: const ValueKey('quick_action_play'),
-          // push (not go) keeps the map underneath so back returns to it
-          onTap: () => context.push('/quick-play'),
-        ),
-        FrostedCircleButton(
-          key: const ValueKey('quick_action_share'),
-          tooltip: 'Share HoopRank',
-          onTap: _shareApp,
-          child: const CustomPaint(
-            size: Size(24, 24),
-            painter: ShareIconPainter(),
+    // Profile + Invite cluster on the left; the Quick Play orb sits at the
+    // true center of the bar so it lines up with the Play tab below it.
+    return SizedBox(
+      height: 76,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ProfileCircle(
+                  key: const ValueKey('quick_action_profile'),
+                  svg: avatarSvg ?? defaultAvatarSvgForId(user?.id),
+                  showNudge: needsSetup,
+                  // Setup uses go() (it carries returnTo=/play and returns to
+                  // the map on save); the plain profile route must push() so
+                  // the map stays underneath and back returns to it.
+                  onTap: () => needsSetup
+                      ? context.go('/profile/setup?returnTo=/play')
+                      : context.push('/profile'),
+                ),
+                const SizedBox(width: 6),
+                _InviteButton(
+                  key: const ValueKey('quick_action_share'),
+                  onTap: _shareApp,
+                ),
+              ],
+            ),
+          ),
+          QuickPlayOrb(
+            key: const ValueKey('quick_action_play'),
+            size: 74,
+            // push (not go) keeps the map underneath so back returns to it
+            onTap: () => context.push('/quick-play'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Teal "Invite" pill — shares the app. Mint keeps it distinct from the
+/// frosted circles and the orange hero while staying on brand.
+class _InviteButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _InviteButton({super.key, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1EBEA9),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1EBEA9).withValues(alpha: 0.4),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.person_add_alt_1_rounded,
+                    size: 16, color: Colors.white),
+                SizedBox(width: 5),
+                Text(
+                  'Invite',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

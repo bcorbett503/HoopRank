@@ -34,11 +34,11 @@ class HomeMapHubScreen extends StatelessWidget {
           onPlayerSelected: (player) => _showPlayerDetails(context, player),
           onFeedSelected: () => context.push('/play/feed'),
         ),
-        // Quick actions: profile / Quick Play / share. Right inset keeps the
-        // row clear of the map's zoom & locate FAB column.
+        // Quick actions: profile + Invite on the left, Quick Play centered.
+        // Full width so the orb lines up with the Play tab beneath it.
         const Positioned(
           left: 16,
-          right: 88,
+          right: 16,
           bottom: 14,
           child: MapQuickActions(),
         ),
