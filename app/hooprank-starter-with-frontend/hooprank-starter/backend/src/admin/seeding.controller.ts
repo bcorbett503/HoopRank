@@ -6,7 +6,6 @@
  */
 import { Controller, Post, Get } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { Public } from '../auth/public.decorator';
 import { RunsService } from '../runs/runs.service';
 
 @Controller()
@@ -17,9 +16,9 @@ export class SeedingController {
     ) { }
 
     /**
-     * Trigger the RunsService cron job
+     * Trigger the RunsService cron job. Admin-only: falls through to the
+     * AuthGuard's 'seed' sensitive-prefix enforcement (was mistakenly @Public).
      */
-    @Public()
     @Post('seed/run-cron')
     async triggerCron() {
         try {
@@ -31,9 +30,8 @@ export class SeedingController {
     }
 
     /**
-     * Diagnostic Route to Bypass PG Firewalls
+     * Diagnostic Route to Bypass PG Firewalls. Admin-only (was @Public).
      */
-    @Public()
     @Get('seed/verify')
     async verifyDB() {
         const res = await this.dataSource.query(`

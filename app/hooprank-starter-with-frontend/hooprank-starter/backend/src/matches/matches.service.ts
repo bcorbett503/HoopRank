@@ -106,6 +106,12 @@ export class MatchesService {
         const newCreatorRating = this.rater.updateRating(creatorRating, opponentRating, creatorGames, creatorWon ? 1 : 0);
         const newOpponentRating = this.rater.updateRating(opponentRating, creatorRating, opponentGames, creatorWon ? 0 : 1);
 
+        // Snapshot EXACT pre-match ratings so a contest can restore them
+        // precisely (re-running the Elo formula in reverse is not accurate).
+        await this.dataSource.query(`
+          UPDATE matches SET creator_rating_before = $2, opponent_rating_before = $3
+          WHERE id = $1
+        `, [id, creatorRating, opponentRating]);
 
         // Update users
         await this.dataSource.query(`
@@ -325,17 +331,31 @@ export class MatchesService {
       const opponent = await this.users.get(opponentId);
 
       if (creator && opponent) {
-        const creatorWon = (match as any).winner_id === creatorId;
-        const curCreatorRating = parseFloat((creator as any).hoop_rank) || 3.0;
-        const curOpponentRating = parseFloat((opponent as any).hoop_rank) || 3.0;
-        // games_played was incremented during completion — use current - 1 for
-        // the reverse calculation so the K-factor matches what was applied.
-        const curCreatorGames = Math.max((parseInt((creator as any).games_played) || 1) - 1, 0);
-        const curOpponentGames = Math.max((parseInt((opponent as any).games_played) || 1) - 1, 0);
+        // Restore the EXACT pre-match ratings snapshotted at completion.
+        // (Re-running Elo in reverse used already-changed ratings and drifted.)
+        const snap = (match as any);
+        const snapCreator = snap.creator_rating_before != null
+          ? parseFloat(snap.creator_rating_before) : null;
+        const snapOpponent = snap.opponent_rating_before != null
+          ? parseFloat(snap.opponent_rating_before) : null;
 
-        // Reverse: recalculate what the rating WAS before the match completed
-        const origCreatorRating = this.rater.updateRating(curCreatorRating, curOpponentRating, curCreatorGames, creatorWon ? 0 : 1);
-        const origOpponentRating = this.rater.updateRating(curOpponentRating, curCreatorRating, curOpponentGames, creatorWon ? 1 : 0);
+        let origCreatorRating: number;
+        let origOpponentRating: number;
+        if (snapCreator != null && !isNaN(snapCreator) &&
+            snapOpponent != null && !isNaN(snapOpponent)) {
+          origCreatorRating = snapCreator;
+          origOpponentRating = snapOpponent;
+        } else {
+          // Legacy matches completed before snapshots existed: best-effort
+          // reverse (imperfect, but only affects pre-migration matches).
+          const creatorWon = (match as any).winner_id === creatorId;
+          const curCreatorRating = parseFloat((creator as any).hoop_rank) || 3.0;
+          const curOpponentRating = parseFloat((opponent as any).hoop_rank) || 3.0;
+          const curCreatorGames = Math.max((parseInt((creator as any).games_played) || 1) - 1, 0);
+          const curOpponentGames = Math.max((parseInt((opponent as any).games_played) || 1) - 1, 0);
+          origCreatorRating = this.rater.updateRating(curCreatorRating, curOpponentRating, curCreatorGames, creatorWon ? 0 : 1);
+          origOpponentRating = this.rater.updateRating(curOpponentRating, curCreatorRating, curOpponentGames, creatorWon ? 1 : 0);
+        }
 
         // Restore original ratings and decrement games_played
         await this.dataSource.query(`
@@ -359,7 +379,8 @@ export class MatchesService {
     // --- Reset match state ---
     await this.dataSource.query(`
       UPDATE matches SET status = 'contested', score_creator = NULL, score_opponent = NULL,
-        winner_id = NULL, status_id = NULL, updated_at = NOW()
+        winner_id = NULL, status_id = NULL,
+        creator_rating_before = NULL, opponent_rating_before = NULL, updated_at = NOW()
       WHERE id = $1
     `, [matchId]);
 
@@ -406,9 +427,15 @@ export class MatchesService {
       LEFT JOIN users creator ON m.creator_id = creator.id
       LEFT JOIN users opponent ON m.opponent_id = opponent.id
       WHERE (m.creator_id = $1 OR m.opponent_id = $1)
-        AND m.status = 'score_submitted'
+        -- Instant results complete the match immediately, so the opponent's
+        -- pending confirm/contest surface must look at 'completed' (and the
+        -- legacy 'score_submitted') matches the OTHER player submitted, within
+        -- the contest window. Filtering on 'score_submitted' alone never
+        -- matched, so the banner never appeared.
+        AND m.status IN ('completed', 'score_submitted')
         AND m.score_submitter_id IS NOT NULL
         AND m.score_submitter_id != $1
+        AND m.updated_at > NOW() - INTERVAL '24 hours'
       ORDER BY m.updated_at DESC
     `, [userId]);
 

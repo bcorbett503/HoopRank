@@ -67,6 +67,14 @@ export async function runSchemaEvolution(
     await dataSource.query(
       `ALTER TABLE matches ADD COLUMN IF NOT EXISTS status_id INTEGER`,
     );
+    // Pre-match rating snapshots so a contest can restore EXACT prior ratings.
+    // (Elo-style updates are not reversible by re-running the formula.)
+    await dataSource.query(
+      `ALTER TABLE matches ADD COLUMN IF NOT EXISTS creator_rating_before DECIMAL(4,2)`,
+    );
+    await dataSource.query(
+      `ALTER TABLE matches ADD COLUMN IF NOT EXISTS opponent_rating_before DECIMAL(4,2)`,
+    );
 
     // ============================================
     // TEAMS TABLE MIGRATIONS
@@ -448,6 +456,43 @@ export async function runSchemaEvolution(
             ) AS seed(id, image_url, image_source_url, image_source_label)
             WHERE courts.id::text = seed.id
         `);
+
+    // ============================================
+    // MAP VISIBILITY: opt-out model
+    // ============================================
+    // Activating location should auto-map a player for others to see. Flip the
+    // privacy-row defaults to visible, then backfill existing rows exactly once
+    // (guarded by a marker) so we never re-enable a user who later opts out.
+    await safeQuery(
+      "map-visibility default map_visibility_enabled",
+      `ALTER TABLE user_privacy ALTER COLUMN map_visibility_enabled SET DEFAULT TRUE`,
+    );
+    await safeQuery(
+      "map-visibility default public_location",
+      `ALTER TABLE user_privacy ALTER COLUMN public_location SET DEFAULT TRUE`,
+    );
+    await safeQuery(
+      "schema_migration_flags table",
+      `CREATE TABLE IF NOT EXISTS schema_migration_flags (
+         key TEXT PRIMARY KEY,
+         applied_at TIMESTAMPTZ DEFAULT NOW()
+       )`,
+    );
+    await safeQuery(
+      "map-visibility one-time backfill",
+      `DO $$
+       BEGIN
+         IF NOT EXISTS (
+           SELECT 1 FROM schema_migration_flags
+           WHERE key = 'map_visibility_optout_backfill_v1'
+         ) THEN
+           UPDATE user_privacy
+             SET map_visibility_enabled = TRUE, public_location = TRUE;
+           INSERT INTO schema_migration_flags (key)
+             VALUES ('map_visibility_optout_backfill_v1');
+         END IF;
+       END $$;`,
+    );
 
     console.log("[SchemaEvolution] All migrations completed successfully");
   } catch (error) {

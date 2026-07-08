@@ -7,16 +7,16 @@
  */
 import { Controller, Get, Post, Headers } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { Public } from '../auth/public.decorator';
 
 @Controller()
 export class AdminController {
     constructor(private dataSource: DataSource) { }
 
     /**
-     * Add image_url columns to messages and team_messages tables
+     * Add image_url columns to messages and team_messages tables.
+     * Admin-only: relies on the AuthGuard 'migrate' sensitive-prefix check
+     * (was mistakenly @Public, which bypasses that enforcement entirely).
      */
-    @Public()
     @Post('migrate/message-image-url')
     async migrateMessageImageUrl() {
         try {
@@ -368,9 +368,27 @@ export class AdminController {
     async findDuplicates() {
         try {
             const courts = await this.dataSource.query(`
-                SELECT name, lat, lng, COUNT(*) as cnt, array_agg(id) as ids
+                SELECT
+                    name,
+                    city,
+                    address,
+                    indoor,
+                    access,
+                    venue_type as "venueType",
+                    ST_Y(geog::geometry) as lat,
+                    ST_X(geog::geometry) as lng,
+                    COUNT(*) as cnt,
+                    array_agg(id ORDER BY id) as ids
                 FROM courts
-                GROUP BY name, lat, lng
+                GROUP BY
+                    name,
+                    city,
+                    address,
+                    indoor,
+                    access,
+                    venue_type,
+                    ST_Y(geog::geometry),
+                    ST_X(geog::geometry)
                 HAVING COUNT(*) > 1
                 ORDER BY cnt DESC;
             `);

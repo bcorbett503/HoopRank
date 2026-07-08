@@ -277,8 +277,10 @@ export class UsersService {
         photo_url: "avatar_url",
         avatarConfig: "avatar_config",
         avatar_config: "avatar_config",
-        hoopRank: "hoop_rank",
-        rating: "hoop_rank",
+        // NOTE: hoop_rank (competitive rating) is intentionally NOT user-
+        // writable — it's owned by the match/rating engine. Mapping `rating`/
+        // `hoopRank` here would let any caller set their own leaderboard rating
+        // via a profile update (mass-assignment). Do not re-add.
         position: "position",
         acceptingChallenges: "accepting_challenges",
         accepting_challenges: "accepting_challenges",
@@ -1277,14 +1279,14 @@ export class UsersService {
           user_id VARCHAR(255) PRIMARY KEY,
           push_enabled BOOLEAN DEFAULT TRUE,
           public_profile BOOLEAN DEFAULT TRUE,
-          public_location BOOLEAN DEFAULT FALSE,
-          map_visibility_enabled BOOLEAN DEFAULT FALSE,
+          public_location BOOLEAN DEFAULT TRUE,
+          map_visibility_enabled BOOLEAN DEFAULT TRUE,
           discover_radius_mi NUMERIC(5,1) DEFAULT 25.0,
           discover_mode TEXT DEFAULT 'open',
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
-      await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS map_visibility_enabled BOOLEAN DEFAULT FALSE`);
+      await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS map_visibility_enabled BOOLEAN DEFAULT TRUE`);
       await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS discover_radius_mi NUMERIC(5,1) DEFAULT 25.0`);
       await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS discover_mode TEXT DEFAULT 'open'`);
       await this.dataSource.query(`ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
@@ -1297,8 +1299,8 @@ export class UsersService {
         user_id TEXT PRIMARY KEY,
         push_enabled INTEGER DEFAULT 1,
         public_profile INTEGER DEFAULT 1,
-        public_location INTEGER DEFAULT 0,
-        map_visibility_enabled INTEGER DEFAULT 0,
+        public_location INTEGER DEFAULT 1,
+        map_visibility_enabled INTEGER DEFAULT 1,
         discover_radius_mi REAL DEFAULT 25.0,
         discover_mode TEXT DEFAULT 'open',
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -1315,15 +1317,19 @@ export class UsersService {
   private async ensurePrivacyRow(userId: string) {
     const isPostgres = !!process.env.DATABASE_URL;
     if (isPostgres) {
+      // Opt-out model: new accounts are map-visible by default so that simply
+      // activating location (loc_enabled) auto-maps them for other players.
       await this.dataSource.query(
-        `INSERT INTO user_privacy (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`,
+        `INSERT INTO user_privacy (user_id, map_visibility_enabled, public_location)
+         VALUES ($1, TRUE, TRUE) ON CONFLICT (user_id) DO NOTHING`,
         [userId],
       );
       return;
     }
 
     await this.dataSource.query(
-      `INSERT OR IGNORE INTO user_privacy (user_id) VALUES (?)`,
+      `INSERT OR IGNORE INTO user_privacy (user_id, map_visibility_enabled, public_location)
+       VALUES (?, 1, 1)`,
       [userId],
     );
   }
@@ -1332,8 +1338,8 @@ export class UsersService {
     const defaults = {
       pushEnabled: true,
       publicProfile: true,
-      publicLocation: false,
-      mapVisibilityEnabled: false,
+      publicLocation: true,
+      mapVisibilityEnabled: true,
       discoverRadiusMi: 25.0,
       discoverMode: "open",
     };

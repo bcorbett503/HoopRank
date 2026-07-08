@@ -250,9 +250,9 @@ export class MapHubService implements OnModuleInit {
         LEFT JOIN user_privacy up ON up.user_id = u.id
         WHERE u.id = ?
           OR (
-            COALESCE(up.map_visibility_enabled, 0) = 1
+            COALESCE(up.map_visibility_enabled, 1) = 1
             AND COALESCE(up.public_profile, 1) = 1
-            AND COALESCE(up.public_location, 0) = 1
+            AND COALESCE(up.public_location, 1) = 1
           )
         LIMIT 75
         `,
@@ -275,9 +275,12 @@ export class MapHubService implements OnModuleInit {
       `(
         u.id::text = ${userParam}
         OR (
-          COALESCE(up.map_visibility_enabled, FALSE) = TRUE
+          -- Opt-out model: activating location (loc_enabled below) auto-maps a
+          -- player unless they have EXPLICITLY turned map visibility / public
+          -- location off. NULL (never touched) defaults to visible.
+          COALESCE(up.map_visibility_enabled, TRUE) = TRUE
           AND COALESCE(up.public_profile, TRUE) = TRUE
-          AND COALESCE(up.public_location, FALSE) = TRUE
+          AND COALESCE(up.public_location, TRUE) = TRUE
         )
       )`,
       `COALESCE(u.loc_enabled, FALSE) = TRUE`,
@@ -493,15 +496,15 @@ export class MapHubService implements OnModuleInit {
           user_id VARCHAR(255) PRIMARY KEY,
           push_enabled BOOLEAN DEFAULT TRUE,
           public_profile BOOLEAN DEFAULT TRUE,
-          public_location BOOLEAN DEFAULT FALSE,
-          map_visibility_enabled BOOLEAN DEFAULT FALSE,
+          public_location BOOLEAN DEFAULT TRUE,
+          map_visibility_enabled BOOLEAN DEFAULT TRUE,
           discover_radius_mi NUMERIC(5,1) DEFAULT 25.0,
           discover_mode TEXT DEFAULT 'open',
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
       await this.dataSource.query(
-        `ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS map_visibility_enabled BOOLEAN DEFAULT FALSE`,
+        `ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS map_visibility_enabled BOOLEAN DEFAULT TRUE`,
       );
       await this.dataSource.query(
         `ALTER TABLE user_privacy ADD COLUMN IF NOT EXISTS discover_radius_mi NUMERIC(5,1) DEFAULT 25.0`,
@@ -526,8 +529,8 @@ export class MapHubService implements OnModuleInit {
       user_id TEXT PRIMARY KEY,
       push_enabled INTEGER DEFAULT 1,
       public_profile INTEGER DEFAULT 1,
-      public_location INTEGER DEFAULT 0,
-      map_visibility_enabled INTEGER DEFAULT 0,
+      public_location INTEGER DEFAULT 1,
+      map_visibility_enabled INTEGER DEFAULT 1,
       discover_radius_mi REAL DEFAULT 25.0,
       discover_mode TEXT DEFAULT 'open',
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -549,10 +552,12 @@ export class MapHubService implements OnModuleInit {
   private async ensurePrivacyRow(userId: string) {
     await this.ensureMapHubSchema();
     if (this.postgres) {
+      // Opt-out model: default new rows to map-visible so activating location
+      // auto-maps the player (see users.service.ensurePrivacyRow).
       await this.dataSource.query(
         `
-        INSERT INTO user_privacy (user_id)
-        VALUES ($1)
+        INSERT INTO user_privacy (user_id, map_visibility_enabled, public_location)
+        VALUES ($1, TRUE, TRUE)
         ON CONFLICT (user_id) DO NOTHING
         `,
         [userId],
@@ -560,7 +565,7 @@ export class MapHubService implements OnModuleInit {
       return;
     }
     await this.dataSource.query(
-      `INSERT OR IGNORE INTO user_privacy (user_id) VALUES (?)`,
+      `INSERT OR IGNORE INTO user_privacy (user_id, map_visibility_enabled, public_location) VALUES (?, 1, 1)`,
       [userId],
     );
   }
