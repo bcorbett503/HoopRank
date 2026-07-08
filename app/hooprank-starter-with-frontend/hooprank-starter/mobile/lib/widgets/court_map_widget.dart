@@ -1861,6 +1861,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     // GPS-derived marker id, which is null until location resolves) so they
     // never render twice — the backend map hub includes them in the list.
     final myPlayerId = authState.currentUser?.id.trim();
+    // Below this zoom the map is at metro scale: drop status bubbles and
+    // court labels so only avatars, name pills and pins remain.
+    final showMapLabels = _currentZoom >= 11.5;
     final topOverlayOffset =
         widget.showCourtList ? 16.0 : MediaQuery.of(context).padding.top + 10.0;
 
@@ -1939,13 +1942,14 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                 final hasCheckIns = checkInState.hasCheckIns(court.id);
                 final rawStatusLabel = _courtStatusLabel(court, checkInState);
                 final statusColor = _courtStatusColor(court, checkInState);
-                // Declutter under the "Me" marker: hide this court's labels
-                // (status bubble + top-follower name) so the avatar doesn't
-                // collide with "5v5 scheduled" pills. The pin stays, so the
-                // court is still visible/tappable.
+                // Declutter: hide this court's labels (status bubble +
+                // top-follower name) when it sits under the "Me" marker OR
+                // when zoomed out past the label threshold — at metro scale
+                // the pills pile up into noise. The pin stays tappable.
                 final overlapsMe = _courtStatusOverlapsUser(
                     court.lat, court.lng, currentUserMapPlayer);
-                final statusLabel = overlapsMe ? null : rawStatusLabel;
+                final statusLabel =
+                    (overlapsMe || !showMapLabels) ? null : rawStatusLabel;
 
                 // Determine marker size - slightly larger for the pin design
                 double markerSize;
@@ -1991,7 +1995,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                         (_mapHubCourtsById[court.id]?.court.hasUpcomingRun ??
                             false) ||
                         court.hasUpcomingRun,
-                    topFollower: overlapsMe ? null : topFollower,
+                    topFollower:
+                        (overlapsMe || !showMapLabels) ? null : topFollower,
                     statusLabel: statusLabel,
                     statusColor: statusColor,
                   ),
@@ -2012,6 +2017,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                         alignment: Alignment.topCenter,
                         child: PlayerMapMarker(
                           player: player,
+                          showDetails: showMapLabels,
                           onTap: () => widget.onPlayerSelected?.call(player),
                         ),
                       ),

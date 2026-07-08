@@ -50,7 +50,8 @@ void main() {
     );
 
     expect(find.text('Accepting challenges'), findsOneWidget);
-    expect(find.text('ELITE 4.60'), findsOneWidget);
+    // Other players lead with identity: "FirstName · rating".
+    expect(find.text('Maya · 4.6'), findsOneWidget);
     expect(find.byIcon(Icons.flash_on_rounded), findsOneWidget);
   });
 
@@ -195,7 +196,7 @@ void main() {
         tester.widget<HoopRankAvatarImage>(find.byType(HoopRankAvatarImage));
     expect(avatarImage.fallback, isNot(isA<Stack>()));
     expect(_avatarGameMeshPainterFinder(), findsNothing);
-    expect(find.text('PRO 4.20'), findsOneWidget);
+    expect(find.text('Maya · 4.2'), findsOneWidget);
     expect(find.text('Locked in'), findsOneWidget);
   });
 

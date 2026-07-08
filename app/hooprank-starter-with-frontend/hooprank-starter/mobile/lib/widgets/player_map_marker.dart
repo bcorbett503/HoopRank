@@ -20,11 +20,17 @@ class PlayerMapMarker extends StatelessWidget {
   final VoidCallback? onTap;
   final bool allowDevelopmentAvatarSprite;
 
+  /// When false (zoomed out), other players show only their avatar + name
+  /// pill — the status bubble is hidden to keep a dense map readable. The
+  /// current user always shows full detail.
+  final bool showDetails;
+
   const PlayerMapMarker({
     super.key,
     required this.player,
     this.onTap,
     this.allowDevelopmentAvatarSprite = false,
+    this.showDetails = true,
   });
 
   /// The current user hasn't customized a flat avatar yet: show the neutral
@@ -66,9 +72,12 @@ class PlayerMapMarker extends StatelessWidget {
           children: [
             Positioned(
               top: 0,
+              // Current user keeps the rank badge ("ELITE 4.67"); other
+              // players lead with WHO they are: "FirstName · 3.4".
               child: _RankBadge(
                 rating: player.rating,
                 accent: accent,
+                name: player.isCurrentUser ? null : player.name,
               ),
             ),
             Positioned(
@@ -103,10 +112,11 @@ class PlayerMapMarker extends StatelessWidget {
                 left: 26,
                 child: _SetupNudgeBadge(),
               ),
-            Positioned(
-              top: statusTop,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 160),
+            if (showDetails || player.isCurrentUser)
+              Positioned(
+                top: statusTop,
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 160),
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -257,10 +267,23 @@ class _RankBadge extends StatelessWidget {
   final double rating;
   final Color accent;
 
+  /// When set, the badge reads "FirstName · 3.4" instead of the rank label —
+  /// used for OTHER players, where identity beats rank tier on a busy map.
+  final String? name;
+
   const _RankBadge({
     required this.rating,
     required this.accent,
+    this.name,
   });
+
+  String get _label {
+    final first = name?.trim().split(RegExp(r'\s+')).first ?? '';
+    if (first.isNotEmpty) {
+      return '$first · ${rating.toStringAsFixed(1)}';
+    }
+    return '${_rankLabel(rating).toUpperCase()} ${rating.toStringAsFixed(2)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -290,7 +313,7 @@ class _RankBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Flexible(
             child: Text(
-              '${_rankLabel(rating).toUpperCase()} ${rating.toStringAsFixed(2)}',
+              _label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
