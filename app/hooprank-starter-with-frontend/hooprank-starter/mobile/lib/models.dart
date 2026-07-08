@@ -58,6 +58,11 @@ class User {
   final double contestRate;
   final int? age;
   final List<String> badges;
+  final Map<String, dynamic>? avatarConfig;
+  final bool acceptingChallenges;
+  final bool locEnabled;
+  final double? lat;
+  final double? lng;
 
   User({
     required this.id,
@@ -77,12 +82,17 @@ class User {
     this.contestRate = 0.0,
     this.age,
     this.badges = const [],
+    this.avatarConfig,
+    this.acceptingChallenges = true,
+    this.locEnabled = false,
+    this.lat,
+    this.lng,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
     final id = json['id']?.toString() ?? '';
     if (id.isEmpty) {
-      throw FormatException('User id cannot be null or empty');
+      throw const FormatException('User id cannot be null or empty');
     }
 
     final gamesPlayed = _parseInt(json['gamesPlayed'] ?? json['games_played']);
@@ -99,6 +109,7 @@ class User {
     final parsedBadges = rawBadges is List
         ? rawBadges.map((e) => e.toString()).toList()
         : <String>[];
+    final rawAvatarConfig = json['avatarConfig'] ?? json['avatar_config'];
 
     debugPrint(
         'USER.fromJson: id=$id, json[position]=${json['position']}, parsed position=$position');
@@ -137,6 +148,22 @@ class User {
       contestRate: contestRate,
       age: json['age'] != null ? _parseInt(json['age']) : null,
       badges: parsedBadges,
+      avatarConfig: rawAvatarConfig is Map
+          ? Map<String, dynamic>.from(rawAvatarConfig)
+          : null,
+      acceptingChallenges: json['acceptingChallenges'] == null &&
+              json['accepting_challenges'] == null
+          ? true
+          : json['acceptingChallenges'] == true ||
+              json['accepting_challenges'] == true ||
+              json['acceptingChallenges'] == 1 ||
+              json['accepting_challenges'] == 1,
+      locEnabled: json['locEnabled'] == true ||
+          json['loc_enabled'] == true ||
+          json['locEnabled'] == 1 ||
+          json['loc_enabled'] == 1,
+      lat: json['lat'] == null ? null : _parseDouble(json['lat']),
+      lng: json['lng'] == null ? null : _parseDouble(json['lng']),
     );
   }
 
@@ -312,6 +339,54 @@ class CheckedInPlayer {
   }
 }
 
+/// Top-ranked follower at a court, used as the map's featured "king" avatar.
+class CourtTopFollower {
+  final String id;
+  final String name;
+  final String? photoUrl;
+  final double rating;
+
+  const CourtTopFollower({
+    required this.id,
+    required this.name,
+    this.photoUrl,
+    this.rating = 0.0,
+  });
+
+  factory CourtTopFollower.fromJson(Map<String, dynamic> json) {
+    return CourtTopFollower(
+      id: _firstNonEmptyString([
+            json['id'],
+            json['userId'],
+            json['topFollowerId'],
+            json['top_follower_id'],
+          ]) ??
+          '',
+      name: _firstNonEmptyString([
+            json['name'],
+            json['userName'],
+            json['topFollowerName'],
+            json['top_follower_name'],
+          ]) ??
+          'Unknown',
+      photoUrl: _firstNonEmptyString([
+        json['photoUrl'],
+        json['photo_url'],
+        json['avatarUrl'],
+        json['avatar_url'],
+        json['topFollowerPhotoUrl'],
+        json['top_follower_photo_url'],
+      ]),
+      rating: _parseDouble(
+        json['rating'] ??
+            json['hoop_rank'] ??
+            json['topFollowerRating'] ??
+            json['top_follower_rating'],
+      ),
+    );
+  }
+}
+
 /// Basketball court location with Kings for each game mode
 class Court {
   final String id;
@@ -324,6 +399,9 @@ class Court {
   final String access; // 'public', 'members', or 'paid'
   final String?
       venueType; // 'school', 'college', 'rec_center', 'gym', 'outdoor', 'other'
+  final String? imageUrl; // Hero image for court cards/details
+  final String? imageSourceUrl; // Attribution/source page for the hero image
+  final String? imageSourceLabel; // Human label for the image source
   final int? followerCount; // Number of users following this court
   // King of the Court for each mode (name, rating, and user ID for challenges)
   final String? king1v1;
@@ -335,6 +413,9 @@ class Court {
   final String? king5v5;
   final String? king5v5Id;
   final double? king5v5Rating;
+  final CourtTopFollower? topFollower;
+  final bool hasUpcomingRun;
+  final bool hasUpcomingActivity;
 
   Court({
     required this.id,
@@ -346,6 +427,9 @@ class Court {
     this.isIndoor = false,
     this.access = 'public',
     this.venueType,
+    this.imageUrl,
+    this.imageSourceUrl,
+    this.imageSourceLabel,
     this.followerCount = 0,
     this.king1v1,
     this.king1v1Id,
@@ -356,6 +440,9 @@ class Court {
     this.king5v5,
     this.king5v5Id,
     this.king5v5Rating,
+    this.topFollower,
+    this.hasUpcomingRun = false,
+    this.hasUpcomingActivity = false,
   });
 
   /// Legacy getter for backwards compatibility
@@ -363,6 +450,9 @@ class Court {
 
   /// Check if court has any Kings
   bool get hasKings => king1v1 != null || king3v3 != null || king5v5 != null;
+
+  /// Ranked follower shown as the featured map avatar.
+  bool get hasTopFollower => topFollower != null;
 
   /// Copy with method to update king data from API
   Court copyWithKings({
@@ -376,6 +466,12 @@ class Court {
     String? king5v5Id,
     double? king5v5Rating,
     int? followerCount,
+    String? imageUrl,
+    String? imageSourceUrl,
+    String? imageSourceLabel,
+    CourtTopFollower? topFollower,
+    bool? hasUpcomingRun,
+    bool? hasUpcomingActivity,
   }) {
     return Court(
       id: id,
@@ -387,6 +483,9 @@ class Court {
       isIndoor: isIndoor,
       access: access,
       venueType: venueType,
+      imageUrl: imageUrl ?? this.imageUrl,
+      imageSourceUrl: imageSourceUrl ?? this.imageSourceUrl,
+      imageSourceLabel: imageSourceLabel ?? this.imageSourceLabel,
       followerCount: followerCount ?? this.followerCount,
       king1v1: king1v1 ?? this.king1v1,
       king1v1Id: king1v1Id ?? this.king1v1Id,
@@ -397,21 +496,60 @@ class Court {
       king5v5: king5v5 ?? this.king5v5,
       king5v5Id: king5v5Id ?? this.king5v5Id,
       king5v5Rating: king5v5Rating ?? this.king5v5Rating,
+      topFollower: topFollower ?? this.topFollower,
+      hasUpcomingRun: hasUpcomingRun ?? this.hasUpcomingRun,
+      hasUpcomingActivity: hasUpcomingActivity ?? this.hasUpcomingActivity,
     );
   }
 
   factory Court.fromJson(Map<String, dynamic> json) {
+    Map<String, dynamic>? topFollowerJson;
+    final rawTopFollower = json['topFollower'];
+    if (rawTopFollower is Map) {
+      topFollowerJson = Map<String, dynamic>.from(rawTopFollower);
+    } else {
+      final flatTopFollowerId = _firstNonEmptyString(
+          [json['topFollowerId'], json['top_follower_id']]);
+      if (flatTopFollowerId != null) {
+        topFollowerJson = {
+          'id': flatTopFollowerId,
+          'name': json['topFollowerName'] ?? json['top_follower_name'],
+          'photoUrl':
+              json['topFollowerPhotoUrl'] ?? json['top_follower_photo_url'],
+          'rating': json['topFollowerRating'] ?? json['top_follower_rating'],
+        };
+      }
+    }
+
     return Court(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Unknown Court',
       lat: _parseDouble(json['lat']),
       lng: _parseDouble(json['lng']),
-      address: json['address']?.toString(),
+      address: _firstNonEmptyString([json['address'], json['city']]),
       isSignature: json['signature'] == true || json['isSignature'] == true,
       isIndoor: json['indoor'] == true || json['isIndoor'] == true,
       access: json['access']?.toString() ?? 'public',
       venueType:
           json['venue_type']?.toString() ?? json['venueType']?.toString(),
+      imageUrl: _firstNonEmptyString([
+        json['imageUrl'],
+        json['image_url'],
+        json['heroImageUrl'],
+        json['hero_image_url'],
+      ]),
+      imageSourceUrl: _firstNonEmptyString([
+        json['imageSourceUrl'],
+        json['image_source_url'],
+        json['photoSourceUrl'],
+        json['photo_source_url'],
+      ]),
+      imageSourceLabel: _firstNonEmptyString([
+        json['imageSourceLabel'],
+        json['image_source_label'],
+        json['photoSourceLabel'],
+        json['photo_source_label'],
+      ]),
       followerCount: _parseInt(json['follower_count'] ?? json['followerCount']),
       king1v1: json['king1v1']?.toString() ?? json['king']?.toString(),
       king1v1Id: json['king1v1Id']?.toString(),
@@ -428,6 +566,13 @@ class Court {
       king5v5Rating: json['king5v5Rating'] != null
           ? _parseDouble(json['king5v5Rating'])
           : null,
+      topFollower: topFollowerJson == null
+          ? null
+          : CourtTopFollower.fromJson(topFollowerJson),
+      hasUpcomingRun:
+          json['hasUpcomingRun'] == true || json['has_upcoming_run'] == true,
+      hasUpcomingActivity: json['hasUpcomingActivity'] == true ||
+          json['has_upcoming_activity'] == true,
     );
   }
 }
@@ -651,5 +796,475 @@ class ScheduledRun {
               .toList() ??
           [],
     );
+  }
+}
+
+class CalendarCourtInfo {
+  final String? id;
+  final String? name;
+  final String? city;
+  final String? address;
+  final double? lat;
+  final double? lng;
+
+  const CalendarCourtInfo({
+    this.id,
+    this.name,
+    this.city,
+    this.address,
+    this.lat,
+    this.lng,
+  });
+
+  factory CalendarCourtInfo.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const CalendarCourtInfo();
+    }
+
+    return CalendarCourtInfo(
+      id: json['id']?.toString() ?? json['courtId']?.toString(),
+      name: json['name']?.toString() ?? json['courtName']?.toString(),
+      city: json['city']?.toString() ?? json['courtCity']?.toString(),
+      address: _firstNonEmptyString([
+        json['address'],
+        json['courtAddress'],
+        json['city'],
+        json['courtCity'],
+      ]),
+      lat: json['lat'] != null || json['courtLat'] != null
+          ? _parseDouble(json['lat'] ?? json['courtLat'])
+          : null,
+      lng: json['lng'] != null || json['courtLng'] != null
+          ? _parseDouble(json['lng'] ?? json['courtLng'])
+          : null,
+    );
+  }
+}
+
+class CalendarParticipantInfo {
+  final String id;
+  final String name;
+  final String? photoUrl;
+
+  const CalendarParticipantInfo({
+    required this.id,
+    required this.name,
+    this.photoUrl,
+  });
+
+  factory CalendarParticipantInfo.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const CalendarParticipantInfo(id: '', name: 'Unknown');
+    }
+
+    return CalendarParticipantInfo(
+      id: json['id']?.toString() ?? json['userId']?.toString() ?? '',
+      name: json['name']?.toString() ??
+          json['displayName']?.toString() ??
+          json['display_name']?.toString() ??
+          'Unknown',
+      photoUrl: _firstNonEmptyString([
+        json['photoUrl'],
+        json['photo_url'],
+        json['avatarUrl'],
+        json['avatar_url'],
+      ]),
+    );
+  }
+}
+
+class CalendarRunDetails {
+  final String runId;
+  final int? statusId;
+  final String gameMode;
+  final String? courtType;
+  final String? ageRange;
+  final int durationMinutes;
+  final int maxPlayers;
+  final int attendeeCount;
+  final bool isRecurring;
+  final String? recurrenceRule;
+  final String? notes;
+  final CalendarParticipantInfo creator;
+  final List<RunAttendee> attendeePreview;
+  final String occurrenceKey;
+
+  const CalendarRunDetails({
+    required this.runId,
+    this.statusId,
+    required this.gameMode,
+    this.courtType,
+    this.ageRange,
+    required this.durationMinutes,
+    required this.maxPlayers,
+    required this.attendeeCount,
+    required this.isRecurring,
+    this.recurrenceRule,
+    this.notes,
+    required this.creator,
+    required this.attendeePreview,
+    required this.occurrenceKey,
+  });
+
+  factory CalendarRunDetails.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const CalendarRunDetails(
+        runId: '',
+        gameMode: '5v5',
+        durationMinutes: 120,
+        maxPlayers: 15,
+        attendeeCount: 0,
+        isRecurring: false,
+        creator: CalendarParticipantInfo(id: '', name: 'Unknown'),
+        attendeePreview: [],
+        occurrenceKey: '',
+      );
+    }
+
+    return CalendarRunDetails(
+      runId: (json['runId'] ?? json['run_id'] ?? json['id'])?.toString() ?? '',
+      statusId: json['statusId'] != null || json['status_id'] != null
+          ? _parseInt(json['statusId'] ?? json['status_id'])
+          : null,
+      gameMode: (json['gameMode'] ?? json['game_mode'])?.toString() ?? '5v5',
+      courtType: (json['courtType'] ?? json['court_type'])?.toString(),
+      ageRange: (json['ageRange'] ?? json['age_range'])?.toString(),
+      durationMinutes: _parseInt(
+        json['durationMinutes'] ?? json['duration_minutes'],
+        fallback: 120,
+      ),
+      maxPlayers: _parseInt(
+        json['maxPlayers'] ?? json['max_players'],
+        fallback: 15,
+      ),
+      attendeeCount: _parseInt(json['attendeeCount'] ?? json['attendee_count']),
+      isRecurring: json['isRecurring'] == true || json['is_recurring'] == true,
+      recurrenceRule:
+          (json['recurrenceRule'] ?? json['recurrence_rule'])?.toString(),
+      notes: json['notes']?.toString(),
+      creator: CalendarParticipantInfo.fromJson(
+        json['creator'] as Map<String, dynamic>?,
+      ),
+      attendeePreview:
+          ((json['attendeePreview'] ?? json['attendees']) as List<dynamic>?)
+                  ?.map((a) => RunAttendee.fromJson(
+                        Map<String, dynamic>.from(a as Map),
+                      ))
+                  .toList() ??
+              const [],
+      occurrenceKey:
+          (json['occurrenceKey'] ?? json['occurrence_key'])?.toString() ?? '',
+    );
+  }
+
+  bool get isFull => attendeeCount >= maxPlayers;
+  bool get isAlmostFull => attendeeCount >= maxPlayers - 2;
+
+  String? get courtTypeLabel {
+    if (courtType == 'full') return 'Full Court';
+    if (courtType == 'half') return 'Half Court';
+    return null;
+  }
+}
+
+class CalendarScheduledMatchDetails {
+  final String matchId;
+  final String challengeId;
+  final String viewerRole;
+  final String visibility;
+  final String? message;
+  final CalendarParticipantInfo creator;
+  final CalendarParticipantInfo opponent;
+
+  const CalendarScheduledMatchDetails({
+    required this.matchId,
+    required this.challengeId,
+    required this.viewerRole,
+    required this.visibility,
+    this.message,
+    required this.creator,
+    required this.opponent,
+  });
+
+  factory CalendarScheduledMatchDetails.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const CalendarScheduledMatchDetails(
+        matchId: '',
+        challengeId: '',
+        viewerRole: 'observer',
+        visibility: 'followed_and_nearby',
+        creator: CalendarParticipantInfo(id: '', name: 'Unknown'),
+        opponent: CalendarParticipantInfo(id: '', name: 'Unknown'),
+      );
+    }
+
+    return CalendarScheduledMatchDetails(
+      matchId: (json['matchId'] ?? json['match_id'])?.toString() ?? '',
+      challengeId:
+          (json['challengeId'] ?? json['challenge_id'])?.toString() ?? '',
+      viewerRole:
+          (json['viewerRole'] ?? json['viewer_role'])?.toString() ?? 'observer',
+      visibility: json['visibility']?.toString() ?? 'followed_and_nearby',
+      message: json['message']?.toString(),
+      creator: CalendarParticipantInfo.fromJson(
+        json['creator'] as Map<String, dynamic>?,
+      ),
+      opponent: CalendarParticipantInfo.fromJson(
+        json['opponent'] as Map<String, dynamic>?,
+      ),
+    );
+  }
+
+  bool get isParticipant => viewerRole == 'creator' || viewerRole == 'opponent';
+  bool get isCreator => viewerRole == 'creator';
+  bool get isOpponent => viewerRole == 'opponent';
+}
+
+class CalendarCourtEventDetails {
+  final String eventId;
+  final String eventType;
+  final DateTime? startsAt;
+  final DateTime? endsAt;
+  final String? timezone;
+  final bool isRecurring;
+  final String? recurrenceRule;
+  final String? seriesStartsOn;
+  final String? seriesEndsOn;
+  final String? organizerName;
+  final String? registrationUrl;
+  final String? sourceUrl;
+  final String? sourceTitle;
+  final String? costText;
+  final String? audience;
+  final String? ageRange;
+  final String? skillLevel;
+  final String? format;
+  final String? evidenceType;
+  final String? confidence;
+  final String? status;
+  final String? notes;
+  final String occurrenceKey;
+
+  const CalendarCourtEventDetails({
+    required this.eventId,
+    required this.eventType,
+    this.startsAt,
+    this.endsAt,
+    this.timezone,
+    this.isRecurring = false,
+    this.recurrenceRule,
+    this.seriesStartsOn,
+    this.seriesEndsOn,
+    this.organizerName,
+    this.registrationUrl,
+    this.sourceUrl,
+    this.sourceTitle,
+    this.costText,
+    this.audience,
+    this.ageRange,
+    this.skillLevel,
+    this.format,
+    this.evidenceType,
+    this.confidence,
+    this.status,
+    this.notes,
+    this.occurrenceKey = '',
+  });
+
+  factory CalendarCourtEventDetails.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const CalendarCourtEventDetails(
+        eventId: '',
+        eventType: 'event',
+      );
+    }
+
+    DateTime? parseDateTime(dynamic value) {
+      var text = value?.toString() ?? '';
+      if (text.isNotEmpty && !text.endsWith('Z')) {
+        text += 'Z';
+      }
+      return DateTime.tryParse(text);
+    }
+
+    return CalendarCourtEventDetails(
+      eventId:
+          (json['eventId'] ?? json['event_id'] ?? json['id'])?.toString() ?? '',
+      eventType:
+          (json['eventType'] ?? json['event_type'])?.toString() ?? 'event',
+      startsAt: parseDateTime(json['startsAt'] ?? json['starts_at']),
+      endsAt: parseDateTime(json['endsAt'] ?? json['ends_at']),
+      timezone: json['timezone']?.toString(),
+      isRecurring: json['isRecurring'] == true || json['is_recurring'] == true,
+      recurrenceRule:
+          (json['recurrenceRule'] ?? json['recurrence_rule'])?.toString(),
+      seriesStartsOn:
+          (json['seriesStartsOn'] ?? json['series_starts_on'])?.toString(),
+      seriesEndsOn:
+          (json['seriesEndsOn'] ?? json['series_ends_on'])?.toString(),
+      organizerName:
+          (json['organizerName'] ?? json['organizer_name'])?.toString(),
+      registrationUrl:
+          (json['registrationUrl'] ?? json['registration_url'])?.toString(),
+      sourceUrl: (json['sourceUrl'] ?? json['source_url'])?.toString(),
+      sourceTitle: (json['sourceTitle'] ?? json['source_title'])?.toString(),
+      costText: (json['costText'] ?? json['cost_text'])?.toString(),
+      audience: json['audience']?.toString(),
+      ageRange: (json['ageRange'] ?? json['age_range'])?.toString(),
+      skillLevel: (json['skillLevel'] ?? json['skill_level'])?.toString(),
+      format: json['format']?.toString(),
+      evidenceType: (json['evidenceType'] ?? json['evidence_type'])?.toString(),
+      confidence: json['confidence']?.toString(),
+      status: json['status']?.toString(),
+      notes: json['notes']?.toString(),
+      occurrenceKey:
+          (json['occurrenceKey'] ?? json['occurrence_key'])?.toString() ?? '',
+    );
+  }
+
+  String get typeLabel {
+    switch (eventType) {
+      case 'team_game':
+        return 'GAME';
+      case 'tournament':
+        return 'TOURNAMENT';
+      case 'league':
+        return 'LEAGUE';
+      case 'practice':
+        return 'PRACTICE';
+      case 'camp':
+        return 'CAMP';
+      case 'clinic':
+        return 'CLINIC';
+      case 'tryout':
+        return 'TRYOUT';
+      default:
+        return 'EVENT';
+    }
+  }
+}
+
+class CalendarEvent {
+  final String id;
+  final String type;
+  final DateTime scheduledAt;
+  final String title;
+  final double? distanceMiles;
+  final bool isConfirmedByMe;
+  final bool isOwnedByMe;
+  final CalendarCourtInfo court;
+  final CalendarRunDetails? run;
+  final CalendarScheduledMatchDetails? scheduledMatch;
+  final CalendarCourtEventDetails? courtEvent;
+
+  const CalendarEvent({
+    required this.id,
+    required this.type,
+    required this.scheduledAt,
+    required this.title,
+    this.distanceMiles,
+    required this.isConfirmedByMe,
+    required this.isOwnedByMe,
+    required this.court,
+    this.run,
+    this.scheduledMatch,
+    this.courtEvent,
+  });
+
+  factory CalendarEvent.fromJson(Map<String, dynamic> json) {
+    DateTime parseScheduledAt() {
+      var text = (json['scheduledAt'] ??
+                  json['scheduled_at'] ??
+                  json['startsAt'] ??
+                  json['starts_at'])
+              ?.toString() ??
+          '';
+      if (text.isNotEmpty && !text.endsWith('Z')) {
+        text += 'Z';
+      }
+      return DateTime.tryParse(text) ?? DateTime.now();
+    }
+
+    final type =
+        (json['type'] ?? json['eventType'] ?? json['event_type'])?.toString() ??
+            'event';
+    final runJson = json['run'] ?? json['runDetails'] ?? json['run_details'];
+    final matchJson = json['scheduledMatch'] ??
+        json['scheduled_match'] ??
+        json['match'] ??
+        json['matchDetails'];
+    final courtEventJson =
+        json['courtEvent'] ?? json['court_event'] ?? json['event'];
+
+    return CalendarEvent(
+      id: json['id']?.toString() ??
+          json['eventId']?.toString() ??
+          '${type}_${json.hashCode}',
+      type: type,
+      scheduledAt: parseScheduledAt(),
+      title: json['title']?.toString() ?? 'Calendar Event',
+      distanceMiles: (() {
+        final value = json['distanceMiles'] ?? json['distance_miles'];
+        if (value == null) return null;
+        return _parseDouble(value);
+      })(),
+      isConfirmedByMe: json['isConfirmedByMe'] == true ||
+          json['is_confirmed_by_me'] == true ||
+          json['isAttendingByMe'] == true,
+      isOwnedByMe: json['isOwnedByMe'] == true ||
+          json['is_owned_by_me'] == true ||
+          json['isOwnedByMe'] == 1,
+      court: CalendarCourtInfo.fromJson(
+        (json['court'] is Map)
+            ? Map<String, dynamic>.from(json['court'] as Map)
+            : json,
+      ),
+      run: runJson is Map
+          ? CalendarRunDetails.fromJson(Map<String, dynamic>.from(runJson))
+          : null,
+      scheduledMatch: matchJson is Map
+          ? CalendarScheduledMatchDetails.fromJson(
+              Map<String, dynamic>.from(matchJson),
+            )
+          : null,
+      courtEvent: courtEventJson is Map
+          ? CalendarCourtEventDetails.fromJson(
+              Map<String, dynamic>.from(courtEventJson),
+            )
+          : null,
+    );
+  }
+
+  bool get isRun => type == 'run' && run != null;
+  bool get isScheduledMatch =>
+      type == 'scheduled_match' && scheduledMatch != null;
+  bool get isCourtEvent => type == 'court_event' && courtEvent != null;
+
+  String get dayLabel {
+    final local = scheduledAt.toLocal();
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return '${weekdays[local.weekday - 1]} ${local.month}/${local.day}';
+  }
+
+  String get timeLabel {
+    final local = scheduledAt.toLocal();
+    final hour =
+        local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:${local.minute.toString().padLeft(2, '0')} $period';
+  }
+
+  String get reminderKey {
+    if (isScheduledMatch) {
+      final challengeId = scheduledMatch!.challengeId;
+      if (challengeId.isNotEmpty) return 'scheduled_match:$challengeId';
+    }
+    if (isRun) {
+      final runId = run!.runId;
+      if (runId.isNotEmpty) {
+        return 'run:$runId:${scheduledAt.toUtc().toIso8601String()}';
+      }
+    }
+    return '$type:$id';
   }
 }

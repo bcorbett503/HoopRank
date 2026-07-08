@@ -67,7 +67,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Matches'),
+        title: const Text('Calendar'),
       ),
       body: ListView.builder(
         itemCount: _matches.length,
@@ -86,9 +86,12 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Match #${m.id}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text('Match #${m.id}',
+                          style: const TextStyle(
+                              color: Colors.grey, fontSize: 12)),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: _getStatusColor(m.status).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
@@ -111,22 +114,31 @@ class _MatchesScreenState extends State<MatchesScreen> {
                       Expanded(
                         child: Column(
                           children: [
-                            CircleAvatar(child: Text(challenger?.name.substring(0, 1) ?? '?')),
+                            CircleAvatar(
+                                child: Text(
+                                    challenger?.name.substring(0, 1) ?? '?')),
                             const SizedBox(height: 4),
-                            Text(challenger?.name ?? 'Unknown', textAlign: TextAlign.center),
+                            Text(challenger?.name ?? 'Unknown',
+                                textAlign: TextAlign.center),
                           ],
                         ),
                       ),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Text('VS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                        child: Text('VS',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey)),
                       ),
                       Expanded(
                         child: Column(
                           children: [
-                            CircleAvatar(child: Text(opponent?.name.substring(0, 1) ?? '?')),
+                            CircleAvatar(
+                                child: Text(
+                                    opponent?.name.substring(0, 1) ?? '?')),
                             const SizedBox(height: 4),
-                            Text(opponent?.name ?? 'Unknown', textAlign: TextAlign.center),
+                            Text(opponent?.name ?? 'Unknown',
+                                textAlign: TextAlign.center),
                           ],
                         ),
                       ),
@@ -135,13 +147,17 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                      const Icon(Icons.calendar_today,
+                          size: 16, color: Colors.grey),
                       const SizedBox(width: 4),
-                      Text(m.scheduledAt?.toString().split('.')[0] ?? '—', style: const TextStyle(fontSize: 12)),
+                      Text(m.scheduledAt?.toString().split('.')[0] ?? '—',
+                          style: const TextStyle(fontSize: 12)),
                       const SizedBox(width: 16),
-                      const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                      const Icon(Icons.location_on,
+                          size: 16, color: Colors.grey),
                       const SizedBox(width: 4),
-                      Text(m.courtId ?? 'Unknown Court', style: const TextStyle(fontSize: 12)),
+                      Text(m.courtId ?? 'Unknown Court',
+                          style: const TextStyle(fontSize: 12)),
                     ],
                   ),
                   if (m.status == 'completed') ...[
@@ -150,8 +166,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Winner: ${_getPlayer(m.winnerId!)?.name ?? '—'}'),
-                        Text('Δ HoopRank: ${m.ratingDelta?.toStringAsFixed(2) ?? '—'}',
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                            'Δ HoopRank: ${m.ratingDelta?.toStringAsFixed(2) ?? '—'}',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ],
@@ -168,7 +186,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
                         if (m.status == 'accepted')
                           ElevatedButton(
                             onPressed: () => _complete(m.id),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepOrange,
+                                foregroundColor: Colors.white),
                             child: const Text('Complete'),
                           ),
                       ],

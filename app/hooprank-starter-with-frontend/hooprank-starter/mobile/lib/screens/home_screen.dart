@@ -1241,6 +1241,7 @@ class _HomeScreenState extends State<HomeScreen>
           subject: 'Invite someone you want to play 1v1',
         ),
       );
+      AnalyticsService.logInviteSent(channel: 'share_sheet');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

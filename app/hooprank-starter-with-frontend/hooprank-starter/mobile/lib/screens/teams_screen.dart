@@ -367,6 +367,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         if (logoImage != null) {
           await ApiService.uploadImage(type: 'team', targetId: team['id'], imageFile: logoImage);
         }
+        if (!mounted) return;
         _loadData();
         AnalyticsService.logTeamCreated(teamType: teamType);
         ScaffoldWithNavBar.refreshBadge?.call();
@@ -424,18 +425,23 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       return;
     }
     try {
-      await ApiService.acceptTeamInvite(invite['id']);
+      // acceptTeamInvite returns false on a non-2xx (e.g. 404 stale invite)
+      // without throwing — don't report a false "Joined!".
+      final ok = await ApiService.acceptTeamInvite(invite['id']);
       _loadData();
       ScaffoldWithNavBar.refreshBadge?.call();
-      // Complete onboarding item
-      if (mounted) {
+      if (!mounted) return;
+      if (ok) {
         context
             .read<OnboardingChecklistState>()
             .completeItem(OnboardingItems.joinOrCreateTeam);
-      }
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Joined ${invite['name']}!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('That invite is no longer available.')),
         );
       }
     } catch (e) {
@@ -1461,6 +1467,20 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     final isScheduleTab = _tabController.index == 1;
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Teams'),
+        leading: BackButton(
+          onPressed: () {
+            // Reached via go() (deep link / notification, no back stack) or
+            // push() — always leave somewhere sensible instead of stranding.
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/play');
+            }
+          },
+        ),
+      ),
       body: Column(
         children: [
           TabBar(

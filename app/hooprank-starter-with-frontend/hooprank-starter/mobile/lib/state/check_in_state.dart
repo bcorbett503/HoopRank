@@ -44,6 +44,12 @@ class FollowedCourtInfo {
   final String courtId;
   final String courtName;
   final String? address;
+  final bool isIndoor;
+  final String access;
+  final int followerCount;
+  final String? imageUrl;
+  final String? imageSourceUrl;
+  final String? imageSourceLabel;
   final int checkInCount;
   final List<CourtActivity> recentActivity;
   final DateTime? lastActivityTime;
@@ -52,6 +58,12 @@ class FollowedCourtInfo {
     required this.courtId,
     required this.courtName,
     this.address,
+    this.isIndoor = false,
+    this.access = 'public',
+    this.followerCount = 0,
+    this.imageUrl,
+    this.imageSourceUrl,
+    this.imageSourceLabel,
     required this.checkInCount,
     required this.recentActivity,
     this.lastActivityTime,
@@ -163,12 +175,35 @@ class CheckInState extends ChangeNotifier {
   // Current user ID (set on login)
   String? _currentUserId;
 
+  // Re-entrancy guard: initialize() is invoked on every AuthState notify.
+  // Without this, redundant/overlapping runs clear collections mid-flight
+  // and clobber freshly-set state (e.g. a just-posted status).
+  String? _initializedUserId;
+  bool _initializing = false;
+
   /// Get follower count for a court
   int getFollowerCount(String courtId) => _courtFollowerCounts[courtId] ?? 0;
+
+  int get courtsWithFollowersCount =>
+      _courtFollowerCounts.values.where((count) => count > 0).length;
 
   /// Initialize state for the given user session.
   /// Clears all prior state first to prevent cross-account data leakage.
   Future<void> initialize(String? userId) async {
+    // Skip redundant re-inits for the same user (auth notifies fire often);
+    // only a genuine account switch or a first init should reload.
+    if (_initializing) return;
+    if (userId != null && userId == _initializedUserId) return;
+    _initializing = true;
+    _initializedUserId = userId;
+    try {
+      await _initializeInner(userId);
+    } finally {
+      _initializing = false;
+    }
+  }
+
+  Future<void> _initializeInner(String? userId) async {
     // Clear previous session data to prevent cross-account leakage
     _courtCheckIns.clear();
     _userCheckedInCourts.clear();
@@ -188,6 +223,7 @@ class CheckInState extends ChangeNotifier {
     await _loadAlertCourts();
     await _loadFollowedPlayers();
     await _loadFollowedTeams();
+    await _loadMyStatus();
 
     // Then sync with backend API (will overwrite local data if successful)
     await _syncFollowsFromApi();
@@ -355,8 +391,6 @@ class CheckInState extends ChangeNotifier {
       debugPrint('Error saving alert courts: $e');
     }
   }
-
-
 
   // ==================== CHECK-IN METHODS ====================
 
@@ -642,6 +676,12 @@ class CheckInState extends ChangeNotifier {
         courtId: courtId,
         courtName: courtName,
         address: court?.address,
+        isIndoor: court?.isIndoor ?? false,
+        access: court?.access ?? 'public',
+        followerCount: court?.followerCount ?? 0,
+        imageUrl: court?.imageUrl,
+        imageSourceUrl: court?.imageSourceUrl,
+        imageSourceLabel: court?.imageSourceLabel,
         checkInCount: checkIns.length,
         recentActivity:
             activity.take(3).toList(), // Show up to 3 recent activities
@@ -885,6 +925,10 @@ class CheckInState extends ChangeNotifier {
       await prefs.setString('user_${_currentUserId}_status', status);
       await prefs.setString('user_${_currentUserId}_status_time',
           DateTime.now().toIso8601String());
+      await prefs.setString('user_${_currentUserId}_status_name', userName);
+      if (photoUrl != null) {
+        await prefs.setString('user_${_currentUserId}_status_photo', photoUrl);
+      }
     } catch (e) {
       debugPrint('Error saving status: $e');
     }
@@ -910,11 +954,49 @@ class CheckInState extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user_${_currentUserId}_status');
       await prefs.remove('user_${_currentUserId}_status_time');
+      await prefs.remove('user_${_currentUserId}_status_name');
+      await prefs.remove('user_${_currentUserId}_status_photo');
     } catch (e) {
       debugPrint('Error clearing status: $e');
     }
 
     notifyListeners();
+  }
+
+  /// Restore the current user's persisted status into memory. Called by
+  /// [initialize], which clears all statuses on every auth change — without
+  /// this the just-set status is wiped on the next AuthState notify.
+  /// Statuses older than 12h are treated as stale and dropped.
+  Future<void> _loadMyStatus() async {
+    if (_currentUserId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final status = prefs.getString('user_${_currentUserId}_status');
+      if (status == null || status.isEmpty) return;
+
+      final timeStr = prefs.getString('user_${_currentUserId}_status_time');
+      final updatedAt = timeStr != null
+          ? (DateTime.tryParse(timeStr) ?? DateTime.now())
+          : DateTime.now();
+      if (DateTime.now().difference(updatedAt) > const Duration(hours: 12)) {
+        await prefs.remove('user_${_currentUserId}_status');
+        await prefs.remove('user_${_currentUserId}_status_time');
+        await prefs.remove('user_${_currentUserId}_status_name');
+        await prefs.remove('user_${_currentUserId}_status_photo');
+        return;
+      }
+
+      _playerStatuses[_currentUserId!] = PlayerStatus(
+        playerId: _currentUserId!,
+        playerName:
+            prefs.getString('user_${_currentUserId}_status_name') ?? 'Me',
+        photoUrl: prefs.getString('user_${_currentUserId}_status_photo'),
+        status: status,
+        updatedAt: updatedAt,
+      );
+    } catch (e) {
+      debugPrint('Error loading my status: $e');
+    }
   }
 
   /// Get the current user's status

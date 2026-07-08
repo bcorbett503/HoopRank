@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "baseRigTargets": [
+    {
+      "modelAssetId": "player_male_skinny_01",
+      "label": "Male Skinny Base",
+      "gender": "male",
+      "build": "skinny",
+      "modelPath": "../dcc_export/player_male_skinny_01.glb",
+      "posterPath": "../dcc_export/player_male_skinny_01_poster.webp",
+      "spritePath": "../dcc_export/player_male_skinny_01_sprite.webp"
+    },
+    {
+      "modelAssetId": "player_male_medium_01",
+      "label": "Male Medium Base",
+      "gender": "male",
+      "build": "medium",
+      "modelPath": "../dcc_export/player_male_medium_01.glb",
+      "posterPath": "../dcc_export/player_male_medium_01_poster.webp",
+      "spritePath": "../dcc_export/player_male_medium_01_sprite.webp"
+    },
+    {
+      "modelAssetId": "player_male_big_01",
+      "label": "Male Big Base",
+      "gender": "male",
+      "build": "big",
+      "modelPath": "../dcc_export/player_male_big_01.glb",
+      "posterPath": "../dcc_export/player_male_big_01_poster.webp",
+      "spritePath": "../dcc_export/player_male_big_01_sprite.webp"
+    },
+    {
+      "modelAssetId": "player_female_skinny_01",
+      "label": "Female Skinny Base",
+      "gender": "female",
+      "build": "skinny",
+      "modelPath": "../dcc_export/player_female_skinny_01.glb",
+      "posterPath": "../dcc_export/player_female_skinny_01_poster.webp",
+      "spritePath": "../dcc_export/player_female_skinny_01_sprite.webp"
+    },
+    {
+      "modelAssetId": "player_female_medium_01",
+      "label": "Female Medium Base",
+      "gender": "female",
+      "build": "medium",
+      "modelPath": "../dcc_export/player_female_medium_01.glb",
+      "posterPath": "../dcc_export/player_female_medium_01_poster.webp",
+      "spritePath": "../dcc_export/player_female_medium_01_sprite.webp"
+    },
+    {
+      "modelAssetId": "player_female_big_01",
+      "label": "Female Big Base",
+      "gender": "female",
+      "build": "big",
+      "modelPath": "../dcc_export/player_female_big_01.glb",
+      "posterPath": "../dcc_export/player_female_big_01_poster.webp",
+      "spritePath": "../dcc_export/player_female_big_01_sprite.webp"
+    }
+  ]
+}

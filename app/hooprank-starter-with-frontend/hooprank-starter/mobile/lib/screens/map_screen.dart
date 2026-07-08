@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
+import '../models/map_hub_models.dart';
 import '../utils/image_utils.dart';
 import '../widgets/court_map_widget.dart';
 import '../widgets/player_profile_sheet.dart';
@@ -10,7 +11,6 @@ import '../services/messages_service.dart';
 import '../services/analytics_service.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
-
 
 class MapScreen extends StatefulWidget {
   final String? initialCourtId;
@@ -45,6 +45,10 @@ class _MapScreenState extends State<MapScreen> {
 
   void _showCourtDetails(Court court) {
     CourtDetailsSheet.show(context, court);
+  }
+
+  void _showPlayerDetails(MapHubPlayer player) {
+    PlayerProfileSheet.showById(context, player.id);
   }
 
   void _showCheckedInPlayersSheet(Court court) {
@@ -191,10 +195,11 @@ class _MapScreenState extends State<MapScreen> {
                                         // Avatar
                                         CircleAvatar(
                                           radius: 22,
-                                          backgroundImage: player.photoUrl !=
-                                                  null
-                                              ? safeImageProvider(player.photoUrl!)
-                                              : null,
+                                          backgroundImage:
+                                              player.photoUrl != null
+                                                  ? safeImageProvider(
+                                                      player.photoUrl!)
+                                                  : null,
                                           backgroundColor:
                                               Colors.blue.withOpacity(0.2),
                                           child: player.photoUrl == null
@@ -751,6 +756,9 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       body: CourtMapWidget(
         onCourtSelected: _showCourtDetails,
+        onPlayerSelected: _showPlayerDetails,
+        showPlayers: true,
+        showStatusBubbles: true,
         initialCourtId: courtId,
         initialLat: widget.initialLat,
         initialLng: widget.initialLng,
@@ -759,4 +767,3 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 }
-

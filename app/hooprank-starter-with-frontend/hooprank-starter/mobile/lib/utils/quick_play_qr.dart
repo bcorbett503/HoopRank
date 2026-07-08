@@ -2,11 +2,13 @@ class QuickPlayQrPayload {
   final String hostId;
   final String hostName;
   final int generatedAtMs;
+  final String? sessionToken;
 
   const QuickPlayQrPayload({
     required this.hostId,
     required this.hostName,
     required this.generatedAtMs,
+    this.sessionToken,
   });
 
   String toQrString() {
@@ -18,6 +20,8 @@ class QuickPlayQrPayload {
         'hostId': hostId,
         'hostName': hostName,
         'ts': generatedAtMs.toString(),
+        if (sessionToken != null && sessionToken!.trim().isNotEmpty)
+          'sessionToken': sessionToken!.trim(),
       },
     ).toString();
   }
@@ -42,6 +46,7 @@ class QuickPlayQrPayload {
     final hostId = uri.queryParameters['hostId']?.trim();
     final hostName = uri.queryParameters['hostName']?.trim();
     final tsRaw = uri.queryParameters['ts']?.trim();
+    final sessionToken = uri.queryParameters['sessionToken']?.trim();
 
     if (hostId == null || hostId.isEmpty) return null;
 
@@ -52,6 +57,8 @@ class QuickPlayQrPayload {
       hostName:
           (hostName == null || hostName.isEmpty) ? 'Quick Play Host' : hostName,
       generatedAtMs: generatedAtMs,
+      sessionToken:
+          (sessionToken == null || sessionToken.isEmpty) ? null : sessionToken,
     );
   }
 }

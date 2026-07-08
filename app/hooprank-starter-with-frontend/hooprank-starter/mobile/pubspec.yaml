@@ -39,6 +39,9 @@ dependencies:
   share_plus: ^12.0.1
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.2.0
+  webview_flutter: ^4.14.0
+  appsflyer_sdk: ^6.18.0
+  model_viewer_plus: ^1.10.0
 
 dev_dependencies:
   flutter_test:
@@ -65,5 +68,14 @@ flutter:
   uses-material-design: true
   assets:
     - assets/data/
-    - assets/
+    - assets/html/
+    - assets/avatar_renders/avatar_stage_console_bg.png
+    - assets/app_icon.png
+    - assets/splash.png
+    - assets/court_marker.jpg
+    - assets/court_marker.png
+    - assets/court_marker_king.jpg
+    - assets/court_marker_king.png
+    - assets/court_marker_signature.jpg
+    - assets/court_marker_signature_crown.jpg
     - assets/onboarding/

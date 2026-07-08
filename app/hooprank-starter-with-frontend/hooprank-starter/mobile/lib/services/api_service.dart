@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models.dart';
+import '../models/map_hub_models.dart';
 import 'auth_service.dart';
 
 class ApiService {
@@ -31,6 +32,7 @@ class ApiService {
   }
 
   static String? _userId;
+  static bool _mapHubEndpointUnavailable = false;
 
   static String? get userId => _userId;
 
@@ -55,9 +57,11 @@ class ApiService {
   }) async {
     final merged = <String, String>{...?(headers)};
 
-    final effectiveUserId = userId ?? _userId;
+    final authUid = AuthService.currentAuthUid;
+    final effectiveUserId =
+        (authUid != null && authUid.isNotEmpty) ? authUid : (userId ?? _userId);
     if (effectiveUserId != null && effectiveUserId.isNotEmpty) {
-      merged.putIfAbsent('x-user-id', () => effectiveUserId);
+      merged['x-user-id'] = effectiveUserId;
     }
 
     // Always get a fresh token from Firebase SDK on every request.
@@ -276,6 +280,10 @@ class ApiService {
   static Future<Map<String, dynamic>> getPrivacySettings() async {
     if (_userId == null || _userId!.isEmpty) {
       return {
+        'pushEnabled': true,
+        'publicProfile': true,
+        'publicLocation': true,
+        'mapVisibilityEnabled': true,
         'discoverRadiusMi': 25.0,
         'discoverMode': 'open',
       };
@@ -283,7 +291,7 @@ class ApiService {
 
     try {
       final response = await authedGet(
-        Uri.parse('$baseUrl/me/privacy'),
+        Uri.parse('$baseUrl/users/me/privacy'),
         headers: {'x-user-id': _userId!},
       );
 
@@ -298,9 +306,93 @@ class ApiService {
     }
 
     return {
+      'pushEnabled': true,
+      'publicProfile': true,
+      'publicLocation': true,
+      'mapVisibilityEnabled': true,
       'discoverRadiusMi': 25.0,
       'discoverMode': 'open',
     };
+  }
+
+  static Future<Map<String, dynamic>> updatePrivacySettings(
+      Map<String, dynamic> data) async {
+    if (_userId == null || _userId!.isEmpty) {
+      return {
+        'success': false,
+        'error': 'User ID required',
+      };
+    }
+
+    try {
+      final response = await authedPut(
+        Uri.parse('$baseUrl/users/me/privacy'),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': _userId!,
+        },
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        final parsed = jsonDecode(response.body);
+        if (parsed is Map<String, dynamic>) return parsed;
+      }
+    } catch (e) {
+      debugPrint('Failed to update privacy settings: $e');
+    }
+
+    return {
+      'success': false,
+      ...data,
+    };
+  }
+
+  static Future<MapHubData?> getMapHub({
+    double? lat,
+    double? lng,
+    double? radiusMiles,
+    double? minLat,
+    double? maxLat,
+    double? minLng,
+    double? maxLng,
+    bool includePlayers = true,
+  }) async {
+    if (_mapHubEndpointUnavailable) return null;
+
+    try {
+      final query = <String, String>{
+        if (lat != null) 'lat': lat.toString(),
+        if (lng != null) 'lng': lng.toString(),
+        if (radiusMiles != null) 'radiusMiles': radiusMiles.toString(),
+        if (minLat != null) 'minLat': minLat.toString(),
+        if (maxLat != null) 'maxLat': maxLat.toString(),
+        if (minLng != null) 'minLng': minLng.toString(),
+        if (maxLng != null) 'maxLng': maxLng.toString(),
+        'includePlayers': includePlayers.toString(),
+      };
+      final uri = Uri.parse('$baseUrl/map/hub').replace(queryParameters: query);
+      final response =
+          await authedGet(uri, headers: {'x-user-id': _userId ?? ''});
+
+      if (response.statusCode == 200) {
+        final parsed = jsonDecode(response.body);
+        if (parsed is Map<String, dynamic>) {
+          return MapHubData.fromJson(parsed);
+        }
+      }
+
+      if (response.statusCode == 404) {
+        _mapHubEndpointUnavailable = true;
+        debugPrint('getMapHub unavailable (404); using legacy map data.');
+        return null;
+      }
+
+      debugPrint('getMapHub failed: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      debugPrint('getMapHub error: $e');
+    }
+    return null;
   }
 
   /// Generic GET request to any endpoint
@@ -376,17 +468,72 @@ class ApiService {
         final List<dynamic> data = jsonDecode(response.body);
         debugPrint('>>> getCourtsFromApi: received ${data.length} courts');
 
-        return data
-            .map((json) => Court(
-                  id: json['id'] as String,
-                  name: json['name'] as String? ?? 'Court',
-                  lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
-                  lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
-                  address: json['city'] as String?,
-                  isSignature: json['signature'] == true,
-                  isIndoor: json['indoor'] == true,
-                ))
-            .toList();
+        String? clean(dynamic value) {
+          final text = value?.toString().trim();
+          if (text == null || text.isEmpty || text.toLowerCase() == 'null') {
+            return null;
+          }
+          return text;
+        }
+
+        String? firstString(List<dynamic> values) {
+          for (final value in values) {
+            final cleaned = clean(value);
+            if (cleaned != null) return cleaned;
+          }
+          return null;
+        }
+
+        double number(dynamic value) {
+          if (value is num) return value.toDouble();
+          return double.tryParse(value?.toString() ?? '') ?? 0.0;
+        }
+
+        int? integer(dynamic value) {
+          if (value is num) return value.toInt();
+          return int.tryParse(value?.toString() ?? '');
+        }
+
+        return data.whereType<Map>().map((raw) {
+          final json = Map<String, dynamic>.from(raw);
+          return Court(
+            id: json['id']?.toString() ?? '',
+            name: json['name']?.toString() ?? 'Court',
+            lat: number(json['lat']),
+            lng: number(json['lng']),
+            address: firstString([json['address'], json['city']]),
+            isSignature:
+                json['signature'] == true || json['isSignature'] == true,
+            isIndoor: json['indoor'] == true || json['isIndoor'] == true,
+            access: json['access']?.toString() ?? 'public',
+            venueType:
+                json['venue_type']?.toString() ?? json['venueType']?.toString(),
+            imageUrl: firstString([
+              json['imageUrl'],
+              json['image_url'],
+              json['heroImageUrl'],
+              json['hero_image_url'],
+            ]),
+            imageSourceUrl: firstString([
+              json['imageSourceUrl'],
+              json['image_source_url'],
+              json['photoSourceUrl'],
+              json['photo_source_url'],
+            ]),
+            imageSourceLabel: firstString([
+              json['imageSourceLabel'],
+              json['image_source_label'],
+              json['photoSourceLabel'],
+              json['photo_source_label'],
+            ]),
+            followerCount:
+                integer(json['follower_count'] ?? json['followerCount']),
+            hasUpcomingRun: json['hasUpcomingRun'] == true ||
+                json['has_upcoming_run'] == true,
+            hasUpcomingActivity: json['hasUpcomingActivity'] == true ||
+                json['has_upcoming_activity'] == true,
+          );
+        }).toList();
       } else {
         debugPrint(
             '>>> getCourtsFromApi: failed with status ${response.statusCode}');
@@ -424,6 +571,23 @@ class ApiService {
     } catch (e) {
       debugPrint('updateProfile error: $e');
       rethrow;
+    }
+  }
+
+  /// Persist the player's avatar configuration (flat Avatar Lab config,
+  /// including its rendered `svg`) to PUT /users/:id/avatar.
+  static Future<void> updateAvatar(
+      String userId, Map<String, dynamic> avatarConfig) async {
+    final response = await authedPut(
+      Uri.parse('$baseUrl/users/$userId/avatar'),
+      headers: {'Content-Type': 'application/json'},
+      userId: userId,
+      body: jsonEncode(avatarConfig),
+    ).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(
+          'Failed to update avatar: ${response.statusCode} - ${response.body}');
     }
   }
 
@@ -508,6 +672,7 @@ class ApiService {
     String? hostId,
     String? message,
     bool autoAccept = true,
+    String? quickPlayToken,
   }) async {
     if (_userId == null || _userId!.isEmpty) {
       throw Exception('Not authenticated');
@@ -526,6 +691,8 @@ class ApiService {
         'guestId': opponentId,
         if (autoAccept) 'autoAccept': true,
         if (message != null && message.trim().isNotEmpty) 'message': message,
+        if (quickPlayToken != null && quickPlayToken.trim().isNotEmpty)
+          'quickPlayToken': quickPlayToken.trim(),
       }),
     );
 
@@ -650,12 +817,18 @@ class ApiService {
       headers: {'x-user-id': _userId ?? ''},
     );
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data is List) {
-        return data.cast<Map<String, dynamic>>();
-      }
+      return _unwrapRankings(jsonDecode(response.body));
     }
     return [];
+  }
+
+  /// The /rankings endpoint returns `{mode, rankings:[...], hasMore}`; older
+  /// callers assumed a bare array. Accept both shapes.
+  static List<Map<String, dynamic>> _unwrapRankings(dynamic data) {
+    final list = data is List
+        ? data
+        : (data is Map ? (data['rankings'] as List? ?? const []) : const []);
+    return list.whereType<Map>().map((m) => m.cast<String, dynamic>()).toList();
   }
 
   /// Get all players
@@ -762,9 +935,22 @@ class ApiService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final List<dynamic> series = data['series'] ?? [];
-      return series.cast<Map<String, dynamic>>();
+      try {
+        final data = jsonDecode(response.body);
+        // Backend returns a bare array; older code assumed {series:[...]}.
+        // Indexing a List with 'series' would throw and (via Future.wait)
+        // blank the whole profile screen — so accept both shapes safely.
+        final List<dynamic> series = data is List
+            ? data
+            : (data is Map ? (data['series'] as List? ?? const []) : const []);
+        return series
+            .whereType<Map>()
+            .map((m) => m.cast<String, dynamic>())
+            .toList();
+      } catch (e) {
+        debugPrint('getUserRankHistory parse failed: $e');
+        return [];
+      }
     } else {
       return [];
     }
@@ -1236,10 +1422,7 @@ class ApiService {
       headers: {'x-user-id': _userId ?? ''},
     );
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data is List) {
-        return data.cast<Map<String, dynamic>>();
-      }
+      return _unwrapRankings(jsonDecode(response.body));
     }
     return [];
   }
@@ -1978,6 +2161,35 @@ class ApiService {
       return data.map((json) => ScheduledRun.fromJson(json)).toList();
     }
     return [];
+  }
+
+  /// Get normalized calendar events for the requested scope and window.
+  static Future<List<CalendarEvent>> getCalendarEvents({
+    required String scope,
+    required DateTime start,
+    required DateTime end,
+    double? lat,
+    double? lng,
+  }) async {
+    final query = <String, String>{
+      'scope': scope,
+      'start': start.toUtc().toIso8601String(),
+      'end': end.toUtc().toIso8601String(),
+      if (lat != null) 'lat': lat.toString(),
+      if (lng != null) 'lng': lng.toString(),
+    };
+    final response = await authedGet(
+      Uri.parse('$baseUrl/calendar/events').replace(queryParameters: query),
+      headers: {'x-user-id': _userId ?? ''},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(CalendarEvent.fromJson)
+          .toList();
+    }
+    throw Exception('Failed to load calendar events');
   }
 
   /// Get runs near user's location (for discoverability)

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -17,11 +19,19 @@ class QuickPlayScreen extends StatefulWidget {
 
 class _QuickPlayScreenState extends State<QuickPlayScreen> {
   late final int _generatedAtMs;
+  late final String _sessionToken;
 
   @override
   void initState() {
     super.initState();
     _generatedAtMs = DateTime.now().millisecondsSinceEpoch;
+    _sessionToken = _buildSessionToken();
+  }
+
+  String _buildSessionToken() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    return bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
   }
 
   Future<void> _copyMatchCode(String matchQrData) async {
@@ -48,11 +58,23 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
             hostId: user.id,
             hostName: hostName,
             generatedAtMs: _generatedAtMs,
+            sessionToken: _sessionToken,
           ).toQrString();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quick Play'),
+        leading: BackButton(
+          onPressed: () {
+            // Entered via push (back stack) or via deep link/tab (no stack):
+            // always leave somewhere sensible.
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/play');
+            }
+          },
+        ),
         actions: [
           IconButton(
             tooltip: 'Scan Match',
@@ -88,7 +110,7 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                   accentColor: const Color(0xFFF97316),
                   title: 'Step 2: Start This Match',
                   subtitle:
-                      'After they install/login, have them tap Scan Match and scan this QR or paste your copied code.',
+                      'Once they are in the app, have them tap Continue without an account or Scan Match, then scan this QR or paste your copied code.',
                   qrData: matchQrData,
                 ),
                 const SizedBox(height: 10),

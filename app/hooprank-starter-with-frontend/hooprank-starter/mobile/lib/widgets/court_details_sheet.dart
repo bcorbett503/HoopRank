@@ -5,6 +5,7 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../state/check_in_state.dart';
 import '../state/onboarding_checklist_state.dart';
+import '../utils/court_images.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../widgets/rating_widgets.dart';
 import '../screens/status_composer_screen.dart';
@@ -68,90 +69,7 @@ class _CourtDetailsSheet extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Court name with basketball icon and follow button
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.deepOrange.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.sports_basketball,
-                              color: Colors.deepOrange,
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  court.name,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (court.address != null)
-                                  Text(
-                                    court.address!,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[400],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          // Follow + alert actions
-                          Consumer<CheckInState>(
-                            builder: (context, checkInState, _) {
-                              final isFollowing =
-                                  checkInState.isFollowing(court.id);
-                              return Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 48,
-                                    height: 48,
-                                    child: IconButton(
-                                      onPressed: () async {
-                                        if (isFollowing) {
-                                          await checkInState
-                                              .unfollowCourt(court.id);
-                                        } else {
-                                          await checkInState
-                                              .followCourt(court.id);
-                                          // Complete onboarding item
-                                          if (context.mounted) {
-                                            context
-                                                .read<OnboardingChecklistState>()
-                                                .completeItem('follow_court');
-                                          }
-                                        }
-                                      },
-                                      icon: Icon(
-                                        isFollowing
-                                            ? Icons.favorite
-                                            : Icons.favorite_border,
-                                        color: isFollowing
-                                            ? Colors.red
-                                            : Colors.grey[400],
-                                        size: 28,
-                                      ),
-                                      tooltip:
-                                          isFollowing ? 'Unfollow' : 'Follow',
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                      _CourtHero(court: court),
                       const SizedBox(height: 10),
 
                       // Follow prompt / "King" roster (followers)
@@ -601,6 +519,344 @@ class _CourtDetailsSheet extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
     );
+  }
+}
+
+class _CourtHero extends StatelessWidget {
+  final Court court;
+
+  const _CourtHero({required this.court});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageInfo = courtImageInfoFor(court);
+    final accent =
+        court.isIndoor ? const Color(0xFF8B5CF6) : const Color(0xFFFF6B35);
+    final followerCount = court.followerCount ?? 0;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: 214,
+        decoration: BoxDecoration(
+          color: const Color(0xFF171717),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: imageInfo == null
+                  ? _CourtHeroFallback(accent: accent)
+                  : Image.network(
+                      imageInfo.imageUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return _CourtHeroFallback(accent: accent);
+                      },
+                      errorBuilder: (_, __, ___) =>
+                          _CourtHeroFallback(accent: accent),
+                    ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.08),
+                      Colors.black.withValues(alpha: 0.48),
+                      Colors.black.withValues(alpha: 0.86),
+                    ],
+                    stops: const [0.0, 0.52, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              left: 12,
+              right: 68,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _CourtHeroChip(
+                    icon: court.isIndoor
+                        ? Icons.roofing_rounded
+                        : Icons.wb_sunny_rounded,
+                    label: court.isIndoor ? 'Indoor' : 'Outdoor',
+                  ),
+                  _CourtHeroChip(
+                    icon: Icons.lock_open_rounded,
+                    label: _formatAccess(court.access),
+                  ),
+                  if (followerCount > 0)
+                    _CourtHeroChip(
+                      icon: Icons.favorite_rounded,
+                      label: followerCount == 1
+                          ? '1 following'
+                          : '$followerCount following',
+                    ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Consumer<CheckInState>(
+                builder: (context, checkInState, _) {
+                  final isFollowing = checkInState.isFollowing(court.id);
+                  return Material(
+                    color: Colors.black.withValues(alpha: 0.36),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      onPressed: () async {
+                        if (isFollowing) {
+                          await checkInState.unfollowCourt(court.id);
+                        } else {
+                          await checkInState.followCourt(court.id);
+                          if (context.mounted) {
+                            context
+                                .read<OnboardingChecklistState>()
+                                .completeItem('follow_court');
+                          }
+                        }
+                      },
+                      icon: Icon(
+                        isFollowing
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: isFollowing ? Colors.redAccent : Colors.white,
+                      ),
+                      tooltip: isFollowing ? 'Unfollow' : 'Follow',
+                    ),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 14,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    court.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      height: 1.02,
+                    ),
+                  ),
+                  if (court.address != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          size: 14,
+                          color: Colors.white.withValues(alpha: 0.76),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            court.address!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.78),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (imageInfo?.sourceLabel != null) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      imageInfo!.sourceLabel!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.54),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatAccess(String access) {
+    final normalized = access.trim().toLowerCase();
+    switch (normalized) {
+      case 'members':
+      case 'member':
+        return 'Members';
+      case 'paid':
+        return 'Paid';
+      case 'public':
+        return 'Public';
+      default:
+        return access.trim().isEmpty ? 'Public' : access.trim();
+    }
+  }
+}
+
+class _CourtHeroChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _CourtHeroChip({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CourtHeroFallback extends StatelessWidget {
+  final Color accent;
+
+  const _CourtHeroFallback({required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withValues(alpha: 0.9),
+            const Color(0xFF111827),
+            const Color(0xFF0F766E),
+          ],
+        ),
+      ),
+      child: CustomPaint(
+        foregroundPainter: _CourtLinesPainter(accent: accent),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _CourtLinesPainter extends CustomPainter {
+  final Color accent;
+
+  const _CourtLinesPainter({required this.accent});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2;
+    final keyPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.08)
+      ..style = PaintingStyle.fill;
+
+    final courtRect = Rect.fromLTWH(
+      size.width * 0.08,
+      size.height * 0.12,
+      size.width * 0.84,
+      size.height * 0.76,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(courtRect, const Radius.circular(10)),
+      linePaint,
+    );
+
+    final lane = Rect.fromCenter(
+      center: Offset(size.width * 0.5, size.height * 0.5),
+      width: size.width * 0.28,
+      height: size.height * 0.62,
+    );
+    canvas.drawRect(lane, keyPaint);
+    canvas.drawRect(lane, linePaint);
+
+    canvas.drawCircle(
+      Offset(size.width * 0.5, size.height * 0.5),
+      size.width * 0.115,
+      linePaint,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.18),
+        width: size.width * 0.42,
+        height: size.height * 0.28,
+      ),
+      0,
+      3.14159,
+      false,
+      linePaint,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.82),
+        width: size.width * 0.42,
+        height: size.height * 0.28,
+      ),
+      3.14159,
+      3.14159,
+      false,
+      linePaint,
+    );
+
+    final glowPaint = Paint()
+      ..color = accent.withValues(alpha: 0.22)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 26);
+    canvas.drawCircle(
+      Offset(size.width * 0.12, size.height * 0.1),
+      size.width * 0.28,
+      glowPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CourtLinesPainter oldDelegate) {
+    return accent != oldDelegate.accent;
   }
 }
 

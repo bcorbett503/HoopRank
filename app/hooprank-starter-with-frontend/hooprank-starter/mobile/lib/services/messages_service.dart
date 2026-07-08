@@ -87,8 +87,10 @@ class ChallengeRequest {
   final User otherUser; // The opponent (challenger or challengee)
   final String direction; // 'sent' or 'received'
   final Map<String, dynamic>? court; // Optional tagged court
+  final DateTime? scheduledAt;
+  final String? matchStatus;
 
-  ChallengeRequest({required this.message, required this.otherUser, required this.direction, this.court});
+  ChallengeRequest({required this.message, required this.otherUser, required this.direction, this.court, this.scheduledAt, this.matchStatus});
 
   factory ChallengeRequest.fromJson(Map<String, dynamic> json) {
     return ChallengeRequest(
@@ -97,7 +99,14 @@ class ChallengeRequest {
       otherUser: User.fromJson(json['otherUser'] ?? json['sender']),
       direction: json['direction'] ?? 'received',
       court: json['court'] as Map<String, dynamic>?,
+      scheduledAt: _parseOptionalDateTime(json['scheduledAt'] ?? json['scheduled_at']),
+      matchStatus: (json['matchStatus'] ?? json['match_status'])?.toString(),
     );
+  }
+
+  static DateTime? _parseOptionalDateTime(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
   }
 
   bool get isSent => direction == 'sent';
@@ -200,6 +209,9 @@ class MessagesService {
         final fromUser = asMap(c['fromUser']);
         final toUser = asMap(c['toUser']);
         final court = c['court'] is Map ? (c['court'] as Map).cast<String, dynamic>() : null;
+        final match = c['match'] is Map ? c['match'] as Map : null;
+        final scheduledAt = ChallengeRequest._parseOptionalDateTime(c['scheduled_at'] ?? c['scheduledAt']);
+        final matchStatus = (c['match_status'] ?? c['matchStatus'] ?? match?['status'])?.toString();
 
         final fromUserId = (c['from_user_id'] ?? c['fromUserId'] ?? fromUser['id'])?.toString() ?? '';
         final toUserId = (c['to_user_id'] ?? c['toUserId'] ?? toUser['id'])?.toString() ?? '';
@@ -232,6 +244,8 @@ class MessagesService {
           otherUser: User.fromJson(otherUserJson.isEmpty ? fallbackOtherUser : otherUserJson),
           direction: direction,
           court: court,
+          scheduledAt: scheduledAt,
+          matchStatus: matchStatus,
         );
       }).toList();
     } else {
@@ -363,7 +377,7 @@ class MessagesService {
 
   /// Send a challenge to another player
   /// Optionally tag a court where the game will be played
-  Future<void> sendChallenge(String senderId, String receiverId, String message, {String? courtId}) async {
+  Future<void> sendChallenge(String senderId, String receiverId, String message, {String? courtId, DateTime? scheduledAt}) async {
     
     final body = <String, dynamic>{
       'toUserId': receiverId,
@@ -371,6 +385,9 @@ class MessagesService {
     };
     if (courtId != null) {
       body['courtId'] = courtId;
+    }
+    if (scheduledAt != null) {
+      body['scheduledAt'] = scheduledAt.toUtc().toIso8601String();
     }
     
     final response = await ApiService.authedPost(

@@ -14,15 +14,20 @@ class MatchResultScreen extends StatelessWidget {
     final opp = match.opponent;
     final r = match;
     
-    // Determine win/loss based on scores
-    final userWon = (r.userScore ?? 0) > (r.oppScore ?? 0);
+    // Determine win/loss/tie based on scores
+    final userScore = r.userScore ?? 0;
+    final oppScore = r.oppScore ?? 0;
+    final isTie = userScore == oppScore;
+    final userWon = userScore > oppScore;
     final currentRating = me?.rating ?? 3.0;
-    
+
     // Estimate rating change using simplified Elo calculation
     // HoopRank uses a 1.0-5.0 scale, similar to K-factor adjusted Elo
     final opponentRating = opp?.rating ?? 3.0;
     double estimatedDelta = 0.0;
-    if (userWon) {
+    if (isTie) {
+      estimatedDelta = 0.0;
+    } else if (userWon) {
       // Winner gains more if opponent was higher rated
       estimatedDelta = 0.1 + (opponentRating - currentRating) * 0.05;
       estimatedDelta = estimatedDelta.clamp(0.05, 0.3);
@@ -49,11 +54,13 @@ class MatchResultScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               decoration: BoxDecoration(
-                color: userWon ? Colors.green : Colors.red,
+                color: isTie
+                    ? Colors.blueGrey
+                    : (userWon ? Colors.green : Colors.red),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Text(
-                userWon ? 'VICTORY!' : 'DEFEAT',
+                isTie ? 'TIE' : (userWon ? 'VICTORY!' : 'DEFEAT'),
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

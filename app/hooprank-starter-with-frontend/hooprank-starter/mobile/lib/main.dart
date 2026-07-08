@@ -8,19 +8,21 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'services/analytics_service.dart';
+import 'services/appsflyer_service.dart';
 
 import 'state/app_state.dart';
 import 'state/check_in_state.dart';
 import 'state/onboarding_checklist_state.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
+import 'screens/home_map_hub_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/rankings_screen.dart';
 
 import 'screens/login_screen.dart';
+import 'screens/calendar_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/teams_screen.dart';
-import 'screens/team_chat_screen.dart';
 import 'screens/quick_play_screen.dart';
 import 'screens/scan_match_screen.dart';
 import 'screens/match_setup_screen.dart';
@@ -32,6 +34,7 @@ import 'screens/messages_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/network_test_screen.dart';
 import 'screens/map_screen.dart';
+import 'navigation/auth_redirect.dart';
 import 'services/notification_service.dart';
 import 'services/court_service.dart';
 
@@ -59,6 +62,9 @@ void main() {
     // Initialize notification service
     await NotificationService().initialize();
 
+    // Initialize attribution + in-app event tracking without blocking app launch.
+    unawaited(AppsFlyerService.initialize());
+
     runApp(
       MultiProvider(
         providers: [
@@ -79,8 +85,8 @@ void main() {
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorHomeKey =
     GlobalKey<NavigatorState>(debugLabel: 'shellHome');
-final _shellNavigatorTeamsKey =
-    GlobalKey<NavigatorState>(debugLabel: 'shellTeams');
+final _shellNavigatorCalendarKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellCalendar');
 final _shellNavigatorRankingsKey =
     GlobalKey<NavigatorState>(debugLabel: 'shellRankings');
 
@@ -154,35 +160,17 @@ class _HoopRankAppState extends State<HoopRankApp> {
       redirect: (context, state) {
         final user = authState.currentUser;
         final loggedIn = user != null;
-        final isLoggingIn = state.uri.toString() == '/login';
-        final isProfileSetup = state.uri.toString() == '/profile/setup';
+        final isAnonymousSession = authState.isAnonymousSession;
 
         debugPrint(
             'ROUTER: uri=${state.uri}, loggedIn=$loggedIn, isProfileComplete=${user?.isProfileComplete}');
-
-        // Not logged in - redirect to login (unless already there)
-        if (!loggedIn && !isLoggingIn) {
-          debugPrint('ROUTER: -> /login (not logged in)');
-          return '/login';
-        }
-
-        // Logged in but profile not complete - force profile setup (except if already on setup or login)
-        if (loggedIn &&
-            !user.isProfileComplete &&
-            !isProfileSetup &&
-            !isLoggingIn) {
-          debugPrint('ROUTER: -> /profile/setup (profile incomplete)');
-          return '/profile/setup';
-        }
-
-        // Profile complete and on login screen - go to home
-        if (loggedIn && user.isProfileComplete && isLoggingIn) {
-          debugPrint('ROUTER: -> /play (profile complete, leaving login)');
-          return '/play';
-        }
-
-        debugPrint('ROUTER: -> null (no redirect)');
-        return null;
+        final redirect = resolveAuthRedirect(
+          user: user,
+          isAnonymousSession: isAnonymousSession,
+          uri: state.uri,
+        );
+        debugPrint('ROUTER: -> ${redirect ?? 'null'}');
+        return redirect;
       },
       routes: [
         StatefulShellRoute.indexedStack(
@@ -193,19 +181,16 @@ class _HoopRankAppState extends State<HoopRankApp> {
             // Rankings (now first - far left in nav)
             StatefulShellBranch(
               navigatorKey: _shellNavigatorRankingsKey,
+              observers: [AnalyticsService.observer],
               routes: [
                 GoRoute(
+                  name: 'rankings',
                   path: '/rankings',
                   builder: (context, state) {
-                    // Support query params for deep linking to Teams tab with specific filter
-                    final tab = state.uri.queryParameters['tab'];
-                    final teamType = state.uri.queryParameters['teamType'];
                     final region = state.uri.queryParameters['region'];
                     return RankingsScreen(
                       // Key forces widget recreation when query params change
                       key: ValueKey(state.uri.toString()),
-                      initialTab: tab == 'teams' ? 1 : 0,
-                      initialTeamType: teamType,
                       initialRegion: region,
                     );
                   },
@@ -216,31 +201,21 @@ class _HoopRankAppState extends State<HoopRankApp> {
             // Messages (swapped - now second)
             StatefulShellBranch(
               navigatorKey: _shellNavigatorMessagesKey,
+              observers: [AnalyticsService.observer],
               routes: [
                 GoRoute(
+                  name: 'messages',
                   path: '/messages',
                   builder: (context, state) => const MessagesScreen(),
                   routes: [
                     GoRoute(
+                      name: 'chat',
                       path: 'chat/:userId',
                       builder: (context, state) {
                         // Get userId from path params - will need to fetch user data
                         final userId = state.pathParameters['userId'] ?? '';
                         // For now we'll handle the user lookup in ChatScreen
                         return ChatScreen(userId: userId);
-                      },
-                    ),
-                    GoRoute(
-                      path: 'team-chat/:teamId',
-                      builder: (context, state) {
-                        final teamId = state.pathParameters['teamId'] ?? '';
-                        final extra =
-                            state.extra as Map<String, dynamic>? ?? {};
-                        return TeamChatScreen(
-                          teamId: teamId,
-                          teamName: extra['teamName'] ?? 'Team',
-                          teamType: extra['teamType'] ?? '5v5',
-                        );
                       },
                     ),
                   ],
@@ -251,49 +226,67 @@ class _HoopRankAppState extends State<HoopRankApp> {
             // Play (in the middle)
             StatefulShellBranch(
               navigatorKey: _shellNavigatorHomeKey,
+              observers: [AnalyticsService.observer],
               routes: [
                 GoRoute(
+                  name: 'play',
                   path: '/play',
-                  builder: (context, state) => const HomeScreen(),
+                  builder: (context, state) => const HomeMapHubScreen(),
+                  routes: [
+                    GoRoute(
+                      name: 'play_feed',
+                      path: 'feed',
+                      builder: (context, state) => const HomeScreen(),
+                    ),
+                  ],
                 ),
                 GoRoute(
+                  name: 'quick_play',
                   path: '/quick-play',
                   builder: (context, state) => const QuickPlayScreen(),
                 ),
                 GoRoute(
+                  name: 'scan_match',
                   path: '/quick-play/scan',
                   builder: (context, state) => const ScanMatchScreen(),
                 ),
                 GoRoute(
+                  name: 'match_setup',
                   path: '/match/setup',
                   builder: (context, state) => const MatchSetupScreen(),
                 ),
                 GoRoute(
+                  name: 'match_map',
                   path: '/match/map',
                   builder: (context, state) => const MatchMapScreen(),
                 ),
                 GoRoute(
+                  name: 'match_live',
                   path: '/match/live',
                   builder: (context, state) => const MatchLiveScreen(),
                 ),
                 GoRoute(
+                  name: 'match_score',
                   path: '/match/score',
                   builder: (context, state) => const MatchScoreScreen(),
                 ),
                 GoRoute(
+                  name: 'match_result',
                   path: '/match/result',
                   builder: (context, state) => const MatchResultScreen(),
                 ),
               ],
             ),
 
-            // Teams (replaced Map)
+            // Calendar
             StatefulShellBranch(
-              navigatorKey: _shellNavigatorTeamsKey,
+              navigatorKey: _shellNavigatorCalendarKey,
+              observers: [AnalyticsService.observer],
               routes: [
                 GoRoute(
-                  path: '/teams',
-                  builder: (context, state) => const TeamsScreen(),
+                  name: 'calendar',
+                  path: '/calendar',
+                  builder: (context, state) => const CalendarScreen(),
                 ),
               ],
             ),
@@ -301,8 +294,10 @@ class _HoopRankAppState extends State<HoopRankApp> {
             // Courts (replaced Profile)
             StatefulShellBranch(
               navigatorKey: _shellNavigatorProfileKey,
+              observers: [AnalyticsService.observer],
               routes: [
                 GoRoute(
+                  name: 'courts',
                   path: '/courts',
                   builder: (context, state) {
                     // Support deep linking to a specific court via multiple methods
@@ -327,6 +322,7 @@ class _HoopRankAppState extends State<HoopRankApp> {
 
         // Player profile - navigate to chat which shows profile and allows messaging
         GoRoute(
+          name: 'player_profile',
           path: '/players/:id',
           builder: (context, state) {
             final playerId = state.pathParameters['id'] ?? '';
@@ -334,20 +330,46 @@ class _HoopRankAppState extends State<HoopRankApp> {
           },
         ),
         GoRoute(
+          name: 'login',
           path: '/login',
-          builder: (context, state) => const LoginScreen(),
+          builder: (context, state) => LoginScreen(
+            returnTo: state.uri.queryParameters['returnTo'],
+          ),
         ),
         GoRoute(
+          path: '/claim-account',
+          builder: (context, state) => LoginScreen(
+            claimMode: true,
+            returnTo: state.uri.queryParameters['returnTo'],
+          ),
+        ),
+        GoRoute(
+          path: '/join',
+          builder: (context, state) => ScanMatchScreen(
+            initialCode: state.uri.queryParameters['code'],
+          ),
+        ),
+        GoRoute(
+          name: 'profile_setup',
           path: '/profile/setup',
-          builder: (context, state) => const ProfileSetupScreen(),
+          builder: (context, state) => ProfileSetupScreen(
+            returnTo: state.uri.queryParameters['returnTo'],
+          ),
         ),
         GoRoute(
+          name: 'network_test',
           path: '/test',
           builder: (context, state) => const NetworkTestScreen(),
         ),
         GoRoute(
+          name: 'profile',
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          name: 'teams',
+          path: '/teams',
+          builder: (context, state) => const TeamsScreen(),
         ),
         // Root path fallback - redirect to play
         GoRoute(
@@ -375,15 +397,13 @@ class _HoopRankAppState extends State<HoopRankApp> {
       title: 'HoopRank',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.dark(
-          primary: const Color(0xFFFF6B35), // Orange from basketball
-          secondary: const Color(0xFF00D9A3), // Green from arrow
-          surface: const Color(0xFF2C3E50), // Dark blue background
-          background: const Color(0xFF1A252F), // Darker blue-grey
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFFFF6B35), // Orange from basketball
+          secondary: Color(0xFF00D9A3), // Green from arrow
+          surface: Color(0xFF2C3E50), // Dark blue background
           onPrimary: Colors.white,
           onSecondary: Colors.white,
           onSurface: Colors.white,
-          onBackground: Colors.white,
         ),
         scaffoldBackgroundColor: const Color(0xFF1A252F),
         cardColor: const Color(0xFF2C3E50),

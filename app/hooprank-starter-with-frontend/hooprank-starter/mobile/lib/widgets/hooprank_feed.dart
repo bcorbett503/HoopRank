@@ -6,10 +6,12 @@ import 'package:share_plus/share_plus.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
 import '../state/onboarding_checklist_state.dart';
+import '../app_config.dart';
 import '../services/api_service.dart';
 import '../services/messages_service.dart';
 import '../services/recommended_matchup_engine.dart';
 import '../models.dart';
+import '../utils/court_images.dart';
 import '../utils/image_utils.dart';
 import 'feed_video_player.dart';
 import 'featured_matchup_feed_card.dart';
@@ -998,52 +1000,256 @@ class _HoopRankFeedState extends State<HoopRankFeed>
                       itemCount: courts.length,
                       itemBuilder: (context, index) {
                         final court = courts[index];
-                        return ListTile(
-                          leading: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.sports_basketball,
-                                color: Colors.blue, size: 24),
-                          ),
-                          title: Text(
-                            court.courtName,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: court.address != null
-                              ? Text(
-                                  court.address!,
-                                  style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.5),
-                                      fontSize: 12),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                )
-                              : null,
-                          trailing: IconButton(
-                            icon: const Icon(Icons.favorite, color: Colors.red),
-                            onPressed: () async {
-                              await checkInState.unfollowCourt(court.courtId);
-                              if (context.mounted) Navigator.pop(context);
-                            },
-                            tooltip: 'Unfollow',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            context.go('/courts?courtId=${court.courtId}');
-                          },
+                        return _buildFollowedCourtCard(
+                          context,
+                          court,
+                          checkInState,
                         );
                       },
                     ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFollowedCourtCard(
+    BuildContext context,
+    FollowedCourtInfo court,
+    CheckInState checkInState,
+  ) {
+    final courtForImage = Court(
+      id: court.courtId,
+      name: court.courtName,
+      lat: 0,
+      lng: 0,
+      address: court.address,
+      isIndoor: court.isIndoor,
+      access: court.access,
+      followerCount: court.followerCount,
+      imageUrl: court.imageUrl,
+      imageSourceUrl: court.imageSourceUrl,
+      imageSourceLabel: court.imageSourceLabel,
+    );
+    final imageInfo = courtImageInfoFor(courtForImage);
+    final statusText = court.checkInCount > 0
+        ? '${court.checkInCount} here now'
+        : court.recentActivity.isNotEmpty
+            ? court.recentActivity.first.description
+            : 'No live activity';
+    final statusColor = court.checkInCount > 0
+        ? const Color(0xFF22C55E)
+        : const Color(0xFFFF6B35);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      child: Material(
+        color: const Color(0xFF262626),
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {
+            Navigator.pop(context);
+            context.go('/courts?courtId=${court.courtId}');
+          },
+          child: Container(
+            height: 112,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(8),
+                  ),
+                  child: SizedBox(
+                    width: 106,
+                    height: double.infinity,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (imageInfo == null)
+                          _buildCourtImageFallback(court.isIndoor)
+                        else
+                          Image.network(
+                            imageInfo.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _buildCourtImageFallback(court.isIndoor),
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return _buildCourtImageFallback(court.isIndoor);
+                            },
+                          ),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.02),
+                                Colors.black.withValues(alpha: 0.38),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 8,
+                          bottom: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.58),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  court.isIndoor
+                                      ? Icons.roofing_rounded
+                                      : Icons.wb_sunny_rounded,
+                                  color: Colors.white,
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  court.isIndoor ? 'Indoor' : 'Outdoor',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.only(left: 12, top: 10, bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          court.courtName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            height: 1.12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        if (court.address != null)
+                          Text(
+                            court.address!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.52),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                statusText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 46,
+                  child: IconButton(
+                    icon: const Icon(Icons.favorite, color: Colors.redAccent),
+                    onPressed: () async {
+                      await checkInState.unfollowCourt(court.courtId);
+                      if (context.mounted) Navigator.pop(context);
+                    },
+                    tooltip: 'Unfollow',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCourtImageFallback(bool isIndoor) {
+    final accent = isIndoor ? const Color(0xFF7C3AED) : const Color(0xFFFF6B35);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent,
+            const Color(0xFF111827),
+            const Color(0xFF047857),
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 18,
+            right: 18,
+            top: 18,
+            bottom: 18,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          Center(
+            child: Icon(
+              Icons.sports_basketball_rounded,
+              color: Colors.white.withValues(alpha: 0.78),
+              size: 34,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2627,8 +2833,7 @@ class _HoopRankFeedState extends State<HoopRankFeed>
       }
     }
 
-    buffer.write(
-        '\n\nDownload HoopRank: https://apps.apple.com/app/hooprank/id6741466657');
+    buffer.write('\n\nDownload HoopRank: ${AppConfig.appStoreUrlString}');
 
     SharePlus.instance.share(ShareParams(text: buffer.toString()));
   }

@@ -415,7 +415,8 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             : null,
                         backgroundColor: Colors.deepOrange[50],
                         child: player.photoUrl == null
-                            ? Text(player.name[0],
+                            ? Text(
+                                player.name.isNotEmpty ? player.name[0] : '?',
                                 style: TextStyle(
                                     fontSize: 32,
                                     color: Colors.deepOrange[800]))

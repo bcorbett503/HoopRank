@@ -3,16 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:url_launcher/url_launcher.dart';
 import '../state/app_state.dart';
 import '../models.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
+import '../navigation/auth_redirect.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+    super.key,
+    this.claimMode = false,
+    this.returnTo,
+  });
+
+  final bool claimMode;
+  final String? returnTo;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -20,6 +27,50 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
+
+  String _resolveReturnToPath() {
+    return sanitizeAuthReturnToPath(widget.returnTo);
+  }
+
+  String _buildProfileSetupRoute(String returnTo) {
+    return Uri(
+      path: '/profile/setup',
+      queryParameters: <String, String>{
+        'returnTo': returnTo,
+      },
+    ).toString();
+  }
+
+  Future<bool> _promptForProfileSetup(String returnTo) async {
+    final completeNow = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Account Saved'),
+        content: const Text(
+          'Your match history and rank are safe. Do you want to finish your profile now or later?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Complete Profile'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return false;
+
+    if (completeNow == true) {
+      context.go(_buildProfileSetupRoute(returnTo));
+      return true;
+    }
+
+    return false;
+  }
 
   String _fallbackPlayerName(String seed) {
     var hash = 0;
@@ -34,87 +85,85 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     final auth = context.read<AuthState>();
+    final wasGuestAccount = auth.currentUser != null && auth.isAnonymousSession;
+    final shouldLinkGuestSession = widget.claimMode || wasGuestAccount;
+    final returnTo = _resolveReturnToPath();
     try {
-      firebase.UserCredential? credential;
+      final identity = await AuthService.signInWithProvider(
+        provider,
+        linkIfAnonymous: shouldLinkGuestSession,
+      );
 
-      if (provider == 'apple') {
-        credential = await AuthService.signInWithApple();
-      } else if (provider == 'google') {
-        credential = await AuthService.signInWithGoogle();
-      } else if (provider == 'facebook') {
-        credential = await AuthService.signInWithFacebook();
-      }
-
-      if (credential == null || credential.user == null) {
+      if (identity == null) {
         // User canceled
         setState(() => _isLoading = false);
         return;
       }
 
-      // Force a reload to guarantee we capture the freshly updated displayName
-      // (especially critical for Apple Sign-In which updates it asynchronously).
-      await credential.user!.reload();
-      final firebaseUser = firebase.FirebaseAuth.instance.currentUser!;
-      final userId = firebaseUser.uid;
+      final userId = identity.uid;
       debugPrint('LOGIN: Firebase UID = $userId');
-
-      // Get ID token first so it's available for both success and fallback cases
-      final idToken = await firebaseUser.getIdToken();
+      final idToken = identity.idToken;
 
       // Try to authenticate with backend (required)
       try {
-        if (idToken != null) {
-          debugPrint('LOGIN: Calling ApiService.authenticate...');
-          final user = await ApiService.authenticate(
-            idToken,
-            uid: userId,
-            email: firebaseUser.email,
-            name: firebaseUser.displayName,
-            photoUrl: firebaseUser.photoURL,
-            provider: provider,
-          );
-          debugPrint(
-              'LOGIN: Backend returned user: ${user.name}, position=${user.position}, isProfileComplete=${user.isProfileComplete}');
+        debugPrint('LOGIN: Calling ApiService.authenticate...');
+        final user = await ApiService.authenticate(
+          idToken,
+          uid: userId,
+          email: identity.email,
+          name: identity.displayName,
+          photoUrl: identity.photoUrl,
+          provider: provider,
+        );
+        debugPrint(
+            'LOGIN: Backend returned user: ${user.name}, position=${user.position}, isProfileComplete=${user.isProfileComplete}');
 
-          await auth.login(user, token: idToken);
-          AnalyticsService.logLogin(provider: provider, success: true);
-          debugPrint(
-              'LOGIN: After auth.login, currentUser position=${auth.currentUser?.position}');
+        await auth.login(user, token: idToken);
+        AnalyticsService.logLogin(provider: provider, success: true);
+        debugPrint(
+            'LOGIN: After auth.login, currentUser position=${auth.currentUser?.position}');
 
-          // Sign in with Apple users must not be asked for name/email again
-          // per Apple Guideline 4.0. We expand this to all providers to
-          // simplify the onboarding flow. If a user already has a name
-          // from their credential but no position (first-time), auto-set
-          // a default so they skip profile setup.
-          if (!user.isProfileComplete) {
-            debugPrint('LOGIN: First-time user — auto-completing profile');
-            try {
-              await ApiService.updateProfile(userId, {
-                'position': 'G',
-                'height': "6'0\"",
-              });
-              await auth.updateUserPosition('G');
-              debugPrint('LOGIN: Auto-set position=G for new user');
-            } catch (e) {
-              debugPrint(
-                  'LOGIN: Auto-complete failed, will show profile setup: $e');
+        // Sign in with Apple users must not be asked for name/email again
+        // per Apple Guideline 4.0. We expand this to all providers to
+        // simplify the onboarding flow. If a user already has a name
+        // from their credential but no position (first-time), auto-set
+        // a default so they skip profile setup.
+        if (!wasGuestAccount && !user.isProfileComplete) {
+          debugPrint('LOGIN: First-time user — auto-completing profile');
+          try {
+            await ApiService.updateProfile(userId, {
+              'position': 'G',
+              'height': "6'0\"",
+            });
+            await auth.updateUserPosition('G');
+            await AnalyticsService.logRegistrationCompletedOnce(
+              userId: userId,
+              provider: provider,
+            );
+            debugPrint('LOGIN: Auto-set position=G for new user');
+          } catch (e) {
+            debugPrint(
+                'LOGIN: Auto-complete failed, will show profile setup: $e');
+          }
+        }
+
+        if (mounted) {
+          if (wasGuestAccount && !user.isProfileComplete) {
+            final handledInProfileSetupPrompt =
+                await _promptForProfileSetup(returnTo);
+            if (!mounted || handledInProfileSetupPrompt) {
+              return;
             }
           }
-
-          // Let the router handle redirect based on user.isProfileComplete
-          // The router will redirect to /profile/setup if incomplete, or /play if complete
-          if (mounted) {
-            context.go(
-                '/play'); // Router will intercept and redirect appropriately
-          }
+          context.go(returnTo);
         }
       } catch (e) {
         debugPrint('⚠️ Backend auth failed, using local fallback: $e');
         // Create a temporary user object with incomplete profile
         final user = User(
           id: userId,
-          name: firebaseUser.displayName ?? _fallbackPlayerName(userId),
-          photoUrl: firebaseUser.photoURL,
+          name: identity.displayName ?? _fallbackPlayerName(userId),
+          photoUrl: identity.photoUrl,
           // position is null, so isProfileComplete will be false
         );
         // IMPORTANT: Pass token even on fallback so authenticated API calls work
@@ -122,6 +171,13 @@ class _LoginScreenState extends State<LoginScreen> {
         AnalyticsService.logLogin(provider: provider, success: false);
 
         if (mounted) {
+          if (wasGuestAccount && !user.isProfileComplete) {
+            final handledInProfileSetupPrompt =
+                await _promptForProfileSetup(returnTo);
+            if (!mounted || handledInProfileSetupPrompt) {
+              return;
+            }
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
@@ -129,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
               duration: Duration(seconds: 4),
             ),
           );
-          context.go('/play'); // Router will redirect to /profile/setup
+          context.go(returnTo);
         }
       }
     } catch (e) {
@@ -145,7 +201,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthState>();
+    final hasGuestAccount =
+        authState.currentUser != null && authState.isAnonymousSession;
+    final isClaimMode = widget.claimMode;
+    final appleLabel =
+        hasGuestAccount ? 'Save with Apple' : 'Continue with Apple';
+    final googleLabel =
+        hasGuestAccount ? 'Save with Google' : 'Continue with Google';
+
     return Scaffold(
+      appBar: isClaimMode
+          ? AppBar(
+              title: const Text('Save Account'),
+            )
+          : null,
       body: Stack(
         children: [
           SafeArea(
@@ -161,15 +231,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: Color(0xFFFF6B35), // Orange
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Welcome to HoopRank',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                  Text(
+                    hasGuestAccount
+                        ? 'Save your account'
+                        : 'Welcome to HoopRank',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Track your game, climb the ranks',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  Text(
+                    hasGuestAccount
+                        ? 'Link Apple or Google so this guest session keeps its rank, match history, and future sign-in.'
+                        : 'Track your game, climb the ranks',
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
@@ -191,16 +268,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          SizedBox(
+                          const SizedBox(
                             width: 24,
                             height: 24,
-                            child: const Icon(Icons.apple, size: 24),
+                            child: Icon(Icons.apple, size: 24),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
-                            'Continue with Apple',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w500),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                appleLabel,
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w500),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -242,16 +324,75 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
-                            'Continue with Google',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w500),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                googleLabel,
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w500),
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
+                  if (!hasGuestAccount && !isClaimMode) ...[
+                    SizedBox(
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            _isLoading ? null : () => context.push('/join'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey.shade700),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        icon: const Icon(Icons.qr_code_scanner),
+                        label: const Text(
+                          'Continue without an account',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'No Apple or Google needed to join. We will create a guest session when you scan, and you can save it after the game.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                  ] else if (!isClaimMode) ...[
+                    TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => context.go(_resolveReturnToPath()),
+                      child: const Text('Keep playing as guest for now'),
+                    ),
+                    const SizedBox(height: 12),
+                  ] else ...[
+                    TextButton(
+                      onPressed: null,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade600,
+                        disabledForegroundColor: Colors.grey.shade600,
+                      ),
+                      child: const Text('Keep playing as guest for now'),
+                    ),
+                    const Text(
+                      'Unavailable here. Save this account first to keep this match history and sign in later.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   // Facebook Sign In Button - hidden for now
                   // To re-enable, uncomment this section:

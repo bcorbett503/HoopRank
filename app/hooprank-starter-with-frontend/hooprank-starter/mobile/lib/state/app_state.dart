@@ -23,9 +23,12 @@ class AuthState extends ChangeNotifier {
 
   User? get currentUser => _currentUser;
   bool get onboardingComplete => _onboardingComplete;
+  bool get isAnonymousSession => AuthService.isAnonymousSession;
 
-  AuthState() {
-    _init();
+  AuthState({bool initialize = true}) {
+    if (initialize) {
+      _init();
+    }
   }
 
   Future<void> _init() async {
@@ -49,8 +52,10 @@ class AuthState extends ChangeNotifier {
           ApiService.setAuthToken(storedToken);
         }
 
-        // Register FCM token for existing session
-        _registerFcmToken();
+        if (!isAnonymousSession) {
+          // Register FCM token for existing session
+          _registerFcmToken();
+        }
 
         // CRITICAL: If cached user doesn't have position, we MUST fetch from backend
         // synchronously to avoid router redirecting to profile setup incorrectly
@@ -91,6 +96,8 @@ class AuthState extends ChangeNotifier {
               'position': updatedUser.position,
               'rating': updatedUser.rating,
               'matchesPlayed': updatedUser.matchesPlayed,
+              'avatarConfig': updatedUser.avatarConfig,
+              'acceptingChallenges': updatedUser.acceptingChallenges,
             }));
       }
     } catch (e) {
@@ -122,6 +129,8 @@ class AuthState extends ChangeNotifier {
               'position': updatedUser.position,
               'rating': updatedUser.rating,
               'matchesPlayed': updatedUser.matchesPlayed,
+              'avatarConfig': updatedUser.avatarConfig,
+              'acceptingChallenges': updatedUser.acceptingChallenges,
             }));
       }
     } catch (e) {
@@ -164,6 +173,8 @@ class AuthState extends ChangeNotifier {
           'position': user.position,
           'rating': user.rating,
           'matchesPlayed': user.matchesPlayed,
+          'avatarConfig': user.avatarConfig,
+          'acceptingChallenges': user.acceptingChallenges,
         }));
 
     if (token != null) {
@@ -171,13 +182,17 @@ class AuthState extends ChangeNotifier {
       await storage.write(key: 'auth_token', value: token);
     }
 
-    // Register FCM token for push notifications
-    _registerFcmToken();
+    if (!isAnonymousSession) {
+      // Register FCM token for push notifications
+      _registerFcmToken();
+    }
 
     // First-login onboarding: request push + location permissions once per install.
     // We do it here (after auth is established) so the prompts are contextual to
     // an actual user session, not the app cold start.
-    await _maybePromptFirstLoginPermissions();
+    if (!isAnonymousSession) {
+      await _maybePromptFirstLoginPermissions();
+    }
   }
 
   Future<void> _maybePromptFirstLoginPermissions() async {
@@ -250,6 +265,8 @@ class AuthState extends ChangeNotifier {
               'position': updatedUser.position,
               'rating': updatedUser.rating,
               'matchesPlayed': updatedUser.matchesPlayed,
+              'avatarConfig': updatedUser.avatarConfig,
+              'acceptingChallenges': updatedUser.acceptingChallenges,
             }));
         debugPrint('User state updated to: ${_currentUser?.name}');
       }
@@ -266,6 +283,8 @@ class AuthState extends ChangeNotifier {
     String? height,
     String? city,
     List<String>? badges,
+    Map<String, dynamic>? avatarConfig,
+    bool? acceptingChallenges,
   }) async {
     if (_currentUser == null) return;
     final current = _currentUser!;
@@ -290,6 +309,11 @@ class AuthState extends ChangeNotifier {
       contestRate: current.contestRate,
       age: current.age,
       badges: badges ?? current.badges,
+      avatarConfig: avatarConfig ?? current.avatarConfig,
+      acceptingChallenges: acceptingChallenges ?? current.acceptingChallenges,
+      locEnabled: current.locEnabled,
+      lat: current.lat,
+      lng: current.lng,
     );
     notifyListeners();
 
@@ -314,6 +338,11 @@ class AuthState extends ChangeNotifier {
           'contestRate': _currentUser!.contestRate,
           'age': _currentUser!.age,
           'badges': _currentUser!.badges,
+          'avatarConfig': _currentUser!.avatarConfig,
+          'acceptingChallenges': _currentUser!.acceptingChallenges,
+          'locEnabled': _currentUser!.locEnabled,
+          'lat': _currentUser!.lat,
+          'lng': _currentUser!.lng,
         }));
   }
 
@@ -365,6 +394,17 @@ class AuthState extends ChangeNotifier {
     } catch (e) {
       debugPrint('Google disconnect failed: $e');
     }
+  }
+
+  @visibleForTesting
+  void debugSetCurrentUser(User? user) {
+    _currentUser = user;
+    if (user != null) {
+      ApiService.setUserId(user.id);
+    } else {
+      ApiService.setUserId('');
+    }
+    notifyListeners();
   }
 }
 

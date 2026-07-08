@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import '../models.dart';
@@ -14,7 +15,9 @@ class ProfileData {
   final int heightIn;
   final String position;
   final String? profilePictureUrl;
+  final Map<String, dynamic>? avatarConfig;
   final String visibility; // 'public', 'friends', 'private'
+  final bool acceptingChallenges;
 
   ProfileData({
     required this.firstName,
@@ -26,7 +29,9 @@ class ProfileData {
     required this.heightIn,
     required this.position,
     this.profilePictureUrl,
+    this.avatarConfig,
     this.visibility = 'public',
+    this.acceptingChallenges = true,
   });
 
   // Calculate age from birthdate
@@ -51,7 +56,9 @@ class ProfileData {
         'heightIn': heightIn,
         'position': position,
         'profilePictureUrl': profilePictureUrl,
+        'avatarConfig': avatarConfig,
         'visibility': visibility,
+        'acceptingChallenges': acceptingChallenges,
       };
 
   factory ProfileData.fromJson(Map<String, dynamic> json) => ProfileData(
@@ -69,7 +76,14 @@ class ProfileData {
         heightIn: json['heightIn'] ?? 0,
         position: json['position'] ?? 'G',
         profilePictureUrl: json['profilePictureUrl'],
+        avatarConfig: json['avatarConfig'] is Map
+            ? Map<String, dynamic>.from(json['avatarConfig'])
+            : null,
         visibility: json['visibility'] ?? 'public',
+        acceptingChallenges: json['acceptingChallenges'] == null
+            ? true
+            : json['acceptingChallenges'] == true ||
+                json['acceptingChallenges'] == 1,
       );
 }
 
@@ -84,7 +98,9 @@ class ProfileService {
       if (raw != null) {
         return ProfileData.fromJson(jsonDecode(raw));
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('Profile cache read failed: $e');
+    }
 
     // Try API if local storage doesn't have it
     if (!userId.startsWith('dev-user-')) {
@@ -121,7 +137,18 @@ class ProfileService {
           position: data['position'] ?? '',
           profilePictureUrl:
               data['photoUrl'] ?? data['avatar_url'] ?? data['photo_url'],
+          avatarConfig: (data['avatarConfig'] ?? data['avatar_config']) is Map
+              ? Map<String, dynamic>.from(
+                  data['avatarConfig'] ?? data['avatar_config'])
+              : null,
           visibility: 'public',
+          acceptingChallenges: data['acceptingChallenges'] == null &&
+                  data['accepting_challenges'] == null
+              ? true
+              : data['acceptingChallenges'] == true ||
+                  data['accepting_challenges'] == true ||
+                  data['acceptingChallenges'] == 1 ||
+                  data['accepting_challenges'] == 1,
         );
 
         // Cache API profile locally so future loads are instant and resilient.
@@ -143,6 +170,14 @@ class ProfileService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key(userId), jsonEncode(data.toJson()));
 
+    // Never send a device-local file path or a generated data: URL as the
+    // photo — only a real remote URL. Anything else would corrupt the profile.
+    final photo = data.profilePictureUrl;
+    final remotePhoto =
+        (photo != null && (photo.startsWith('http://') || photo.startsWith('https://')))
+            ? photo
+            : null;
+
     // Try to save to API (if available)
     try {
       await ApiService.updateProfile(userId, {
@@ -153,7 +188,9 @@ class ProfileService {
         'badges': data.badges,
         'height': "${data.heightFt}'${data.heightIn}\"",
         'position': data.position,
-        'photoUrl': data.profilePictureUrl,
+        'photoUrl': remotePhoto,
+        'avatarConfig': data.avatarConfig,
+        'acceptingChallenges': data.acceptingChallenges,
       });
     } catch (e) {
       // Continue anyway - local storage save succeeded

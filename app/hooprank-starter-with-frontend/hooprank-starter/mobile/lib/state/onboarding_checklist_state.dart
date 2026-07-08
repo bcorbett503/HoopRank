@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 /// Keys for each onboarding checklist item.
 class OnboardingItems {
@@ -158,6 +159,7 @@ class OnboardingChecklistState extends ChangeNotifier {
     debugPrint(
         'ONBOARDING: completeItem called for key=$key, already=${_completed[key]}');
     if (_completed[key] == true) return; // already done
+    final wasAllComplete = allComplete;
     _completed[key] = true;
     debugPrint('ONBOARDING: ✅ Marked $key as complete');
     notifyListeners();
@@ -172,6 +174,14 @@ class OnboardingChecklistState extends ChangeNotifier {
       if (_completed[k] == true) progressMap[k] = true;
     }
     ApiService.updateOnboardingProgress(progressMap);
+
+    if (!wasAllComplete && allComplete) {
+      AnalyticsService.logTutorialCompletion(
+        tutorialId: 'onboarding_checklist',
+        success: true,
+        content: 'Get Started',
+      );
+    }
   }
 
   /// User manually collapses/hides the checklist.

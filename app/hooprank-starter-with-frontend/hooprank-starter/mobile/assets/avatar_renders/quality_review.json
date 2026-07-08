@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "activePack": "nextgen3d",
+  "qualityTier": "next-gen-console-style-generated",
+  "productionArtStatus": "not_approved",
+  "renderSource": "generated-procedural-3d-mesh-projection",
+  "target": "PS5-quality DCC-authored basketball character renders",
+  "activeAssets": [
+    "assets/avatar_renders/nextgen3d_guard_triple_threat_cutout.png",
+    "assets/avatar_renders/nextgen3d_hoodie_crossed_arms_cutout.png",
+    "assets/avatar_renders/nextgen3d_warmups_jumper_cutout.png",
+    "assets/avatar_renders/nextgen3d_tee_dribble_cutout.png",
+    "assets/avatar_renders/nextgen3d_female_guard_triple_threat_cutout.png",
+    "assets/avatar_renders/nextgen3d_female_hoodie_crossed_arms_cutout.png",
+    "assets/avatar_renders/nextgen3d_female_warmups_jumper_cutout.png",
+    "assets/avatar_renders/nextgen3d_female_tee_dribble_cutout.png"
+  ],
+  "blockingGaps": [
+    "Visible fallback art is generated procedural mesh-projection work rather than DCC-authored character art.",
+    "Runtime base GLBs are local procedural development rigs, not artist/provider-approved production character assets.",
+    "No approved art-director review or production source package is present."
+  ],
+  "approvalRequirements": [
+    "Production GLBs are authored/exported from Blender, Maya, Unreal, or equivalent DCC tooling.",
+    "Character meshes have production skin, hair, cloth, sneaker, and basketball materials.",
+    "Full-body renders are approved as AAA sports-game avatar quality in app framing.",
+    "Strict model-pack validation and normal iOS simulator builds pass."
+  ]
+}

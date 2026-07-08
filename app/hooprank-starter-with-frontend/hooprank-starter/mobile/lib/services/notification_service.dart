@@ -4,6 +4,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import '../models.dart';
 import 'api_service.dart';
 
 /// Handles push notifications via Firebase Cloud Messaging
@@ -17,6 +20,7 @@ class NotificationService with WidgetsBindingObserver {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
+  bool _timeZonesInitialized = false;
 
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
@@ -48,6 +52,11 @@ class NotificationService with WidgetsBindingObserver {
 
   /// Initialize notification service - call once on app start
   Future<void> initialize() async {
+    if (!_timeZonesInitialized) {
+      tz.initializeTimeZones();
+      _timeZonesInitialized = true;
+    }
+
     // Initialize local notifications for foreground display
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -89,6 +98,7 @@ class NotificationService with WidgetsBindingObserver {
       final isAuthorized = status == AuthorizationStatus.authorized ||
           status == AuthorizationStatus.provisional;
       if (isAuthorized) {
+        await _registerForRemoteNotifications();
         _fcmToken = await _messaging.getToken();
         debugPrint('FCM Token (pre-authorized): $_fcmToken');
       } else {
@@ -144,6 +154,7 @@ class NotificationService with WidgetsBindingObserver {
           IOSFlutterLocalNotificationsPlugin>();
       await ios?.requestPermissions(alert: true, badge: true, sound: true);
 
+      await _registerForRemoteNotifications();
       _fcmToken = await _messaging.getToken();
       debugPrint('FCM Token (post-authorize): $_fcmToken');
       return true;
@@ -196,6 +207,14 @@ class NotificationService with WidgetsBindingObserver {
       debugPrint('FCM token registered with backend');
     } catch (e) {
       debugPrint('Failed to register FCM token: $e');
+    }
+  }
+
+  Future<void> _registerForRemoteNotifications() async {
+    try {
+      await _badgeChannel.invokeMethod('registerForRemoteNotifications');
+    } catch (e) {
+      debugPrint('Failed to register for remote notifications: $e');
     }
   }
 
@@ -286,7 +305,7 @@ class NotificationService with WidgetsBindingObserver {
       case 'score_submitted':
       case 'score_contested':
       case 'match_completed':
-        router.go('/matches');
+        router.go('/calendar');
         break;
       case 'court_activity':
         final courtId = data['courtId'] as String? ?? '';
@@ -295,6 +314,9 @@ class NotificationService with WidgetsBindingObserver {
         } else {
           router.go('/courts');
         }
+        break;
+      case 'calendar_event':
+        router.go('/calendar');
         break;
       case 'team_invite':
       case 'team_invite_accepted':
@@ -313,6 +335,97 @@ class NotificationService with WidgetsBindingObserver {
         router.go('/play');
         break;
     }
+  }
+
+  Future<void> scheduleCalendarReminderForEvent(CalendarEvent event) async {
+    if (!event.isConfirmedByMe) return;
+
+    final body = event.isRun
+        ? 'Run starts in 1 hour${event.court.name != null ? ' at ${event.court.name}' : ''}.'
+        : 'Match starts in 1 hour${event.court.name != null ? ' at ${event.court.name}' : ''}.';
+    await scheduleConfirmedEventReminder(
+      reminderKey: event.reminderKey,
+      scheduledAt: event.scheduledAt,
+      title: event.title,
+      body: body,
+      payload: {
+        'type': 'calendar_event',
+        'eventId': event.id,
+      },
+    );
+  }
+
+  Future<void> scheduleRunReminder(ScheduledRun run) async {
+    final title =
+        run.title?.isNotEmpty == true ? run.title! : '${run.gameMode} Run';
+    await scheduleConfirmedEventReminder(
+      reminderKey: _runReminderKey(run.id, run.scheduledAt),
+      scheduledAt: run.scheduledAt,
+      title: title,
+      body:
+          'Run starts in 1 hour${run.courtName != null ? ' at ${run.courtName}' : ''}.',
+      payload: {
+        'type': 'calendar_event',
+        'runId': run.id,
+      },
+    );
+  }
+
+  Future<void> cancelRunReminder(ScheduledRun run) async {
+    await cancelCalendarReminder(_runReminderKey(run.id, run.scheduledAt));
+  }
+
+  Future<void> scheduleConfirmedEventReminder({
+    required String reminderKey,
+    required DateTime scheduledAt,
+    required String title,
+    required String body,
+    Map<String, dynamic>? payload,
+  }) async {
+    final remindAt = scheduledAt.toLocal().subtract(const Duration(hours: 1));
+    if (!remindAt.isAfter(DateTime.now())) {
+      return;
+    }
+
+    await _localNotifications.zonedSchedule(
+      _stableNotificationId(reminderKey),
+      title,
+      body,
+      tz.TZDateTime.from(remindAt.toUtc(), tz.UTC),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'hooprank_calendar_channel',
+          'HoopRank Calendar',
+          channelDescription: 'Confirmed run and match reminders',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentBadge: false,
+          presentSound: true,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      payload: jsonEncode(payload ?? const {'type': 'calendar_event'}),
+    );
+  }
+
+  Future<void> cancelCalendarReminder(String reminderKey) async {
+    await _localNotifications.cancel(_stableNotificationId(reminderKey));
+  }
+
+  int _stableNotificationId(String value) {
+    var hash = 0;
+    for (final codeUnit in value.codeUnits) {
+      hash = ((hash * 31) + codeUnit) & 0x7fffffff;
+    }
+    return hash;
+  }
+
+  String _runReminderKey(String runId, DateTime scheduledAt) {
+    return 'run:$runId:${scheduledAt.toUtc().toIso8601String()}';
   }
 }
 

@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "contractId": "hooprank_base_avatar_rig_v1",
+  "description": "Reusable HoopRank full-body basketball avatar rig contract for six base body models with runtime layers.",
+  "runtimeBinding": "base_body_plus_runtime_layers",
+  "baseBodyVariants": [
+    {
+      "modelAssetId": "player_male_skinny_01",
+      "gender": "male",
+      "build": "skinny"
+    },
+    {
+      "modelAssetId": "player_male_medium_01",
+      "gender": "male",
+      "build": "medium"
+    },
+    {
+      "modelAssetId": "player_male_big_01",
+      "gender": "male",
+      "build": "big"
+    },
+    {
+      "modelAssetId": "player_female_skinny_01",
+      "gender": "female",
+      "build": "skinny"
+    },
+    {
+      "modelAssetId": "player_female_medium_01",
+      "gender": "female",
+      "build": "medium"
+    },
+    {
+      "modelAssetId": "player_female_big_01",
+      "gender": "female",
+      "build": "big"
+    }
+  ],
+  "baseSelectionAxes": [
+    "gender",
+    "build"
+  ],
+  "runtimeCustomizationLayers": {
+    "raceAndSkin": [
+      "baseAppearance",
+      "skinTone"
+    ],
+    "hair": [
+      "hairStyle",
+      "hairColor"
+    ],
+    "height": [
+      "height"
+    ],
+    "clothes": [
+      "outfit",
+      "clothesTint"
+    ],
+    "pose": [
+      "stance",
+      "modelAnimationName"
+    ]
+  },
+  "runtimeLayerAxes": [
+    "baseAppearance",
+    "skinTone",
+    "hairStyle",
+    "hairColor",
+    "height",
+    "outfit",
+    "clothesTint",
+    "stance",
+    "modelAnimationName"
+  ],
+  "nonLayeredBaseAxes": [
+    "gender",
+    "build"
+  ],
+  "requiredMaterialSlots": [
+    "avatar_skin",
+    "avatar_skin_shadow",
+    "avatar_hair",
+    "avatar_hair_fade",
+    "avatar_hair_straight",
+    "avatar_hair_curls",
+    "avatar_hair_locs",
+    "avatar_hair_braids",
+    "avatar_hair_buzz",
+    "avatar_jersey_primary",
+    "avatar_shorts_secondary",
+    "avatar_trim",
+    "avatar_shoe",
+    "avatar_sole",
+    "avatar_sneaker_accent",
+    "avatar_ball",
+    "avatar_ball_seam"
+  ],
+  "visibilityGroups": {
+    "hair": [
+      "avatar_hair_fade",
+      "avatar_hair_straight",
+      "avatar_hair_curls",
+      "avatar_hair_locs",
+      "avatar_hair_braids",
+      "avatar_hair_buzz"
+    ],
+    "outfit": [
+      "avatar_outfit_jersey",
+      "avatar_outfit_hoodie",
+      "avatar_outfit_warmups",
+      "avatar_outfit_tee"
+    ]
+  },
+  "morphTargets": {
+    "height": [
+      "avatar_height_compact",
+      "avatar_height_tall",
+      "avatar_height_center"
+    ]
+  },
+  "requiredAnimationClips": [
+    "tripleThreatIdle",
+    "lockedInIdle",
+    "jumperIdle",
+    "dribbleIdle"
+  ],
+  "requiredRuntimeCapabilities": [
+    "runtimeMaterialColors",
+    "hairVisibilityNodes",
+    "outfitVisibilityNodes",
+    "heightMorphTargets",
+    "namedAnimationClips",
+    "transparentMapSprite"
+  ],
+  "spriteExport": {
+    "format": "webp",
+    "alpha": true,
+    "framing": "full_body_floor_contact",
+    "minimumLongEdgePx": 1200
+  },
+  "mobileBudgets": {
+    "maxGlbBytes": 12000000,
+    "targetGlbBytes": 6000000,
+    "maxTriangleCount": 120000,
+    "targetTriangleCount": 65000,
+    "maxMaterialCount": 32,
+    "maxTextureCount": 24
+  },
+  "productionQualityFloors": {
+    "minVertexCount": 12000,
+    "minTriangleCount": 20000,
+    "minJointCount": 32,
+    "minTextureCount": 6,
+    "minNormalMappedMaterialCount": 4,
+    "minSkinnedMeshNodeCount": 1
+  }
+}

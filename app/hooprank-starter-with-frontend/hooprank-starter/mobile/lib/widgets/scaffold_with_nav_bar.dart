@@ -27,7 +27,6 @@ class ScaffoldWithNavBar extends StatefulWidget {
 
 class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
   int _unreadCount = 0;
-  int _teamInvitesCount = 0;
   int _challengeCount = 0;
   bool _hasLoadedInitially = false;
 
@@ -58,12 +57,11 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
       // Load all counts in parallel
       final results = await Future.wait([
         ApiService.getUnreadMessageCount(),
-        ApiService.getTeamInvites(),
         ApiService.getPendingChallenges(),
       ]);
       if (mounted) {
         final myUserId = ApiService.userId ?? '';
-        final challenges = results[2] as List;
+        final challenges = results[1] as List;
         final incomingPendingCount = challenges.where((raw) {
           if (raw is! Map<String, dynamic>) return false;
           final status = (raw['status'] ?? '').toString().toLowerCase();
@@ -79,7 +77,6 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
 
         setState(() {
           _unreadCount = results[0] as int;
-          _teamInvitesCount = (results[1] as List).length;
           _challengeCount = incomingPendingCount;
           _hasLoadedInitially = true;
         });
@@ -98,8 +95,8 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
     }
 
     if (index == 2) {
-      // Feed runs inside an IndexedStack branch, so trigger an explicit refresh
-      // when users switch to that tab to avoid stale challenge cards.
+      // The Play branch owns the legacy feed route; keep the callback wired for
+      // any feed widgets already mounted under this branch.
       ScaffoldWithNavBar.refreshFeedTab?.call();
     }
 
@@ -113,11 +110,11 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
 
   @override
   Widget build(BuildContext context) {
-    // Check if current screen is Feed (index 2) - Feed has its own app bar
-    final isFeedScreen = widget.navigationShell.currentIndex == 2;
+    // Play/home owns the first viewport and does not use the shared app bar.
+    final isPlayScreen = widget.navigationShell.currentIndex == 2;
 
     return Scaffold(
-      appBar: isFeedScreen ? null : const HoopRankAppBar(),
+      appBar: isPlayScreen ? null : const HoopRankAppBar(),
       body: widget.navigationShell,
       bottomNavigationBar: Builder(
         builder: (context) {
@@ -140,8 +137,8 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
               onDestinationSelected: (int index) => _onTap(context, index),
               labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
               destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.leaderboard),
+                const NavigationDestination(
+                  icon: Icon(Icons.leaderboard),
                   label: 'Rankings',
                 ),
                 NavigationDestination(
@@ -164,20 +161,11 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
                     ),
                     child: const Icon(Icons.sports_basketball),
                   ),
-                  label: 'Feed',
+                  label: 'Play',
                 ),
-                NavigationDestination(
-                  icon: Badge(
-                    isLabelVisible: _teamInvitesCount > 0,
-                    label: Text(
-                      _teamInvitesCount > 99
-                          ? '99+'
-                          : _teamInvitesCount.toString(),
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                    child: const Icon(Icons.groups),
-                  ),
-                  label: 'Teams',
+                const NavigationDestination(
+                  icon: Icon(Icons.calendar_today),
+                  label: 'Calendar',
                 ),
                 const NavigationDestination(
                     icon: Icon(Icons.place), label: 'Courts'),

@@ -4,15 +4,87 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models.dart';
+import '../models/map_hub_models.dart';
 import '../services/court_service.dart';
-import '../services/profile_service.dart';
-import '../services/zipcode_service.dart';
 import '../services/api_service.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
+import 'package:go_router/go_router.dart';
+import '../utils/court_images.dart';
+import '../utils/flat_avatar.dart';
 
+import 'avatar_image.dart';
 import 'basketball_marker.dart';
+import 'player_map_marker.dart';
+import 'player_status_sheet.dart';
+
+const double kCourtSelectionZoom = 16.0;
+const double kCourtDeepLinkPreviewZoom = 16.0;
+const double kUserLocationInitialZoom = 12.5;
+const Color kCourtFilterAccentColor = Color(0xFFF47C2C);
+const Color kCourtFilterAccentBorderColor = Color(0xFFFFB067);
+const Color kCourtFilterHintColor = Color(0xFF1FA463);
+const Color kCourtFilterHintBorderColor = Color(0xFF7ED8A5);
+const int kTopFollowerLegacyPrefetchBatchLimit = 8;
+
+enum CourtFollowFilterMode {
+  all,
+  mine,
+  allFollowed,
+}
+
+const String kCourtFollowFilterEducationPrefsPrefix =
+    'court_follow_filter_education_v1_';
+
+String? courtFollowFilterEducationPrefsKeyForUser(String? userId) {
+  final trimmed = userId?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+  return '$kCourtFollowFilterEducationPrefsPrefix$trimmed';
+}
+
+bool shouldShowCourtFollowFilterEducation({
+  required bool preferenceLoaded,
+  required bool educationCompleted,
+  required CourtFollowFilterMode followFilterMode,
+}) {
+  return preferenceLoaded &&
+      !educationCompleted &&
+      followFilterMode != CourtFollowFilterMode.all;
+}
+
+List<Court> buildCourtListForViewport({
+  required List<Court> visibleCourts,
+  Court? previewCourt,
+  required bool showPreviewCourtOnly,
+}) {
+  if (!showPreviewCourtOnly || previewCourt == null) {
+    return visibleCourts;
+  }
+
+  for (final court in visibleCourts) {
+    if (court.id == previewCourt.id) {
+      return [court];
+    }
+  }
+
+  return [previewCourt];
+}
+
+bool courtHasFollowOrScheduledRunSignal({
+  required Court court,
+  required bool isFollowing,
+  required int followerCountFromState,
+}) {
+  final knownFollowerCount = court.followerCount ?? 0;
+  return isFollowing ||
+      followerCountFromState > 0 ||
+      knownFollowerCount > 0 ||
+      court.hasUpcomingRun;
+}
 
 class CourtMapWidget extends StatefulWidget {
   final Function(Court) onCourtSelected;
@@ -21,6 +93,14 @@ class CourtMapWidget extends StatefulWidget {
   final double? initialLat;
   final double? initialLng;
   final String? initialCourtName;
+  final bool showCourtList;
+  final bool showPlayers;
+  final bool showStatusBubbles;
+  final bool showHubControls;
+  final String? initialRunsFilter;
+  final bool? initialIndoorFilter;
+  final Function(MapHubPlayer)? onPlayerSelected;
+  final VoidCallback? onFeedSelected;
 
   const CourtMapWidget({
     super.key,
@@ -30,6 +110,14 @@ class CourtMapWidget extends StatefulWidget {
     this.initialLat,
     this.initialLng,
     this.initialCourtName,
+    this.showCourtList = true,
+    this.showPlayers = false,
+    this.showStatusBubbles = false,
+    this.showHubControls = false,
+    this.initialRunsFilter,
+    this.initialIndoorFilter = true,
+    this.onPlayerSelected,
+    this.onFeedSelected,
   });
 
   @override
@@ -40,6 +128,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
+  final CourtService _courtService = CourtService();
   Timer? _debounceTimer;
   List<Court> _courts = [];
   int? _courtsTotalBeforeCap; // Used to show "zoom in" hint when we cap results
@@ -47,20 +136,206 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   bool _isLoading = true;
   LatLng _initialCenter =
       const LatLng(38.0194, -122.5376); // Default to San Rafael
-  double _currentZoom = 14.0;
-  bool _showFollowedOnly = false; // Filter for courts the current user follows
-  bool? _filterIndoor = true; // null=all, true=indoor only, false=outdoor only
+  double _currentZoom = kUserLocationInitialZoom;
+  LatLng? _currentUserMapPoint;
+  CourtFollowFilterMode _followFilterMode = CourtFollowFilterMode.all;
+  bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
   String? _filterAccess; // null=all, 'public', 'private'
   String? _runsFilter; // null=off, 'today'=runs today, 'all'=all upcoming runs
   Set<String> _courtsWithRuns = {}; // Court IDs with runs (based on filter)
+  Court? _deepLinkPreviewCourt;
+  bool _showDeepLinkPreviewOnly = false;
+  bool _mapReady = false;
+  bool _didAutoOpenDeepLinkDetails = false;
+  final Map<String, CourtTopFollower?> _topFollowersByCourtId = {};
+  final Set<String> _topFollowerRequestsInFlight = {};
+  bool _didLoadFollowFilterEducation = false;
+  bool _hasCompletedFollowFilterEducation = false;
+  String? _followFilterEducationUserId;
+  MapHubPrivacy _mapHubPrivacy = const MapHubPrivacy();
+  final Map<String, MapHubCourt> _mapHubCourtsById = {};
+  List<MapHubPlayer> _mapHubPlayers = [];
+  bool _isMapHubLoading = false;
+  bool _hubPlayersVisible = true;
+  bool _hubCourtsVisible = true;
+  bool _isSavingMapVisibility = false;
 
   bool _noCourtsFound = false;
   bool _didInitialZoomOutToFindCourts = false;
 
+  bool get _isMapHubEnabled =>
+      widget.showPlayers || widget.showStatusBubbles || widget.showHubControls;
+
+  LatLng? _currentUserProfilePoint() {
+    final user = Provider.of<AuthState>(context, listen: false).currentUser;
+    final lat = user?.lat;
+    final lng = user?.lng;
+    if (user?.locEnabled != true || lat == null || lng == null) {
+      return null;
+    }
+    if (lat == 0 && lng == 0) {
+      return null;
+    }
+    return LatLng(lat, lng);
+  }
+
+  MapHubPlayer? _currentUserMapPlayer(User? user) {
+    final point = _currentUserMapPoint;
+    if (point == null) return null;
+
+    if (user == null) return null;
+
+    // listen: true so the marker's status pill updates live when the player
+    // sets a new status from the sheet.
+    final currentStatus =
+        Provider.of<CheckInState>(context).getMyStatus()?.trim();
+    final statusLabel =
+        currentStatus == null || currentStatus.isEmpty ? 'now' : currentStatus;
+
+    return MapHubPlayer(
+      id: user.id,
+      name: user.name,
+      avatarUrl: user.photoUrl,
+      avatarConfig: user.avatarConfig,
+      rating: user.rating,
+      position: user.position,
+      city: user.city,
+      lat: point.latitude,
+      lng: point.longitude,
+      customStatus: currentStatus,
+      statusLabel: statusLabel,
+      acceptingChallenges: user.acceptingChallenges,
+      isCurrentUser: true,
+    );
+  }
+
+  Future<void> _loadMapHubData({bool force = false}) async {
+    if (!_isMapHubEnabled) return;
+    if (_isMapHubLoading && !force) return;
+
+    final center = _mapReady ? _mapController.camera.center : _initialCenter;
+    final radiusKm = _calculateRadiusFromZoom(_currentZoom);
+    final radiusMiles = (radiusKm * 0.621371).clamp(1.0, 100.0).toDouble();
+
+    _isMapHubLoading = true;
+    final hub = await ApiService.getMapHub(
+      lat: center.latitude,
+      lng: center.longitude,
+      radiusMiles: radiusMiles,
+      includePlayers: widget.showPlayers,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      if (hub != null) {
+        _mapHubPrivacy = hub.privacy;
+        _mapHubPlayers = hub.players;
+        _mapHubCourtsById
+          ..clear()
+          ..addEntries(
+              hub.courts.map((court) => MapEntry(court.court.id, court)));
+      }
+      _isMapHubLoading = false;
+    });
+  }
+
+  Future<void> _toggleMapVisibility(bool enabled) async {
+    if (_isSavingMapVisibility) return;
+    final authState = Provider.of<AuthState>(context, listen: false);
+    final userId = authState.currentUser?.id;
+    if (userId == null || userId.isEmpty) return;
+
+    setState(() => _isSavingMapVisibility = true);
+    try {
+      if (enabled) {
+        final position = await _determinePosition();
+        await ApiService.updateProfile(userId, {
+          'lat': position.latitude,
+          'lng': position.longitude,
+          'locEnabled': true,
+        });
+      } else {
+        await ApiService.updateProfile(userId, {'locEnabled': false});
+      }
+
+      final settings = await ApiService.updatePrivacySettings({
+        'mapVisibilityEnabled': enabled,
+        'publicLocation': enabled,
+      });
+      final parsedSettings = Map<String, dynamic>.from(settings)
+        ..remove('success');
+
+      if (!mounted) return;
+      setState(() {
+        _mapHubPrivacy = MapHubPrivacy.fromJson(parsedSettings);
+      });
+      await _loadMapHubData(force: true);
+    } catch (e) {
+      debugPrint('MAP HUB: Failed to update visibility: $e');
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('Unable to update map visibility.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingMapVisibility = false);
+      }
+    }
+  }
+
+  List<Court> _mergeMapHubCourtData(List<Court> courts) {
+    if (_mapHubCourtsById.isEmpty) return courts;
+    return courts.map((court) {
+      final hubCourt = _mapHubCourtsById[court.id];
+      if (hubCourt == null) return court;
+      return court.copyWithKings(
+        followerCount: hubCourt.followerCount,
+        imageUrl: hubCourt.court.imageUrl,
+        imageSourceUrl: hubCourt.court.imageSourceUrl,
+        imageSourceLabel: hubCourt.court.imageSourceLabel,
+        topFollower: hubCourt.topFollower,
+        hasUpcomingRun: hubCourt.court.hasUpcomingRun,
+        hasUpcomingActivity: hubCourt.activeCheckInCount > 0 ||
+            hubCourt.court.hasUpcomingActivity,
+      );
+    }).toList();
+  }
+
+  bool _courtHasAnyFollowers(Court court, CheckInState checkInState) {
+    final followerCountFromState = checkInState.getFollowerCount(court.id);
+    return courtHasFollowOrScheduledRunSignal(
+      court: court,
+      isFollowing: checkInState.isFollowing(court.id),
+      followerCountFromState: followerCountFromState,
+    );
+  }
+
+  int _followFilterCount(CheckInState checkInState) {
+    switch (_followFilterMode) {
+      case CourtFollowFilterMode.mine:
+        return checkInState.followedCourts.length;
+      case CourtFollowFilterMode.allFollowed:
+        return checkInState.courtsWithFollowersCount;
+      case CourtFollowFilterMode.all:
+        return 0;
+    }
+  }
+
   bool _courtMatchesActiveFilters(Court court, CheckInState checkInState) {
-    // Followed filter - only courts the current user follows.
-    if (_showFollowedOnly && !checkInState.isFollowing(court.id)) {
-      return false;
+    switch (_followFilterMode) {
+      case CourtFollowFilterMode.mine:
+        if (!checkInState.isFollowing(court.id)) {
+          return false;
+        }
+        break;
+      case CourtFollowFilterMode.allFollowed:
+        if (!_courtHasAnyFollowers(court, checkInState)) {
+          return false;
+        }
+        break;
+      case CourtFollowFilterMode.all:
+        break;
     }
 
     // Indoor/Outdoor filter
@@ -84,6 +359,78 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     }
 
     return true;
+  }
+
+  CourtTopFollower? _resolvedTopFollowerForCourt(Court court) {
+    final hubTopFollower = _mapHubCourtsById[court.id]?.topFollower;
+    if (hubTopFollower != null) {
+      return hubTopFollower;
+    }
+    if (_topFollowersByCourtId.containsKey(court.id)) {
+      return _topFollowersByCourtId[court.id];
+    }
+    return court.topFollower;
+  }
+
+  void _prefetchTopFollowers(List<Court> courts) {
+    if (!mounted || courts.isEmpty) return;
+
+    final checkInState = Provider.of<CheckInState>(context, listen: false);
+    var legacyRequestsStarted = 0;
+    for (final court in courts) {
+      final existingTopFollower =
+          _mapHubCourtsById[court.id]?.topFollower ?? court.topFollower;
+      if (existingTopFollower != null) {
+        _topFollowersByCourtId.putIfAbsent(court.id, () => existingTopFollower);
+        continue;
+      }
+
+      if (_isMapHubEnabled) {
+        continue;
+      }
+
+      final followerCountFromState = checkInState.getFollowerCount(court.id);
+      final knownFollowerCount = court.followerCount ?? 0;
+      final shouldTryLoading = knownFollowerCount > 0 ||
+          followerCountFromState > 0 ||
+          checkInState.isFollowing(court.id);
+
+      if (!shouldTryLoading ||
+          _topFollowersByCourtId.containsKey(court.id) ||
+          _topFollowerRequestsInFlight.contains(court.id)) {
+        continue;
+      }
+
+      if (legacyRequestsStarted >= kTopFollowerLegacyPrefetchBatchLimit) {
+        break;
+      }
+
+      legacyRequestsStarted++;
+      _topFollowerRequestsInFlight.add(court.id);
+      unawaited(_loadTopFollowerForCourt(court.id));
+    }
+  }
+
+  Future<void> _loadTopFollowerForCourt(String courtId) async {
+    try {
+      final followers = await ApiService.getCourtFollowers(courtId, limit: 1);
+      final leader = followers.isEmpty
+          ? null
+          : CourtTopFollower(
+              id: followers.first.id,
+              name: followers.first.name,
+              photoUrl: followers.first.photoUrl,
+              rating: followers.first.rating,
+            );
+
+      _topFollowersByCourtId[courtId] = leader;
+      if (!mounted) return;
+      setState(() {});
+    } catch (e) {
+      debugPrint('MAP: Failed to load top follower for court $courtId: $e');
+    } finally {
+      _topFollowerRequestsInFlight.remove(courtId);
+    }
   }
 
   Future<void> _zoomOutUntilAtLeastOneCourtVisible() async {
@@ -180,7 +527,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
 
     final checkInState = Provider.of<CheckInState>(context, listen: false);
     final bounds = _mapController.camera.visibleBounds;
-    final courtsInView = CourtService().getCourtsInBounds(
+    final courtsInView = _courtService.getCourtsInBounds(
       bounds.south,
       bounds.west,
       bounds.north,
@@ -199,7 +546,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     Court? nearest;
     double nearestMeters = double.infinity;
 
-    for (final court in CourtService().getCourts()) {
+    for (final court in _courtService.getCourts()) {
       if (!_courtMatchesActiveFilters(court, checkInState)) continue;
 
       // If this widget is being used in a limited-radius context, don't jump
@@ -251,45 +598,116 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   @override
   void initState() {
     super.initState();
+    _filterIndoor = widget.initialIndoorFilter;
+    _runsFilter = widget.initialRunsFilter;
     WidgetsBinding.instance.addObserver(this);
+    _courtService.addListener(_handleCourtServiceChanged);
     _initializeMap();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id.trim();
+    if (_followFilterEducationUserId == userId &&
+        _didLoadFollowFilterEducation) {
+      return;
+    }
+    _followFilterEducationUserId = userId;
+    unawaited(_loadFollowFilterEducationState());
   }
 
   @override
   void didUpdateWidget(covariant CourtMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Handle navigation to a new court
-    if (widget.initialCourtId != null &&
-        widget.initialCourtId != oldWidget.initialCourtId) {
-      _navigateToCourt(widget.initialCourtId!);
+    final deepLinkChanged = widget.initialCourtId != oldWidget.initialCourtId ||
+        widget.initialCourtName != oldWidget.initialCourtName ||
+        widget.initialLat != oldWidget.initialLat ||
+        widget.initialLng != oldWidget.initialLng;
+
+    if (!deepLinkChanged) {
+      return;
     }
+
+    _didAutoOpenDeepLinkDetails = false;
+
+    final hasDeepLink = widget.initialCourtId != null ||
+        widget.initialCourtName != null ||
+        (widget.initialLat != null && widget.initialLng != null);
+
+    if (!hasDeepLink) {
+      _dismissDeepLinkPreview();
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _handleDeepLinkNavigation();
+    });
   }
 
-  void _navigateToCourt(String courtId) {
-    debugPrint('MAP: _navigateToCourt called with courtId: $courtId');
-
-    // First try direct ID lookup
-    Court? targetCourt = CourtService().getCourtById(courtId);
-
-    // If not found, try the enhanced findCourt method
-    if (targetCourt == null) {
-      debugPrint('MAP: Court not found by ID, trying findCourt...');
-      targetCourt = CourtService().findCourt(id: courtId);
+  void _dismissDeepLinkPreview() {
+    if (!_showDeepLinkPreviewOnly && _deepLinkPreviewCourt == null) {
+      return;
     }
 
-    if (targetCourt != null) {
-      _zoomToCourtAndSelect(targetCourt);
-    } else {
-      debugPrint('MAP: Court not found for ID: $courtId');
-    }
+    setState(() {
+      _showDeepLinkPreviewOnly = false;
+      _deepLinkPreviewCourt = null;
+    });
   }
 
-  /// Zoom to a court's location and show its details
-  void _zoomToCourtAndSelect(Court court) {
+  void _activateDeepLinkPreview(Court court) {
+    final target = LatLng(court.lat, court.lng);
+    setState(() {
+      _clearMapFilters();
+      _deepLinkPreviewCourt = court;
+      _showDeepLinkPreviewOnly = true;
+      _currentZoom = kCourtDeepLinkPreviewZoom;
+    });
+    _mapController.move(target, kCourtDeepLinkPreviewZoom);
+    _updateCourtsForMapCenter();
+  }
+
+  void _openDeepLinkCourtDetails(Court court) {
+    if (_didAutoOpenDeepLinkDetails) {
+      return;
+    }
+
+    _didAutoOpenDeepLinkDetails = true;
+    Future.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted) {
+        return;
+      }
+      widget.onCourtSelected(court);
+    });
+  }
+
+  /// Zoom to a court's location and show its details.
+  void _zoomToCourtAndSelect(
+    Court court, {
+    double zoom = kCourtSelectionZoom,
+    bool showDetails = true,
+  }) {
     debugPrint(
         'MAP: Zooming to court: ${court.name} at (${court.lat}, ${court.lng})');
     final target = LatLng(court.lat, court.lng);
-    _mapController.move(target, 16.0);
+
+    if (_showDeepLinkPreviewOnly) {
+      _dismissDeepLinkPreview();
+    }
+
+    _mapController.move(target, zoom);
+    setState(() {
+      _currentZoom = zoom;
+    });
+    _updateCourtsForMapCenter();
+
+    if (!showDetails) {
+      return;
+    }
+
     // Show court details sheet after a brief delay to allow map animation
     Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) {
@@ -298,9 +716,68 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     });
   }
 
+  void _clearMapFilters() {
+    _followFilterMode = CourtFollowFilterMode.all;
+    _filterIndoor = null;
+    _filterAccess = null;
+    _runsFilter = null;
+    _courtsWithRuns = {};
+  }
+
+  Court? _resolveDeepLinkCourt() {
+    Court? targetCourt;
+
+    if (widget.initialCourtId != null) {
+      targetCourt = _courtService.getCourtById(widget.initialCourtId!);
+      targetCourt ??= _courtService.findCourt(
+        id: widget.initialCourtId!,
+        name: widget.initialCourtName,
+        lat: widget.initialLat,
+        lng: widget.initialLng,
+      );
+    }
+
+    if (targetCourt == null && widget.initialCourtName != null) {
+      targetCourt = _courtService.getCourtByName(widget.initialCourtName!);
+    }
+
+    return targetCourt;
+  }
+
+  LatLng? _currentDeepLinkTarget() {
+    if (_deepLinkPreviewCourt != null) {
+      return LatLng(_deepLinkPreviewCourt!.lat, _deepLinkPreviewCourt!.lng);
+    }
+
+    if (widget.initialLat != null && widget.initialLng != null) {
+      return LatLng(widget.initialLat!, widget.initialLng!);
+    }
+
+    return null;
+  }
+
+  void _primeInitialDeepLinkPreview(Court? targetCourt) {
+    _clearMapFilters();
+
+    if (targetCourt != null) {
+      _deepLinkPreviewCourt = targetCourt;
+      _showDeepLinkPreviewOnly = true;
+      _initialCenter = LatLng(targetCourt.lat, targetCourt.lng);
+      _currentZoom = kCourtDeepLinkPreviewZoom;
+      _courts = [targetCourt];
+      return;
+    }
+
+    if (widget.initialLat != null && widget.initialLng != null) {
+      _initialCenter = LatLng(widget.initialLat!, widget.initialLng!);
+      _currentZoom = kCourtDeepLinkPreviewZoom;
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _courtService.removeListener(_handleCourtServiceChanged);
     _debounceTimer?.cancel();
     _mapController.dispose();
     _searchController.dispose();
@@ -310,8 +787,52 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Re-read courts from CourtService (which HomeScreen already refreshed)
+      _refreshCourtsFromService(force: true);
+    }
+  }
+
+  void _handleCourtServiceChanged() {
+    if (!mounted || _isLoading) return;
+
+    if (_searchController.text.trim().isNotEmpty) {
+      _onSearchChanged(_searchController.text);
+      return;
+    }
+
+    if (widget.limitDistanceKm != null) {
+      final nearbyCourts = _applyFilters(_courtService.getCourtsNear(
+        _initialCenter.latitude,
+        _initialCenter.longitude,
+        radiusKm: widget.limitDistanceKm!,
+      ));
+      final capped =
+          _capCourtsForPerformance(nearbyCourts, isSearchMode: false);
+      _prefetchTopFollowers(capped);
+      setState(() {
+        _courts = capped;
+        _noCourtsFound = capped.isEmpty;
+      });
+      return;
+    }
+
+    if (_mapReady) {
       _updateCourtsForMapCenter();
+      return;
+    }
+
+    final allCourts = _applyFilters(_courtService.getCourts());
+    final capped = _capCourtsForPerformance(allCourts, isSearchMode: false);
+    _prefetchTopFollowers(capped);
+    setState(() {
+      _courts = capped;
+    });
+  }
+
+  void _refreshCourtsFromService({bool force = false}) {
+    if (force) {
+      unawaited(_courtService.forceRefresh());
+    } else {
+      unawaited(_courtService.loadCourts());
     }
   }
 
@@ -321,7 +842,28 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
         widget.initialCourtName != null ||
         (widget.initialLat != null && widget.initialLng != null);
 
-    await CourtService().loadCourts();
+    await _courtService.loadCourts();
+    await _loadInitialRunsFilterIfNeeded();
+    final courts = _courtService.getCourts();
+
+    final initialDeepLinkCourt = hasDeepLink ? _resolveDeepLinkCourt() : null;
+    if (initialDeepLinkCourt != null) {
+      debugPrint('MAP: Priming deep link court: ${initialDeepLinkCourt.name}');
+    }
+
+    if (hasDeepLink) {
+      if (mounted) {
+        setState(() {
+          _primeInitialDeepLinkPreview(initialDeepLinkCourt);
+          if (_courts.isEmpty) {
+            _courts = courts;
+          }
+          _isLoading = false;
+        });
+        _prefetchTopFollowers(_courts);
+      }
+      return;
+    }
 
     bool locationObtained = false;
 
@@ -329,22 +871,25 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     try {
       Position position = await _determinePosition();
       _initialCenter = LatLng(position.latitude, position.longitude);
-      _currentZoom = 14.0;
+      _currentUserMapPoint = _initialCenter;
+      _currentZoom = kUserLocationInitialZoom;
       locationObtained = true;
       debugPrint(
           'MAP: Using GPS location: ${position.latitude}, ${position.longitude}');
 
       if (widget.limitDistanceKm != null) {
-        final nearbyCourts = CourtService().getCourtsNear(
+        final nearbyCourts = _courtService.getCourtsNear(
             position.latitude, position.longitude,
             radiusKm: widget.limitDistanceKm!);
 
         if (mounted) {
+          final filteredNearbyCourts = _applyFilters(nearbyCourts);
+          _prefetchTopFollowers(filteredNearbyCourts);
           setState(() {
-            _courts = nearbyCourts;
+            _courts = filteredNearbyCourts;
             _noCourtsFound = nearbyCourts.isEmpty;
             _isLoading = false;
-            _currentZoom = 15.0;
+            _currentZoom = kUserLocationInitialZoom;
           });
           return;
         }
@@ -358,50 +903,35 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
 
     // Log if using default location
     if (!locationObtained) {
-      debugPrint('MAP: Using default location (San Rafael)');
+      final profilePoint = _currentUserProfilePoint();
+      if (profilePoint != null) {
+        _initialCenter = profilePoint;
+        _currentUserMapPoint = profilePoint;
+        _currentZoom = kUserLocationInitialZoom;
+        locationObtained = true;
+        debugPrint(
+            'MAP: Using profile location: ${profilePoint.latitude}, ${profilePoint.longitude}');
+      } else {
+        debugPrint('MAP: Using default location (San Rafael)');
+      }
     }
 
     if (mounted) {
-      final courts = CourtService().getCourts();
+      final filteredCourts =
+          _capCourtsForPerformance(_applyFilters(courts), isSearchMode: true);
+      _prefetchTopFollowers(filteredCourts);
       setState(() {
-        _courts = courts;
+        _courts = filteredCourts;
         _isLoading = false;
       });
-
-      // Handle initial court selection from query params or direct coords
-      // Use post-frame callback to ensure map is ready
-      if (hasDeepLink) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _handleDeepLinkNavigation();
-        });
-      }
     }
   }
 
   /// Handle deep link navigation after map is ready
   void _handleDeepLinkNavigation() {
-    Court? targetCourt;
-
-    // First try by court ID
+    Court? targetCourt = _resolveDeepLinkCourt();
     if (widget.initialCourtId != null) {
       debugPrint('MAP: Deep link court ID: ${widget.initialCourtId}');
-      targetCourt = CourtService().getCourtById(widget.initialCourtId!);
-      if (targetCourt == null) {
-        debugPrint('MAP: Court not found by ID, trying findCourt...');
-        targetCourt = CourtService().findCourt(
-          id: widget.initialCourtId!,
-          name: widget.initialCourtName,
-          lat: widget.initialLat,
-          lng: widget.initialLng,
-        );
-      }
-    }
-
-    // If still not found, try by name
-    if (targetCourt == null && widget.initialCourtName != null) {
-      debugPrint(
-          'MAP: Trying to find court by name: ${widget.initialCourtName}');
-      targetCourt = CourtService().getCourtByName(widget.initialCourtName!);
     }
 
     // If still not found but we have coordinates, navigate to that location anyway
@@ -411,10 +941,19 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       debugPrint(
           'MAP: Court not found, but navigating to coordinates: ${widget.initialLat}, ${widget.initialLng}');
       final target = LatLng(widget.initialLat!, widget.initialLng!);
-      _mapController.move(target, 16.0);
+      _dismissDeepLinkPreview();
+      _mapController.move(target, kCourtDeepLinkPreviewZoom);
+      setState(() {
+        _currentZoom = kCourtDeepLinkPreviewZoom;
+      });
+      _updateCourtsForMapCenter();
     } else if (targetCourt != null) {
       debugPrint('MAP: Found deep link court: ${targetCourt.name}');
-      _zoomToCourtAndSelect(targetCourt);
+      if (_mapReady) {
+        _zoomToCourtAndSelect(targetCourt);
+      } else {
+        _activateDeepLinkPreview(targetCourt);
+      }
     } else if (widget.initialCourtId != null) {
       debugPrint('MAP: Court not found for ID: ${widget.initialCourtId}');
     }
@@ -448,12 +987,18 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
 
   Future<void> _moveToUserLocation() async {
     try {
+      _dismissDeepLinkPreview();
       Position position = await _determinePosition();
-      _mapController.move(LatLng(position.latitude, position.longitude), 15.0);
+      if (!mounted) return;
+      final point = LatLng(position.latitude, position.longitude);
+      _mapController.move(point, kUserLocationInitialZoom);
       setState(() {
-        _currentZoom = 15.0;
+        _currentZoom = kUserLocationInitialZoom;
+        _currentUserMapPoint = point;
       });
+      _updateCourtsForMapCenter();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not get location: $e')),
       );
@@ -461,6 +1006,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   }
 
   void _onSearchChanged(String query) {
+    _dismissDeepLinkPreview();
+
     final trimmed = query.trim();
 
     // Empty search means "browse the map". Never render the entire court set at once.
@@ -470,25 +1017,148 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       return;
     }
 
-    List<Court> filteredCourts = CourtService().searchCourts(trimmed);
+    List<Court> filteredCourts = _courtService.searchCourts(trimmed);
     filteredCourts = _applyFilters(filteredCourts);
 
     final capped = _capCourtsForPerformance(filteredCourts, isSearchMode: true);
     if (!mounted) return;
+    _prefetchTopFollowers(capped);
     setState(() {
       _courts = capped;
     });
   }
 
-  void _toggleFollowedFilter() {
+  void _setFollowFilter(CourtFollowFilterMode mode) {
+    _dismissDeepLinkPreview();
+    if (_followFilterMode == mode) {
+      return;
+    }
     setState(() {
-      _showFollowedOnly = !_showFollowedOnly;
+      _followFilterMode = mode;
     });
     // Re-run search with current query
     _onSearchChanged(_searchController.text);
   }
 
+  String? _followFilterEducationPrefsKey() {
+    return courtFollowFilterEducationPrefsKeyForUser(
+      Provider.of<AuthState>(context, listen: false).currentUser?.id,
+    );
+  }
+
+  Future<void> _loadFollowFilterEducationState() async {
+    final prefsKey = _followFilterEducationPrefsKey();
+    if (prefsKey == null) {
+      if (!mounted) return;
+      setState(() {
+        _didLoadFollowFilterEducation = true;
+        _hasCompletedFollowFilterEducation = false;
+      });
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final completed = prefs.getBool(prefsKey) ?? false;
+      if (!mounted) return;
+      setState(() {
+        _didLoadFollowFilterEducation = true;
+        _hasCompletedFollowFilterEducation = completed;
+      });
+    } catch (e) {
+      debugPrint('MAP: Failed to load court follow filter education: $e');
+      if (!mounted) return;
+      setState(() {
+        _didLoadFollowFilterEducation = true;
+        _hasCompletedFollowFilterEducation = false;
+      });
+    }
+  }
+
+  Future<void> _completeFollowFilterEducation() async {
+    if (_hasCompletedFollowFilterEducation) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _hasCompletedFollowFilterEducation = true;
+      });
+    } else {
+      _hasCompletedFollowFilterEducation = true;
+    }
+
+    final prefsKey = _followFilterEducationPrefsKey();
+    if (prefsKey == null) {
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(prefsKey, true);
+    } catch (e) {
+      debugPrint('MAP: Failed to save court follow filter education: $e');
+    }
+  }
+
+  bool get _shouldShowFollowFilterEducation =>
+      shouldShowCourtFollowFilterEducation(
+        preferenceLoaded: _didLoadFollowFilterEducation,
+        educationCompleted: _hasCompletedFollowFilterEducation,
+        followFilterMode: _followFilterMode,
+      );
+
+  Widget _buildFollowFilterEducationCallout() {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 210),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: kCourtFilterHintColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: kCourtFilterHintBorderColor.withValues(alpha: 0.95),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.only(top: 1),
+              child: Icon(
+                Icons.filter_alt_rounded,
+                size: 14,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Tap filters to see all courts.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _toggleIndoorFilter(bool? value) {
+    _dismissDeepLinkPreview();
     setState(() {
       _filterIndoor = value;
     });
@@ -496,6 +1166,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   }
 
   void _setAccessFilter(String? access) {
+    _dismissDeepLinkPreview();
     setState(() {
       _filterAccess = access;
     });
@@ -503,6 +1174,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   }
 
   Future<void> _setRunsFilter(String? filter) async {
+    _dismissDeepLinkPreview();
     if (filter == null) {
       // Clear runs filter
       setState(() {
@@ -511,9 +1183,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       });
     } else {
       try {
-        // Load court IDs with runs from API
-        final courtsWithRuns =
-            await ApiService.getCourtsWithRuns(today: filter == 'today');
+        // Load court IDs with runs from API.
+        final courtsWithRuns = await _loadCourtsWithRuns(filter);
         if (!mounted) return;
         setState(() {
           _runsFilter = filter;
@@ -538,43 +1209,31 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     }
   }
 
+  Future<Set<String>> _loadCourtsWithRuns(String filter) {
+    return ApiService.getCourtsWithRuns(today: filter == 'today');
+  }
+
+  Future<void> _loadInitialRunsFilterIfNeeded() async {
+    final filter = widget.initialRunsFilter;
+    if (filter == null) return;
+
+    _runsFilter = filter;
+    try {
+      _courtsWithRuns = await _loadCourtsWithRuns(filter);
+    } catch (e) {
+      debugPrint('MAP: Could not load initial scheduled-run filter: $e');
+      _runsFilter = null;
+      _courtsWithRuns = {};
+    }
+  }
+
   List<Court> _applyFilters(List<Court> courts) {
     var filtered = courts;
+    final checkInState = Provider.of<CheckInState>(context, listen: false);
 
-    // Followed filter - only courts the current user follows.
-    if (_showFollowedOnly) {
-      final checkInState = Provider.of<CheckInState>(context, listen: false);
-      filtered = filtered
-          .where((court) => checkInState.isFollowing(court.id))
-          .toList();
-    }
-
-    // Indoor/Outdoor filter
-    if (_filterIndoor != null) {
-      filtered =
-          filtered.where((court) => court.isIndoor == _filterIndoor).toList();
-    }
-
-    // Access filter
-    if (_filterAccess != null) {
-      if (_filterAccess == 'private') {
-        filtered = filtered
-            .where(
-                (court) => court.access == 'members' || court.access == 'paid')
-            .toList();
-      } else {
-        filtered =
-            filtered.where((court) => court.access == _filterAccess).toList();
-      }
-    }
-
-    // Runs filter (today or all upcoming)
-    if (_runsFilter != null) {
-      filtered = filtered
-          .where((court) => _courtsWithRuns.contains(court.id))
-          .toList();
-    }
-
+    filtered = filtered
+        .where((court) => _courtMatchesActiveFilters(court, checkInState))
+        .toList();
     return filtered;
   }
 
@@ -582,7 +1241,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     // Use visible bounds to filter courts - only show courts actually visible on map
     final bounds = _mapController.camera.visibleBounds;
 
-    var courtsInView = CourtService().getCourtsInBounds(
+    var courtsInView = _courtService.getCourtsInBounds(
       bounds.south,
       bounds.west,
       bounds.north,
@@ -593,12 +1252,14 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     courtsInView = _applyFilters(courtsInView);
 
     final capped = _capCourtsForPerformance(courtsInView, isSearchMode: false);
+    _prefetchTopFollowers(capped);
 
     if (mounted) {
       setState(() {
         _courts = capped;
       });
     }
+    unawaited(_loadMapHubData());
   }
 
   int _maxCourtsForZoom(double zoom) {
@@ -653,6 +1314,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   }
 
   void _zoomIn() {
+    _dismissDeepLinkPreview();
     setState(() {
       _currentZoom++;
       _mapController.move(_mapController.camera.center, _currentZoom);
@@ -660,6 +1322,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   }
 
   void _zoomOut() {
+    _dismissDeepLinkPreview();
     setState(() {
       _currentZoom--;
       _mapController.move(_mapController.camera.center, _currentZoom);
@@ -798,6 +1461,294 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     );
   }
 
+  Widget _buildCourtSelectionHint({
+    required Color accentColor,
+    required bool isPreviewCourt,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isPreviewCourt
+            ? accentColor.withOpacity(0.08)
+            : Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isPreviewCourt
+              ? accentColor.withOpacity(0.28)
+              : Colors.white.withOpacity(0.1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.touch_app_rounded,
+            size: 15,
+            color: isPreviewCourt ? accentColor : Colors.white70,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Select to see details',
+              style: TextStyle(
+                color: Colors.grey[100],
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 18,
+            color: isPreviewCourt ? accentColor : Colors.grey[400],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _courtStatusLabel(Court court, CheckInState checkInState) {
+    final hubStatus = _mapHubCourtsById[court.id]?.statusLabel;
+    if (hubStatus != null && hubStatus.trim().isNotEmpty) {
+      return hubStatus;
+    }
+    final checkInCount = checkInState.getCheckInCount(court.id);
+    if (checkInCount > 0) {
+      return checkInCount == 1 ? '1 player here' : '$checkInCount players here';
+    }
+    if (court.hasUpcomingRun) {
+      return 'Run scheduled';
+    }
+    return null;
+  }
+
+  Color _courtStatusColor(Court court, CheckInState checkInState) {
+    final hubCourt = _mapHubCourtsById[court.id];
+    if ((hubCourt?.activeCheckInCount ?? 0) > 0 ||
+        checkInState.getCheckInCount(court.id) > 0) {
+      return const Color(0xFF16A34A);
+    }
+    if (hubCourt?.nextRun != null || court.hasUpcomingRun) {
+      return const Color(0xFFFF6B35);
+    }
+    return const Color(0xFFEA580C);
+  }
+
+  Widget _buildCourtMarkerChild({
+    required Court court,
+    required double markerSize,
+    required bool isSignature,
+    required bool hasKings,
+    required bool hasActivity,
+    required CourtTopFollower? topFollower,
+    required String? statusLabel,
+    required Color statusColor,
+  }) {
+    final marker = BasketballMarker(
+      size: markerSize,
+      isLegendary: isSignature,
+      hasKing: hasKings || topFollower != null,
+      isIndoor: court.isIndoor,
+      hasActivity: hasActivity,
+      activityColor: statusColor,
+      courtImageUrl: courtMarkerImageUrlFor(court),
+      avatarUrl: topFollower?.photoUrl,
+      avatarLabel: topFollower?.name,
+      onTap: () => _zoomToCourtAndSelect(court),
+    );
+
+    if (!widget.showStatusBubbles ||
+        statusLabel == null ||
+        statusLabel.trim().isEmpty) {
+      return marker;
+    }
+
+    return SizedBox(
+      width: 132,
+      height: markerSize + 34,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          marker,
+          Positioned(
+            top: markerSize - 2,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 126),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: statusColor.withValues(alpha: 0.28)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Text(
+                statusLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapHubControls() {
+    if (!widget.showHubControls) return const SizedBox.shrink();
+
+    return Positioned(
+      left: 16,
+      bottom: 16,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _isSavingMapVisibility
+                    ? null
+                    : () => _toggleMapVisibility(
+                          !_mapHubPrivacy.mapVisibilityEnabled,
+                        ),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isSavingMapVisibility)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        Icon(
+                          _mapHubPrivacy.mapVisibilityEnabled
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          size: 18,
+                          color: _mapHubPrivacy.mapVisibilityEnabled
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFF6B7280),
+                        ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _mapHubPrivacy.mapVisibilityEnabled
+                            ? 'Visible'
+                            : 'Hidden',
+                        style: const TextStyle(
+                          color: Color(0xFF111827),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildHubIconButton(
+                  tooltip: 'Players',
+                  icon: Icons.groups_rounded,
+                  selected: _hubPlayersVisible,
+                  onTap: () => setState(
+                    () => _hubPlayersVisible = !_hubPlayersVisible,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildHubIconButton(
+                  tooltip: 'Courts',
+                  icon: Icons.sports_basketball,
+                  selected: _hubCourtsVisible,
+                  onTap: () => setState(
+                    () => _hubCourtsVisible = !_hubCourtsVisible,
+                  ),
+                ),
+                if (widget.onFeedSelected != null) ...[
+                  const SizedBox(width: 8),
+                  _buildHubIconButton(
+                    tooltip: 'Feed',
+                    icon: Icons.dynamic_feed_rounded,
+                    selected: false,
+                    onTap: widget.onFeedSelected,
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHubIconButton({
+    required String tooltip,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback? onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? const Color(0xFFFF6B35) : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.16),
+                  blurRadius: 9,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: selected ? Colors.white : const Color(0xFF111827),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -831,528 +1782,824 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       );
     }
 
+    final listCourts = buildCourtListForViewport(
+      visibleCourts: _courts,
+      previewCourt: _deepLinkPreviewCourt,
+      showPreviewCourtOnly: _showDeepLinkPreviewOnly,
+    );
+    final rawMarkerCourts =
+        _showDeepLinkPreviewOnly && _deepLinkPreviewCourt != null
+            ? [_deepLinkPreviewCourt!]
+            : _courts;
+    final markerCourts =
+        _hubCourtsVisible ? _mergeMapHubCourtData(rawMarkerCourts) : <Court>[];
+    final authState = Provider.of<AuthState>(context);
+    final currentUserMapPlayer = _currentUserMapPlayer(authState.currentUser);
+    final currentUserMapPlayerId = currentUserMapPlayer?.id;
+    final topOverlayOffset =
+        widget.showCourtList ? 16.0 : MediaQuery.of(context).padding.top + 10.0;
+
+    final mapStack = Stack(
+      children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _initialCenter,
+            initialZoom: _currentZoom,
+            onMapReady: () {
+              if (!_mapReady) {
+                setState(() {
+                  _mapReady = true;
+                });
+              }
+              final previewTarget = _currentDeepLinkTarget();
+              if (_showDeepLinkPreviewOnly && previewTarget != null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted || !_showDeepLinkPreviewOnly) {
+                    return;
+                  }
+                  _mapController.move(
+                    previewTarget,
+                    kCourtDeepLinkPreviewZoom,
+                  );
+                  setState(() {
+                    _currentZoom = kCourtDeepLinkPreviewZoom;
+                  });
+                  _updateCourtsForMapCenter();
+                  if (_deepLinkPreviewCourt != null) {
+                    _openDeepLinkCourtDetails(_deepLinkPreviewCourt!);
+                  }
+                });
+                return;
+              }
+
+              // Filter courts after map is ready and we can get bounds.
+              _updateCourtsForMapCenter();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                if (_runsFilter != null) {
+                  _maybePanToNearestCourtWithRun();
+                } else {
+                  _zoomOutUntilAtLeastOneCourtVisible();
+                }
+              });
+            },
+            onPositionChanged: (position, hasGesture) {
+              if (hasGesture && _showDeepLinkPreviewOnly) {
+                _dismissDeepLinkPreview();
+              }
+              _currentZoom = position.zoom ?? 10.0;
+              // Debounce court updates to avoid rebuilding on every frame
+              _debounceTimer?.cancel();
+              _debounceTimer = Timer(const Duration(milliseconds: 150), () {
+                _updateCourtsForMapCenter();
+              });
+            },
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.bcorbett.hooprank',
+            ),
+            MarkerLayer(
+              markers: markerCourts.map((court) {
+                // Signature courts get the crown marker and are larger
+                final isSignature = court.isSignature;
+                final hasKings = court.hasKings;
+                final topFollower = _resolvedTopFollowerForCourt(court);
+                final hasTopFollower = topFollower != null;
+                // Check if court has active check-ins
+                final checkInState =
+                    Provider.of<CheckInState>(context, listen: false);
+                final hasCheckIns = checkInState.hasCheckIns(court.id);
+                final statusLabel = _courtStatusLabel(court, checkInState);
+                final statusColor = _courtStatusColor(court, checkInState);
+
+                // Determine marker size - slightly larger for the pin design
+                double markerSize;
+
+                if (isSignature) {
+                  markerSize = 50;
+                } else if (court.isIndoor) {
+                  markerSize = 42;
+                } else if (hasKings) {
+                  markerSize = 46;
+                } else {
+                  markerSize = 40;
+                }
+
+                if (hasTopFollower) {
+                  markerSize *= 1.25;
+                }
+
+                // Scale up selected court slightly
+                // (If we had selected court state easily accessible here)
+
+                return Marker(
+                  point: LatLng(court.lat, court.lng),
+                  width: widget.showStatusBubbles &&
+                          statusLabel != null &&
+                          statusLabel.trim().isNotEmpty
+                      ? 132
+                      : markerSize,
+                  height: widget.showStatusBubbles &&
+                          statusLabel != null &&
+                          statusLabel.trim().isNotEmpty
+                      ? markerSize + 34
+                      : markerSize,
+                  alignment: Alignment.topCenter,
+                  child: _buildCourtMarkerChild(
+                    court: court,
+                    markerSize: markerSize,
+                    isSignature: isSignature,
+                    hasKings: hasKings,
+                    hasActivity: hasCheckIns ||
+                        (_mapHubCourtsById[court.id]?.activeCheckInCount ?? 0) >
+                            0 ||
+                        (_mapHubCourtsById[court.id]?.court.hasUpcomingRun ??
+                            false) ||
+                        court.hasUpcomingRun,
+                    topFollower: topFollower,
+                    statusLabel: statusLabel,
+                    statusColor: statusColor,
+                  ),
+                );
+              }).toList(),
+            ),
+            if (widget.showPlayers && _hubPlayersVisible)
+              MarkerLayer(
+                markers: _mapHubPlayers
+                    .where((player) => player.lat != 0 || player.lng != 0)
+                    .where((player) => player.id != currentUserMapPlayerId)
+                    .map(
+                      (player) => Marker(
+                        point: LatLng(player.lat, player.lng),
+                        width: PlayerMapMarker.markerWidth,
+                        height: PlayerMapMarker.markerHeight,
+                        alignment: Alignment.topCenter,
+                        child: PlayerMapMarker(
+                          player: player,
+                          onTap: () => widget.onPlayerSelected?.call(player),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            if (currentUserMapPlayer != null)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: LatLng(
+                      currentUserMapPlayer.lat,
+                      currentUserMapPlayer.lng,
+                    ),
+                    width: PlayerMapMarker.markerWidth,
+                    height: PlayerMapMarker.markerHeight,
+                    alignment: Alignment.topCenter,
+                    child: PlayerMapMarker(
+                      player: currentUserMapPlayer,
+                      // Un-customized: tap nudges to profile setup.
+                      // Customized: tap opens the status preset sheet.
+                      onTap: flatAvatarSvg(currentUserMapPlayer.avatarConfig) ==
+                              null
+                          ? () => context.go('/profile/setup?returnTo=/play')
+                          : () => PlayerStatusSheet.show(context),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        Positioned(
+          top: topOverlayOffset,
+          left: 16,
+          right: 16,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Search bar
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search courts...',
+                    prefixIcon: Icon(Icons.search),
+                    border: InputBorder.none,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                  onChanged: _onSearchChanged,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Simplified filter row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Scheduled Runs dropdown (primary)
+                  Expanded(
+                    child: PopupMenuButton<String>(
+                      onOpened: () {},
+                      onSelected: (value) async {
+                        if (value == 'off') {
+                          await _setRunsFilter(null);
+                          return;
+                        }
+
+                        await _setRunsFilter(value);
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'today',
+                          child: Row(
+                            children: [
+                              Icon(Icons.today,
+                                  size: 18,
+                                  color: _runsFilter == 'today'
+                                      ? Colors.deepOrange
+                                      : null),
+                              const SizedBox(width: 8),
+                              Text('Today',
+                                  style: TextStyle(
+                                      color: _runsFilter == 'today'
+                                          ? Colors.deepOrange
+                                          : null)),
+                              if (_runsFilter == 'today') const Spacer(),
+                              if (_runsFilter == 'today')
+                                const Icon(Icons.check,
+                                    size: 16, color: Colors.deepOrange),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'all',
+                          child: Container(
+                            width: double.infinity,
+                            child: Row(
+                              children: [
+                                Icon(Icons.calendar_month,
+                                    size: 18,
+                                    color: _runsFilter == 'all'
+                                        ? Colors.deepOrange
+                                        : null),
+                                const SizedBox(width: 8),
+                                Text('All Upcoming',
+                                    style: TextStyle(
+                                        color: _runsFilter == 'all'
+                                            ? Colors.deepOrange
+                                            : null)),
+                                if (_runsFilter == 'all') const Spacer(),
+                                if (_runsFilter == 'all')
+                                  const Icon(Icons.check,
+                                      size: 16, color: Colors.deepOrange),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_runsFilter != null) ...[
+                          const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            value: 'off',
+                            child: Row(
+                              children: [
+                                Icon(Icons.close, size: 18, color: Colors.grey),
+                                SizedBox(width: 8),
+                                Text('Clear Filter',
+                                    style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _runsFilter != null
+                              ? const Color(0xFFFF5722)
+                              : Colors.grey[800],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              size: 16,
+                              color: _runsFilter != null
+                                  ? Colors.white
+                                  : Colors.grey[400],
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _runsFilter == 'today'
+                                  ? 'Today'
+                                  : (_runsFilter == 'all'
+                                      ? 'All Runs'
+                                      : 'Find Runs'),
+                              style: TextStyle(
+                                color: _runsFilter != null
+                                    ? Colors.white
+                                    : Colors.grey[400],
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              size: 16,
+                              color: _runsFilter != null
+                                  ? Colors.white
+                                  : Colors.grey[400],
+                            ),
+                            if (_courtsWithRuns.isNotEmpty) ...[
+                              const SizedBox(width: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${_courtsWithRuns.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Indoor/Outdoor filter dropdown
+                          PopupMenuButton<String>(
+                            onSelected: (value) {
+                              switch (value) {
+                                case 'all':
+                                  setState(() {
+                                    _filterIndoor = null;
+                                  });
+                                  _onSearchChanged(_searchController.text);
+                                  break;
+                                case 'indoor':
+                                  _toggleIndoorFilter(
+                                      _filterIndoor == true ? null : true);
+                                  break;
+                                case 'outdoor':
+                                  _toggleIndoorFilter(
+                                      _filterIndoor == false ? null : false);
+                                  break;
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'all',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.clear_all, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Show All'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
+                              PopupMenuItem(
+                                value: 'indoor',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.home,
+                                      size: 18,
+                                      color: _filterIndoor == true
+                                          ? kCourtFilterAccentColor
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Indoor',
+                                      style: TextStyle(
+                                        color: _filterIndoor == true
+                                            ? kCourtFilterAccentColor
+                                            : null,
+                                      ),
+                                    ),
+                                    if (_filterIndoor == true) const Spacer(),
+                                    if (_filterIndoor == true)
+                                      const Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: kCourtFilterAccentColor,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'outdoor',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.wb_sunny,
+                                      size: 18,
+                                      color: _filterIndoor == false
+                                          ? kCourtFilterAccentColor
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Outdoor',
+                                      style: TextStyle(
+                                        color: _filterIndoor == false
+                                            ? kCourtFilterAccentColor
+                                            : null,
+                                      ),
+                                    ),
+                                    if (_filterIndoor == false) const Spacer(),
+                                    if (_filterIndoor == false)
+                                      const Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: kCourtFilterAccentColor,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: _filterIndoor != null
+                                    ? kCourtFilterAccentColor
+                                    : Colors.grey[800],
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _filterIndoor != null
+                                      ? kCourtFilterAccentBorderColor
+                                      : Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _filterIndoor == true
+                                        ? 'Indoor'
+                                        : (_filterIndoor == false
+                                            ? 'Outdoor'
+                                            : 'All'),
+                                    style: TextStyle(
+                                      color: _filterIndoor != null
+                                          ? Colors.white
+                                          : Colors.grey[400],
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.filter_alt_rounded,
+                                    size: 15,
+                                    color: _filterIndoor != null
+                                        ? Colors.white
+                                        : Colors.grey[400],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Followed scope chip (heart icon only) — last
+                          Consumer<CheckInState>(
+                            builder: (context, checkInState, _) {
+                              final followedCount =
+                                  _followFilterCount(checkInState);
+                              return PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case 'all':
+                                      _setFollowFilter(
+                                          CourtFollowFilterMode.all);
+                                      unawaited(
+                                          _completeFollowFilterEducation());
+                                      break;
+                                    case 'mine':
+                                      _setFollowFilter(
+                                          CourtFollowFilterMode.mine);
+                                      break;
+                                    case 'followed':
+                                      _setFollowFilter(
+                                        CourtFollowFilterMode.allFollowed,
+                                      );
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: 'all',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.clear_all,
+                                          size: 18,
+                                          color: _followFilterMode ==
+                                                  CourtFollowFilterMode.all
+                                              ? kCourtFilterAccentColor
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'All Courts',
+                                          style: TextStyle(
+                                            color: _followFilterMode ==
+                                                    CourtFollowFilterMode.all
+                                                ? kCourtFilterAccentColor
+                                                : null,
+                                          ),
+                                        ),
+                                        if (_followFilterMode ==
+                                            CourtFollowFilterMode.all)
+                                          const Spacer(),
+                                        if (_followFilterMode ==
+                                            CourtFollowFilterMode.all)
+                                          const Icon(
+                                            Icons.check,
+                                            size: 16,
+                                            color: kCourtFilterAccentColor,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'mine',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.favorite_rounded,
+                                          size: 18,
+                                          color: _followFilterMode ==
+                                                  CourtFollowFilterMode.mine
+                                              ? kCourtFilterAccentColor
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'My Follows',
+                                          style: TextStyle(
+                                            color: _followFilterMode ==
+                                                    CourtFollowFilterMode.mine
+                                                ? kCourtFilterAccentColor
+                                                : null,
+                                          ),
+                                        ),
+                                        if (_followFilterMode ==
+                                            CourtFollowFilterMode.mine)
+                                          const Spacer(),
+                                        if (_followFilterMode ==
+                                            CourtFollowFilterMode.mine)
+                                          const Icon(
+                                            Icons.check,
+                                            size: 16,
+                                            color: kCourtFilterAccentColor,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'followed',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.favorite_rounded,
+                                          size: 18,
+                                          color: _followFilterMode ==
+                                                  CourtFollowFilterMode
+                                                      .allFollowed
+                                              ? kCourtFilterAccentColor
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'All Follows',
+                                          style: TextStyle(
+                                            color: _followFilterMode ==
+                                                    CourtFollowFilterMode
+                                                        .allFollowed
+                                                ? kCourtFilterAccentColor
+                                                : null,
+                                          ),
+                                        ),
+                                        if (_followFilterMode ==
+                                            CourtFollowFilterMode.allFollowed)
+                                          const Spacer(),
+                                        if (_followFilterMode ==
+                                            CourtFollowFilterMode.allFollowed)
+                                          const Icon(
+                                            Icons.check,
+                                            size: 16,
+                                            color: kCourtFilterAccentColor,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 10, horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: _followFilterMode !=
+                                            CourtFollowFilterMode.all
+                                        ? kCourtFilterAccentColor
+                                        : Colors.grey[800],
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: _followFilterMode !=
+                                              CourtFollowFilterMode.all
+                                          ? kCourtFilterAccentBorderColor
+                                          : Colors.white
+                                              .withValues(alpha: 0.08),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _followFilterMode !=
+                                                CourtFollowFilterMode.all
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        size: 18,
+                                        color: _followFilterMode !=
+                                                CourtFollowFilterMode.all
+                                            ? Colors.white
+                                            : Colors.grey[400],
+                                      ),
+                                      if (followedCount > 0) ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 5, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.2),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            '$followedCount',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(width: 2),
+                                      Icon(
+                                        Icons.filter_alt_rounded,
+                                        size: 15,
+                                        color: _followFilterMode !=
+                                                CourtFollowFilterMode.all
+                                            ? Colors.white
+                                            : Colors.grey[400],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      if (_shouldShowFollowFilterEducation) ...[
+                        const SizedBox(height: 6),
+                        _buildFollowFilterEducationCallout(),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+              if (_courtsTotalBeforeCap != null &&
+                  _courtsCapLimit != null &&
+                  _courtsTotalBeforeCap! > _courtsCapLimit!) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.zoom_in,
+                          size: 16, color: Colors.white70),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Showing $_courtsCapLimit of $_courtsTotalBeforeCap courts. Zoom in to see more.',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FloatingActionButton(
+                heroTag: 'zoom_in',
+                mini: true,
+                onPressed: _zoomIn,
+                child: const Icon(Icons.add),
+              ),
+              const SizedBox(height: 8),
+              FloatingActionButton(
+                heroTag: 'zoom_out',
+                mini: true,
+                onPressed: _zoomOut,
+                child: const Icon(Icons.remove),
+              ),
+              const SizedBox(height: 16),
+              FloatingActionButton(
+                heroTag: 'my_location',
+                onPressed: _moveToUserLocation,
+                child: const Icon(Icons.my_location),
+              ),
+            ],
+          ),
+        ),
+        _buildMapHubControls(),
+      ],
+    );
+
+    if (!widget.showCourtList) {
+      return mapStack;
+    }
+
     return Column(
       children: [
         Expanded(
           flex: 2,
-          child: Stack(
-            children: [
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: _initialCenter,
-                  initialZoom: _currentZoom,
-                  onMapReady: () {
-                    // Filter courts after map is ready and we can get bounds
-                    _updateCourtsForMapCenter();
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) return;
-                      _zoomOutUntilAtLeastOneCourtVisible();
-                    });
-                  },
-                  onPositionChanged: (position, hasGesture) {
-                    _currentZoom = position.zoom ?? 10.0;
-                    // Debounce court updates to avoid rebuilding on every frame
-                    _debounceTimer?.cancel();
-                    _debounceTimer =
-                        Timer(const Duration(milliseconds: 150), () {
-                      _updateCourtsForMapCenter();
-                    });
-                  },
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.bcorbett.hooprank',
-                  ),
-                  MarkerLayer(
-                    markers: _courts.map((court) {
-                      // Signature courts get the crown marker and are larger
-                      final isSignature = court.isSignature;
-                      final hasKings = court.hasKings;
-                      // Check if court has active check-ins
-                      final checkInState =
-                          Provider.of<CheckInState>(context, listen: false);
-                      final hasCheckIns = checkInState.hasCheckIns(court.id);
-
-                      // Determine marker size - slightly larger for the pin design
-                      double markerSize;
-
-                      if (isSignature) {
-                        markerSize = 50;
-                      } else if (court.isIndoor) {
-                        markerSize = 42;
-                      } else if (hasKings) {
-                        markerSize = 46;
-                      } else {
-                        markerSize = 40;
-                      }
-
-                      // Scale up selected court slightly
-                      // (If we had selected court state easily accessible here)
-
-                      return Marker(
-                        point: LatLng(court.lat, court.lng),
-                        width: markerSize,
-                        height: markerSize,
-                        alignment: Alignment.topCenter,
-                        child: BasketballMarker(
-                          size: markerSize,
-                          isLegendary: isSignature,
-                          hasKing: hasKings,
-                          isIndoor: court.isIndoor,
-                          hasActivity: hasCheckIns,
-                          onTap: () => _zoomToCourtAndSelect(court),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-              Positioned(
-                top: 16,
-                left: 16,
-                right: 16,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Search bar
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search courts...',
-                          prefixIcon: Icon(Icons.search),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
-                        ),
-                        onChanged: _onSearchChanged,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Simplified filter row
-                    Row(
-                      children: [
-                        // Scheduled Runs dropdown (primary)
-                        Expanded(
-                          child: PopupMenuButton<String>(
-                            onOpened: () {},
-                            onSelected: (value) async {
-                              if (value == 'off') {
-                                await _setRunsFilter(null);
-                                return;
-                              }
-
-                              await _setRunsFilter(value);
-                            },
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'today',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.today,
-                                        size: 18,
-                                        color: _runsFilter == 'today'
-                                            ? Colors.deepOrange
-                                            : null),
-                                    const SizedBox(width: 8),
-                                    Text('Today',
-                                        style: TextStyle(
-                                            color: _runsFilter == 'today'
-                                                ? Colors.deepOrange
-                                                : null)),
-                                    if (_runsFilter == 'today') const Spacer(),
-                                    if (_runsFilter == 'today')
-                                      const Icon(Icons.check,
-                                          size: 16, color: Colors.deepOrange),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'all',
-                                child: Container(
-                                  width: double.infinity,
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.calendar_month,
-                                          size: 18,
-                                          color: _runsFilter == 'all'
-                                              ? Colors.deepOrange
-                                              : null),
-                                      const SizedBox(width: 8),
-                                      Text('All Upcoming',
-                                          style: TextStyle(
-                                              color: _runsFilter == 'all'
-                                                  ? Colors.deepOrange
-                                                  : null)),
-                                      if (_runsFilter == 'all') const Spacer(),
-                                      if (_runsFilter == 'all')
-                                        const Icon(Icons.check,
-                                            size: 16, color: Colors.deepOrange),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              if (_runsFilter != null) ...[
-                                const PopupMenuDivider(),
-                                const PopupMenuItem(
-                                  value: 'off',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.close,
-                                          size: 18, color: Colors.grey),
-                                      SizedBox(width: 8),
-                                      Text('Clear Filter',
-                                          style: TextStyle(color: Colors.grey)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              decoration: BoxDecoration(
-                                color: _runsFilter != null
-                                    ? const Color(0xFFFF5722)
-                                    : Colors.grey[800],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.calendar_today,
-                                    size: 16,
-                                    color: _runsFilter != null
-                                        ? Colors.white
-                                        : Colors.grey[400],
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _runsFilter == 'today'
-                                        ? 'Today'
-                                        : (_runsFilter == 'all'
-                                            ? 'All Runs'
-                                            : 'Find Runs'),
-                                    style: TextStyle(
-                                      color: _runsFilter != null
-                                          ? Colors.white
-                                          : Colors.grey[400],
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Icon(
-                                    Icons.arrow_drop_down,
-                                    size: 16,
-                                    color: _runsFilter != null
-                                        ? Colors.white
-                                        : Colors.grey[400],
-                                  ),
-                                  if (_courtsWithRuns.isNotEmpty) ...[
-                                    const SizedBox(width: 2),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 5, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        '${_courtsWithRuns.length}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Indoor/Outdoor filter dropdown
-                        PopupMenuButton<String>(
-                          onSelected: (value) {
-                            switch (value) {
-                              case 'all':
-                                setState(() {
-                                  _filterIndoor = null;
-                                  _filterAccess = null;
-                                  _runsFilter = null;
-                                  _showFollowedOnly = false;
-                                  _courtsWithRuns = {};
-                                });
-                                _onSearchChanged(_searchController.text);
-                                break;
-                              case 'indoor':
-                                _toggleIndoorFilter(
-                                    _filterIndoor == true ? null : true);
-                                break;
-                              case 'outdoor':
-                                _toggleIndoorFilter(
-                                    _filterIndoor == false ? null : false);
-                                break;
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'all',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.clear_all, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Show All'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuDivider(),
-                            PopupMenuItem(
-                              value: 'indoor',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.home,
-                                      size: 18,
-                                      color: _filterIndoor == true
-                                          ? Colors.blue
-                                          : null),
-                                  const SizedBox(width: 8),
-                                  Text('Indoor',
-                                      style: TextStyle(
-                                          color: _filterIndoor == true
-                                              ? Colors.blue
-                                              : null)),
-                                  if (_filterIndoor == true) const Spacer(),
-                                  if (_filterIndoor == true)
-                                    const Icon(Icons.check,
-                                        size: 16, color: Colors.blue),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'outdoor',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.wb_sunny,
-                                      size: 18,
-                                      color: _filterIndoor == false
-                                          ? Colors.grey[700]
-                                          : null),
-                                  const SizedBox(width: 8),
-                                  Text('Outdoor',
-                                      style: TextStyle(
-                                          color: _filterIndoor == false
-                                              ? Colors.grey[700]
-                                              : null)),
-                                  if (_filterIndoor == false) const Spacer(),
-                                  if (_filterIndoor == false)
-                                    Icon(Icons.check,
-                                        size: 16, color: Colors.grey[700]),
-                                ],
-                              ),
-                            ),
-                          ],
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _filterIndoor != null
-                                  ? const Color(0xFF00C853)
-                                  : Colors.grey[800],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _filterIndoor == true
-                                      ? 'Indoor'
-                                      : (_filterIndoor == false
-                                          ? 'Outdoor'
-                                          : 'All'),
-                                  style: TextStyle(
-                                    color: _filterIndoor != null
-                                        ? Colors.white
-                                        : Colors.grey[400],
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.arrow_drop_down,
-                                  size: 18,
-                                  color: _filterIndoor != null
-                                      ? Colors.white
-                                      : Colors.grey[400],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Followed chip (heart icon only) — last
-                        Consumer<CheckInState>(
-                          builder: (context, checkInState, _) {
-                            final followedCount =
-                                checkInState.followedCourts.length;
-                            return GestureDetector(
-                              onTap: _toggleFollowedFilter,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 10, horizontal: 12),
-                                decoration: BoxDecoration(
-                                  color: _showFollowedOnly
-                                      ? Colors.red
-                                      : Colors.grey[800],
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      _showFollowedOnly
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      size: 18,
-                                      color: _showFollowedOnly
-                                          ? Colors.white
-                                          : Colors.grey[400],
-                                    ),
-                                    if (followedCount > 0) ...[
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.2),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          '$followedCount',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    if (_courtsTotalBeforeCap != null &&
-                        _courtsCapLimit != null &&
-                        _courtsTotalBeforeCap! > _courtsCapLimit!) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.55),
-                          borderRadius: BorderRadius.circular(10),
-                          border:
-                              Border.all(color: Colors.white.withOpacity(0.08)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.zoom_in,
-                                size: 16, color: Colors.white70),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Showing $_courtsCapLimit of $_courtsTotalBeforeCap courts. Zoom in to see more.',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Positioned(
-                bottom: 16,
-                right: 16,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FloatingActionButton(
-                      heroTag: 'zoom_in',
-                      mini: true,
-                      onPressed: _zoomIn,
-                      child: const Icon(Icons.add),
-                    ),
-                    const SizedBox(height: 8),
-                    FloatingActionButton(
-                      heroTag: 'zoom_out',
-                      mini: true,
-                      onPressed: _zoomOut,
-                      child: const Icon(Icons.remove),
-                    ),
-                    const SizedBox(height: 16),
-                    FloatingActionButton(
-                      heroTag: 'my_location',
-                      onPressed: _moveToUserLocation,
-                      child: const Icon(Icons.my_location),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          child: mapStack,
         ),
         Expanded(
           flex: 1,
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            itemCount: _courts.length,
+            itemCount: listCourts.length,
             itemBuilder: (context, index) {
-              final court = _courts[index];
+              final court = listCourts[index];
+              final isPreviewCourt = _showDeepLinkPreviewOnly &&
+                  _deepLinkPreviewCourt?.id == court.id;
 
-              // Determine assets and styling
-              String listMarkerAsset;
+              // Determine image and styling
+              final listMarkerImageUrl = courtMarkerImageUrlFor(court);
               Color accentColor;
 
               if (court.isSignature) {
-                listMarkerAsset = 'assets/court_marker_signature_crown.jpg';
                 accentColor = Colors.amber;
               } else if (court.hasKings) {
-                listMarkerAsset = 'assets/court_marker_king.jpg';
                 accentColor = Colors.orange;
               } else {
-                listMarkerAsset = 'assets/court_marker.jpg';
                 accentColor = const Color(0xFF00C853); // HoopRank Green default
               }
 
               return Consumer<CheckInState>(
                 builder: (context, checkInState, _) {
                   final isFollowing = checkInState.isFollowing(court.id);
-                  final followerCount = checkInState.getFollowerCount(court.id);
                   final checkInCount = checkInState.getCheckInCount(court.id);
                   final hasActivity = checkInCount > 0;
+                  const previewAccentColor = Color(0xFFFF7A45);
 
                   return Container(
                     key: index == 0 ? null : null,
@@ -1361,15 +2608,24 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                       color: const Color(0xFF1E1E1E),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                          color: hasActivity
-                              ? const Color(0xFF00C853).withOpacity(0.3)
-                              : Colors.white.withOpacity(0.05)),
+                          color: isPreviewCourt
+                              ? previewAccentColor.withOpacity(0.7)
+                              : hasActivity
+                                  ? const Color(0xFF00C853).withOpacity(0.3)
+                                  : Colors.white.withOpacity(0.05),
+                          width: isPreviewCourt ? 1.6 : 1),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.2),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
+                        if (isPreviewCourt)
+                          BoxShadow(
+                            color: previewAccentColor.withOpacity(0.18),
+                            blurRadius: 18,
+                            offset: const Offset(0, 10),
+                          ),
                       ],
                     ),
                     child: Material(
@@ -1392,9 +2648,17 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                                           ? const Color(0xFF00C853)
                                           : accentColor.withOpacity(0.5),
                                       width: 2),
-                                  image: DecorationImage(
-                                    image: AssetImage(listMarkerAsset),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: HoopRankAvatarImage(
+                                    imageUrl: listMarkerImageUrl,
+                                    width: 56,
+                                    height: 56,
                                     fit: BoxFit.cover,
+                                    fallback: _CourtListImageFallback(
+                                      accentColor: accentColor,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1420,6 +2684,34 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                                             ),
                                           ),
                                         ),
+                                        if (isPreviewCourt) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: previewAccentColor
+                                                  .withOpacity(0.16),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                              border: Border.all(
+                                                color: previewAccentColor
+                                                    .withOpacity(0.4),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'MAP PREVIEW',
+                                              style: TextStyle(
+                                                color: previewAccentColor,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                         if (hasActivity) ...[
                                           const SizedBox(width: 8),
                                           Container(
@@ -1468,6 +2760,14 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                                           ],
                                         ),
                                       ),
+
+                                    const SizedBox(height: 10),
+                                    _buildCourtSelectionHint(
+                                      accentColor: isPreviewCourt
+                                          ? previewAccentColor
+                                          : accentColor,
+                                      isPreviewCourt: isPreviewCourt,
+                                    ),
 
                                     // Bottom Row: Kings & Followers
                                     const SizedBox(height: 8),
@@ -1568,4 +2868,64 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       ],
     );
   }
+}
+
+class _CourtListImageFallback extends StatelessWidget {
+  final Color accentColor;
+
+  const _CourtListImageFallback({required this.accentColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            accentColor.withValues(alpha: 0.86),
+            const Color(0xFF111827),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _CourtListFallbackPainter(),
+            ),
+          ),
+          Icon(
+            Icons.sports_basketball,
+            color: Colors.white.withValues(alpha: 0.32),
+            size: 22,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CourtListFallbackPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final line = Paint()
+      ..color = Colors.white.withValues(alpha: 0.72)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+
+    final court = rect.deflate(8);
+    canvas.drawRect(court, line);
+    canvas.drawLine(
+      Offset(court.center.dx, court.top),
+      Offset(court.center.dx, court.bottom),
+      line,
+    );
+    canvas.drawCircle(court.center, 5, line);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CourtListFallbackPainter oldDelegate) => false;
 }

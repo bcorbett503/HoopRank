@@ -42,7 +42,11 @@ class HomePrimaryActionSection extends StatelessWidget {
         if (recommended == null) return _buildLoadingCard();
         return _buildRecommendedCard(context, recommended!);
       case HomePrimaryActionState.inviteFallback:
-        return _buildInviteCard(context);
+        return InviteFriendActionButton(
+          isSubmitting: isSubmitting,
+          onPressed: onInvitePressed,
+          onDismissPressed: onDismissInvitePressed,
+        );
     }
   }
 
@@ -93,7 +97,7 @@ class HomePrimaryActionSection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.deepOrange.withOpacity(0.1),
+                  color: Colors.deepOrange.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.recommend,
@@ -118,7 +122,7 @@ class HomePrimaryActionSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFF2C3E50),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+            border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,81 +322,81 @@ class HomePrimaryActionSection extends StatelessWidget {
       ],
     );
   }
+}
 
-  Widget _buildInviteCard(BuildContext context) {
+class InviteFriendActionButton extends StatelessWidget {
+  final bool isSubmitting;
+  final VoidCallback onPressed;
+  final VoidCallback? onDismissPressed;
+
+  const InviteFriendActionButton({
+    super.key,
+    required this.isSubmitting,
+    required this.onPressed,
+    this.onDismissPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2C3E50),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.lightBlueAccent.withOpacity(0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.group_add,
-                  color: Colors.lightBlueAccent, size: 16),
-              const SizedBox(width: 6),
-              const Expanded(
-                child: Text(
-                  'Invite someone to play 1v1',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isSubmitting ? null : onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2C3E50).withValues(alpha: 0.68),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Row(
+              children: [
+                isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.person_add_alt_1,
+                        color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isSubmitting ? 'Preparing invite...' : 'Invite a friend',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              if (onDismissInvitePressed != null)
-                IconButton(
-                  onPressed: onDismissInvitePressed,
-                  icon: const Icon(Icons.close, size: 18),
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints.tightFor(width: 24, height: 24),
-                  splashRadius: 14,
-                  color: Colors.white70,
-                  tooltip: 'Dismiss',
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'No strong matchup right now.',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 11,
-              height: 1.2,
+                if (onDismissPressed != null) ...[
+                  const SizedBox(width: 10),
+                  IconButton(
+                    onPressed: onDismissPressed,
+                    tooltip: 'Hide',
+                    icon: const Icon(Icons.close, size: 18),
+                    color: Colors.white70,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints.tightFor(width: 28, height: 28),
+                    splashRadius: 16,
+                  ),
+                ] else
+                  const SizedBox(width: 20),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: isSubmitting ? null : onInvitePressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.lightBlueAccent.withOpacity(0.2),
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(38),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-              ),
-              icon: isSubmitting
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.share, size: 14),
-              label: Text(isSubmitting ? 'Preparing...' : 'Send invite link'),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

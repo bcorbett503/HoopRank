@@ -130,8 +130,17 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
 
     if (confirm == true) {
       try {
-        await ApiService.leaveTeam(widget.teamId);
-        if (mounted) Navigator.pop(context);
+        // leaveTeam returns false on non-2xx without throwing — don't leave
+        // the screen (and imply success) if the request didn't take.
+        final ok = await ApiService.leaveTeam(widget.teamId);
+        if (!mounted) return;
+        if (ok) {
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not leave team. Try again.')),
+          );
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -164,8 +173,15 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
 
     if (confirm == true) {
       try {
-        await ApiService.deleteTeam(widget.teamId);
-        if (mounted) Navigator.pop(context);
+        final ok = await ApiService.deleteTeam(widget.teamId);
+        if (!mounted) return;
+        if (ok) {
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not delete team. Try again.')),
+          );
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -721,7 +737,10 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
         backgroundColor: isPending ? Colors.grey[300] : Colors.deepOrange[100],
         child: member['photoUrl'] == null
             ? Text(
-                (member['name'] ?? '?')[0].toUpperCase(),
+                () {
+                  final n = (member['name'] ?? '').toString();
+                  return n.isNotEmpty ? n[0].toUpperCase() : '?';
+                }(),
                 style: TextStyle(color: isPending ? Colors.grey : Colors.deepOrange),
               )
             : null,
