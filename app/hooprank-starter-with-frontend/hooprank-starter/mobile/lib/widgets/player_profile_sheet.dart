@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../state/check_in_state.dart';
 import '../screens/chat_screen.dart';
+import '../utils/default_avatar_variants.dart';
+import '../utils/flat_avatar.dart';
 import '../utils/image_utils.dart';
+
+/// Shared palette for the dark profile sheet — matches the permission
+/// prompts and status sheet (surface #141E28, brand orange accents).
+const Color _sheetSurface = Color(0xFF141E28);
+const Color _cardSurface = Color(0x10FFFFFF); // white @ ~6%
+const Color _brandOrange = Color(0xFFFF6B35);
+Color _ink(double alpha) => Colors.white.withValues(alpha: alpha);
 
 /// A clickable player name that shows their profile when tapped
 class ClickablePlayerName extends StatelessWidget {
@@ -179,6 +189,8 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
         rating = double.tryParse(ratingValue) ?? 3.0;
       }
 
+      final rawAvatarConfig =
+          profileData['avatarConfig'] ?? profileData['avatar_config'];
       final user = User(
         id: widget.userId,
         name: profileData['name']?.toString() ?? 'Unknown',
@@ -190,6 +202,11 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
         matchesPlayed: (profileData['matchesPlayed'] as int?) ?? 0,
         wins: (profileData['wins'] as int?) ?? 0,
         height: profileData['height']?.toString(),
+        // Carry the avatar config through so the sheet can render the
+        // player's flat avatar (or their deterministic default).
+        avatarConfig: rawAvatarConfig is Map
+            ? Map<String, dynamic>.from(rawAvatarConfig)
+            : null,
       );
 
       setState(() {
@@ -212,11 +229,11 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
       return Container(
         height: 300,
         decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          color: _sheetSurface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: const Center(
-          child: CircularProgressIndicator(color: Colors.deepOrange),
+          child: CircularProgressIndicator(color: _brandOrange),
         ),
       );
     }
@@ -225,17 +242,17 @@ class _LoadingProfileSheetState extends State<_LoadingProfileSheet> {
       return Container(
         height: 200,
         decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          color: _sheetSurface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+              Icon(Icons.error_outline, size: 48, color: _ink(0.35)),
               const SizedBox(height: 16),
               Text(_error ?? 'Player not found',
-                  style: TextStyle(color: Colors.grey[600])),
+                  style: TextStyle(color: _ink(0.6))),
             ],
           ),
         ),
@@ -376,8 +393,8 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
 
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        color: _sheetSurface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.7,
@@ -399,29 +416,18 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 20),
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
+                        color: _ink(0.18),
+                        borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                   ),
 
-                  // Player header
+                  // Player header — the flat avatar is the hero (their own
+                  // if customized, else their deterministic default), with
+                  // the photo as a small corner badge, Snapchat-style.
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundImage: player.photoUrl != null
-                            ? safeImageProvider(player.photoUrl!)
-                            : null,
-                        backgroundColor: Colors.deepOrange[50],
-                        child: player.photoUrl == null
-                            ? Text(
-                                player.name.isNotEmpty ? player.name[0] : '?',
-                                style: TextStyle(
-                                    fontSize: 32,
-                                    color: Colors.deepOrange[800]))
-                            : null,
-                      ),
+                      _AvatarHero(player: player),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -430,8 +436,10 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             Text(
                               player.name,
                               style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 23,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: -0.3,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -450,12 +458,12 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                               Row(
                                 children: [
                                   Icon(Icons.location_city,
-                                      size: 14, color: Colors.grey[600]),
+                                      size: 14, color: _ink(0.55)),
                                   const SizedBox(width: 4),
                                   Text(
                                     city ?? _getCityName(zip),
                                     style: TextStyle(
-                                        color: Colors.grey[600], fontSize: 13),
+                                        color: _ink(0.55), fontSize: 13),
                                   ),
                                 ],
                               ),
@@ -497,7 +505,9 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                               isFollowing
                                   ? Icons.favorite
                                   : Icons.favorite_border,
-                              color: isFollowing ? Colors.red : Colors.grey,
+                              color: isFollowing
+                                  ? const Color(0xFFF87171)
+                                  : _ink(0.45),
                               size: 28,
                             ),
                           );
@@ -538,14 +548,19 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                                     );
                                   });
                                 },
-                          icon: const Icon(Icons.message),
+                          icon: const Icon(Icons.message, size: 20),
                           label: const Text('Message'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[100],
-                            foregroundColor: Colors.deepOrange,
+                            backgroundColor: _cardSurface,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(
-                                color: Colors.deepOrange.withOpacity(0.3)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            side: BorderSide(color: _ink(0.14), width: 0.5),
+                            textStyle: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 15),
                           ),
                         ),
                       ),
@@ -575,12 +590,18 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                                     );
                                   });
                                 },
-                          icon: const Icon(Icons.sports_basketball),
+                          icon: const Icon(Icons.sports_basketball, size: 20),
                           label: const Text('Challenge'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepOrange,
+                            backgroundColor: _brandOrange,
                             foregroundColor: Colors.white,
+                            elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            textStyle: const TextStyle(
+                                fontWeight: FontWeight.w900, fontSize: 15),
                           ),
                         ),
                       ),
@@ -598,12 +619,17 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             widget.onInviteToTeam?.call();
                           });
                         },
-                        icon: const Icon(Icons.group_add),
+                        icon: const Icon(Icons.group_add, size: 20),
                         label: const Text('Invite to Team'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.blue,
-                          side: const BorderSide(color: Colors.blue),
+                          foregroundColor: const Color(0xFF38BDF8),
+                          side: const BorderSide(color: Color(0x6638BDF8)),
                           padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          textStyle: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 15),
                         ),
                       ),
                     ),
@@ -612,7 +638,7 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                   // Report & Block buttons (Guideline 1.2)
                   if (!isSelf) ...[
                     const SizedBox(height: 16),
-                    const Divider(),
+                    Divider(color: _ink(0.08)),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -622,9 +648,12 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             icon: const Icon(Icons.flag_outlined, size: 18),
                             label: const Text('Report'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.orange,
-                              side: const BorderSide(color: Colors.orange),
+                              foregroundColor: const Color(0xFFFBBF24),
+                              side: const BorderSide(color: Color(0x66FBBF24)),
                               padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
                             ),
                           ),
                         ),
@@ -635,9 +664,12 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                             icon: const Icon(Icons.block, size: 18),
                             label: const Text('Block'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
+                              foregroundColor: const Color(0xFFF87171),
+                              side: const BorderSide(color: Color(0x66F87171)),
                               padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
                             ),
                           ),
                         ),
@@ -651,15 +683,15 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                   const Text(
                     'Player Stats',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 12),
                   _isLoading
                       ? const Center(
-                          child: CircularProgressIndicator(
-                              color: Colors.deepOrange))
+                          child: CircularProgressIndicator(color: _brandOrange))
                       : Column(
                           children: [
                             Row(
@@ -710,22 +742,27 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                   const Text(
                     'Details',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Card(
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _cardSurface,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
                           _buildDetailRow(
                               Icons.height, 'Height', height ?? 'Not set'),
-                          const Divider(),
+                          Divider(color: _ink(0.08)),
                           _buildDetailRow(Icons.star, 'Position',
                               player.position ?? 'Not set'),
-                          const Divider(),
+                          Divider(color: _ink(0.08)),
                           _buildCommunityRatingRow(player),
                         ],
                       ),
@@ -738,23 +775,27 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                   const Text(
                     'Recent Matches',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 12),
                   if (_isLoading)
                     const Center(
-                        child:
-                            CircularProgressIndicator(color: Colors.deepOrange))
+                        child: CircularProgressIndicator(color: _brandOrange))
                   else if (_recentMatches.isEmpty)
-                    Card(
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _cardSurface,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Center(
                           child: Text(
                             'No recent matches',
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(color: _ink(0.55)),
                           ),
                         ),
                       ),
@@ -915,42 +956,46 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
+        color: _cardSurface,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.grey[700]),
+          Icon(icon, size: 15, color: _brandOrange),
           const SizedBox(width: 4),
           Text(text,
-              style: TextStyle(
-                  color: Colors.grey[700], fontWeight: FontWeight.w500)),
+              style: TextStyle(color: _ink(0.85), fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 
   Widget _buildStatCard(String label, String value, IconData icon) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: _cardSurface,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Icon(icon, size: 24, color: Colors.orange),
+            Icon(icon, size: 24, color: _brandOrange),
             const SizedBox(height: 8),
             Text(
               value,
               style: const TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
               ),
             ),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: _ink(0.55),
               ),
             ),
           ],
@@ -964,12 +1009,12 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
+          Icon(icon, size: 20, color: _ink(0.5)),
           const SizedBox(width: 12),
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[600],
+              color: _ink(0.55),
               fontSize: 14,
             ),
           ),
@@ -977,8 +1022,9 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
           Text(
             value,
             style: const TextStyle(
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
               fontSize: 14,
+              color: Colors.white,
             ),
           ),
         ],
@@ -994,19 +1040,19 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(Icons.gavel, size: 20, color: Colors.grey[600]),
+          Icon(Icons.gavel, size: 20, color: _ink(0.5)),
           const SizedBox(width: 12),
           Text(
             'Matches Contested',
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            style: TextStyle(color: _ink(0.55), fontSize: 14),
           ),
           const Spacer(),
           Text(
             contestedCount.toString(),
             style: TextStyle(
-              color: contestedCount > 0 ? Colors.orange : Colors.grey[500],
+              color: contestedCount > 0 ? _brandOrange : _ink(0.45),
               fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -1070,24 +1116,34 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
       statusDisplay = isWin ? 'Victory' : 'Defeat';
     }
 
-    return Card(
+    const winColor = Color(0xFF4ADE80);
+    const lossColor = Color(0xFFF87171);
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: _cardSurface,
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: isWin == true
-              ? Colors.green[100]
-              : (isWin == false ? Colors.red[100] : Colors.grey[100]),
+              ? winColor.withValues(alpha: 0.16)
+              : (isWin == false
+                  ? lossColor.withValues(alpha: 0.16)
+                  : _cardSurface),
           child: Icon(
             isWin == true
                 ? Icons.check
                 : (isWin == false ? Icons.close : Icons.remove),
             color: isWin == true
-                ? Colors.green
-                : (isWin == false ? Colors.red : Colors.grey),
+                ? winColor
+                : (isWin == false ? lossColor : _ink(0.5)),
           ),
         ),
-        title: Text('vs $opponentDisplay'),
-        subtitle: Text(statusDisplay),
+        title: Text('vs $opponentDisplay',
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w700)),
+        subtitle: Text(statusDisplay, style: TextStyle(color: _ink(0.55))),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1096,15 +1152,16 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
               Text(
                 scoreStr,
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w900,
                   fontSize: 16,
+                  color: Colors.white,
                 ),
               ),
             if (isWin != null)
               Text(
                 isWin ? 'WIN' : 'LOSS',
                 style: TextStyle(
-                  color: isWin ? Colors.green : Colors.red,
+                  color: isWin ? winColor : lossColor,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),
@@ -1128,9 +1185,9 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
     ];
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: _sheetSurface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => SafeArea(
         child: Column(
@@ -1141,21 +1198,24 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+                color: _ink(0.18),
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text('Report ${player.name}',
                   style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white)),
             ),
-            const Divider(),
+            Divider(color: _ink(0.08)),
             ...reasons.map((reason) => ListTile(
                   leading:
-                      const Icon(Icons.flag_outlined, color: Colors.orange),
-                  title: Text(reason),
+                      const Icon(Icons.flag_outlined, color: Color(0xFFFBBF24)),
+                  title:
+                      Text(reason, style: const TextStyle(color: Colors.white)),
                   onTap: () async {
                     Navigator.pop(ctx);
                     try {
@@ -1228,6 +1288,68 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                 style:
                     TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The header hero: the player's flat avatar (their own if customized, else
+/// their deterministic default) over a soft brand glow, with the photo as a
+/// small corner badge — same doctrine as the map and profile setup: the
+/// avatar is the main thing, the photo is optional.
+class _AvatarHero extends StatelessWidget {
+  final User player;
+
+  const _AvatarHero({required this.player});
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarSvg =
+        flatAvatarSvg(player.avatarConfig) ?? defaultAvatarSvgForId(player.id);
+    return SizedBox(
+      width: 104,
+      height: 126,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  _brandOrange.withValues(alpha: 0.22),
+                  _brandOrange.withValues(alpha: 0.0),
+                ],
+              ),
+            ),
+          ),
+          SvgPicture.string(
+            avatarSvg,
+            width: 96,
+            height: 122,
+            fit: BoxFit.contain,
+          ),
+          if (player.photoUrl != null)
+            Positioned(
+              right: -2,
+              bottom: 4,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _brandOrange, width: 2),
+                  image: DecorationImage(
+                    image: safeImageProvider(player.photoUrl!),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
