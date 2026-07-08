@@ -302,10 +302,20 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
     final router = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
     List<Map<String, dynamic>> teams;
+    Set<String> playerTeamIds;
     try {
-      teams = await ApiService.getMyTeams();
+      final results = await Future.wait([
+        ApiService.getMyTeams(),
+        ApiService.getUserTeams(player.id),
+      ]);
+      teams = results[0];
+      playerTeamIds = results[1]
+          .map((t) => t['id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
     } catch (_) {
       teams = [];
+      playerTeamIds = {};
     }
     if (!mounted) return;
 
@@ -320,9 +330,21 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
       return;
     }
 
+    final eligible = teams
+        .where((t) => !playerTeamIds.contains(t['id']?.toString()))
+        .toList();
+    if (eligible.isEmpty) {
+      _dismissSheetThen(() {
+        messenger.showSnackBar(
+          SnackBar(content: Text('${player.name} is already on your team.')),
+        );
+      });
+      return;
+    }
+
     Map<String, dynamic>? team;
     if (teams.length == 1) {
-      team = teams.first;
+      team = eligible.first;
     } else {
       team = await showModalBottomSheet<Map<String, dynamic>>(
         context: context,
@@ -345,23 +367,37 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('Invite ${player.name} to…',
+                child: Text('Invite ${player.name} to\u2026',
                     style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                         color: Colors.white)),
               ),
               Divider(color: _ink(0.08)),
-              ...teams.map((t) => ListTile(
-                    leading:
-                        const Icon(Icons.groups_rounded, color: _brandOrange),
-                    title: Text(t['name']?.toString() ?? 'Team',
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.w700)),
-                    subtitle: Text(t['teamType']?.toString() ?? '',
-                        style: TextStyle(color: _ink(0.5), fontSize: 12)),
-                    onTap: () => Navigator.pop(ctx, t),
-                  )),
+              // Teams the player is already on stay visible but disabled so
+              // it is obvious why they cannot be picked.
+              ...teams.map((t) {
+                final already = playerTeamIds.contains(t['id']?.toString());
+                return ListTile(
+                  enabled: !already,
+                  leading: Icon(Icons.groups_rounded,
+                      color: already ? _ink(0.25) : _brandOrange),
+                  title: Text(t['name']?.toString() ?? 'Team',
+                      style: TextStyle(
+                          color: already ? _ink(0.35) : Colors.white,
+                          fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                      already
+                          ? 'Already on this team'
+                          : (t['teamType']?.toString() ?? ''),
+                      style: TextStyle(
+                          color: _ink(already ? 0.3 : 0.5), fontSize: 12)),
+                  trailing: already
+                      ? Icon(Icons.check_rounded, color: _ink(0.3), size: 18)
+                      : null,
+                  onTap: already ? null : () => Navigator.pop(ctx, t),
+                );
+              }),
               const SizedBox(height: 16),
             ],
           ),
@@ -374,15 +410,24 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
     final teamName = team['name']?.toString() ?? 'your team';
     try {
       final ok = await ApiService.inviteToTeam(teamId, player.id);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(ok
-              ? 'Invited ${player.name} to $teamName'
-              : 'Could not send the invite. Try again.'),
-        ),
-      );
+      if (!mounted) return;
+      // Dismiss the profile sheet before toasting — a snackbar shown under
+      // the modal is invisible, so the confirmation was easy to miss.
+      _dismissSheetThen(() {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(ok
+                ? 'Invited ${player.name} to $teamName'
+                : 'Could not send the invite. Try again.'),
+          ),
+        );
+      });
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        _dismissSheetThen(() {
+          messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+        });
+      }
     }
   }
 
