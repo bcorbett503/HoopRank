@@ -46,6 +46,15 @@ export class Court {
   @Column({ name: "image_source_label", type: "text", nullable: true })
   imageSourceLabel: string;
 
+  @Column({ name: "image_provider", type: "text", nullable: true })
+  imageProvider: string;
+
+  @Column({ name: "image_place_id", type: "text", nullable: true })
+  imagePlaceId: string;
+
+  @Column({ name: "image_place_updated_at", type: "timestamp", nullable: true })
+  imagePlaceUpdatedAt: Date;
+
   // Note: geog is PostGIS geography type - handled via raw queries in service
   // We don't map it directly as TypeORM doesn't natively support PostGIS
 

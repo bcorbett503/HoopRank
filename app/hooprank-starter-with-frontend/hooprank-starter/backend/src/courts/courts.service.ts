@@ -25,7 +25,8 @@ const COURT_IMAGE_SEEDS = [
     id: "88f85c04-8e09-3217-1818-6adc818c784b",
     imageUrl:
       "https://www.ci.gladstone.or.us/sites/g/files/vyhlif13701/files/media/publicworks/image/17061/08_25_17_senior_center.jpg",
-    sourceUrl: "https://www.ci.gladstone.or.us/publicworks/page/city-facilities",
+    sourceUrl:
+      "https://www.ci.gladstone.or.us/publicworks/page/city-facilities",
     sourceLabel: "City of Gladstone official venue image",
   },
   {
@@ -93,9 +94,27 @@ const COURT_IMAGE_SEEDS = [
   },
 ];
 
+type CourtImageResult = {
+  url: string;
+  cacheControl: string;
+};
+
+type CourtImageBackingInput = {
+  courtId: string;
+  imageProvider: string;
+  imagePlaceId: string;
+  imageSourceUrl?: string | null;
+  imageSourceLabel?: string | null;
+};
+
 @Injectable()
 export class CourtsService implements OnModuleInit {
   private dialect: DbDialect;
+  private readonly publicApiBaseUrl = (
+    process.env.PUBLIC_API_BASE_URL ||
+    process.env.API_BASE_URL ||
+    "https://heartfelt-appreciation-production-65f1.up.railway.app"
+  ).replace(/\/+$/, "");
 
   constructor(
     @InjectRepository(Court)
@@ -129,6 +148,15 @@ export class CourtsService implements OnModuleInit {
         await this.dataSource.query(
           `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_updated_at TIMESTAMP`,
         );
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_provider TEXT`,
+        );
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_place_id TEXT`,
+        );
+        await this.dataSource.query(
+          `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_place_updated_at TIMESTAMP`,
+        );
         await this.seedCourtImages();
       } catch (e) {
         console.error("[CourtsService] Failed to add columns:", e.message);
@@ -149,19 +177,21 @@ export class CourtsService implements OnModuleInit {
                     image_url as "imageUrl",
                     image_source_url as "imageSourceUrl",
                     image_source_label as "imageSourceLabel",
+                    image_provider as "imageProvider",
+                    image_place_id as "imagePlaceId",
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng
                 FROM courts
                 ORDER BY name ASC
             `);
-      return courts;
+      return courts.map((court: any) => this.withResolvedImageUrl(court));
     }
 
     // SQLite fallback for local development
     const courts = await this.courtsRepository.find({
       order: { name: "ASC" },
     });
-    return courts;
+    return courts.map((court: any) => this.withResolvedImageUrl(court));
   }
 
   async findById(id: string): Promise<Court | undefined> {
@@ -173,6 +203,8 @@ export class CourtsService implements OnModuleInit {
                     image_url as "imageUrl",
                     image_source_url as "imageSourceUrl",
                     image_source_label as "imageSourceLabel",
+                    image_provider as "imageProvider",
+                    image_place_id as "imagePlaceId",
                     ST_Y(geog::geometry) as lat,
                     ST_X(geog::geometry) as lng
                 FROM courts
@@ -181,12 +213,18 @@ export class CourtsService implements OnModuleInit {
         [id],
       );
       if (results.length === 0) return undefined;
-      return { ...results[0], king: await this.calculateKing(id) } as any;
+      return this.withResolvedImageUrl({
+        ...results[0],
+        king: await this.calculateKing(id),
+      }) as any;
     }
 
     const court = await this.courtsRepository.findOne({ where: { id } });
     if (!court) return undefined;
-    return { ...court, king: await this.calculateKing(id) } as any;
+    return this.withResolvedImageUrl({
+      ...court,
+      king: await this.calculateKing(id),
+    }) as any;
   }
 
   async searchByLocation(
@@ -204,6 +242,8 @@ export class CourtsService implements OnModuleInit {
 	                    image_url as "imageUrl",
 	                    image_source_url as "imageSourceUrl",
 	                    image_source_label as "imageSourceLabel",
+	                    image_provider as "imageProvider",
+	                    image_place_id as "imagePlaceId",
 	                    ST_Y(geog::geometry) as lat,
 	                    ST_X(geog::geometry) as lng,
 	                    (SELECT COUNT(*) FROM user_followed_courts WHERE court_id = courts.id::text) as follower_count
@@ -214,7 +254,7 @@ export class CourtsService implements OnModuleInit {
             `,
         [minLng, minLat, maxLng, maxLat],
       );
-      return courts;
+      return courts.map((court: any) => this.withResolvedImageUrl(court));
     }
 
     // SQLite fallback - use simple bounding box
@@ -230,7 +270,84 @@ export class CourtsService implements OnModuleInit {
       })
       .orderBy("court.name", "ASC")
       .limit(100)
-      .getMany();
+      .getMany()
+      .then((courts) =>
+        courts.map((court: any) => this.withResolvedImageUrl(court)),
+      );
+  }
+
+  async getCourtImage(courtId: string): Promise<CourtImageResult | null> {
+    const court = await this.findImageBacking(courtId);
+    if (!court) return null;
+
+    const directImageUrl = this.cleanString(court.imageUrl ?? court.image_url);
+    if (
+      directImageUrl &&
+      !this.isGeneratedCourtImageUrl(courtId, directImageUrl)
+    ) {
+      return { url: directImageUrl, cacheControl: "public, max-age=3600" };
+    }
+
+    const provider = this.cleanString(
+      court.imageProvider ?? court.image_provider,
+    );
+    const placeId = this.cleanString(
+      court.imagePlaceId ?? court.image_place_id,
+    );
+    if (provider !== "google_places" || !placeId) return null;
+
+    const photoUri = await this.resolveGooglePlacesPhotoUri(placeId);
+    if (!photoUri) return null;
+    return { url: photoUri, cacheControl: "no-store" };
+  }
+
+  async updateCourtImageBackings(
+    images: CourtImageBackingInput[],
+  ): Promise<{ received: number; updated: number; skipped: number }> {
+    const safeImages = Array.isArray(images) ? images.slice(0, 500) : [];
+    let updated = 0;
+    let skipped = 0;
+
+    for (const image of safeImages) {
+      const courtId = this.cleanString(image?.courtId);
+      const provider = this.cleanString(image?.imageProvider);
+      const placeId = this.cleanString(image?.imagePlaceId);
+      if (!courtId || provider !== "google_places" || !placeId) {
+        skipped++;
+        continue;
+      }
+
+      const result = await this.dataSource.query(
+        `
+                UPDATE courts
+                SET
+                    image_provider = $2,
+                    image_place_id = $3,
+                    image_source_url = COALESCE(NULLIF(image_source_url, ''), $4),
+                    image_source_label = COALESCE(NULLIF(image_source_label, ''), $5),
+                    image_place_updated_at = NOW(),
+                    image_updated_at = COALESCE(image_updated_at, NOW())
+                WHERE id::text = $1
+                  AND NULLIF(image_url, '') IS NULL
+                RETURNING id
+            `,
+        [
+          courtId,
+          provider,
+          placeId,
+          this.cleanString(image.imageSourceUrl),
+          this.cleanString(image.imageSourceLabel) || "Google Maps photo",
+        ],
+      );
+
+      if (Array.isArray(result) && result.length > 0) {
+        updated++;
+      } else {
+        skipped++;
+      }
+    }
+
+    return { received: safeImages.length, updated, skipped };
   }
 
   private async seedCourtImages(): Promise<void> {
@@ -248,6 +365,108 @@ export class CourtsService implements OnModuleInit {
         [seed.id, seed.imageUrl, seed.sourceUrl, seed.sourceLabel],
       );
     }
+  }
+
+  private async findImageBacking(courtId: string): Promise<any | null> {
+    if (this.dialect.isPostgres) {
+      const rows = await this.dataSource.query(
+        `
+                SELECT
+                    id,
+                    image_url as "imageUrl",
+                    image_provider as "imageProvider",
+                    image_place_id as "imagePlaceId"
+                FROM courts
+                WHERE id::text = $1
+                LIMIT 1
+            `,
+        [courtId],
+      );
+      return rows[0] ?? null;
+    }
+
+    const rows = await this.dataSource.query(
+      `
+            SELECT
+                id,
+                image_url as "imageUrl",
+                image_provider as "imageProvider",
+                image_place_id as "imagePlaceId"
+            FROM courts
+            WHERE id = ?
+            LIMIT 1
+        `,
+      [courtId],
+    );
+    return rows[0] ?? null;
+  }
+
+  private withResolvedImageUrl<T extends Record<string, any>>(court: T): T {
+    const imageUrl = this.cleanString(court.imageUrl ?? court.image_url);
+    const provider = this.cleanString(
+      court.imageProvider ?? court.image_provider,
+    );
+    const placeId = this.cleanString(
+      court.imagePlaceId ?? court.image_place_id,
+    );
+
+    if (!imageUrl && provider === "google_places" && placeId && court.id) {
+      (court as any).imageUrl =
+        `${this.publicApiBaseUrl}/courts/${encodeURIComponent(
+          court.id.toString(),
+        )}/image`;
+    }
+
+    if (
+      !this.cleanString(court.imageSourceLabel ?? court.image_source_label) &&
+      provider === "google_places"
+    ) {
+      (court as any).imageSourceLabel = "Google Maps photo";
+    }
+
+    return court;
+  }
+
+  private async resolveGooglePlacesPhotoUri(
+    placeId: string,
+  ): Promise<string | null> {
+    const apiKey = process.env.GOOGLE_API_KEY;
+    if (!apiKey) return null;
+
+    const detailsRes = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+      {
+        headers: {
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "photos",
+        },
+      },
+    );
+    if (!detailsRes.ok) return null;
+
+    const details = await detailsRes.json();
+    const photoName = this.cleanString(details?.photos?.[0]?.name);
+    if (!photoName) return null;
+
+    const mediaRes = await fetch(
+      `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(
+        apiKey,
+      )}`,
+    );
+    if (!mediaRes.ok) return null;
+
+    const media = await mediaRes.json();
+    return this.cleanString(media?.photoUri);
+  }
+
+  private isGeneratedCourtImageUrl(courtId: string, imageUrl: string): boolean {
+    return imageUrl === `${this.publicApiBaseUrl}/courts/${courtId}/image`;
+  }
+
+  private cleanString(value: any): string | null {
+    if (value === undefined || value === null) return null;
+    const text = String(value).trim();
+    return text.length > 0 ? text : null;
   }
 
   private async calculateKing(courtId: string): Promise<string | undefined> {

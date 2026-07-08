@@ -18,6 +18,11 @@ type MapHubArgs = {
 export class MapHubService implements OnModuleInit {
   private readonly postgres: boolean;
   private schemaReady = false;
+  private readonly publicApiBaseUrl = (
+    process.env.PUBLIC_API_BASE_URL ||
+    process.env.API_BASE_URL ||
+    "https://heartfelt-appreciation-production-65f1.up.railway.app"
+  ).replace(/\/+$/, "");
 
   constructor(private readonly dataSource: DataSource) {
     this.postgres = isPostgres(dataSource);
@@ -155,6 +160,8 @@ export class MapHubService implements OnModuleInit {
         c.image_url AS "imageUrl",
         c.image_source_url AS "imageSourceUrl",
         c.image_source_label AS "imageSourceLabel",
+        c.image_provider AS "imageProvider",
+        c.image_place_id AS "imagePlaceId",
         ST_Y(c.geog::geometry) AS lat,
         ST_X(c.geog::geometry) AS lng,
         (
@@ -384,9 +391,12 @@ export class MapHubService implements OnModuleInit {
       access: row.access ?? "public",
       venueType: row.venueType ?? row.venue_type ?? null,
       signature: row.signature === true,
-      imageUrl: row.imageUrl ?? row.image_url ?? null,
+      imageUrl: this.imageUrlForCourt(row),
       imageSourceUrl: row.imageSourceUrl ?? row.image_source_url ?? null,
-      imageSourceLabel: row.imageSourceLabel ?? row.image_source_label ?? null,
+      imageSourceLabel:
+        row.imageSourceLabel ??
+        row.image_source_label ??
+        (this.isGooglePlacesImage(row) ? "Google Maps photo" : null),
       followerCount,
       activeCheckInCount,
       hasUpcomingRun: hasUpcomingRun === true,
@@ -395,6 +405,29 @@ export class MapHubService implements OnModuleInit {
       nextRun,
       topFollower: row.topFollower ?? row.top_follower ?? null,
     };
+  }
+
+  private imageUrlForCourt(row: any): string | null {
+    const imageUrl = this.cleanString(row.imageUrl ?? row.image_url);
+    if (imageUrl) return imageUrl;
+    if (!this.isGooglePlacesImage(row) || !row.id) return null;
+    return `${this.publicApiBaseUrl}/courts/${encodeURIComponent(
+      row.id.toString(),
+    )}/image`;
+  }
+
+  private isGooglePlacesImage(row: any): boolean {
+    return (
+      this.cleanString(row.imageProvider ?? row.image_provider) ===
+        "google_places" &&
+      !!this.cleanString(row.imagePlaceId ?? row.image_place_id)
+    );
+  }
+
+  private cleanString(value: any): string | null {
+    if (value === undefined || value === null) return null;
+    const text = String(value).trim();
+    return text.length > 0 ? text : null;
   }
 
   private normalizePlayer(row: any, currentUserId?: string) {

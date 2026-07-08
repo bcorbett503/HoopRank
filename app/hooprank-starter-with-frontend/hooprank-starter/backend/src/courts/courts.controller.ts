@@ -4,10 +4,14 @@ import {
   Post,
   Delete,
   Param,
+  Body,
   Headers,
   Query,
   BadRequestException,
+  NotFoundException,
+  Res,
 } from "@nestjs/common";
+import { Response } from "express";
 import { CourtsService } from "./courts.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { Court } from "./court.entity";
@@ -41,6 +45,15 @@ export class CourtsController {
       );
       await this.dataSource.query(
         `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_updated_at TIMESTAMP`,
+      );
+      await this.dataSource.query(
+        `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_provider TEXT`,
+      );
+      await this.dataSource.query(
+        `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_place_id TEXT`,
+      );
+      await this.dataSource.query(
+        `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_place_updated_at TIMESTAMP`,
       );
       results.push("court image columns ensured");
     } catch (e) {
@@ -173,6 +186,25 @@ export class CourtsController {
     return { success: true, updated: result.length, venue_type };
   }
 
+  @Post("admin/images")
+  async updateImageBackings(
+    @Body()
+    body: {
+      images?: Array<{
+        courtId: string;
+        imageProvider: string;
+        imagePlaceId: string;
+        imageSourceUrl?: string;
+        imageSourceLabel?: string;
+      }>;
+    },
+  ) {
+    if (!Array.isArray(body?.images)) {
+      throw new BadRequestException("images array is required");
+    }
+    return this.courtsService.updateCourtImageBackings(body.images);
+  }
+
   @Get("follower-counts")
   async getFollowerCounts() {
     return this.courtsService.getFollowerCounts();
@@ -210,6 +242,17 @@ export class CourtsController {
   async getSignatureCourts() {
     const courts = await this.courtsService.findAll();
     return courts.slice(0, 20);
+  }
+
+  @Public()
+  @Get(":id/image")
+  async getCourtImage(@Param("id") id: string, @Res() res: Response) {
+    const image = await this.courtsService.getCourtImage(id);
+    if (!image) {
+      throw new NotFoundException("Court image not found");
+    }
+    res.setHeader("Cache-Control", image.cacheControl);
+    return res.redirect(302, image.url);
   }
 
   @Public()

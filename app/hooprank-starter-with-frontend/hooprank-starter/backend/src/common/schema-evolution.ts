@@ -416,6 +416,15 @@ export async function runSchemaEvolution(
     await dataSource.query(
       `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_updated_at TIMESTAMP`,
     );
+    await dataSource.query(
+      `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_provider TEXT`,
+    );
+    await dataSource.query(
+      `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_place_id TEXT`,
+    );
+    await dataSource.query(
+      `ALTER TABLE courts ADD COLUMN IF NOT EXISTS image_place_updated_at TIMESTAMP`,
+    );
     await dataSource.query(`
             UPDATE courts
             SET
