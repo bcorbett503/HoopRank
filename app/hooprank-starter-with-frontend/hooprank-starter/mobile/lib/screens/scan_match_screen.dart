@@ -199,10 +199,11 @@ class _ScanMatchScreenState extends State<ScanMatchScreen> {
   }
 
   Future<void> _showManualEntrySheet() async {
-    final initialText = await _readClipboardText() ?? '';
-    if (!mounted) return;
-
-    final controller = TextEditingController(text: initialText);
+    // Don't auto-read the clipboard here: on iOS 16+ that fires the system
+    // "would like to paste" prompt the instant the user taps Enter Code, even
+    // though they only asked to type. The in-sheet Paste button covers the
+    // paste path explicitly (Apple's guidance), so open empty and autofocus.
+    final controller = TextEditingController();
     final submitted = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -232,7 +233,7 @@ class _ScanMatchScreenState extends State<ScanMatchScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: controller,
-                  autofocus: initialText.isEmpty,
+                  autofocus: true,
                   minLines: 2,
                   maxLines: 4,
                   textInputAction: TextInputAction.done,
