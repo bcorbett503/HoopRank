@@ -39,6 +39,23 @@ import UserNotifications
         case "clearBadge":
           self.clearApplicationBadge()
           result(nil)
+        case "registerForRemoteNotifications":
+          DispatchQueue.main.async {
+            UIApplication.shared.registerForRemoteNotifications()
+          }
+          result(nil)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      // Device identifiers (used by AppsFlyer for test-device registration).
+      let deviceChannel = FlutterMethodChannel(
+        name: "hooprank/device_identifiers", binaryMessenger: controller.binaryMessenger)
+      deviceChannel.setMethodCallHandler { call, result in
+        switch call.method {
+        case "getVendorIdentifier":
+          result(UIDevice.current.identifierForVendor?.uuidString)
         default:
           result(FlutterMethodNotImplemented)
         }

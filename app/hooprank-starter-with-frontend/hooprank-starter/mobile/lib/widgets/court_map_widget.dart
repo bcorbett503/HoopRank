@@ -221,6 +221,23 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     );
   }
 
+  /// Whether a court at [lat],[lng] sits under the current-user marker on
+  /// screen. Used to hide that court's status bubble so the large "Me" avatar
+  /// reads cleanly instead of colliding with nearby "5v5 scheduled" pills.
+  /// (The court pin still shows and stays tappable.)
+  bool _courtStatusOverlapsUser(double lat, double lng, MapHubPlayer? me) {
+    if (me == null || !_mapReady) return false;
+    try {
+      final camera = _mapController.camera;
+      final mePt = camera.latLngToScreenPoint(LatLng(me.lat, me.lng));
+      final courtPt = camera.latLngToScreenPoint(LatLng(lat, lng));
+      return (courtPt.x - mePt.x).abs() < 120 &&
+          (courtPt.y - mePt.y).abs() < 145;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _loadMapHubData({bool force = false}) async {
     if (!_isMapHubEnabled) return;
     if (_isMapHubLoading && !force) return;
@@ -1844,7 +1861,10 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
         _hubCourtsVisible ? _mergeMapHubCourtData(rawMarkerCourts) : <Court>[];
     final authState = Provider.of<AuthState>(context);
     final currentUserMapPlayer = _currentUserMapPlayer(authState.currentUser);
-    final currentUserMapPlayerId = currentUserMapPlayer?.id;
+    // Exclude the current user from the players layer by their auth id (not the
+    // GPS-derived marker id, which is null until location resolves) so they
+    // never render twice — the backend map hub includes them in the list.
+    final myPlayerId = authState.currentUser?.id.trim();
     final topOverlayOffset =
         widget.showCourtList ? 16.0 : MediaQuery.of(context).padding.top + 10.0;
 
@@ -1921,8 +1941,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                 final checkInState =
                     Provider.of<CheckInState>(context, listen: false);
                 final hasCheckIns = checkInState.hasCheckIns(court.id);
-                final statusLabel = _courtStatusLabel(court, checkInState);
+                final rawStatusLabel = _courtStatusLabel(court, checkInState);
                 final statusColor = _courtStatusColor(court, checkInState);
+                // Declutter under the "Me" marker: hide this court's labels
+                // (status bubble + top-follower name) so the avatar doesn't
+                // collide with "5v5 scheduled" pills. The pin stays, so the
+                // court is still visible/tappable.
+                final overlapsMe = _courtStatusOverlapsUser(
+                    court.lat, court.lng, currentUserMapPlayer);
+                final statusLabel = overlapsMe ? null : rawStatusLabel;
 
                 // Determine marker size - slightly larger for the pin design
                 double markerSize;
@@ -1968,7 +1995,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                         (_mapHubCourtsById[court.id]?.court.hasUpcomingRun ??
                             false) ||
                         court.hasUpcomingRun,
-                    topFollower: topFollower,
+                    topFollower: overlapsMe ? null : topFollower,
                     statusLabel: statusLabel,
                     statusColor: statusColor,
                   ),
@@ -1979,7 +2006,8 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
               MarkerLayer(
                 markers: _mapHubPlayers
                     .where((player) => player.lat != 0 || player.lng != 0)
-                    .where((player) => player.id != currentUserMapPlayerId)
+                    .where((player) =>
+                        myPlayerId == null || player.id.trim() != myPlayerId)
                     .map(
                       (player) => Marker(
                         point: LatLng(player.lat, player.lng),
