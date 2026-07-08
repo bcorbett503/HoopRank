@@ -1024,6 +1024,21 @@ class ApiService {
     return null;
   }
 
+  /// Verify a match start by QR scan: the scanning participant proves both
+  /// players are together, which unlocks score submission server-side.
+  static Future<Map<String, dynamic>?> verifyMatchStart(String matchId) async {
+    final response = await authedPost(
+      Uri.parse('$baseUrl/api/v1/matches/$matchId/verify-start'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({}),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final parsed = jsonDecode(response.body);
+      if (parsed is Map<String, dynamic>) return parsed;
+    }
+    return null;
+  }
+
   /// Submit score for a match
   static Future<Map<String, dynamic>> submitScore({
     required String matchId,

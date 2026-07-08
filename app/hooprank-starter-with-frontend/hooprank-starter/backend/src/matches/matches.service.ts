@@ -18,11 +18,58 @@ export class MatchesService {
     private notificationsService: NotificationsService,
   ) { }
 
+  async onModuleInit() {
+    // Fraud guard: matches must be started by a QR scan between both
+    // players before a score can be recorded. Idempotent column add.
+    if (process.env.DATABASE_URL) {
+      try {
+        await this.dataSource.query(
+          `ALTER TABLE matches ADD COLUMN IF NOT EXISTS scan_verified BOOLEAN DEFAULT FALSE`,
+        );
+      } catch (e) {
+        console.error('scan_verified column ensure failed:', e);
+      }
+    }
+  }
+
+  /**
+   * Mark a match as scan-verified: called when one participant scans the
+   * other's QR in person. This is the gate that unlocks score submission —
+   * a match that was never scanned can never produce a result.
+   */
+  async verifyStart(id: string, userId: string): Promise<Match> {
+    const isPostgres = !!process.env.DATABASE_URL;
+    if (!isPostgres) throw new Error('Only supported on PostgreSQL');
+
+    const match = await this.get(id);
+    if (!match) throw new Error('Match not found');
+
+    const creatorId = (match as any).creator_id || match.creatorId;
+    const opponentId = (match as any).opponent_id || match.opponentId;
+    if (userId !== creatorId && userId !== opponentId) {
+      throw new Error('You are not a participant in this match');
+    }
+
+    const status = ((match as any).status || '').toString().toLowerCase();
+    if (!['pending', 'accepted', 'live'].includes(status)) {
+      throw new Error(`Cannot start a match whose status is '${status}'`);
+    }
+
+    const result = await this.dataSource.query(`
+      UPDATE matches
+      SET scan_verified = TRUE, status = 'accepted', updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `, [id]);
+    return result[0];
+  }
+
   async create(
     creatorId: string,
     opponentId?: string,
     courtId?: string,
     autoAccept: boolean = false,
+    scanVerified: boolean = false,
   ): Promise<Match> {
     // Use raw SQL for production compatibility
     const isPostgres = !!process.env.DATABASE_URL;
@@ -30,10 +77,10 @@ export class MatchesService {
 
     if (isPostgres) {
       const result = await this.dataSource.query(`
-        INSERT INTO matches (id, status, match_type, creator_id, opponent_id, court_id, started_by, created_at, updated_at)
-        VALUES (gen_random_uuid(), $1, '1v1', $2, $3, $4, '{}', NOW(), NOW())
+        INSERT INTO matches (id, status, match_type, creator_id, opponent_id, court_id, started_by, scan_verified, created_at, updated_at)
+        VALUES (gen_random_uuid(), $1, '1v1', $2, $3, $4, '{}', $5, NOW(), NOW())
         RETURNING *
-      `, [initialStatus, creatorId, opponentId || null, courtId || null]);
+      `, [initialStatus, creatorId, opponentId || null, courtId || null, scanVerified]);
       return result[0];
     }
 
@@ -70,6 +117,12 @@ export class MatchesService {
   }
 
   async complete(id: string, winnerId: string): Promise<Match> {
+    // Same anti-fraud gate as scored submissions: no scan, no result.
+    const match = await this.get(id);
+    const scanVerified = match && ((match as any).scan_verified === true || (match as any).scan_verified === 't');
+    if (!scanVerified) {
+      throw new Error('Start the match with a QR scan first — both players must scan to record a result');
+    }
     return this.completeWithScores(id, winnerId, null, null);
   }
 
@@ -236,6 +289,13 @@ export class MatchesService {
 
     if (submitterId !== creatorId && submitterId !== opponentId) {
       throw new Error('You are not a participant in this match');
+    }
+
+    // Anti-fraud gate: a result only counts if the match was started by a
+    // QR scan between both players (both physically present).
+    const scanVerified = (match as any).scan_verified === true || (match as any).scan_verified === 't';
+    if (!scanVerified) {
+      throw new Error('Start the match with a QR scan first — both players must scan to record a result');
     }
 
     // Store score_submitter_id so contestScore knows who submitted

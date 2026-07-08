@@ -62,9 +62,13 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
       if (mounted) {
         final myUserId = ApiService.userId ?? '';
         final challenges = results[1] as List;
-        final incomingPendingCount = challenges.where((raw) {
+        // Needs-attention challenges: incoming pending ones (you must
+        // respond) plus ANY live match (accepted, not yet finished) —
+        // there's a game to play, keep it on the radar.
+        final challengeAttentionCount = challenges.where((raw) {
           if (raw is! Map<String, dynamic>) return false;
           final status = (raw['status'] ?? '').toString().toLowerCase();
+          if (status == 'accepted') return true;
           if (status != 'pending') return false;
 
           final dynamic toUser = raw['toUser'];
@@ -77,7 +81,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
 
         setState(() {
           _unreadCount = results[0] as int;
-          _challengeCount = incomingPendingCount;
+          _challengeCount = challengeAttentionCount;
           _hasLoadedInitially = true;
         });
       }

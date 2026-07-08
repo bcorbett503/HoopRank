@@ -498,8 +498,9 @@ class _HoopRankFeedState extends State<HoopRankFeed>
           ...pinnedWidgets,
           ..._forYouPosts.asMap().entries.map((entry) {
             return AnimatedListItem(
-              index:
-                  (featuredMatchup == null ? 0 : 1) + pinnedWidgets.length + entry.key,
+              index: (featuredMatchup == null ? 0 : 1) +
+                  pinnedWidgets.length +
+                  entry.key,
               child: _buildFeedItemCard(entry.value),
             );
           }),
@@ -1897,31 +1898,28 @@ class _HoopRankFeedState extends State<HoopRankFeed>
         _loadPendingChallenges(); // Refresh challenges
         ScaffoldWithNavBar.refreshBadge?.call();
 
-        // CRITICAL: Set opponent in MatchState from challenge data BEFORE navigating
-        final matchState = Provider.of<MatchState>(context, listen: false);
-        matchState.setOpponent(challenge.otherUser.toPlayer());
-
-        // Set matchId if backend returned one
-        if (result['matchId'] != null) {
-          matchState.setMatchId(result['matchId'].toString());
-        }
-
-        // Set court if challenge had one
-        if (challenge.court != null) {
-          final court = Court(
-            id: challenge.court!['id']?.toString() ?? '',
-            name: challenge.court!['name']?.toString() ?? 'Unknown',
-            lat: 0, lng: 0, // coords not needed for display
-          );
-          matchState.setCourt(court);
-        }
-
         context
             .read<OnboardingChecklistState>()
             .completeItem(OnboardingItems.acceptChallenge);
 
-        // Navigate to match setup (opponent will be pre-populated)
-        context.go('/match/setup');
+        // Scan-gated start: route into the QR handshake — both players must
+        // scan in person before a result can be recorded.
+        final matchId = result['matchId']?.toString();
+        if (matchId == null || matchId.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Could not start the match. Try again.')),
+          );
+          return;
+        }
+        context.push(Uri(
+          path: '/quick-play',
+          queryParameters: {
+            'matchId': matchId,
+            'opponentId': challenge.otherUser.id,
+            'opponentName': challenge.otherUser.name,
+          },
+        ).toString());
       }
     } catch (e) {
       if (mounted) {

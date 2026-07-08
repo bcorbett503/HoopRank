@@ -2320,29 +2320,6 @@ class _HomeScreenState extends State<HomeScreen>
 
       if (!mounted) return;
 
-      // Set up the opponent in MatchState
-      final p = Player(
-        id: challenge.otherUser.id,
-        slug: challenge.otherUser.id,
-        name: challenge.otherUser.name,
-        team: challenge.otherUser.team ?? 'Free Agent',
-        position: challenge.otherUser.position ?? 'G',
-        age: 25,
-        height: '6\'0"',
-        weight: '180 lbs',
-        rating: challenge.otherUser.rating,
-        offense: 80,
-        defense: 80,
-        shooting: 80,
-        passing: 80,
-        rebounding: 80,
-      );
-
-      final matchState = context.read<MatchState>();
-      matchState.setOpponent(p);
-      if (matchId != null) {
-        matchState.setMatchId(matchId);
-      }
       context
           .read<OnboardingChecklistState>()
           .completeItem(OnboardingItems.acceptChallenge);
@@ -2350,9 +2327,24 @@ class _HomeScreenState extends State<HomeScreen>
       // Refresh badge count now that challenge is accepted
       ScaffoldWithNavBar.refreshBadge?.call();
 
-      // Navigate to match setup
+      // Scan-gated start: both players must scan in person before a result
+      // can be recorded, so route into the QR handshake instead of setup.
       AnalyticsService.logChallengeAccepted(mode: '1v1');
-      context.push('/match/setup');
+      if (matchId == null || matchId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Could not start the match. Try again.')),
+        );
+        return;
+      }
+      context.push(Uri(
+        path: '/quick-play',
+        queryParameters: {
+          'matchId': matchId,
+          'opponentId': challenge.otherUser.id,
+          'opponentName': challenge.otherUser.name,
+        },
+      ).toString());
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

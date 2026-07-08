@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -7,11 +8,26 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../app_config.dart';
+import '../models.dart';
+import '../services/api_service.dart';
 import '../state/app_state.dart';
 import '../utils/quick_play_qr.dart';
 
 class QuickPlayScreen extends StatefulWidget {
-  const QuickPlayScreen({super.key});
+  /// When set, this screen starts an EXISTING challenge match: the QR
+  /// carries the matchId, the opponent's scan verify-starts it server-side,
+  /// and this device polls until that happens, then jumps into the live
+  /// match. Without it, this is the classic ad-hoc Quick Play flow.
+  final String? matchId;
+  final String? opponentId;
+  final String? opponentName;
+
+  const QuickPlayScreen({
+    super.key,
+    this.matchId,
+    this.opponentId,
+    this.opponentName,
+  });
 
   @override
   State<QuickPlayScreen> createState() => _QuickPlayScreenState();
@@ -20,12 +36,69 @@ class QuickPlayScreen extends StatefulWidget {
 class _QuickPlayScreenState extends State<QuickPlayScreen> {
   late final int _generatedAtMs;
   late final String _sessionToken;
+  Timer? _verifyPoll;
 
   @override
   void initState() {
     super.initState();
     _generatedAtMs = DateTime.now().millisecondsSinceEpoch;
     _sessionToken = _buildSessionToken();
+    if (widget.matchId != null && widget.matchId!.isNotEmpty) {
+      _verifyPoll = Timer.periodic(
+        const Duration(seconds: 3),
+        (_) => _checkMatchVerified(),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _verifyPoll?.cancel();
+    super.dispose();
+  }
+
+  /// The opponent's scan flips scan_verified server-side; the moment we see
+  /// it, both phones are in — go live.
+  Future<void> _checkMatchVerified() async {
+    final matchId = widget.matchId;
+    if (matchId == null || !mounted) return;
+    try {
+      final match = await ApiService.getMatch(matchId);
+      if (match == null || !mounted) return;
+      final verified = match['scan_verified'] == true;
+      final status = (match['status'] ?? '').toString().toLowerCase();
+      if (verified && (status == 'live' || status == 'accepted')) {
+        _verifyPoll?.cancel();
+        _enterLiveMatch();
+      }
+    } catch (_) {
+      // Poll again on the next tick.
+    }
+  }
+
+  void _enterLiveMatch() {
+    final matchState = context.read<MatchState>();
+    matchState.reset();
+    matchState.mode = '1v1';
+    matchState.setOpponent(Player(
+      id: widget.opponentId ?? '',
+      slug: widget.opponentId ?? '',
+      name: widget.opponentName ?? 'Opponent',
+      team: 'Free Agent',
+      position: 'G',
+      age: 25,
+      height: "6'0\"",
+      weight: '180 lbs',
+      rating: 3.0,
+      offense: 75,
+      defense: 75,
+      shooting: 75,
+      passing: 75,
+      rebounding: 75,
+    ));
+    matchState.setMatchId(widget.matchId);
+    matchState.startMatch();
+    context.go('/match/live');
   }
 
   String _buildSessionToken() {
@@ -52,6 +125,9 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthState>().currentUser;
     final hostName = user?.name.trim().isNotEmpty == true ? user!.name : 'Host';
+    final isChallengeStart =
+        widget.matchId != null && widget.matchId!.isNotEmpty;
+    final opponentLabel = widget.opponentName ?? 'your opponent';
     final matchQrData = user == null
         ? ''
         : QuickPlayQrPayload(
@@ -59,11 +135,12 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
             hostName: hostName,
             generatedAtMs: _generatedAtMs,
             sessionToken: _sessionToken,
+            matchId: widget.matchId,
           ).toQrString();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quick Play'),
+        title: Text(isChallengeStart ? 'Start Match' : 'Quick Play'),
         leading: BackButton(
           onPressed: () {
             // Entered via push (back stack) or via deep link/tab (no stack):
@@ -109,10 +186,35 @@ class _QuickPlayScreenState extends State<QuickPlayScreen> {
                   stepTag: 'STEP 2',
                   accentColor: const Color(0xFFF97316),
                   title: 'Step 2: Start This Match',
-                  subtitle:
-                      'Once they are in the app, have them tap Continue without an account or Scan Match, then scan this QR or paste your copied code.',
+                  subtitle: isChallengeStart
+                      ? 'Have $opponentLabel scan this code (or scan theirs). '
+                          'Both players must scan in person — that\'s what '
+                          'makes the result count.'
+                      : 'Once they are in the app, have them tap Continue without an account or Scan Match, then scan this QR or paste your copied code.',
                   qrData: matchQrData,
                 ),
+                if (isChallengeStart) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFF97316),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Waiting for $opponentLabel to scan\u2026',
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12.5),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,

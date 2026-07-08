@@ -19,6 +19,24 @@ void main() {
       expect(parsed.hostName, 'Host Player');
       expect(parsed.generatedAtMs, 1731104100000);
       expect(parsed.sessionToken, 'quick-play-token-1');
+      expect(parsed.matchId, isNull);
+    });
+
+    test('round trips a challenge-start payload with a matchId', () {
+      const payload = QuickPlayQrPayload(
+        hostId: 'host-user-1',
+        hostName: 'Host Player',
+        generatedAtMs: 1731104100000,
+        sessionToken: 'quick-play-token-1',
+        matchId: 'match-abc-123',
+      );
+
+      final parsed = QuickPlayQrPayload.tryParse(payload.toQrString());
+
+      expect(parsed, isNotNull);
+      expect(parsed!.matchId, 'match-abc-123');
+      // Legacy codes without a matchId still parse (matchId just stays null),
+      // so old app versions' QRs keep working through the create path.
     });
 
     test('rejects non quick play URLs', () {

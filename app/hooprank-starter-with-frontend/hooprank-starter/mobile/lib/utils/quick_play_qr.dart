@@ -4,11 +4,17 @@ class QuickPlayQrPayload {
   final int generatedAtMs;
   final String? sessionToken;
 
+  /// When present, the QR belongs to an EXISTING match (a challenge that was
+  /// accepted): scanning it verify-starts that match instead of creating a
+  /// new Quick Play one.
+  final String? matchId;
+
   const QuickPlayQrPayload({
     required this.hostId,
     required this.hostName,
     required this.generatedAtMs,
     this.sessionToken,
+    this.matchId,
   });
 
   String toQrString() {
@@ -22,6 +28,8 @@ class QuickPlayQrPayload {
         'ts': generatedAtMs.toString(),
         if (sessionToken != null && sessionToken!.trim().isNotEmpty)
           'sessionToken': sessionToken!.trim(),
+        if (matchId != null && matchId!.trim().isNotEmpty)
+          'matchId': matchId!.trim(),
       },
     ).toString();
   }
@@ -47,6 +55,7 @@ class QuickPlayQrPayload {
     final hostName = uri.queryParameters['hostName']?.trim();
     final tsRaw = uri.queryParameters['ts']?.trim();
     final sessionToken = uri.queryParameters['sessionToken']?.trim();
+    final matchId = uri.queryParameters['matchId']?.trim();
 
     if (hostId == null || hostId.isEmpty) return null;
 
@@ -59,6 +68,7 @@ class QuickPlayQrPayload {
       generatedAtMs: generatedAtMs,
       sessionToken:
           (sessionToken == null || sessionToken.isEmpty) ? null : sessionToken,
+      matchId: (matchId == null || matchId.isEmpty) ? null : matchId,
     );
   }
 }

@@ -32,6 +32,7 @@ function mapMatchForIOS(match: any): any {
     score_creator: match.scoreCreator ?? match.score_creator,
     score_opponent: match.scoreOpponent ?? match.score_opponent,
     match_type: match.matchType ?? match.match_type ?? '1v1',
+    scan_verified: match.scan_verified === true || match.scan_verified === 't' || match.scanVerified === true,
     created_at: match.createdAt ?? match.created_at,
     updated_at: match.updatedAt ?? match.updated_at,
   };
@@ -56,11 +57,16 @@ export class MatchesController {
       throw new ForbiddenException('hostId must match authenticated user');
     }
     const opponentId = body.guestId || (body as any).opponentId;
+    // A quickPlayToken only exists on a device that scanned the host's QR,
+    // so matches created through Quick Play are born scan-verified.
+    const scanVerified = typeof (body as any).quickPlayToken === 'string' &&
+      (body as any).quickPlayToken.length > 0;
     const match = await this.matches.create(
       creatorId,
       opponentId,
       body.courtId,
       body.autoAccept === true,
+      scanVerified,
     );
 
     if (body.message && opponentId) {
@@ -83,6 +89,16 @@ export class MatchesController {
     const opponentId = userId;
     if (!opponentId) throw new Error('opponentId required');
     return mapMatchForIOS(await this.matches.accept(id, opponentId));
+  }
+
+  @Post(':id/verify-start')
+  async verifyStart(
+    @Headers('x-user-id') userId: string,
+    @Param('id') id: string,
+  ): Promise<Match> {
+    if (!userId) throw new ForbiddenException('Authentication required');
+    const match = await this.matches.verifyStart(id, userId);
+    return mapMatchForIOS(match);
   }
 
   @Post(':id/complete')

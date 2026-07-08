@@ -329,7 +329,7 @@ class _ScanMatchScreenState extends State<ScanMatchScreen> {
       }
 
       setState(() {
-        _statusMessage = 'Creating match...';
+        _statusMessage = 'Starting match...';
       });
 
       Map<String, dynamic>? profile;
@@ -353,12 +353,23 @@ class _ScanMatchScreenState extends State<ScanMatchScreen> {
         fallback: 3.0,
       );
 
-      final created = await ApiService.createQuickPlayMatch(
-        opponentId: payload.hostId,
-        quickPlayToken: payload.sessionToken,
-      );
-
-      final matchId = _extractMatchId(created);
+      String? matchId;
+      if (payload.matchId != null && payload.matchId!.isNotEmpty) {
+        // Existing challenge match: this scan IS the in-person handshake.
+        // verify-start unlocks score submission server-side and flips the
+        // host's waiting screen into the live match.
+        final verified = await ApiService.verifyMatchStart(payload.matchId!);
+        if (verified == null) {
+          throw Exception('Could not verify the match start. Try again.');
+        }
+        matchId = payload.matchId;
+      } else {
+        final created = await ApiService.createQuickPlayMatch(
+          opponentId: payload.hostId,
+          quickPlayToken: payload.sessionToken,
+        );
+        matchId = _extractMatchId(created);
+      }
       if (matchId == null || matchId.isEmpty) {
         throw Exception('Match created, but no match ID was returned.');
       }

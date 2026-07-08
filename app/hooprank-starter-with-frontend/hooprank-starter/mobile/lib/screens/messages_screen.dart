@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../models.dart';
 import '../services/analytics_service.dart';
 import '../services/messages_service.dart';
 import '../services/notification_service.dart';
@@ -254,30 +253,65 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
     return !finished.contains((c.matchStatus ?? '').toLowerCase());
   }
 
-  /// Jump back into an accepted challenge's match.
-  void _resumeMatch(ChallengeRequest challenge) {
-    final matchState = context.read<MatchState>();
-    matchState.setOpponent(Player(
-      id: challenge.otherUser.id,
-      slug: challenge.otherUser.id,
-      name: challenge.otherUser.name,
-      team: challenge.otherUser.team ?? 'Free Agent',
-      position: challenge.otherUser.position ?? 'G',
-      age: 25,
-      height: '6\'0"',
-      weight: '180 lbs',
-      rating: challenge.otherUser.rating,
-      offense: 80,
-      defense: 80,
-      shooting: 80,
-      passing: 80,
-      rebounding: 80,
-    ));
-    final matchId = challenge.message.matchId;
-    if (matchId != null && matchId.isNotEmpty) {
-      matchState.setMatchId(matchId);
+  /// Start a challenge match through the in-person QR handshake. Accepts the
+  /// challenge first if it's still pending, then opens the Start Match screen
+  /// where one player's scan of the other's QR verifies the match — the only
+  /// path that lets a score be recorded (anti-fraud gate).
+  Future<void> _startMatch(ChallengeRequest challenge) async {
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    String? matchId = challenge.message.matchId;
+    try {
+      if (!_isLiveChallenge(challenge)) {
+        final result = await _messagesService.acceptChallenge(
+            userId, challenge.message.id);
+        matchId = (result['matchId'] as String?) ?? matchId;
+        if (!mounted) return;
+        context
+            .read<OnboardingChecklistState>()
+            .completeItem(OnboardingItems.acceptChallenge);
+        AnalyticsService.logChallengeAccepted(mode: '1v1');
+        _loadAllConversations();
+        ScaffoldWithNavBar.refreshBadge?.call();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+      return;
     }
-    context.push('/match/setup');
+    if (!mounted) return;
+    if (matchId == null || matchId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not start the match. Try again.')),
+      );
+      return;
+    }
+    final other = challenge.otherUser;
+    context.push(Uri(
+      path: '/quick-play',
+      queryParameters: {
+        'matchId': matchId,
+        'opponentId': other.id,
+        'opponentName': other.name,
+      },
+    ).toString());
+  }
+
+  /// Open the chat thread with the challenger.
+  void _openChallengeChat(ChallengeRequest challenge) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(otherUser: challenge.otherUser),
+      ),
+    ).then((_) {
+      _loadAllConversations();
+      ScaffoldWithNavBar.refreshBadge?.call();
+    });
   }
 
   /// A pending challenge card: challenger, message, court/time, and
@@ -382,16 +416,19 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (isLive)
+                // Every startable challenge leads with the scan-gated Start
+                // Match: both players must scan in person for the result to
+                // count, so there's no direct accept-and-submit path.
+                if (isLive || challenge.isReceived) ...[
                   SizedBox(
                     width: double.infinity,
                     height: 38,
                     child: ElevatedButton.icon(
-                      onPressed: () => _resumeMatch(challenge),
-                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                      label: const Text('Resume match'),
+                      onPressed: () => _startMatch(challenge),
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                      label: const Text('Start Match'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: liveGreen,
+                        backgroundColor: isLive ? liveGreen : orange,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -401,52 +438,38 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
                             fontWeight: FontWeight.w900, fontSize: 14),
                       ),
                     ),
-                  )
-                else if (challenge.isReceived)
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 38,
-                          child: ElevatedButton(
-                            onPressed: () => _acceptChallenge(challenge),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: orange,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              textStyle: const TextStyle(
-                                  fontWeight: FontWeight.w900, fontSize: 14),
+                      if (!isLive) ...[
+                        Expanded(
+                          child: SizedBox(
+                            height: 36,
+                            child: OutlinedButton(
+                              onPressed: () => _declineChallenge(challenge),
+                              style: _challengeOutlineStyle,
+                              child: const Text('Decline'),
                             ),
-                            child: const Text('Accept'),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
+                        const SizedBox(width: 10),
+                      ],
                       Expanded(
                         child: SizedBox(
-                          height: 38,
-                          child: OutlinedButton(
-                            onPressed: () => _declineChallenge(challenge),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white70,
-                              side: BorderSide(
-                                  color: Colors.white.withOpacity(0.25)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              textStyle: const TextStyle(
-                                  fontWeight: FontWeight.w800, fontSize: 14),
-                            ),
-                            child: const Text('Decline'),
+                          height: 36,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openChallengeChat(challenge),
+                            icon: const Icon(Icons.chat_bubble_outline_rounded,
+                                size: 15),
+                            label: const Text('Message'),
+                            style: _challengeOutlineStyle,
                           ),
                         ),
                       ),
                     ],
-                  )
-                else
+                  ),
+                ] else ...[
                   Row(
                     children: [
                       Icon(Icons.hourglass_top_rounded,
@@ -459,8 +482,20 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
                             fontSize: 12,
                             fontWeight: FontWeight.w700),
                       ),
+                      const Spacer(),
+                      SizedBox(
+                        height: 32,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openChallengeChat(challenge),
+                          icon: const Icon(Icons.chat_bubble_outline_rounded,
+                              size: 14),
+                          label: const Text('Message'),
+                          style: _challengeOutlineStyle,
+                        ),
+                      ),
                     ],
                   ),
+                ],
               ],
             ),
           ),
@@ -469,56 +504,14 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
     );
   }
 
-  Future<void> _acceptChallenge(ChallengeRequest challenge) async {
-    final userId =
-        Provider.of<AuthState>(context, listen: false).currentUser?.id;
-    if (userId == null) return;
-
-    try {
-      // Accept and pick up the created match, mirroring the home-feed flow.
-      final result =
-          await _messagesService.acceptChallenge(userId, challenge.message.id);
-      final matchId = result['matchId'] as String?;
-
-      if (!mounted) return;
-
-      final matchState = context.read<MatchState>();
-      matchState.setOpponent(Player(
-        id: challenge.otherUser.id,
-        slug: challenge.otherUser.id,
-        name: challenge.otherUser.name,
-        team: challenge.otherUser.team ?? 'Free Agent',
-        position: challenge.otherUser.position ?? 'G',
-        age: 25,
-        height: '6\'0"',
-        weight: '180 lbs',
-        rating: challenge.otherUser.rating,
-        offense: 80,
-        defense: 80,
-        shooting: 80,
-        passing: 80,
-        rebounding: 80,
-      ));
-      if (matchId != null) {
-        matchState.setMatchId(matchId);
-      }
-      context
-          .read<OnboardingChecklistState>()
-          .completeItem(OnboardingItems.acceptChallenge);
-
-      _loadAllConversations();
-      ScaffoldWithNavBar.refreshBadge?.call();
-
-      AnalyticsService.logChallengeAccepted(mode: '1v1');
-      context.push('/match/setup');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
+  ButtonStyle get _challengeOutlineStyle => OutlinedButton.styleFrom(
+        foregroundColor: Colors.white70,
+        side: BorderSide(color: Colors.white.withOpacity(0.25)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+      );
 
   Future<void> _declineChallenge(ChallengeRequest challenge) async {
     final userId =

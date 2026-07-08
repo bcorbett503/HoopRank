@@ -243,7 +243,11 @@ class _HoopRankAppState extends State<HoopRankApp> {
                 GoRoute(
                   name: 'quick_play',
                   path: '/quick-play',
-                  builder: (context, state) => const QuickPlayScreen(),
+                  builder: (context, state) => QuickPlayScreen(
+                    matchId: state.uri.queryParameters['matchId'],
+                    opponentId: state.uri.queryParameters['opponentId'],
+                    opponentName: state.uri.queryParameters['opponentName'],
+                  ),
                 ),
                 GoRoute(
                   name: 'scan_match',
