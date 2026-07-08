@@ -442,19 +442,17 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      if (!isLive) ...[
-                        Expanded(
-                          child: SizedBox(
-                            height: 36,
-                            child: OutlinedButton(
-                              onPressed: () => _declineChallenge(challenge),
-                              style: _challengeOutlineStyle,
-                              child: const Text('Decline'),
-                            ),
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: OutlinedButton(
+                            onPressed: () => _declineChallenge(challenge),
+                            style: _challengeOutlineStyle,
+                            child: Text(isLive ? 'Cancel Match' : 'Decline'),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                      ],
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: SizedBox(
                           height: 36,
@@ -518,12 +516,15 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
         Provider.of<AuthState>(context, listen: false).currentUser?.id;
     if (userId == null) return;
 
+    final isLive = _isLiveChallenge(challenge);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Decline Challenge?'),
-        content:
-            Text('Decline the challenge from ${challenge.otherUser.name}?'),
+        title: Text(isLive ? 'Cancel Match?' : 'Decline Challenge?'),
+        content: Text(isLive
+            ? 'Cancel your match with ${challenge.otherUser.name}? '
+                'No result will be recorded.'
+            : 'Decline the challenge from ${challenge.otherUser.name}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -532,7 +533,7 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Yes, Decline'),
+            child: Text(isLive ? 'Yes, Cancel Match' : 'Yes, Decline'),
           ),
         ],
       ),
@@ -544,8 +545,9 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text(
-                    'Declined challenge from ${challenge.otherUser.name}')),
+                content: Text(isLive
+                    ? 'Match with ${challenge.otherUser.name} cancelled'
+                    : 'Declined challenge from ${challenge.otherUser.name}')),
           );
           _loadAllConversations();
           ScaffoldWithNavBar.refreshBadge?.call();

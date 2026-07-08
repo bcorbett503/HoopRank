@@ -262,12 +262,31 @@ export class ChallengesService {
 
             const challenge = challenges[0];
 
-            if (challenge.to_user_id !== userId) {
-                throw new HttpException('You can only decline challenges sent to you', HttpStatus.FORBIDDEN);
-            }
-
-            if (challenge.status !== 'pending') {
-                throw new HttpException('Challenge is no longer pending', HttpStatus.BAD_REQUEST);
+            // Pending: only the recipient may decline. Accepted (live match
+            // not yet played): either participant may back out — that also
+            // cancels the linked match so it drops off both players' lists.
+            if (challenge.status === 'pending') {
+                if (challenge.to_user_id !== userId) {
+                    throw new HttpException('You can only decline challenges sent to you', HttpStatus.FORBIDDEN);
+                }
+            } else if (challenge.status === 'accepted') {
+                if (challenge.to_user_id !== userId && challenge.from_user_id !== userId) {
+                    throw new HttpException('You are not part of this challenge', HttpStatus.FORBIDDEN);
+                }
+                if (challenge.match_id) {
+                    const matches = await this.dataSource.query(
+                        `SELECT status FROM matches WHERE id = $1`, [challenge.match_id]);
+                    const matchStatus = matches[0]?.status;
+                    if (matchStatus === 'completed') {
+                        throw new HttpException('This match already has a result', HttpStatus.BAD_REQUEST);
+                    }
+                    await this.dataSource.query(`
+                        UPDATE matches SET status = 'cancelled', updated_at = NOW()
+                        WHERE id = $1 AND status != 'completed'
+                    `, [challenge.match_id]);
+                }
+            } else {
+                throw new HttpException('Challenge is no longer active', HttpStatus.BAD_REQUEST);
             }
 
             await this.dataSource.query(`
@@ -280,9 +299,12 @@ export class ChallengesService {
                 SELECT * FROM challenges WHERE id = $1
             `, [challengeId]);
 
-            // Notify challenger their challenge was declined
+            // Notify the other participant
             const declinerName = await this.getUserName(userId);
-            this.notificationsService.sendChallengeNotification(challenge.from_user_id, declinerName, 'declined', challengeId).catch(() => { });
+            const otherUserId = challenge.from_user_id === userId
+                ? challenge.to_user_id
+                : challenge.from_user_id;
+            this.notificationsService.sendChallengeNotification(otherUserId, declinerName, 'declined', challengeId).catch(() => { });
 
             return updated[0];
         }
