@@ -19,6 +19,7 @@ import 'avatar_image.dart';
 import 'basketball_marker.dart';
 import 'player_map_marker.dart';
 import 'player_status_sheet.dart';
+import 'permission_prompts.dart';
 
 const double kCourtSelectionZoom = 16.0;
 const double kCourtDeepLinkPreviewZoom = 16.0;
@@ -97,6 +98,10 @@ class CourtMapWidget extends StatefulWidget {
   final bool showPlayers;
   final bool showStatusBubbles;
   final bool showHubControls;
+
+  /// When true, the first-run "Put Yourself on the Map" + "Accept Challenges"
+  /// permission onboarding runs on this map (only the primary hub map).
+  final bool enablePermissionOnboarding;
   final String? initialRunsFilter;
   final bool? initialIndoorFilter;
   final Function(MapHubPlayer)? onPlayerSelected;
@@ -114,6 +119,7 @@ class CourtMapWidget extends StatefulWidget {
     this.showPlayers = false,
     this.showStatusBubbles = false,
     this.showHubControls = false,
+    this.enablePermissionOnboarding = false,
     this.initialRunsFilter,
     this.initialIndoorFilter = true,
     this.onPlayerSelected,
@@ -159,6 +165,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   bool _hubPlayersVisible = true;
   bool _hubCourtsVisible = true;
   bool _isSavingMapVisibility = false;
+  bool _ranPermissionOnboarding = false;
 
   bool _noCourtsFound = false;
   bool _didInitialZoomOutToFindCourts = false;
@@ -237,6 +244,43 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       }
       _isMapHubLoading = false;
     });
+
+    // First-run permission onboarding, once we know the visibility state.
+    if (hub != null &&
+        widget.enablePermissionOnboarding &&
+        !_ranPermissionOnboarding) {
+      _ranPermissionOnboarding = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _maybeRunPermissionOnboarding();
+      });
+    }
+  }
+
+  /// Snapchat-style first-run flow: offer to go live on the map, then to accept
+  /// challenges. Each step is shown at most once (gated by SharedPreferences).
+  Future<void> _maybeRunPermissionOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted &&
+        !_mapHubPrivacy.mapVisibilityEnabled &&
+        prefs.getBool(kSeenMapVisibilityPrompt) != true) {
+      await prefs.setBool(kSeenMapVisibilityPrompt, true);
+      if (!mounted) return;
+      final goLive = await showMapVisibilityPrompt(context);
+      if (goLive && mounted) {
+        await _toggleMapVisibility(true);
+      }
+    }
+    if (!mounted) return;
+    await maybeShowAcceptChallengesPrompt(context);
+  }
+
+  /// Enabling visibility from the toggle goes through the "Put Yourself on the
+  /// Map" sheet (and chains the Accept Challenges prompt on first opt-in).
+  Future<void> _requestGoVisible() async {
+    final goLive = await showMapVisibilityPrompt(context);
+    if (!goLive || !mounted) return;
+    await _toggleMapVisibility(true);
+    if (mounted) await maybeShowAcceptChallengesPrompt(context);
   }
 
   Future<void> _toggleMapVisibility(bool enabled) async {
@@ -1620,9 +1664,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
               child: InkWell(
                 onTap: _isSavingMapVisibility
                     ? null
-                    : () => _toggleMapVisibility(
-                          !_mapHubPrivacy.mapVisibilityEnabled,
-                        ),
+                    : () => _mapHubPrivacy.mapVisibilityEnabled
+                        ? _toggleMapVisibility(false)
+                        : _requestGoVisible(),
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   height: 42,

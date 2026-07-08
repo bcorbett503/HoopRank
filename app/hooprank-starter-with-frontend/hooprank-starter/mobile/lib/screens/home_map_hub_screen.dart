@@ -27,6 +27,7 @@ class HomeMapHubScreen extends StatelessWidget {
           showPlayers: true,
           showStatusBubbles: true,
           showHubControls: false,
+          enablePermissionOnboarding: true,
           initialRunsFilter: 'all',
           initialIndoorFilter: null,
           onCourtSelected: (court) => _showCourtDetails(context, court),
