@@ -8,6 +8,103 @@ import '../utils/generated_avatar.dart';
 import 'avatar_game_mesh_painter.dart';
 import 'avatar_image.dart';
 
+/// Zoomed-out consolidation bubble: N nearby players collapse into one
+/// tappable count marker so avatars don't blanket the map at metro scale.
+/// Styled to match the rank badge (dark pill, white border) with the orange
+/// accent when anyone in the group is challenge-ready.
+class PlayerClusterMarker extends StatelessWidget {
+  static const markerSize = 92.0;
+
+  final int count;
+  final bool acceptingChallenges;
+  final VoidCallback? onTap;
+
+  const PlayerClusterMarker({
+    super.key,
+    required this.count,
+    this.acceptingChallenges = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent =
+        acceptingChallenges ? const Color(0xFFFF6B35) : const Color(0xFF38BDF8);
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: markerSize,
+        height: markerSize,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              key: const ValueKey('player_cluster_bubble'),
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: const Color(0xF2111827),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.45),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.groups_rounded, size: 17, color: accent),
+                  Text(
+                    '$count',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      height: 1.05,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 3),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Text(
+                'hoopers',
+                style: TextStyle(
+                  color: Color(0xFF111827),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class PlayerMapMarker extends StatelessWidget {
   static const markerWidth = 192.0;
   static const markerHeight = 204.0;

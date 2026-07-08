@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models.dart';
 import '../models/map_hub_models.dart';
+import '../utils/player_clustering.dart';
 import '../services/court_service.dart';
 import '../services/api_service.dart';
 import '../state/check_in_state.dart';
@@ -238,6 +239,43 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       );
 
   Color _topChipInk(bool active) => active ? Colors.white : kMapControlInk;
+
+  /// Screen-space player consolidation: at the current zoom, players whose
+  /// avatars would pile on top of each other merge into a [PlayerCluster]
+  /// rendered as one count bubble. The merge radius widens as the map zooms
+  /// out, so a metro view reads "N hoopers" while zooming in fans the group
+  /// back out into full avatars. Pre-ready (or on projection failure) every
+  /// player stands alone.
+  /// Past street-level zoom clustering turns off entirely — co-located
+  /// players (same court) must fan out into real avatars here, otherwise a
+  /// bubble at max zoom could never be expanded.
+  static const _playerClusterMaxZoom = 15.5;
+
+  List<PlayerCluster> _computePlayerClusters(List<MapHubPlayer> others) {
+    if (!_mapReady ||
+        others.length < 2 ||
+        _currentZoom >= _playerClusterMaxZoom) {
+      return [
+        for (final p in others) PlayerCluster([p]),
+      ];
+    }
+    final camera = _mapController.camera;
+    return clusterMapPlayers(
+      others,
+      project: (p) => camera.latLngToScreenPoint(LatLng(p.lat, p.lng)),
+      radius: clusterRadiusForZoom(_currentZoom),
+    );
+  }
+
+  /// Tap on a cluster bubble: dive toward the group so it fans out into
+  /// individual avatars (the tighter merge radius at higher zoom does the
+  /// splitting naturally).
+  void _expandPlayerCluster(PlayerCluster cluster) {
+    final targetZoom = (_currentZoom + 2.5).clamp(3.0, kCourtSelectionZoom);
+    _currentZoom = targetZoom;
+    _mapController.move(LatLng(cluster.lat, cluster.lng), targetZoom);
+    setState(() {});
+  }
 
   /// Collision-aware labels: project every player marker to screen space and
   /// suppress the labels (name pill + status) of LOWER-priority players whose
@@ -1941,8 +1979,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
         .where((player) => player.lat != 0 || player.lng != 0)
         .where((player) => myPlayerId == null || player.id.trim() != myPlayerId)
         .toList();
+    // Consolidate players whose avatars would pile up at this zoom into
+    // count bubbles; zooming in separates them back into full avatars.
+    final playerClusters = _computePlayerClusters(otherMapPlayers);
+    final unclusteredPlayers = [
+      for (final c in playerClusters)
+        if (c.isSingle) c.single,
+    ];
     final suppressedLabelIds = _computeLabelSuppression(
-      otherMapPlayers,
+      unclusteredPlayers,
       currentUserMapPlayer,
       showMapLabels,
     );
@@ -2002,6 +2047,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
               // Debounce court updates to avoid rebuilding on every frame
               _debounceTimer?.cancel();
               _debounceTimer = Timer(const Duration(milliseconds: 150), () {
+                // Re-cluster/re-suppress right away at the new camera —
+                // the court refetch below repaints again when it lands.
+                if (mounted) setState(() {});
                 _updateCourtsForMapCenter();
               });
             },
@@ -2087,22 +2135,35 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
             ),
             if (widget.showPlayers && _hubPlayersVisible)
               MarkerLayer(
-                markers: otherMapPlayers
-                    .map(
-                      (player) => Marker(
-                        point: LatLng(player.lat, player.lng),
+                markers: [
+                  for (final cluster in playerClusters)
+                    if (cluster.isSingle)
+                      Marker(
+                        point: LatLng(cluster.single.lat, cluster.single.lng),
                         width: PlayerMapMarker.markerWidth,
                         height: PlayerMapMarker.markerHeight,
                         alignment: Alignment.topCenter,
                         child: PlayerMapMarker(
-                          player: player,
+                          player: cluster.single,
                           showDetails: showMapLabels,
-                          showLabels: !suppressedLabelIds.contains(player.id),
-                          onTap: () => widget.onPlayerSelected?.call(player),
+                          showLabels:
+                              !suppressedLabelIds.contains(cluster.single.id),
+                          onTap: () =>
+                              widget.onPlayerSelected?.call(cluster.single),
+                        ),
+                      )
+                    else
+                      Marker(
+                        point: LatLng(cluster.lat, cluster.lng),
+                        width: PlayerClusterMarker.markerSize,
+                        height: PlayerClusterMarker.markerSize,
+                        child: PlayerClusterMarker(
+                          count: cluster.count,
+                          acceptingChallenges: cluster.anyAcceptingChallenges,
+                          onTap: () => _expandPlayerCluster(cluster),
                         ),
                       ),
-                    )
-                    .toList(),
+                ],
               ),
             if (currentUserMapPlayer != null)
               MarkerLayer(

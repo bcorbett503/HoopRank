@@ -277,6 +277,34 @@ void main() {
     expect(find.text('Me'), findsOneWidget);
     expect(find.text('now'), findsOneWidget);
   });
+
+  testWidgets('PlayerClusterMarker shows the consolidated player count',
+      (tester) async {
+    await tester.pumpWidget(const _ClusterHarness(count: 7));
+
+    expect(find.byKey(const ValueKey('player_cluster_bubble')), findsOneWidget);
+    expect(find.text('7'), findsOneWidget);
+    expect(find.text('hoopers'), findsOneWidget);
+    expect(find.byIcon(Icons.groups_rounded), findsOneWidget);
+  });
+
+  testWidgets('PlayerClusterMarker fires onTap', (tester) async {
+    var tapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: PlayerClusterMarker(
+              count: 3,
+              onTap: () => tapped = true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('player_cluster_bubble')));
+    expect(tapped, isTrue);
+  });
 }
 
 Finder _avatarGameMeshPainterFinder() {
@@ -284,4 +312,29 @@ Finder _avatarGameMeshPainterFinder() {
     (widget) =>
         widget is CustomPaint && widget.painter is AvatarGameMeshPainter,
   );
+}
+
+// -- Cluster bubble ---------------------------------------------------------
+
+void _noop() {}
+
+class _ClusterHarness extends StatelessWidget {
+  final int count;
+  final bool accepting;
+  const _ClusterHarness({required this.count, this.accepting = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: PlayerClusterMarker(
+            count: count,
+            acceptingChallenges: accepting,
+            onTap: _noop,
+          ),
+        ),
+      ),
+    );
+  }
 }
