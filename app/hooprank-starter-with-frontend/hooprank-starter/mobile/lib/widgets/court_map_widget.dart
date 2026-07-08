@@ -2155,11 +2155,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                     else
                       Marker(
                         point: LatLng(cluster.lat, cluster.lng),
-                        width: PlayerClusterMarker.markerSize,
-                        height: PlayerClusterMarker.markerSize,
+                        width: PlayerClusterMarker.markerWidth,
+                        height: PlayerClusterMarker.markerHeight,
+                        alignment: Alignment.topCenter,
                         child: PlayerClusterMarker(
-                          count: cluster.count,
-                          acceptingChallenges: cluster.anyAcceptingChallenges,
+                          members: cluster.members,
                           onTap: () => _expandPlayerCluster(cluster),
                         ),
                       ),

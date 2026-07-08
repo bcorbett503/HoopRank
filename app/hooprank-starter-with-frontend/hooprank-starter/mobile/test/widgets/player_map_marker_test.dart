@@ -278,31 +278,62 @@ void main() {
     expect(find.text('now'), findsOneWidget);
   });
 
-  testWidgets('PlayerClusterMarker shows the consolidated player count',
+  testWidgets('PlayerClusterMarker leads with an avatar and shows the count',
       (tester) async {
-    await tester.pumpWidget(const _ClusterHarness(count: 7));
+    final members = [
+      for (var i = 0; i < 7; i++)
+        MapHubPlayer.fromJson({
+          'id': 'p$i',
+          'name': 'Player $i',
+          'lat': 37.0,
+          'lng': -122.0,
+        }),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: PlayerClusterMarker(members: members, onTap: () {}),
+          ),
+        ),
+      ),
+    );
 
-    expect(find.byKey(const ValueKey('player_cluster_bubble')), findsOneWidget);
-    expect(find.text('7'), findsOneWidget);
-    expect(find.text('hoopers'), findsOneWidget);
+    // Lead avatar renders as a real figure, count reads "+6 more".
+    expect(find.byKey(const ValueKey('player_cluster_lead_avatar')),
+        findsOneWidget);
+    expect(find.byType(SvgPicture), findsNWidgets(2)); // lead + ghost
+    expect(find.byKey(const ValueKey('player_cluster_count_badge')),
+        findsOneWidget);
+    expect(find.text('+6'), findsOneWidget);
+    expect(find.text('7 hoopers'), findsOneWidget);
     expect(find.byIcon(Icons.groups_rounded), findsOneWidget);
   });
 
   testWidgets('PlayerClusterMarker fires onTap', (tester) async {
     var tapped = false;
+    final members = [
+      for (var i = 0; i < 2; i++)
+        MapHubPlayer.fromJson({
+          'id': 'p$i',
+          'name': 'Player $i',
+          'lat': 37.0,
+          'lng': -122.0,
+        }),
+    ];
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: Center(
             child: PlayerClusterMarker(
-              count: 3,
+              members: members,
               onTap: () => tapped = true,
             ),
           ),
         ),
       ),
     );
-    await tester.tap(find.byKey(const ValueKey('player_cluster_bubble')));
+    await tester.tap(find.byKey(const ValueKey('player_cluster_lead_avatar')));
     expect(tapped, isTrue);
   });
 }
@@ -312,29 +343,4 @@ Finder _avatarGameMeshPainterFinder() {
     (widget) =>
         widget is CustomPaint && widget.painter is AvatarGameMeshPainter,
   );
-}
-
-// -- Cluster bubble ---------------------------------------------------------
-
-void _noop() {}
-
-class _ClusterHarness extends StatelessWidget {
-  final int count;
-  final bool accepting;
-  const _ClusterHarness({required this.count, this.accepting = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: PlayerClusterMarker(
-            count: count,
-            acceptingChallenges: accepting,
-            onTap: _noop,
-          ),
-        ),
-      ),
-    );
-  }
 }

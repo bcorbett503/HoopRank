@@ -8,96 +8,147 @@ import '../utils/generated_avatar.dart';
 import 'avatar_game_mesh_painter.dart';
 import 'avatar_image.dart';
 
-/// Zoomed-out consolidation bubble: N nearby players collapse into one
-/// tappable count marker so avatars don't blanket the map at metro scale.
-/// Styled to match the rank badge (dark pill, white border) with the orange
-/// accent when anyone in the group is challenge-ready.
+/// Zoomed-out consolidation marker: a group of nearby players renders as
+/// the highest-priority member's full avatar with a ghosted teammate behind
+/// it and a "N hoopers" pill + count badge — so the map keeps its character
+/// (you always see a real player) while the pile-up collapses to one marker.
+/// Tapping dives toward the group, which fans out into individual avatars.
 class PlayerClusterMarker extends StatelessWidget {
-  static const markerSize = 92.0;
+  static const markerWidth = PlayerMapMarker.markerWidth;
+  static const markerHeight = PlayerMapMarker.markerHeight;
 
-  final int count;
-  final bool acceptingChallenges;
+  static const _figureWidth = 140.0;
+  static const _figureHeight = 134.0;
+
+  /// Cluster members, highest priority first (the seed leads the stack).
+  final List<MapHubPlayer> members;
   final VoidCallback? onTap;
 
   const PlayerClusterMarker({
     super.key,
-    required this.count,
-    this.acceptingChallenges = false,
+    required this.members,
     this.onTap,
   });
 
+  int get count => members.length;
+
+  String? _svgFor(MapHubPlayer p) =>
+      flatAvatarSvg(p.avatarConfig) ?? defaultAvatarSvgForId(p.id);
+
   @override
   Widget build(BuildContext context) {
-    final accent =
-        acceptingChallenges ? const Color(0xFFFF6B35) : const Color(0xFF38BDF8);
+    final rep = members.first;
+    final ghost = members.length > 1 ? members[1] : null;
+    final accent = members.any((p) => p.acceptingChallenges)
+        ? const Color(0xFFFF6B35)
+        : const Color(0xFF38BDF8);
+    final repSvg = _svgFor(rep);
+    final ghostSvg = ghost == null ? null : _svgFor(ghost);
+
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: markerSize,
-        height: markerSize,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        width: markerWidth,
+        height: markerHeight,
+        child: Stack(
+          alignment: Alignment.topCenter,
           children: [
-            Container(
-              key: const ValueKey('player_cluster_bubble'),
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: const Color(0xF2111827),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: accent.withValues(alpha: 0.45),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.groups_rounded, size: 17, color: accent),
-                  Text(
-                    '$count',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      height: 1.05,
+            // "N hoopers" pill where a player's name pill would sit.
+            Positioned(
+              top: 0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xF2111827),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 3),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(999),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Text(
-                'hoopers',
-                style: TextStyle(
-                  color: Color(0xFF111827),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.groups_rounded, size: 14, color: accent),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$count hoopers',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+            // Ghosted teammate peeking out behind the lead avatar sells the
+            // "stack of players" read without text clutter.
+            if (ghostSvg != null)
+              Positioned(
+                top: 28,
+                child: Transform.translate(
+                  offset: const Offset(20, 0),
+                  child: Opacity(
+                    opacity: 0.45,
+                    child: SizedBox(
+                      width: _figureWidth * 0.92,
+                      height: _figureHeight * 0.92,
+                      child: SvgPicture.string(ghostSvg, fit: BoxFit.contain),
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              top: 34,
+              child: SizedBox(
+                key: const ValueKey('player_cluster_lead_avatar'),
+                width: _figureWidth,
+                height: _figureHeight,
+                child: repSvg != null
+                    ? SvgPicture.string(repSvg, fit: BoxFit.contain)
+                    : const SizedBox.shrink(),
+              ),
+            ),
+            // "+N" badge overlapping the figure's shoulder.
+            if (count > 1)
+              Positioned(
+                top: 44,
+                right: 34,
+                child: Container(
+                  key: const ValueKey('player_cluster_count_badge'),
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xF2111827),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.45),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    '+${count - 1}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
