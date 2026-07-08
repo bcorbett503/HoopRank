@@ -167,6 +167,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   bool _isSavingMapVisibility = false;
   bool _ranPermissionOnboarding = false;
 
+  // Unique per-instance suffix for the map FAB hero tags. Two CourtMapWidgets
+  // (Play + Courts tabs) stay alive in the nav shell at once, so shared hero
+  // tags like 'zoom_in' would collide during route transitions.
+  final String _fabHeroScope = UniqueKey().toString();
+
   bool _noCourtsFound = false;
   bool _didInitialZoomOutToFindCourts = false;
 
@@ -2581,21 +2586,21 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
             mainAxisSize: MainAxisSize.min,
             children: [
               FloatingActionButton(
-                heroTag: 'zoom_in',
+                heroTag: 'zoom_in_$_fabHeroScope',
                 mini: true,
                 onPressed: _zoomIn,
                 child: const Icon(Icons.add),
               ),
               const SizedBox(height: 8),
               FloatingActionButton(
-                heroTag: 'zoom_out',
+                heroTag: 'zoom_out_$_fabHeroScope',
                 mini: true,
                 onPressed: _zoomOut,
                 child: const Icon(Icons.remove),
               ),
               const SizedBox(height: 16),
               FloatingActionButton(
-                heroTag: 'my_location',
+                heroTag: 'my_location_$_fabHeroScope',
                 onPressed: _moveToUserLocation,
                 child: const Icon(Icons.my_location),
               ),
