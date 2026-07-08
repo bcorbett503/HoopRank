@@ -115,7 +115,7 @@ class QuickPlayOrb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: 'Quick Play',
+      message: 'Start a match',
       child: Container(
         width: size,
         height: size,
@@ -146,9 +146,30 @@ class QuickPlayOrb extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             customBorder: const CircleBorder(),
-            child: CustomPaint(
-              key: const ValueKey('quick_play_ball'),
-              painter: _BasketballPainter(),
+            // Ball + explicit label so the hero clearly reads "start a match".
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: CustomPaint(
+                    key: const ValueKey('quick_play_ball'),
+                    painter: _BasketballPainter(),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'PLAY',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: size * 0.135,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1,
+                    height: 1,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

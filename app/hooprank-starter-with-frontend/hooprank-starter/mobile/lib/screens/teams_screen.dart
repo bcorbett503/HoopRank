@@ -117,49 +117,9 @@ class _TeamsScreenState extends State<TeamsScreen>
   }
 
   // ==============================
-  // Single-team limit check
-  // ==============================
-  bool _canAddTeam() => _myTeams.isEmpty;
-
-  void _showSubscriberDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.lock, color: Colors.amber, size: 28),
-            SizedBox(width: 8),
-            Text('One Team Limit'),
-          ],
-        ),
-        content: const Text(
-          'You already have a team!\n\n'
-          'Managing multiple teams is coming soon for HoopRank subscribers. '
-          'Stay tuned! 🏀',
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepOrange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==============================
   // Create Team
   // ==============================
   void _showCreateTeamDialog() {
-    if (!_canAddTeam()) {
-      _showSubscriberDialog();
-      return;
-    }
-
     final nameController = TextEditingController();
     String teamType = '5v5';
     String? ageGroup;
@@ -478,11 +438,7 @@ class _TeamsScreenState extends State<TeamsScreen>
   // Invites
   // ==============================
   Future<void> _acceptInvite(Map<String, dynamic> invite) async {
-    // Check single-team limit
-    if (_myTeams.isNotEmpty) {
-      _showSubscriberDialog();
-      return;
-    }
+    // Multiple teams are allowed — accept invites freely.
     try {
       // acceptTeamInvite returns false on a non-2xx (e.g. 404 stale invite)
       // without throwing — don't report a false "Joined!".
@@ -1747,7 +1703,7 @@ class _TeamsScreenState extends State<TeamsScreen>
   // FABs
   // ==============================
   Widget? _buildMyTeamsFAB() {
-    final hasTeam = _myTeams.isNotEmpty;
+    // Multiple teams are allowed — create is always available.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
@@ -1755,21 +1711,11 @@ class _TeamsScreenState extends State<TeamsScreen>
         children: [
           FloatingActionButton.extended(
             heroTag: 'createTeam',
-            onPressed: hasTeam ? null : _showCreateTeamDialog,
-            backgroundColor: hasTeam ? Colors.grey.shade700 : Colors.deepOrange,
-            foregroundColor: hasTeam ? Colors.grey.shade500 : Colors.white,
-            icon: Icon(hasTeam ? Icons.lock : Icons.add),
-            label: hasTeam
-                ? const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('1 Team Max', style: TextStyle(fontSize: 13)),
-                      Text('(subscribe for more)',
-                          style: TextStyle(
-                              fontSize: 9, fontWeight: FontWeight.normal)),
-                    ],
-                  )
-                : const Text('Create Team'),
+            onPressed: _showCreateTeamDialog,
+            backgroundColor: Colors.deepOrange,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add),
+            label: const Text('Create Team'),
           ),
         ],
       ),

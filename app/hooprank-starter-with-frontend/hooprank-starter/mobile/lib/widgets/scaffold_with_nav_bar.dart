@@ -157,8 +157,8 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
                   label: 'Messages',
                 ),
                 const NavigationDestination(
-                  icon: Icon(Icons.sports_basketball),
-                  label: 'Play',
+                  icon: Icon(Icons.home_rounded),
+                  label: 'Home',
                 ),
                 const NavigationDestination(
                   icon: Icon(Icons.calendar_today),

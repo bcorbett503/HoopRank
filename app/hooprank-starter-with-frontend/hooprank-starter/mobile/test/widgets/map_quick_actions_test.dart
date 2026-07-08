@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:hooprank/state/app_state.dart';
+import 'package:hooprank/state/check_in_state.dart';
 import 'package:hooprank/widgets/map_quick_actions.dart';
 
 Widget _harness() {
@@ -39,8 +40,12 @@ Widget _harness() {
       GoRoute(path: '/quick-play', builder: (_, __) => const SizedBox()),
     ],
   );
-  return ChangeNotifierProvider<AuthState>(
-    create: (_) => AuthState(initialize: false),
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<AuthState>(
+          create: (_) => AuthState(initialize: false)),
+      ChangeNotifierProvider<CheckInState>(create: (_) => CheckInState()),
+    ],
     child: MaterialApp.router(routerConfig: router),
   );
 }
@@ -62,9 +67,9 @@ void main() {
     // Dump a real PNG so the bar can be eyeballed without a device.
     final dump = Platform.environment['QA_DUMP'];
     if (dump != null) {
-      final boundary = tester
-              .renderObject(find.byKey(const ValueKey('qa_capture')))
-          as RenderRepaintBoundary;
+      final boundary =
+          tester.renderObject(find.byKey(const ValueKey('qa_capture')))
+              as RenderRepaintBoundary;
       await tester.runAsync(() async {
         final image = await boundary.toImage(pixelRatio: 3);
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
