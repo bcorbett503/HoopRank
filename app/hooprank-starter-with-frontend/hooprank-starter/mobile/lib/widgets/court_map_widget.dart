@@ -17,6 +17,7 @@ import '../utils/flat_avatar.dart';
 
 import 'avatar_image.dart';
 import 'basketball_marker.dart';
+import 'map_control_buttons.dart';
 import 'player_map_marker.dart';
 import 'player_status_sheet.dart';
 import 'permission_prompts.dart';
@@ -166,11 +167,6 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   bool _hubCourtsVisible = true;
   bool _isSavingMapVisibility = false;
   bool _ranPermissionOnboarding = false;
-
-  // Unique per-instance suffix for the map FAB hero tags. Two CourtMapWidgets
-  // (Play + Courts tabs) stay alive in the nav shell at once, so shared hero
-  // tags like 'zoom_in' would collide during route transitions.
-  final String _fabHeroScope = UniqueKey().toString();
 
   bool _noCourtsFound = false;
   bool _didInitialZoomOutToFindCourts = false;
@@ -2613,24 +2609,17 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              FloatingActionButton(
-                heroTag: 'zoom_in_$_fabHeroScope',
-                mini: true,
-                onPressed: _zoomIn,
-                child: const Icon(Icons.add),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton(
-                heroTag: 'zoom_out_$_fabHeroScope',
-                mini: true,
-                onPressed: _zoomOut,
-                child: const Icon(Icons.remove),
-              ),
-              const SizedBox(height: 16),
-              FloatingActionButton(
-                heroTag: 'my_location_$_fabHeroScope',
-                onPressed: _moveToUserLocation,
-                child: const Icon(Icons.my_location),
+              MapZoomPill(onZoomIn: _zoomIn, onZoomOut: _zoomOut),
+              const SizedBox(height: 14),
+              FrostedCircleButton(
+                size: 52,
+                tooltip: 'My location',
+                onTap: _moveToUserLocation,
+                child: const Icon(
+                  Icons.my_location,
+                  size: 23,
+                  color: kMapControlInk,
+                ),
               ),
             ],
           ),
