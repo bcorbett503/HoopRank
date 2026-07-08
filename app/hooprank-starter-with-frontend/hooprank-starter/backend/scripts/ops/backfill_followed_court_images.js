@@ -121,10 +121,12 @@ function normalizeCourt(raw) {
 }
 
 function isMissingImage(court) {
-  return (
-    !court.imageUrl &&
-    !(court.imageProvider === "google_places" && court.imagePlaceId)
-  );
+  const generatedProxy =
+    court.imageUrl &&
+    court.imageProvider === "google_places" &&
+    court.id &&
+    court.imageUrl.includes(`/courts/${court.id}/image`);
+  return !court.imageUrl || generatedProxy;
 }
 
 function courtQuery(court) {
@@ -248,6 +250,20 @@ async function searchPlaces(court, apiKey, options) {
   return parsed.places || [];
 }
 
+async function resolvePlacePhotoUri(photoName, apiKey) {
+  const cleaned = cleanString(photoName);
+  if (!cleaned) return null;
+  const res = await fetch(
+    `https://places.googleapis.com/v1/${cleaned}/media?maxWidthPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(
+      apiKey,
+    )}`,
+    { signal: AbortSignal.timeout(parseIntArg("--timeout-ms", 30000)) },
+  );
+  if (!res.ok) return null;
+  const parsed = await res.json();
+  return cleanString(parsed.photoUri);
+}
+
 async function findCandidate(court, apiKey, options) {
   if (!court.id)
     return { status: "skipped", reason: "missing_court_id", court };
@@ -275,8 +291,12 @@ async function findCandidate(court, apiKey, options) {
   const photoCount = Array.isArray(best.place.photos)
     ? best.place.photos.length
     : 0;
+  const imageUrl =
+    photoCount > 0
+      ? await resolvePlacePhotoUri(best.place.photos?.[0]?.name, apiKey)
+      : null;
   return {
-    status: photoCount > 0 ? "matched" : "no_photo",
+    status: imageUrl ? "matched" : "no_photo",
     courtId: court.id,
     courtName: court.name,
     courtCity: court.city,
@@ -291,6 +311,7 @@ async function findCandidate(court, apiKey, options) {
         : Number(best.ranking.distanceKm.toFixed(3)),
     nameSimilarity: Number(best.ranking.similarity.toFixed(3)),
     photoCount,
+    imageUrl,
     imageProvider: "google_places",
     imageSourceLabel: "Google Maps photo",
   };
@@ -309,6 +330,7 @@ async function applyBatch(base, adminHeaders, candidates) {
         courtId: candidate.courtId,
         imageProvider: "google_places",
         imagePlaceId: candidate.placeId,
+        imageUrl: candidate.imageUrl,
         imageSourceUrl: candidate.googleMapsUri,
         imageSourceLabel: "Google Maps photo",
       })),

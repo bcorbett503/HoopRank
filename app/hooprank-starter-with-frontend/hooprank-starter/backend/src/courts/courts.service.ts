@@ -103,6 +103,7 @@ type CourtImageBackingInput = {
   courtId: string;
   imageProvider: string;
   imagePlaceId: string;
+  imageUrl?: string | null;
   imageSourceUrl?: string | null;
   imageSourceLabel?: string | null;
 };
@@ -323,8 +324,9 @@ export class CourtsService implements OnModuleInit {
                 SET
                     image_provider = $2,
                     image_place_id = $3,
-                    image_source_url = COALESCE(NULLIF(image_source_url, ''), $4),
-                    image_source_label = COALESCE(NULLIF(image_source_label, ''), $5),
+                    image_url = COALESCE(NULLIF(image_url, ''), $4),
+                    image_source_url = COALESCE(NULLIF(image_source_url, ''), $5),
+                    image_source_label = COALESCE(NULLIF(image_source_label, ''), $6),
                     image_place_updated_at = NOW(),
                     image_updated_at = COALESCE(image_updated_at, NOW())
                 WHERE id::text = $1
@@ -335,6 +337,7 @@ export class CourtsService implements OnModuleInit {
           courtId,
           provider,
           placeId,
+          this.cleanString(image.imageUrl),
           this.cleanString(image.imageSourceUrl),
           this.cleanString(image.imageSourceLabel) || "Google Maps photo",
         ],

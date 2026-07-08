@@ -194,6 +194,7 @@ export class CourtsController {
         courtId: string;
         imageProvider: string;
         imagePlaceId: string;
+        imageUrl?: string;
         imageSourceUrl?: string;
         imageSourceLabel?: string;
       }>;
