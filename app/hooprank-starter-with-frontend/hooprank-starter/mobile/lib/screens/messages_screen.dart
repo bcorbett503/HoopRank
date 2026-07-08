@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../state/app_state.dart';
+import '../models.dart';
+import '../services/analytics_service.dart';
 import '../services/messages_service.dart';
 import '../services/notification_service.dart';
+import '../state/app_state.dart';
+import '../state/onboarding_checklist_state.dart';
 import '../utils/image_utils.dart';
 import '../widgets/player_profile_sheet.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
@@ -18,6 +22,7 @@ class MessagesScreen extends StatefulWidget {
 class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
   final MessagesService _messagesService = MessagesService();
   List<Conversation> _conversations = [];
+  List<ChallengeRequest> _challenges = [];
   bool _isLoading = true;
   String? _error;
 
@@ -57,17 +62,32 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
 
     try {
       List<Conversation> conversations = [];
+      List<ChallengeRequest> challenges = [];
 
       try {
-        conversations = await _messagesService.getConversations(userId);
+        final results = await Future.wait([
+          _messagesService.getConversations(userId),
+          _messagesService.getPendingChallenges(userId),
+        ]);
+        conversations = results[0] as List<Conversation>;
+        // Track challenges here in Messages: pending ones surface as their
+        // own section (received first, then sent awaiting a reply).
+        challenges = (results[1] as List<ChallengeRequest>)
+            .where((c) =>
+                (c.message.challengeStatus ?? 'pending').toLowerCase() ==
+                'pending')
+            .toList()
+          ..sort((a, b) => (a.isReceived ? 0 : 1) - (b.isReceived ? 0 : 1));
       } catch (e) {
         debugPrint('Conversations error: $e');
         conversations = [];
+        challenges = [];
       }
 
       if (mounted) {
         setState(() {
           _conversations = conversations;
+          _challenges = challenges;
           _isLoading = false;
           _error = null;
         });
@@ -98,7 +118,7 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
           child: Text('Error: $_error',
               style: const TextStyle(color: Colors.red)));
     }
-    if (_conversations.isEmpty) {
+    if (_conversations.isEmpty && _challenges.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -127,6 +147,52 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
       onRefresh: _loadAllConversations,
       child: ListView(
         children: [
+          if (_challenges.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF6B35).withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.flash_on_rounded,
+                        size: 14, color: Color(0xFFFF6B35)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'CHALLENGES',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF6B35),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${_challenges.length}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ..._challenges.map(_buildChallengeTile),
+          ],
           if (_conversations.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -162,6 +228,267 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
         ],
       ),
     );
+  }
+
+  /// A pending challenge card: challenger, message, court/time, and
+  /// Accept / Decline for received ones (sent ones show "awaiting reply").
+  Widget _buildChallengeTile(ChallengeRequest challenge) {
+    const orange = Color(0xFFFF6B35);
+    final other = challenge.otherUser;
+    final detail = [
+      if (challenge.courtName != null) challenge.courtName!,
+      if (challenge.scheduledAt != null)
+        '${challenge.scheduledAt!.month}/${challenge.scheduledAt!.day}',
+    ].join(' · ');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: orange.withOpacity(0.45)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(otherUser: other),
+              ),
+            ).then((_) {
+              _loadAllConversations();
+              ScaffoldWithNavBar.refreshBadge?.call();
+            });
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () =>
+                          PlayerProfileSheet.showById(context, other.id),
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundImage: other.photoUrl != null
+                            ? safeImageProvider(other.photoUrl!)
+                            : null,
+                        backgroundColor: orange.withOpacity(0.18),
+                        child: other.photoUrl == null
+                            ? Text(
+                                other.name.isNotEmpty ? other.name[0] : '?',
+                                style: const TextStyle(
+                                    color: orange, fontWeight: FontWeight.bold),
+                              )
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            challenge.isReceived
+                                ? '${other.name} challenged you'
+                                : 'You challenged ${other.name}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            detail.isNotEmpty
+                                ? '${challenge.message.content} · $detail'
+                                : challenge.message.content,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (challenge.isReceived)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 38,
+                          child: ElevatedButton(
+                            onPressed: () => _acceptChallenge(challenge),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: orange,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              textStyle: const TextStyle(
+                                  fontWeight: FontWeight.w900, fontSize: 14),
+                            ),
+                            child: const Text('Accept'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SizedBox(
+                          height: 38,
+                          child: OutlinedButton(
+                            onPressed: () => _declineChallenge(challenge),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: BorderSide(
+                                  color: Colors.white.withOpacity(0.25)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              textStyle: const TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 14),
+                            ),
+                            child: const Text('Decline'),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Icon(Icons.hourglass_top_rounded,
+                          size: 14, color: Colors.white38),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Awaiting reply',
+                        style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _acceptChallenge(ChallengeRequest challenge) async {
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      // Accept and pick up the created match, mirroring the home-feed flow.
+      final result =
+          await _messagesService.acceptChallenge(userId, challenge.message.id);
+      final matchId = result['matchId'] as String?;
+
+      if (!mounted) return;
+
+      final matchState = context.read<MatchState>();
+      matchState.setOpponent(Player(
+        id: challenge.otherUser.id,
+        slug: challenge.otherUser.id,
+        name: challenge.otherUser.name,
+        team: challenge.otherUser.team ?? 'Free Agent',
+        position: challenge.otherUser.position ?? 'G',
+        age: 25,
+        height: '6\'0"',
+        weight: '180 lbs',
+        rating: challenge.otherUser.rating,
+        offense: 80,
+        defense: 80,
+        shooting: 80,
+        passing: 80,
+        rebounding: 80,
+      ));
+      if (matchId != null) {
+        matchState.setMatchId(matchId);
+      }
+      context
+          .read<OnboardingChecklistState>()
+          .completeItem(OnboardingItems.acceptChallenge);
+
+      _loadAllConversations();
+      ScaffoldWithNavBar.refreshBadge?.call();
+
+      AnalyticsService.logChallengeAccepted(mode: '1v1');
+      context.push('/match/setup');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _declineChallenge(ChallengeRequest challenge) async {
+    final userId =
+        Provider.of<AuthState>(context, listen: false).currentUser?.id;
+    if (userId == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Decline Challenge?'),
+        content:
+            Text('Decline the challenge from ${challenge.otherUser.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Yes, Decline'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _messagesService.declineChallenge(userId, challenge.message.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Declined challenge from ${challenge.otherUser.name}')),
+          );
+          _loadAllConversations();
+          ScaffoldWithNavBar.refreshBadge?.call();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildConversationTile(Conversation conversation, int index) {

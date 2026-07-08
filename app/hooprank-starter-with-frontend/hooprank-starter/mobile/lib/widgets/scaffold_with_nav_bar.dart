@@ -142,25 +142,22 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
                   label: 'Rankings',
                 ),
                 NavigationDestination(
+                  // Challenges are tracked in Messages, so the bubble counts
+                  // unread messages + pending incoming challenges together.
                   icon: Badge(
-                    isLabelVisible: _unreadCount > 0,
+                    isLabelVisible: _unreadCount + _challengeCount > 0,
                     label: Text(
-                      _unreadCount > 99 ? '99+' : _unreadCount.toString(),
+                      (_unreadCount + _challengeCount) > 99
+                          ? '99+'
+                          : '${_unreadCount + _challengeCount}',
                       style: const TextStyle(fontSize: 10),
                     ),
                     child: const Icon(Icons.message),
                   ),
                   label: 'Messages',
                 ),
-                NavigationDestination(
-                  icon: Badge(
-                    isLabelVisible: _challengeCount > 0,
-                    label: Text(
-                      _challengeCount > 99 ? '99+' : _challengeCount.toString(),
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                    child: const Icon(Icons.sports_basketball),
-                  ),
+                const NavigationDestination(
+                  icon: Icon(Icons.sports_basketball),
                   label: 'Play',
                 ),
                 const NavigationDestination(

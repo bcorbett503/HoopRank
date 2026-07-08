@@ -55,9 +55,9 @@ void main() {
     expect(find.byKey(const ValueKey('quick_action_play')), findsOneWidget);
     expect(find.byKey(const ValueKey('quick_action_share')), findsOneWidget);
     // Quick Play is a stylized orb with a hand-painted basketball; sharing
-    // is the teal "Invite" pill next to the profile circle.
+    // is the teal icon-only invite circle next to the profile.
     expect(find.byKey(const ValueKey('quick_play_ball')), findsOneWidget);
-    expect(find.text('Invite'), findsOneWidget);
+    expect(find.byIcon(Icons.person_add_alt_1_rounded), findsOneWidget);
 
     // Dump a real PNG so the bar can be eyeballed without a device.
     final dump = Platform.environment['QA_DUMP'];

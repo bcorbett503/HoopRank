@@ -73,8 +73,8 @@ class MapQuickActions extends StatelessWidget {
   }
 }
 
-/// Teal "Invite" pill — shares the app. Mint keeps it distinct from the
-/// frosted circles and the orange hero while staying on brand.
+/// Teal invite circle — shares the app. Icon-only keeps the bar calm; mint
+/// stays distinct from the frosted circles and the orange hero.
 class _InviteButton extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -82,49 +82,36 @@ class _InviteButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: const Color(0xFF1EBEA9),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1EBEA9).withValues(alpha: 0.4),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(999),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.person_add_alt_1_rounded,
-                    size: 16, color: Colors.white),
-                SizedBox(width: 5),
-                Text(
-                  'Invite',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+    return Tooltip(
+      message: 'Invite friends',
+      child: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1EBEA9),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1EBEA9).withValues(alpha: 0.4),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
             ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: const Icon(Icons.person_add_alt_1_rounded,
+                size: 20, color: Colors.white),
           ),
         ),
       ),
@@ -149,60 +136,59 @@ class _ProfileCircle extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-      width: 54,
-      height: 54,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.28),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            // Head-and-shoulders crop of the full-body avatar. OverflowBox
-            // lets the SVG render larger than the circle so the clip really
-            // crops to the head instead of shrinking the whole figure.
-            child: ClipOval(
-              child: OverflowBox(
-                maxWidth: 78,
-                maxHeight: 104,
-                alignment: Alignment.topCenter,
-                child: SvgPicture.string(
-                  svg,
-                  width: 78,
-                  fit: BoxFit.fitWidth,
+        width: 54,
+        height: 54,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              // Head-and-shoulders crop of the full-body avatar. OverflowBox
+              // lets the SVG render larger than the circle so the clip really
+              // crops to the head instead of shrinking the whole figure.
+              child: ClipOval(
+                child: OverflowBox(
+                  maxWidth: 78,
+                  maxHeight: 104,
+                  alignment: Alignment.topCenter,
+                  child: SvgPicture.string(
+                    svg,
+                    width: 78,
+                    fit: BoxFit.fitWidth,
+                  ),
                 ),
               ),
             ),
-          ),
-          if (showNudge)
-            Positioned(
-              top: -1,
-              right: -1,
-              child: Container(
-                width: 15,
-                height: 15,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
+            if (showNudge)
+              Positioned(
+                top: -1,
+                right: -1,
+                child: Container(
+                  width: 15,
+                  height: 15,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
                 ),
               ),
-            ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
 }
-
