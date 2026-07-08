@@ -291,33 +291,39 @@ class _HoopRankAppState extends State<HoopRankApp> {
               ],
             ),
 
-            // Courts (replaced Profile)
+            // Teams (restored — replaced Courts as the fifth tab)
             StatefulShellBranch(
               navigatorKey: _shellNavigatorProfileKey,
               observers: [AnalyticsService.observer],
               routes: [
                 GoRoute(
-                  name: 'courts',
-                  path: '/courts',
-                  builder: (context, state) {
-                    // Support deep linking to a specific court via multiple methods
-                    final courtId = state.uri.queryParameters['courtId'];
-                    final lat =
-                        double.tryParse(state.uri.queryParameters['lat'] ?? '');
-                    final lng =
-                        double.tryParse(state.uri.queryParameters['lng'] ?? '');
-                    final courtName = state.uri.queryParameters['courtName'];
-                    return MapScreen(
-                      initialCourtId: courtId,
-                      initialLat: lat,
-                      initialLng: lng,
-                      initialCourtName: courtName,
-                    );
-                  },
+                  name: 'teams',
+                  path: '/teams',
+                  builder: (context, state) => const TeamsScreen(),
                 ),
               ],
             ),
           ],
+        ),
+
+        // Courts map — still deep-linkable (court shares, onboarding, runs)
+        // as a full-screen route now that Teams owns the fifth tab.
+        GoRoute(
+          name: 'courts',
+          path: '/courts',
+          builder: (context, state) {
+            // Support deep linking to a specific court via multiple methods
+            final courtId = state.uri.queryParameters['courtId'];
+            final lat = double.tryParse(state.uri.queryParameters['lat'] ?? '');
+            final lng = double.tryParse(state.uri.queryParameters['lng'] ?? '');
+            final courtName = state.uri.queryParameters['courtName'];
+            return MapScreen(
+              initialCourtId: courtId,
+              initialLat: lat,
+              initialLng: lng,
+              initialCourtName: courtName,
+            );
+          },
         ),
 
         // Player profile - navigate to chat which shows profile and allows messaging
@@ -365,11 +371,6 @@ class _HoopRankAppState extends State<HoopRankApp> {
           name: 'profile',
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
-        ),
-        GoRoute(
-          name: 'teams',
-          path: '/teams',
-          builder: (context, state) => const TeamsScreen(),
         ),
         // Root path fallback - redirect to play
         GoRoute(

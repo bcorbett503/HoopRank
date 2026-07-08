@@ -165,7 +165,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
                   label: 'Calendar',
                 ),
                 const NavigationDestination(
-                    icon: Icon(Icons.place), label: 'Courts'),
+                    icon: Icon(Icons.groups_rounded), label: 'Teams'),
               ],
             ),
           );

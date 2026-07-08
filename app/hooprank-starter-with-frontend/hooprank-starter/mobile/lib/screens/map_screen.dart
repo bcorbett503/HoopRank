@@ -754,6 +754,20 @@ class _MapScreenState extends State<MapScreen> {
         GoRouterState.of(context).uri.queryParameters['courtId'];
 
     return Scaffold(
+      // Courts is a full-screen route now (Teams owns the fifth tab), so it
+      // needs its own back affordance for deep links with no back stack.
+      appBar: AppBar(
+        title: const Text('Courts'),
+        leading: BackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/play');
+            }
+          },
+        ),
+      ),
       body: CourtMapWidget(
         onCourtSelected: _showCourtDetails,
         onPlayerSelected: _showPlayerDetails,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models.dart';
 import '../services/api_service.dart';
@@ -292,6 +293,97 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
   void _dismissSheetThen(VoidCallback action) {
     Navigator.of(context).pop();
     WidgetsBinding.instance.addPostFrameCallback((_) => action());
+  }
+
+  /// Default invite-to-team flow: pick one of my teams (auto-picks when I
+  /// have exactly one) and send the invite. With no team yet, routes to the
+  /// Teams tab to create one.
+  Future<void> _inviteToTeamFlow(User player) async {
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    List<Map<String, dynamic>> teams;
+    try {
+      teams = await ApiService.getMyTeams();
+    } catch (_) {
+      teams = [];
+    }
+    if (!mounted) return;
+
+    if (teams.isEmpty) {
+      _dismissSheetThen(() {
+        router.go('/teams');
+        messenger.showSnackBar(
+          const SnackBar(
+              content: Text('Create a team first, then invite players.')),
+        );
+      });
+      return;
+    }
+
+    Map<String, dynamic>? team;
+    if (teams.length == 1) {
+      team = teams.first;
+    } else {
+      team = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        backgroundColor: _sheetSurface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _ink(0.18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('Invite ${player.name} to…',
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white)),
+              ),
+              Divider(color: _ink(0.08)),
+              ...teams.map((t) => ListTile(
+                    leading:
+                        const Icon(Icons.groups_rounded, color: _brandOrange),
+                    title: Text(t['name']?.toString() ?? 'Team',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
+                    subtitle: Text(t['teamType']?.toString() ?? '',
+                        style: TextStyle(color: _ink(0.5), fontSize: 12)),
+                    onTap: () => Navigator.pop(ctx, t),
+                  )),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      );
+    }
+    if (team == null || !mounted) return;
+
+    final teamId = team['id']?.toString() ?? '';
+    final teamName = team['name']?.toString() ?? 'your team';
+    try {
+      final ok = await ApiService.inviteToTeam(teamId, player.id);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(ok
+              ? 'Invited ${player.name} to $teamName'
+              : 'Could not send the invite. Try again.'),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   /// Load fresh profile, stats, and recent matches from API
@@ -608,16 +700,21 @@ class _PlayerProfileSheetState extends State<PlayerProfileSheet> {
                     ],
                   ),
 
-                  // Invite to Team button
-                  if (widget.onInviteToTeam != null) ...[
+                  // Invite to Team — always available for other players.
+                  // Uses the injected handler when provided (e.g. Rankings)
+                  // or the default my-teams picker flow.
+                  if (!isSelf || widget.onInviteToTeam != null) ...[
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          _dismissSheetThen(() {
-                            widget.onInviteToTeam?.call();
-                          });
+                          final injected = widget.onInviteToTeam;
+                          if (injected != null) {
+                            _dismissSheetThen(injected);
+                          } else {
+                            _inviteToTeamFlow(player);
+                          }
                         },
                         icon: const Icon(Icons.group_add, size: 20),
                         label: const Text('Invite to Team'),

@@ -24,7 +24,8 @@ class TeamsScreen extends StatefulWidget {
   State<TeamsScreen> createState() => _TeamsScreenState();
 }
 
-class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStateMixin {
+class _TeamsScreenState extends State<TeamsScreen>
+    with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _myTeams = [];
   List<Map<String, dynamic>> _invites = [];
   List<Map<String, dynamic>> _events = [];
@@ -65,14 +66,14 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     try {
       // Fire ALL network calls in parallel
       final results = await Future.wait([
-        ApiService.getMyTeams(),           // 0
-        ApiService.getTeamInvites(),        // 1
-        ApiService.getAllTeamEvents(),       // 2
-        CourtService().loadCourts(),        // 3 (returns void, won't be used)
-        ApiService.getTeamRankings(teamType: '5v5'),  // 4
-        ApiService.getTeamRankings(teamType: '3v3'),  // 5
+        ApiService.getMyTeams(), // 0
+        ApiService.getTeamInvites(), // 1
+        ApiService.getAllTeamEvents(), // 2
+        CourtService().loadCourts(), // 3 (returns void, won't be used)
+        ApiService.getTeamRankings(teamType: '5v5'), // 4
+        ApiService.getTeamRankings(teamType: '3v3'), // 5
       ]);
-      
+
       if (mounted) {
         // Process team rankings for opponent search
         try {
@@ -84,7 +85,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             final id = t['id']?.toString() ?? '';
             if (id.isNotEmpty && seen.add(id)) _allTeams.add(t);
           }
-          debugPrint('TEAMS_SEARCH: loaded ${_allTeams.length} teams for search');
+          debugPrint(
+              'TEAMS_SEARCH: loaded ${_allTeams.length} teams for search');
         } catch (e) {
           debugPrint('Failed to process team rankings: $e');
         }
@@ -96,7 +98,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
           _isLoading = false;
           _didLoadOnce = true;
         });
-        
+
         // Load pending scores in background (non-blocking)
         ApiService.getPendingTeamScores().then((ps) {
           if (mounted) setState(() => _pendingScores = ps);
@@ -106,7 +108,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       }
     } catch (e) {
       debugPrint('Error loading teams: $e');
-      if (mounted) setState(() { _isLoading = false; _didLoadOnce = true; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _didLoadOnce = true;
+        });
     }
   }
 
@@ -185,7 +191,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   child: GestureDetector(
                     onTap: () async {
                       final picker = ImagePicker();
-                      final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 512, maxHeight: 512);
+                      final picked = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 512,
+                          maxHeight: 512);
                       if (picked != null) {
                         setDialogState(() => selectedImage = File(picked.path));
                       }
@@ -195,9 +204,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         CircleAvatar(
                           radius: 40,
                           backgroundColor: Colors.grey[700],
-                          backgroundImage: selectedImage != null ? FileImage(selectedImage!) : null,
+                          backgroundImage: selectedImage != null
+                              ? FileImage(selectedImage!)
+                              : null,
                           child: selectedImage == null
-                              ? const Icon(Icons.groups, size: 36, color: Colors.white54)
+                              ? const Icon(Icons.groups,
+                                  size: 36, color: Colors.white54)
                               : null,
                         ),
                         Positioned(
@@ -209,7 +221,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                               color: Colors.deepOrange,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 14),
+                            child: const Icon(Icons.camera_alt,
+                                color: Colors.white, size: 14),
                           ),
                         ),
                       ],
@@ -231,7 +244,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 const SizedBox(height: 16),
 
                 // --- Team Type ---
-                const Text('Team Type', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Team Type',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -239,9 +253,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                       child: ChoiceChip(
                         label: const Text('3v3'),
                         selected: teamType == '3v3',
-                        onSelected: (_) => setDialogState(() => teamType = '3v3'),
+                        onSelected: (_) =>
+                            setDialogState(() => teamType = '3v3'),
                         selectedColor: Colors.deepOrange,
-                        labelStyle: TextStyle(color: teamType == '3v3' ? Colors.white : null),
+                        labelStyle: TextStyle(
+                            color: teamType == '3v3' ? Colors.white : null),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -249,9 +265,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                       child: ChoiceChip(
                         label: const Text('5v5'),
                         selected: teamType == '5v5',
-                        onSelected: (_) => setDialogState(() => teamType = '5v5'),
+                        onSelected: (_) =>
+                            setDialogState(() => teamType = '5v5'),
                         selectedColor: Colors.deepOrange,
-                        labelStyle: TextStyle(color: teamType == '5v5' ? Colors.white : null),
+                        labelStyle: TextStyle(
+                            color: teamType == '5v5' ? Colors.white : null),
                       ),
                     ),
                   ],
@@ -260,55 +278,75 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 const SizedBox(height: 16),
 
                 // --- Skill Level ---
-                const Text('Skill Level', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Skill Level',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   runSpacing: 4,
-                  children: skillLevels.map((sl) => ChoiceChip(
-                    avatar: skillLevel == sl ? null : Icon(skillIcons[sl], size: 16),
-                    label: Text(sl, style: const TextStyle(fontSize: 12)),
-                    selected: skillLevel == sl,
-                    onSelected: (_) => setDialogState(() => skillLevel = skillLevel == sl ? null : sl),
-                    selectedColor: Colors.deepPurple,
-                    labelStyle: TextStyle(color: skillLevel == sl ? Colors.white : null),
-                    visualDensity: VisualDensity.compact,
-                  )).toList(),
+                  children: skillLevels
+                      .map((sl) => ChoiceChip(
+                            avatar: skillLevel == sl
+                                ? null
+                                : Icon(skillIcons[sl], size: 16),
+                            label:
+                                Text(sl, style: const TextStyle(fontSize: 12)),
+                            selected: skillLevel == sl,
+                            onSelected: (_) => setDialogState(() =>
+                                skillLevel = skillLevel == sl ? null : sl),
+                            selectedColor: Colors.deepPurple,
+                            labelStyle: TextStyle(
+                                color: skillLevel == sl ? Colors.white : null),
+                            visualDensity: VisualDensity.compact,
+                          ))
+                      .toList(),
                 ),
 
                 const SizedBox(height: 16),
 
                 // --- Age Group ---
-                const Text('Age Group', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Age Group',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   runSpacing: 4,
-                  children: ageGroups.map((ag) => ChoiceChip(
-                    label: Text(ag, style: const TextStyle(fontSize: 12)),
-                    selected: ageGroup == ag,
-                    onSelected: (_) => setDialogState(() => ageGroup = ageGroup == ag ? null : ag),
-                    selectedColor: Colors.teal,
-                    labelStyle: TextStyle(color: ageGroup == ag ? Colors.white : null),
-                    visualDensity: VisualDensity.compact,
-                  )).toList(),
+                  children: ageGroups
+                      .map((ag) => ChoiceChip(
+                            label:
+                                Text(ag, style: const TextStyle(fontSize: 12)),
+                            selected: ageGroup == ag,
+                            onSelected: (_) => setDialogState(
+                                () => ageGroup = ageGroup == ag ? null : ag),
+                            selectedColor: Colors.teal,
+                            labelStyle: TextStyle(
+                                color: ageGroup == ag ? Colors.white : null),
+                            visualDensity: VisualDensity.compact,
+                          ))
+                      .toList(),
                 ),
 
                 const SizedBox(height: 16),
 
                 // --- Gender ---
-                const Text('Gender', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Gender',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
-                  children: genders.map((g) => ChoiceChip(
-                    label: Text(g, style: const TextStyle(fontSize: 12)),
-                    selected: gender == g,
-                    onSelected: (_) => setDialogState(() => gender = gender == g ? null : g),
-                    selectedColor: Colors.indigo,
-                    labelStyle: TextStyle(color: gender == g ? Colors.white : null),
-                    visualDensity: VisualDensity.compact,
-                  )).toList(),
+                  children: genders
+                      .map((g) => ChoiceChip(
+                            label:
+                                Text(g, style: const TextStyle(fontSize: 12)),
+                            selected: gender == g,
+                            onSelected: (_) => setDialogState(
+                                () => gender = gender == g ? null : g),
+                            selectedColor: Colors.indigo,
+                            labelStyle: TextStyle(
+                                color: gender == g ? Colors.white : null),
+                            visualDensity: VisualDensity.compact,
+                          ))
+                      .toList(),
                 ),
 
                 const SizedBox(height: 12),
@@ -360,12 +398,27 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     );
   }
 
-  Future<void> _createTeam(String name, String teamType, File? logoImage, {String? ageGroup, String? gender, String? skillLevel, String? homeCourtId, String? city, String? description}) async {
+  Future<void> _createTeam(String name, String teamType, File? logoImage,
+      {String? ageGroup,
+      String? gender,
+      String? skillLevel,
+      String? homeCourtId,
+      String? city,
+      String? description}) async {
     try {
-      final team = await ApiService.createTeam(name: name, teamType: teamType, ageGroup: ageGroup, gender: gender, skillLevel: skillLevel, homeCourtId: homeCourtId, city: city, description: description);
+      final team = await ApiService.createTeam(
+          name: name,
+          teamType: teamType,
+          ageGroup: ageGroup,
+          gender: gender,
+          skillLevel: skillLevel,
+          homeCourtId: homeCourtId,
+          city: city,
+          description: description);
       if (team != null && mounted) {
         if (logoImage != null) {
-          await ApiService.uploadImage(type: 'team', targetId: team['id'], imageFile: logoImage);
+          await ApiService.uploadImage(
+              type: 'team', targetId: team['id'], imageFile: logoImage);
         }
         if (!mounted) return;
         _loadData();
@@ -382,25 +435,30 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     } catch (e) {
       if (mounted) {
         final errorStr = e.toString().toLowerCase();
-        if (errorStr.contains('team_name_taken') || errorStr.contains('already exists')) {
+        if (errorStr.contains('team_name_taken') ||
+            errorStr.contains('already exists')) {
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                  Icon(Icons.warning_amber_rounded,
+                      color: Colors.orange, size: 28),
                   SizedBox(width: 8),
                   Text('Name Taken'),
                 ],
               ),
-              content: Text('A $teamType team named "$name" already exists.\n\nPlease choose a different name.'),
+              content: Text(
+                  'A $teamType team named "$name" already exists.\n\nPlease choose a different name.'),
               actions: [
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pop(ctx);
                     _showCreateTeamDialog();
                   },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepOrange,
+                      foregroundColor: Colors.white),
                   child: const Text('Choose New Name'),
                 ),
               ],
@@ -408,7 +466,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to create team. Please try again.')),
+            const SnackBar(
+                content: Text('Failed to create team. Please try again.')),
           );
         }
       }
@@ -440,8 +499,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('That invite is no longer available.')),
+          const SnackBar(content: Text('That invite is no longer available.')),
         );
       }
     } catch (e) {
@@ -513,7 +571,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         return [];
       }
       final results = courtService.searchCourts(query).take(5).toList();
-      debugPrint('COURT_SEARCH: query="$query" totalCourts=${courtService.courts.length} results=${results.length}');
+      debugPrint(
+          'COURT_SEARCH: query="$query" totalCourts=${courtService.courts.length} results=${results.length}');
       return results;
     } catch (e) {
       debugPrint('COURT_SEARCH ERROR: $e');
@@ -526,11 +585,15 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     if (query.isEmpty || _allTeams.isEmpty) return [];
     final lowerQuery = query.toLowerCase();
     final myTeamIds = _myTeams.map((t) => t['id']?.toString()).toSet();
-    return _allTeams.where((team) {
-      final name = (team['name'] ?? team['teamName'] ?? '').toString().toLowerCase();
-      final id = team['id']?.toString() ?? '';
-      return name.contains(lowerQuery) && !myTeamIds.contains(id);
-    }).take(5).toList();
+    return _allTeams
+        .where((team) {
+          final name =
+              (team['name'] ?? team['teamName'] ?? '').toString().toLowerCase();
+          final id = team['id']?.toString() ?? '';
+          return name.contains(lowerQuery) && !myTeamIds.contains(id);
+        })
+        .take(5)
+        .toList();
   }
 
   // ==============================
@@ -554,12 +617,18 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         // Section header
         Row(
           children: [
-            Icon(Icons.favorite, size: 14, color: Colors.redAccent.withOpacity(0.7)),
+            Icon(Icons.favorite,
+                size: 14, color: Colors.redAccent.withOpacity(0.7)),
             const SizedBox(width: 6),
-            const Text('Your courts:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+            const Text('Your courts:',
+                style: TextStyle(color: Colors.white54, fontSize: 12)),
             if (hasOverflow) ...[
               const Spacer(),
-              Text('scroll ↕', style: TextStyle(color: Colors.white.withOpacity(0.25), fontSize: 10, fontStyle: FontStyle.italic)),
+              Text('scroll ↕',
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.25),
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic)),
             ],
           ],
         ),
@@ -583,7 +652,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 Flexible(
                   child: Text(
                     selectedCourt.name,
-                    style: const TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                        color: Colors.green,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -607,7 +679,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             ),
             child: ScrollbarTheme(
               data: ScrollbarThemeData(
-                thumbColor: WidgetStateProperty.all(Colors.white.withOpacity(0.2)),
+                thumbColor:
+                    WidgetStateProperty.all(Colors.white.withOpacity(0.2)),
                 radius: const Radius.circular(4),
                 thickness: WidgetStateProperty.all(3.0),
               ),
@@ -618,20 +691,26 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   child: Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: followedCourts.take(5).map((court) => ActionChip(
-                      avatar: const Icon(Icons.location_on, size: 16, color: Colors.blue),
-                      label: Text(
-                        court.name,
-                        style: const TextStyle(fontSize: 12, color: Colors.white70),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      backgroundColor: Colors.blue.withOpacity(0.15),
-                      side: BorderSide(color: Colors.blue.withOpacity(0.3)),
-                      onPressed: () => setState(() {
-                        onCourtSelected(court);
-                        searchController.clear();
-                      }),
-                    )).toList(),
+                    children: followedCourts
+                        .take(5)
+                        .map((court) => ActionChip(
+                              avatar: const Icon(Icons.location_on,
+                                  size: 16, color: Colors.blue),
+                              label: Text(
+                                court.name,
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.white70),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              backgroundColor: Colors.blue.withOpacity(0.15),
+                              side: BorderSide(
+                                  color: Colors.blue.withOpacity(0.3)),
+                              onPressed: () => setState(() {
+                                onCourtSelected(court);
+                                searchController.clear();
+                              }),
+                            ))
+                        .toList(),
                   ),
                 ),
               ),
@@ -645,8 +724,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             controller: searchController,
             decoration: InputDecoration(
               hintText: 'Search other courts...',
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
-              prefixIcon: Icon(Icons.search, size: 18, color: Colors.white.withOpacity(0.3)),
+              hintStyle:
+                  TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+              prefixIcon: Icon(Icons.search,
+                  size: 18, color: Colors.white.withOpacity(0.3)),
               suffixIcon: searchController.text.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, size: 18),
@@ -658,9 +739,16 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               isDense: true,
               filled: true,
               fillColor: Colors.white.withOpacity(0.04),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white.withOpacity(0.06))),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.blue.withOpacity(0.4))),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      BorderSide(color: Colors.white.withOpacity(0.06))),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.blue.withOpacity(0.4))),
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
             style: const TextStyle(fontSize: 13),
@@ -686,10 +774,14 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   return ListTile(
                     dense: true,
                     visualDensity: VisualDensity.compact,
-                    leading: Icon(court.isIndoor ? Icons.roofing : Icons.park, size: 18, color: Colors.blue),
-                    title: Text(court.name, style: const TextStyle(fontSize: 13)),
+                    leading: Icon(court.isIndoor ? Icons.roofing : Icons.park,
+                        size: 18, color: Colors.blue),
+                    title:
+                        Text(court.name, style: const TextStyle(fontSize: 13)),
                     subtitle: court.address != null
-                        ? Text(court.address!, style: TextStyle(fontSize: 11, color: Colors.grey[500]))
+                        ? Text(court.address!,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[500]))
                         : null,
                     onTap: () => setState(() {
                       onCourtSelected(court);
@@ -707,7 +799,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   // ==============================
   // Shared: Inline date & time pickers
   // ==============================
-  Widget _buildInlineDatePicker(DateTime selectedDate, void Function(DateTime) onChanged) {
+  Widget _buildInlineDatePicker(
+      DateTime selectedDate, void Function(DateTime) onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -717,7 +810,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             const SizedBox(width: 6),
             Text(
               DateFormat('EEEE, MMM d').format(selectedDate),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.blue),
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.blue),
             ),
           ],
         ),
@@ -728,13 +824,15 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             data: const CupertinoThemeData(
               brightness: Brightness.dark,
               textTheme: CupertinoTextThemeData(
-                dateTimePickerTextStyle: TextStyle(color: Colors.white, fontSize: 16),
+                dateTimePickerTextStyle:
+                    TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
             child: CupertinoDatePicker(
               mode: CupertinoDatePickerMode.date,
               initialDateTime: selectedDate,
-              minimumDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+              minimumDate: DateTime(DateTime.now().year, DateTime.now().month,
+                  DateTime.now().day),
               maximumDate: DateTime.now().add(const Duration(days: 365)),
               onDateTimeChanged: onChanged,
             ),
@@ -744,9 +842,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildInlineTimePicker(TimeOfDay selectedTime, void Function(DateTime) onChanged) {
+  Widget _buildInlineTimePicker(
+      TimeOfDay selectedTime, void Function(DateTime) onChanged) {
     final now = DateTime.now();
-    final dt = DateTime(now.year, now.month, now.day, selectedTime.hour, selectedTime.minute);
+    final dt = DateTime(
+        now.year, now.month, now.day, selectedTime.hour, selectedTime.minute);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -756,7 +856,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             const SizedBox(width: 6),
             Text(
               DateFormat('h:mm a').format(dt),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.orange),
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.orange),
             ),
           ],
         ),
@@ -767,7 +870,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             data: const CupertinoThemeData(
               brightness: Brightness.dark,
               textTheme: CupertinoTextThemeData(
-                dateTimePickerTextStyle: TextStyle(color: Colors.white, fontSize: 16),
+                dateTimePickerTextStyle:
+                    TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
             child: CupertinoDatePicker(
@@ -826,9 +930,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.fitness_center, color: Colors.green, size: 20),
+                  const Icon(Icons.fitness_center,
+                      color: Colors.green, size: 20),
                   const SizedBox(width: 8),
-                  const Text('Add Practice', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  const Text('Add Practice',
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
                 ],
               ),
               actions: [
@@ -838,19 +944,26 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     onPressed: () async {
                       Navigator.pop(sheetContext);
                       final eventDate = DateTime(
-                        selectedDate.year, selectedDate.month, selectedDate.day,
-                        selectedTime.hour, selectedTime.minute,
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        selectedTime.hour,
+                        selectedTime.minute,
                       );
                       try {
                         await ApiService.createTeamEvent(
                           teamId: selectedTeamId,
                           type: 'practice',
-                          title: titleController.text.trim().isEmpty ? 'Practice' : titleController.text.trim(),
+                          title: titleController.text.trim().isEmpty
+                              ? 'Practice'
+                              : titleController.text.trim(),
                           eventDate: eventDate.toUtc().toIso8601String(),
                           locationName: selectedCourt?.name ?? null,
                           courtId: selectedCourt?.id,
                           recurrenceRule: recurrence,
-                          notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                          notes: notesController.text.trim().isEmpty
+                              ? null
+                              : notesController.text.trim(),
                         );
                         _loadData();
                         if (mounted) {
@@ -861,7 +974,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to create practice: $e')),
+                            SnackBar(
+                                content: Text('Failed to create practice: $e')),
                           );
                         }
                       }
@@ -869,7 +983,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                     ),
                     child: const Text('Create'),
                   ),
@@ -885,7 +1000,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   _buildCourtPicker(
                     selectedCourt: selectedCourt,
                     searchController: courtSearchController,
-                    onCourtSelected: (court) { selectedCourt = court; },
+                    onCourtSelected: (court) {
+                      selectedCourt = court;
+                    },
                     setState: setSheetState,
                   ),
                   const SizedBox(height: 20),
@@ -898,7 +1015,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
                   // Time picker
                   _buildInlineTimePicker(selectedTime, (dt) {
-                    setSheetState(() => selectedTime = TimeOfDay(hour: dt.hour, minute: dt.minute));
+                    setSheetState(() => selectedTime =
+                        TimeOfDay(hour: dt.hour, minute: dt.minute));
                   }),
                   const SizedBox(height: 20),
 
@@ -906,9 +1024,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   if (_myTeams.length > 1) ...[
                     Row(
                       children: [
-                        Icon(Icons.groups, size: 14, color: Colors.green.withOpacity(0.7)),
+                        Icon(Icons.groups,
+                            size: 14, color: Colors.green.withOpacity(0.7)),
                         const SizedBox(width: 6),
-                        const Text('Team:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                        const Text('Team:',
+                            style:
+                                TextStyle(color: Colors.white54, fontSize: 12)),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -918,14 +1039,21 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         isDense: true,
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.04),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
                       ),
-                      items: _myTeams.map((t) => DropdownMenuItem(
-                        value: t['id']?.toString(),
-                        child: Text(t['name'] ?? 'Team', style: const TextStyle(fontSize: 13)),
-                      )).toList(),
-                      onChanged: (v) => setSheetState(() => selectedTeamId = v ?? selectedTeamId),
+                      items: _myTeams
+                          .map((t) => DropdownMenuItem(
+                                value: t['id']?.toString(),
+                                child: Text(t['name'] ?? 'Team',
+                                    style: const TextStyle(fontSize: 13)),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setSheetState(
+                          () => selectedTeamId = v ?? selectedTeamId),
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -933,9 +1061,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   // Recurrence
                   Row(
                     children: [
-                      Icon(Icons.repeat, size: 14, color: Colors.orange.withOpacity(0.7)),
+                      Icon(Icons.repeat,
+                          size: 14, color: Colors.orange.withOpacity(0.7)),
                       const SizedBox(width: 6),
-                      const Text('Repeat:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      const Text('Repeat:',
+                          style:
+                              TextStyle(color: Colors.white54, fontSize: 12)),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -945,14 +1076,27 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                       isDense: true,
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                     ),
                     items: const [
-                      DropdownMenuItem(value: null, child: Text('None', style: TextStyle(fontSize: 13))),
-                      DropdownMenuItem(value: 'weekly', child: Text('Weekly', style: TextStyle(fontSize: 13))),
-                      DropdownMenuItem(value: 'biweekly', child: Text('Every 2 Weeks', style: TextStyle(fontSize: 13))),
-                      DropdownMenuItem(value: 'daily', child: Text('Daily', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(
+                          value: null,
+                          child: Text('None', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(
+                          value: 'weekly',
+                          child:
+                              Text('Weekly', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(
+                          value: 'biweekly',
+                          child: Text('Every 2 Weeks',
+                              style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(
+                          value: 'daily',
+                          child: Text('Daily', style: TextStyle(fontSize: 13))),
                     ],
                     onChanged: (v) => setSheetState(() => recurrence = v),
                   ),
@@ -963,12 +1107,16 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     controller: titleController,
                     decoration: InputDecoration(
                       hintText: 'Title',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.3), fontSize: 13),
                       isDense: true,
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
                     ),
                     style: const TextStyle(fontSize: 13),
                   ),
@@ -979,12 +1127,16 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     controller: notesController,
                     decoration: InputDecoration(
                       hintText: 'Notes (optional)',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.3), fontSize: 13),
                       isDense: true,
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
                     ),
                     style: const TextStyle(fontSize: 13),
                     maxLines: 2,
@@ -1043,9 +1195,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.sports_basketball, color: Colors.purple, size: 20),
+                  const Icon(Icons.sports_basketball,
+                      color: Colors.purple, size: 20),
                   const SizedBox(width: 8),
-                  const Text('Add Game', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  const Text('Add Game',
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
                 ],
               ),
               actions: [
@@ -1054,22 +1208,30 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   child: ElevatedButton(
                     onPressed: () async {
                       Navigator.pop(sheetContext);
-                      final opponent = selectedOpponentName ?? opponentController.text.trim();
+                      final opponent = selectedOpponentName ??
+                          opponentController.text.trim();
                       final eventDate = DateTime(
-                        selectedDate.year, selectedDate.month, selectedDate.day,
-                        selectedTime.hour, selectedTime.minute,
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        selectedTime.hour,
+                        selectedTime.minute,
                       );
                       try {
                         await ApiService.createTeamEvent(
                           teamId: selectedTeamId,
                           type: 'game',
-                          title: titleController.text.trim().isEmpty ? 'vs ${opponent.isEmpty ? "TBD" : opponent}' : titleController.text.trim(),
+                          title: titleController.text.trim().isEmpty
+                              ? 'vs ${opponent.isEmpty ? "TBD" : opponent}'
+                              : titleController.text.trim(),
                           eventDate: eventDate.toUtc().toIso8601String(),
                           locationName: selectedCourt?.name ?? null,
                           courtId: selectedCourt?.id,
                           opponentTeamId: selectedOpponentId,
                           opponentTeamName: opponent.isEmpty ? null : opponent,
-                          notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                          notes: notesController.text.trim().isEmpty
+                              ? null
+                              : notesController.text.trim(),
                         );
                         _loadData();
                         if (mounted) {
@@ -1080,7 +1242,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to create game: $e')),
+                            SnackBar(
+                                content: Text('Failed to create game: $e')),
                           );
                         }
                       }
@@ -1088,7 +1251,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purple,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                     ),
                     child: const Text('Create'),
                   ),
@@ -1104,7 +1268,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   _buildCourtPicker(
                     selectedCourt: selectedCourt,
                     searchController: courtSearchController,
-                    onCourtSelected: (court) { selectedCourt = court; },
+                    onCourtSelected: (court) {
+                      selectedCourt = court;
+                    },
                     setState: setSheetState,
                   ),
                   const SizedBox(height: 20),
@@ -1112,9 +1278,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   // Opponent section — bounded box with followed teams
                   Row(
                     children: [
-                      Icon(Icons.sports_basketball, size: 14, color: Colors.purple.withOpacity(0.7)),
+                      Icon(Icons.sports_basketball,
+                          size: 14, color: Colors.purple.withOpacity(0.7)),
                       const SizedBox(width: 6),
-                      const Text('Opponent:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      const Text('Opponent:',
+                          style:
+                              TextStyle(color: Colors.white54, fontSize: 12)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -1123,21 +1292,27 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   if (selectedOpponentName != null)
                     Container(
                       margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.purple.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.purple.withOpacity(0.4)),
+                        border:
+                            Border.all(color: Colors.purple.withOpacity(0.4)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.check_circle, size: 16, color: Colors.purple),
+                          const Icon(Icons.check_circle,
+                              size: 16, color: Colors.purple),
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
                               'vs $selectedOpponentName',
-                              style: const TextStyle(color: Colors.purple, fontSize: 13, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                  color: Colors.purple,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -1148,7 +1323,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                               selectedOpponentId = null;
                               opponentController.clear();
                             }),
-                            child: const Icon(Icons.close, size: 16, color: Colors.purple),
+                            child: const Icon(Icons.close,
+                                size: 16, color: Colors.purple),
                           ),
                         ],
                       ),
@@ -1157,7 +1333,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   // Followed teams bounded box
                   if (selectedOpponentName == null)
                     Builder(builder: (_) {
-                      final checkInState = Provider.of<CheckInState>(context, listen: false);
+                      final checkInState =
+                          Provider.of<CheckInState>(context, listen: false);
                       final teamNames = checkInState.followedTeamNames;
                       if (teamNames.isEmpty) return const SizedBox.shrink();
                       final hasOverflow = teamNames.length >= 3;
@@ -1165,12 +1342,14 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         constraints: const BoxConstraints(maxHeight: 120),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.08)),
                           color: Colors.white.withOpacity(0.03),
                         ),
                         child: ScrollbarTheme(
                           data: ScrollbarThemeData(
-                            thumbColor: WidgetStateProperty.all(Colors.white.withOpacity(0.2)),
+                            thumbColor: WidgetStateProperty.all(
+                                Colors.white.withOpacity(0.2)),
                             radius: const Radius.circular(4),
                             thickness: WidgetStateProperty.all(3.0),
                           ),
@@ -1184,24 +1363,33 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                                 children: teamNames.entries
                                     .where((entry) {
                                       // Exclude all of the user's own teams, not just the selected one
-                                      final myTeamIds = _myTeams.map((t) => t['id']?.toString()).toSet();
+                                      final myTeamIds = _myTeams
+                                          .map((t) => t['id']?.toString())
+                                          .toSet();
                                       return !myTeamIds.contains(entry.key);
                                     })
                                     .map((entry) => ActionChip(
-                                  avatar: const Icon(Icons.groups, size: 16, color: Colors.purple),
-                                  label: Text(
-                                    entry.value,
-                                    style: const TextStyle(fontSize: 12, color: Colors.white70),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  backgroundColor: Colors.purple.withOpacity(0.15),
-                                  side: BorderSide(color: Colors.purple.withOpacity(0.3)),
-                                  onPressed: () => setSheetState(() {
-                                    selectedOpponentId = entry.key;
-                                    selectedOpponentName = entry.value;
-                                    opponentController.clear();
-                                  }),
-                                )).toList(),
+                                          avatar: const Icon(Icons.groups,
+                                              size: 16, color: Colors.purple),
+                                          label: Text(
+                                            entry.value,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.white70),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          backgroundColor:
+                                              Colors.purple.withOpacity(0.15),
+                                          side: BorderSide(
+                                              color: Colors.purple
+                                                  .withOpacity(0.3)),
+                                          onPressed: () => setSheetState(() {
+                                            selectedOpponentId = entry.key;
+                                            selectedOpponentName = entry.value;
+                                            opponentController.clear();
+                                          }),
+                                        ))
+                                    .toList(),
                               ),
                             ),
                           ),
@@ -1216,21 +1404,35 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                       controller: opponentController,
                       decoration: InputDecoration(
                         hintText: 'Search or type team name...',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
-                        prefixIcon: Icon(Icons.search, size: 18, color: Colors.white.withOpacity(0.3)),
+                        hintStyle: TextStyle(
+                            color: Colors.white.withOpacity(0.3), fontSize: 13),
+                        prefixIcon: Icon(Icons.search,
+                            size: 18, color: Colors.white.withOpacity(0.3)),
                         suffixIcon: opponentController.text.isNotEmpty
                             ? GestureDetector(
-                                onTap: () => setSheetState(() => opponentController.clear()),
-                                child: Icon(Icons.close, size: 18, color: Colors.white.withOpacity(0.4)),
+                                onTap: () => setSheetState(
+                                    () => opponentController.clear()),
+                                child: Icon(Icons.close,
+                                    size: 18,
+                                    color: Colors.white.withOpacity(0.4)),
                               )
                             : null,
                         isDense: true,
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.04),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white.withOpacity(0.06))),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.purple.withOpacity(0.4))),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.06))),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                                color: Colors.purple.withOpacity(0.4))),
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 10),
                       ),
                       style: const TextStyle(fontSize: 13),
                       onChanged: (_) => setSheetState(() {}),
@@ -1249,29 +1451,46 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                               constraints: const BoxConstraints(maxHeight: 200),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                                border: Border.all(
+                                    color: Colors.purple.withOpacity(0.2)),
                                 color: Colors.grey[850],
                               ),
                               child: ListView.separated(
                                 shrinkWrap: true,
                                 padding: EdgeInsets.zero,
                                 itemCount: teamResults.length,
-                                separatorBuilder: (_, __) => Divider(height: 1, color: Colors.white.withOpacity(0.06)),
+                                separatorBuilder: (_, __) => Divider(
+                                    height: 1,
+                                    color: Colors.white.withOpacity(0.06)),
                                 itemBuilder: (_, i) {
                                   final team = teamResults[i];
-                                  final teamName = (team['name'] ?? team['teamName'] ?? 'Unknown').toString();
-                                  final teamType = (team['teamType'] ?? '').toString();
+                                  final teamName = (team['name'] ??
+                                          team['teamName'] ??
+                                          'Unknown')
+                                      .toString();
+                                  final teamType =
+                                      (team['teamType'] ?? '').toString();
                                   return ListTile(
                                     dense: true,
-                                    visualDensity: const VisualDensity(vertical: -3),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                                    leading: const Icon(Icons.groups, size: 18, color: Colors.purple),
-                                    title: Text(teamName, style: const TextStyle(fontSize: 13, color: Colors.white)),
+                                    visualDensity:
+                                        const VisualDensity(vertical: -3),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    leading: const Icon(Icons.groups,
+                                        size: 18, color: Colors.purple),
+                                    title: Text(teamName,
+                                        style: const TextStyle(
+                                            fontSize: 13, color: Colors.white)),
                                     subtitle: teamType.isNotEmpty
-                                        ? Text(teamType, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.4)))
+                                        ? Text(teamType,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.white
+                                                    .withOpacity(0.4)))
                                         : null,
                                     onTap: () => setSheetState(() {
-                                      selectedOpponentId = team['id']?.toString();
+                                      selectedOpponentId =
+                                          team['id']?.toString();
                                       selectedOpponentName = teamName;
                                       opponentController.clear();
                                     }),
@@ -1284,23 +1503,28 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                             padding: const EdgeInsets.only(top: 4),
                             child: InkWell(
                               onTap: () => setSheetState(() {
-                                selectedOpponentName = opponentController.text.trim();
+                                selectedOpponentName =
+                                    opponentController.text.trim();
                                 selectedOpponentId = null;
                               }),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                                  border: Border.all(
+                                      color: Colors.purple.withOpacity(0.2)),
                                   color: Colors.purple.withOpacity(0.06),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.add, size: 16, color: Colors.purple),
+                                    const Icon(Icons.add,
+                                        size: 16, color: Colors.purple),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Use "${opponentController.text.trim()}"',
-                                      style: const TextStyle(fontSize: 13, color: Colors.purple),
+                                      style: const TextStyle(
+                                          fontSize: 13, color: Colors.purple),
                                     ),
                                   ],
                                 ),
@@ -1321,7 +1545,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
                   // Time picker
                   _buildInlineTimePicker(selectedTime, (dt) {
-                    setSheetState(() => selectedTime = TimeOfDay(hour: dt.hour, minute: dt.minute));
+                    setSheetState(() => selectedTime =
+                        TimeOfDay(hour: dt.hour, minute: dt.minute));
                   }),
                   const SizedBox(height: 20),
 
@@ -1329,9 +1554,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   if (_myTeams.length > 1) ...[
                     Row(
                       children: [
-                        Icon(Icons.groups, size: 14, color: Colors.purple.withOpacity(0.7)),
+                        Icon(Icons.groups,
+                            size: 14, color: Colors.purple.withOpacity(0.7)),
                         const SizedBox(width: 6),
-                        const Text('Your team:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                        const Text('Your team:',
+                            style:
+                                TextStyle(color: Colors.white54, fontSize: 12)),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -1341,14 +1569,21 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                         isDense: true,
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.04),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
                       ),
-                      items: _myTeams.map((t) => DropdownMenuItem(
-                        value: t['id']?.toString(),
-                        child: Text(t['name'] ?? 'Team', style: const TextStyle(fontSize: 13)),
-                      )).toList(),
-                      onChanged: (v) => setSheetState(() => selectedTeamId = v ?? selectedTeamId),
+                      items: _myTeams
+                          .map((t) => DropdownMenuItem(
+                                value: t['id']?.toString(),
+                                child: Text(t['name'] ?? 'Team',
+                                    style: const TextStyle(fontSize: 13)),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setSheetState(
+                          () => selectedTeamId = v ?? selectedTeamId),
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -1358,12 +1593,16 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     controller: titleController,
                     decoration: InputDecoration(
                       hintText: 'Title (optional) e.g. Semifinal',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.3), fontSize: 13),
                       isDense: true,
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
                     ),
                     style: const TextStyle(fontSize: 13),
                   ),
@@ -1374,12 +1613,16 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     controller: notesController,
                     decoration: InputDecoration(
                       hintText: 'Notes (optional)',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.3), fontSize: 13),
                       isDense: true,
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
                     ),
                     style: const TextStyle(fontSize: 13),
                     maxLines: 2,
@@ -1396,7 +1639,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   // ==============================
   // Attendance toggle
   // ==============================
-  Future<void> _toggleAttendance(Map<String, dynamic> event, String status) async {
+  Future<void> _toggleAttendance(
+      Map<String, dynamic> event, String status) async {
     final teamId = event['teamId']?.toString() ?? '';
     final eventId = event['id']?.toString() ?? '';
     if (teamId.isEmpty || eventId.isEmpty) return;
@@ -1433,7 +1677,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         orElse: () => <String, dynamic>{},
       );
       final teamType = team['teamType']?.toString() ?? '5v5';
-      final teamName = event['teamName']?.toString() ?? team['name']?.toString() ?? 'My Team';
+      final teamName = event['teamName']?.toString() ??
+          team['name']?.toString() ??
+          'My Team';
       final opponentName = event['opponentTeamName']?.toString() ?? 'Opponent';
 
       if (!mounted) return;
@@ -1466,21 +1712,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     final isScheduleTab = _tabController.index == 1;
 
+    // No local AppBar: Teams is a nav tab now, so the shell supplies the
+    // shared HoopRank app bar (same as Rankings / Messages / Calendar).
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Teams'),
-        leading: BackButton(
-          onPressed: () {
-            // Reached via go() (deep link / notification, no back stack) or
-            // push() — always leave somewhere sensible instead of stranding.
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/play');
-            }
-          },
-        ),
-      ),
       body: Column(
         children: [
           TabBar(
@@ -1504,7 +1738,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: isScheduleTab ? _buildScheduleFABs() : _buildMyTeamsFAB(),
+      floatingActionButton:
+          isScheduleTab ? _buildScheduleFABs() : _buildMyTeamsFAB(),
     );
   }
 
@@ -1529,7 +1764,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('1 Team Max', style: TextStyle(fontSize: 13)),
-                      Text('(subscribe for more)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.normal)),
+                      Text('(subscribe for more)',
+                          style: TextStyle(
+                              fontSize: 9, fontWeight: FontWeight.normal)),
                     ],
                   )
                 : const Text('Create Team'),
@@ -1581,7 +1818,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             const SizedBox(height: 16),
             const Text(
               'No teams yet',
-              style: TextStyle(fontSize: 18, color: Colors.white54, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.white54,
+                  fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -1636,7 +1876,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               children: [
                 Text(
                   invite['name'] ?? 'Team',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.white),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1653,7 +1896,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               side: BorderSide(color: Colors.red.withOpacity(0.4)),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               minimumSize: Size.zero,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Decline', style: TextStyle(fontSize: 12)),
           ),
@@ -1666,7 +1910,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               minimumSize: Size.zero,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Accept', style: TextStyle(fontSize: 12)),
           ),
@@ -1684,11 +1929,17 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     final cityVal = team['city'];
     final descriptionVal = team['description'];
     final ratingValue = team['rating'];
-    final rating = ratingValue is num ? ratingValue.toDouble() : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0);
+    final rating = ratingValue is num
+        ? ratingValue.toDouble()
+        : (double.tryParse(ratingValue?.toString() ?? '') ?? 3.0);
     final winsValue = team['wins'];
-    final wins = winsValue is int ? winsValue : (int.tryParse(winsValue?.toString() ?? '') ?? 0);
+    final wins = winsValue is int
+        ? winsValue
+        : (int.tryParse(winsValue?.toString() ?? '') ?? 0);
     final lossesValue = team['losses'];
-    final losses = lossesValue is int ? lossesValue : (int.tryParse(lossesValue?.toString() ?? '') ?? 0);
+    final losses = lossesValue is int
+        ? lossesValue
+        : (int.tryParse(lossesValue?.toString() ?? '') ?? 0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1697,19 +1948,24 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            Navigator.push(context, MaterialPageRoute(
-              builder: (_) => TeamDetailScreen(teamId: team['id']),
-            )).then((_) => _loadData());
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TeamDetailScreen(teamId: team['id']),
+                )).then((_) => _loadData());
           },
           borderRadius: BorderRadius.circular(16),
-            child: Padding(
+          child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1720,18 +1976,27 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     Expanded(
                       child: Text(
                         team['name'] ?? 'Team',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
                       ),
                     ),
                     if (isOwner)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.amber.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                          border:
+                              Border.all(color: Colors.amber.withOpacity(0.3)),
                         ),
-                        child: const Text('Owner', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
+                        child: const Text('Owner',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.amber,
+                                fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
@@ -1742,18 +2007,25 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   runSpacing: 6,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: teamType == '3v3' ? Colors.blue.withOpacity(0.2) : Colors.purple.withOpacity(0.2),
+                        color: teamType == '3v3'
+                            ? Colors.blue.withOpacity(0.2)
+                            : Colors.purple.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: teamType == '3v3' ? Colors.blue.withOpacity(0.3) : Colors.purple.withOpacity(0.3),
+                          color: teamType == '3v3'
+                              ? Colors.blue.withOpacity(0.3)
+                              : Colors.purple.withOpacity(0.3),
                         ),
                       ),
                       child: Text(
                         teamType,
                         style: TextStyle(
-                          color: teamType == '3v3' ? Colors.blue[300] : Colors.purple[200],
+                          color: teamType == '3v3'
+                              ? Colors.blue[300]
+                              : Colors.purple[200],
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
@@ -1761,33 +2033,51 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     ),
                     if (skillLevel != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: Colors.deepPurple.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.deepPurple.withOpacity(0.3)),
+                          border: Border.all(
+                              color: Colors.deepPurple.withOpacity(0.3)),
                         ),
-                        child: Text(skillLevel, style: TextStyle(color: Colors.deepPurple[200], fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: Text(skillLevel,
+                            style: TextStyle(
+                                color: Colors.deepPurple[200],
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold)),
                       ),
                     if (ageGroup != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: Colors.teal.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                          border:
+                              Border.all(color: Colors.teal.withOpacity(0.3)),
                         ),
-                        child: Text(ageGroup, style: TextStyle(color: Colors.teal[300], fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: Text(ageGroup,
+                            style: TextStyle(
+                                color: Colors.teal[300],
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold)),
                       ),
                     if (gender != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: Colors.indigo.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.indigo.withOpacity(0.3)),
+                          border:
+                              Border.all(color: Colors.indigo.withOpacity(0.3)),
                         ),
-                        child: Text(gender, style: TextStyle(color: Colors.indigo[300], fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: Text(gender,
+                            style: TextStyle(
+                                color: Colors.indigo[300],
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
@@ -1811,32 +2101,40 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     decoration: BoxDecoration(
                       color: Colors.deepOrange.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.deepOrange.withOpacity(0.15)),
+                      border: Border.all(
+                          color: Colors.deepOrange.withOpacity(0.15)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.pending_actions, size: 14, color: Colors.deepOrange[300]),
+                            Icon(Icons.pending_actions,
+                                size: 14, color: Colors.deepOrange[300]),
                             const SizedBox(width: 6),
                             Text(
                               'Pending Invites',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.deepOrange[300]),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepOrange[300]),
                             ),
                           ],
                         ),
                         const SizedBox(height: 6),
-                        ...(team['pendingMembers'] as List).map<Widget>((member) {
+                        ...(team['pendingMembers'] as List)
+                            .map<Widget>((member) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 2),
                             child: Row(
                               children: [
-                                Icon(Icons.schedule, size: 12, color: Colors.grey[500]),
+                                Icon(Icons.schedule,
+                                    size: 12, color: Colors.grey[500]),
                                 const SizedBox(width: 6),
                                 Text(
                                   member['name'] ?? 'Unknown',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey[400]),
                                 ),
                               ],
                             ),
@@ -1846,7 +2144,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     ),
                   ),
                 ],
-                if (descriptionVal != null && descriptionVal.toString().isNotEmpty) ...[
+                if (descriptionVal != null &&
+                    descriptionVal.toString().isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
                     descriptionVal.toString(),
@@ -1890,17 +2189,19 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
     // Determine which of my teams is involved
     final myTeam = _myTeams.firstWhere(
-      (t) => t['id']?.toString() == ps['creator_team_id']?.toString() ||
-             t['id']?.toString() == ps['opponent_team_id']?.toString(),
+      (t) =>
+          t['id']?.toString() == ps['creator_team_id']?.toString() ||
+          t['id']?.toString() == ps['opponent_team_id']?.toString(),
       orElse: () => <String, dynamic>{},
     );
     final myTeamId = myTeam['id']?.toString() ?? '';
     final isSubmitter = submittedByTeamId == myTeamId;
 
-    final isPendingConfirmation = status == 'pending_confirmation' && !isSubmitter;
+    final isPendingConfirmation =
+        status == 'pending_confirmation' && !isSubmitter;
     final isPendingAmendment = status == 'pending_amendment' && isSubmitter;
     final isWaiting = (status == 'pending_confirmation' && isSubmitter) ||
-                      (status == 'pending_amendment' && !isSubmitter);
+        (status == 'pending_amendment' && !isSubmitter);
 
     final accentColor = isPendingAmendment ? Colors.orange : Colors.blue;
 
@@ -1921,7 +2222,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               children: [
                 Icon(
                   isPendingAmendment ? Icons.edit_note : Icons.scoreboard,
-                  color: accentColor, size: 20,
+                  color: accentColor,
+                  size: 20,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1932,7 +2234,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                             ? 'Score Amendment Proposed'
                             : 'Awaiting Opponent',
                     style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                       color: accentColor,
                     ),
                   ),
@@ -1944,21 +2247,27 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(creatorName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(creatorName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13)),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${scoreCreator ?? '-'} - ${scoreOpponent ?? '-'}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(opponentName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(opponentName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13)),
               ],
             ),
             // Amended scores (if pending_amendment)
@@ -1967,9 +2276,12 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Proposed: ', style: TextStyle(color: Colors.orange[300], fontSize: 12)),
+                  Text('Proposed: ',
+                      style:
+                          TextStyle(color: Colors.orange[300], fontSize: 12)),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     decoration: BoxDecoration(
                       color: Colors.orange.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(6),
@@ -1977,7 +2289,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     ),
                     child: Text(
                       '$amendedCreator - $amendedOpponent',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.orange[300]),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: Colors.orange[300]),
                     ),
                   ),
                 ],
@@ -1992,21 +2307,28 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         try {
-                          await ApiService.confirmTeamMatchScore(teamId: myTeamId, matchId: matchId);
+                          await ApiService.confirmTeamMatchScore(
+                              teamId: myTeamId, matchId: matchId);
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Score confirmed! Ratings updated.')),
+                              const SnackBar(
+                                  content: Text(
+                                      'Score confirmed! Ratings updated.')),
                             );
                             _loadData();
                           }
                         } catch (e) {
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                          if (mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')));
                         }
                       },
                       icon: const Icon(Icons.check, size: 16),
-                      label: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text('Confirm',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green, foregroundColor: Colors.white,
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                     ),
@@ -2016,7 +2338,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     child: OutlinedButton.icon(
                       onPressed: () => _showAmendScoreDialog(myTeamId, matchId),
                       icon: const Icon(Icons.edit, size: 16),
-                      label: const Text('Amend Score', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text('Amend Score',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.orange,
                         side: const BorderSide(color: Colors.orange),
@@ -2033,21 +2356,28 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         try {
-                          await ApiService.confirmAmendment(teamId: myTeamId, matchId: matchId);
+                          await ApiService.confirmAmendment(
+                              teamId: myTeamId, matchId: matchId);
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Amendment accepted! Ratings updated.')),
+                              const SnackBar(
+                                  content: Text(
+                                      'Amendment accepted! Ratings updated.')),
                             );
                             _loadData();
                           }
                         } catch (e) {
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                          if (mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')));
                         }
                       },
                       icon: const Icon(Icons.check, size: 16),
-                      label: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text('Accept',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green, foregroundColor: Colors.white,
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                     ),
@@ -2057,19 +2387,25 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     child: OutlinedButton.icon(
                       onPressed: () async {
                         try {
-                          await ApiService.rejectAmendment(teamId: myTeamId, matchId: matchId);
+                          await ApiService.rejectAmendment(
+                              teamId: myTeamId, matchId: matchId);
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Amendment rejected. Waiting for opponent to re-confirm.')),
+                              const SnackBar(
+                                  content: Text(
+                                      'Amendment rejected. Waiting for opponent to re-confirm.')),
                             );
                             _loadData();
                           }
                         } catch (e) {
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                          if (mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')));
                         }
                       },
                       icon: const Icon(Icons.close, size: 16),
-                      label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text('Reject',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                         side: const BorderSide(color: Colors.red),
@@ -2091,8 +2427,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     SizedBox(
-                      width: 14, height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey[500]),
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.grey[500]),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -2129,7 +2467,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Enter the correct scores:', style: TextStyle(color: Colors.white70)),
+            const Text('Enter the correct scores:',
+                style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -2139,7 +2478,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
                     decoration: const InputDecoration(
-                      hintText: '0', labelText: 'Your Score',
+                      hintText: '0',
+                      labelText: 'Your Score',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -2151,7 +2491,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
                     decoration: const InputDecoration(
-                      hintText: '0', labelText: 'Opp. Score',
+                      hintText: '0',
+                      labelText: 'Opp. Score',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -2173,8 +2514,10 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               Navigator.pop(ctx);
               try {
                 await ApiService.amendTeamMatchScore(
-                  teamId: teamId, matchId: matchId,
-                  myScore: my, opponentScore: opp,
+                  teamId: teamId,
+                  matchId: matchId,
+                  myScore: my,
+                  opponentScore: opp,
                 );
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -2183,10 +2526,13 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   _loadData();
                 }
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                if (mounted)
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('Error: $e')));
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange, foregroundColor: Colors.white),
             child: const Text('Submit Amendment'),
           ),
         ],
@@ -2203,11 +2549,15 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_note, size: 64, color: Colors.white.withOpacity(0.1)),
+            Icon(Icons.event_note,
+                size: 64, color: Colors.white.withOpacity(0.1)),
             const SizedBox(height: 16),
             const Text(
               'No upcoming events',
-              style: TextStyle(fontSize: 18, color: Colors.white54, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.white54,
+                  fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
@@ -2242,7 +2592,9 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     final isPractice = event['type'] == 'practice';
     final accentColor = isPractice ? Colors.green : Colors.purple;
     final eventDate = DateTime.tryParse(event['eventDate']?.toString() ?? '');
-    final dateStr = eventDate != null ? DateFormat('EEE, MMM d • h:mm a').format(eventDate.toLocal()) : 'TBD';
+    final dateStr = eventDate != null
+        ? DateFormat('EEE, MMM d • h:mm a').format(eventDate.toLocal())
+        : 'TBD';
     final inCount = event['inCount'] ?? 0;
     final outCount = event['outCount'] ?? 0;
     final myStatus = event['myStatus']?.toString();
@@ -2265,32 +2617,42 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: accentColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     isPractice ? 'PRACTICE' : 'GAME',
-                    style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5),
+                    style: TextStyle(
+                        color: accentColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                        letterSpacing: 0.5),
                   ),
                 ),
                 if (recurrence != null) ...[
                   const SizedBox(width: 6),
                   Icon(Icons.repeat, size: 14, color: Colors.grey[500]),
                   const SizedBox(width: 2),
-                  Text(recurrence, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                  Text(recurrence,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 11)),
                 ],
                 const Spacer(),
                 if (teamName.isNotEmpty)
-                  Text(teamName, style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                  Text(teamName,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 11)),
               ],
             ),
             const SizedBox(height: 10),
             // Title
             Text(
               event['title'] ?? (isPractice ? 'Practice' : 'Game'),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
             ),
             const SizedBox(height: 6),
             // Date/time row
@@ -2298,17 +2660,20 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               children: [
                 Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
                 const SizedBox(width: 4),
-                Text(dateStr, style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                Text(dateStr,
+                    style: TextStyle(color: Colors.grey[400], fontSize: 13)),
               ],
             ),
             // Location
-            if (event['locationName'] != null && (event['locationName'] as String).isNotEmpty) ...[
+            if (event['locationName'] != null &&
+                (event['locationName'] as String).isNotEmpty) ...[
               const SizedBox(height: 4),
               Row(
                 children: [
                   Icon(Icons.place, size: 14, color: Colors.grey[500]),
                   const SizedBox(width: 4),
-                  Text(event['locationName'], style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                  Text(event['locationName'],
+                      style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                 ],
               ),
             ],
@@ -2319,7 +2684,8 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 children: [
                   Icon(Icons.groups, size: 14, color: Colors.grey[500]),
                   const SizedBox(width: 4),
-                  Text('vs ${event['opponentTeamName']}', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                  Text('vs ${event['opponentTeamName']}',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                 ],
               ),
             ],
@@ -2329,12 +2695,16 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
               children: [
                 // IN count
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(myStatus == 'in' ? 0.25 : 0.08),
+                    color: Colors.green
+                        .withOpacity(myStatus == 'in' ? 0.25 : 0.08),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: myStatus == 'in' ? Colors.green : Colors.green.withOpacity(0.2),
+                      color: myStatus == 'in'
+                          ? Colors.green
+                          : Colors.green.withOpacity(0.2),
                       width: myStatus == 'in' ? 1.5 : 1,
                     ),
                   ),
@@ -2343,12 +2713,18 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle, size: 16, color: myStatus == 'in' ? Colors.green : Colors.green.withOpacity(0.5)),
+                        Icon(Icons.check_circle,
+                            size: 16,
+                            color: myStatus == 'in'
+                                ? Colors.green
+                                : Colors.green.withOpacity(0.5)),
                         const SizedBox(width: 4),
                         Text(
                           'IN $inCount',
                           style: TextStyle(
-                            color: myStatus == 'in' ? Colors.green : Colors.green.withOpacity(0.6),
+                            color: myStatus == 'in'
+                                ? Colors.green
+                                : Colors.green.withOpacity(0.6),
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -2360,12 +2736,16 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                 const SizedBox(width: 8),
                 // OUT count
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(myStatus == 'out' ? 0.2 : 0.05),
+                    color:
+                        Colors.red.withOpacity(myStatus == 'out' ? 0.2 : 0.05),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: myStatus == 'out' ? Colors.red : Colors.red.withOpacity(0.15),
+                      color: myStatus == 'out'
+                          ? Colors.red
+                          : Colors.red.withOpacity(0.15),
                       width: myStatus == 'out' ? 1.5 : 1,
                     ),
                   ),
@@ -2374,12 +2754,18 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cancel, size: 16, color: myStatus == 'out' ? Colors.red : Colors.red.withOpacity(0.4)),
+                        Icon(Icons.cancel,
+                            size: 16,
+                            color: myStatus == 'out'
+                                ? Colors.red
+                                : Colors.red.withOpacity(0.4)),
                         const SizedBox(width: 4),
                         Text(
                           'OUT $outCount',
                           style: TextStyle(
-                            color: myStatus == 'out' ? Colors.red : Colors.red.withOpacity(0.5),
+                            color: myStatus == 'out'
+                                ? Colors.red
+                                : Colors.red.withOpacity(0.5),
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -2394,17 +2780,23 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                   ElevatedButton.icon(
                     onPressed: () => _startGameFromEvent(event),
                     icon: const Icon(Icons.scoreboard, size: 16),
-                    label: const Text('Input Outcome', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text('Input Outcome',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purple,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       minimumSize: Size.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 // Notes indicator
-                if (isPractice && event['notes'] != null && (event['notes'] as String).isNotEmpty)
+                if (isPractice &&
+                    event['notes'] != null &&
+                    (event['notes'] as String).isNotEmpty)
                   Tooltip(
                     message: event['notes'],
                     child: Icon(Icons.note, size: 16, color: Colors.grey[600]),
@@ -2417,4 +2809,3 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
     );
   }
 }
-
