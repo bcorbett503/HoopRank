@@ -353,6 +353,10 @@ async function main() {
   const maxDistanceKm = parseFloatArg("--max-distance-km", 2.0);
   const sleepMs = parseIntArg("--sleep-ms", 150);
   const batchSize = parseIntArg("--batch-size", 100);
+  const concurrency = Math.max(
+    1,
+    Math.min(parseIntArg("--concurrency", 6), 20),
+  );
   const output = path.resolve(
     process.cwd(),
     readArg("--output", "followed_court_image_candidates.jsonl"),
@@ -391,13 +395,28 @@ async function main() {
   let pendingApply = [];
 
   try {
-    for (const court of selected) {
-      let candidate;
-      try {
-        candidate = await findCandidate(court, apiKey, {
-          maxResults,
-          maxDistanceKm,
-        });
+    for (let start = 0; start < selected.length; start += concurrency) {
+      const chunk = selected.slice(start, start + concurrency);
+      const candidates = await Promise.all(
+        chunk.map(async (court) => {
+          try {
+            return await findCandidate(court, apiKey, {
+              maxResults,
+              maxDistanceKm,
+            });
+          } catch (error) {
+            return {
+              status: "error",
+              courtId: court.id,
+              courtName: court.name,
+              courtCity: court.city,
+              error: error.message,
+            };
+          }
+        }),
+      );
+
+      for (const candidate of candidates) {
         if (candidate.status === "matched") {
           stats.matched++;
           pendingApply.push(candidate);
@@ -405,31 +424,24 @@ async function main() {
           stats.noPhoto++;
         } else if (candidate.status === "no_match") {
           stats.noMatch++;
+        } else if (candidate.status === "error") {
+          stats.errors++;
         } else {
           stats.skipped++;
         }
 
-        if (apply && pendingApply.length >= batchSize) {
-          const result = await applyBatch(base, adminHeaders, pendingApply);
+        while (apply && pendingApply.length >= batchSize) {
+          const batch = pendingApply.splice(0, batchSize);
+          const result = await applyBatch(base, adminHeaders, batch);
           stats.applied += result.updated || 0;
-          pendingApply = [];
         }
-      } catch (error) {
-        stats.errors++;
-        candidate = {
-          status: "error",
-          courtId: court.id,
-          courtName: court.name,
-          courtCity: court.city,
-          error: error.message,
-        };
+        stats.processed++;
+        stream.write(`${JSON.stringify(candidate)}\n`);
+        if (stats.processed % 25 === 0 || stats.processed === selected.length) {
+          console.log(JSON.stringify(stats));
+        }
       }
 
-      stats.processed++;
-      stream.write(`${JSON.stringify(candidate)}\n`);
-      if (stats.processed % 25 === 0 || stats.processed === selected.length) {
-        console.log(JSON.stringify(stats));
-      }
       if (sleepMs > 0) await sleep(sleepMs);
     }
 
