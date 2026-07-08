@@ -70,14 +70,20 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
           _messagesService.getPendingChallenges(userId),
         ]);
         conversations = results[0] as List<Conversation>;
-        // Track challenges here in Messages: pending ones surface as their
-        // own section (received first, then sent awaiting a reply).
+        // Track challenges here in Messages: live matches persist at the
+        // top, then pending ones (received first, then sent).
+        int rank(ChallengeRequest c) => _isLiveChallenge(c)
+            ? 0
+            : c.isReceived
+                ? 1
+                : 2;
         challenges = (results[1] as List<ChallengeRequest>)
             .where((c) =>
+                _isLiveChallenge(c) ||
                 (c.message.challengeStatus ?? 'pending').toLowerCase() ==
-                'pending')
+                    'pending')
             .toList()
-          ..sort((a, b) => (a.isReceived ? 0 : 1) - (b.isReceived ? 0 : 1));
+          ..sort((a, b) => rank(a) - rank(b));
       } catch (e) {
         debugPrint('Conversations error: $e');
         conversations = [];
@@ -230,10 +236,58 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
     );
   }
 
+  /// A challenge is "live" once accepted and its match hasn't finished —
+  /// it persists here so players can always get back to the game.
+  static bool _isLiveChallenge(ChallengeRequest c) {
+    if ((c.message.challengeStatus ?? '').toLowerCase() != 'accepted') {
+      return false;
+    }
+    const finished = {
+      'completed',
+      'ended',
+      'cancelled',
+      'canceled',
+      'declined',
+      'expired',
+      'contested',
+    };
+    return !finished.contains((c.matchStatus ?? '').toLowerCase());
+  }
+
+  /// Jump back into an accepted challenge's match.
+  void _resumeMatch(ChallengeRequest challenge) {
+    final matchState = context.read<MatchState>();
+    matchState.setOpponent(Player(
+      id: challenge.otherUser.id,
+      slug: challenge.otherUser.id,
+      name: challenge.otherUser.name,
+      team: challenge.otherUser.team ?? 'Free Agent',
+      position: challenge.otherUser.position ?? 'G',
+      age: 25,
+      height: '6\'0"',
+      weight: '180 lbs',
+      rating: challenge.otherUser.rating,
+      offense: 80,
+      defense: 80,
+      shooting: 80,
+      passing: 80,
+      rebounding: 80,
+    ));
+    final matchId = challenge.message.matchId;
+    if (matchId != null && matchId.isNotEmpty) {
+      matchState.setMatchId(matchId);
+    }
+    context.push('/match/setup');
+  }
+
   /// A pending challenge card: challenger, message, court/time, and
   /// Accept / Decline for received ones (sent ones show "awaiting reply").
+  /// Live (accepted) challenges show a green Resume card instead.
   Widget _buildChallengeTile(ChallengeRequest challenge) {
     const orange = Color(0xFFFF6B35);
+    const liveGreen = Color(0xFF22C55E);
+    final isLive = _isLiveChallenge(challenge);
+    final accent = isLive ? liveGreen : orange;
     final other = challenge.otherUser;
     final detail = [
       if (challenge.courtName != null) challenge.courtName!,
@@ -246,7 +300,7 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
       decoration: BoxDecoration(
         color: Colors.grey[900],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: orange.withOpacity(0.45)),
+        border: Border.all(color: accent.withOpacity(0.45)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
@@ -285,12 +339,12 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
                         backgroundImage: other.photoUrl != null
                             ? safeImageProvider(other.photoUrl!)
                             : null,
-                        backgroundColor: orange.withOpacity(0.18),
+                        backgroundColor: accent.withOpacity(0.18),
                         child: other.photoUrl == null
                             ? Text(
                                 other.name.isNotEmpty ? other.name[0] : '?',
-                                style: const TextStyle(
-                                    color: orange, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    color: accent, fontWeight: FontWeight.bold),
                               )
                             : null,
                       ),
@@ -301,9 +355,11 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            challenge.isReceived
-                                ? '${other.name} challenged you'
-                                : 'You challenged ${other.name}',
+                            isLive
+                                ? 'Live match with ${other.name}'
+                                : challenge.isReceived
+                                    ? '${other.name} challenged you'
+                                    : 'You challenged ${other.name}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -326,7 +382,27 @@ class _MessagesScreenState extends State<MessagesScreen> with RouteAware {
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (challenge.isReceived)
+                if (isLive)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 38,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _resumeMatch(challenge),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: const Text('Resume match'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: liveGreen,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900, fontSize: 14),
+                      ),
+                    ),
+                  )
+                else if (challenge.isReceived)
                   Row(
                     children: [
                       Expanded(
