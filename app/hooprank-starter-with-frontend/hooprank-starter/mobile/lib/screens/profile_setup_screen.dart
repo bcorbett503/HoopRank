@@ -57,7 +57,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String? _profilePictureUrl;
   Map<String, dynamic>? _avatarConfig;
   File? _imageFile;
-  bool _photoRemoved = false; // user explicitly removed their photo this session
+  bool _photoRemoved =
+      false; // user explicitly removed their photo this session
   bool _loading = true;
 
   // Track if fields have been touched for validation UI
@@ -109,9 +110,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         }
         final existingAvatarConfig =
             auth.currentUser?.avatarConfig ?? existing.avatarConfig;
-        final hasAvatarConfig =
-            isFlatAvatarConfig(existingAvatarConfig) ||
-                isGeneratedAvatarConfig(existingAvatarConfig);
+        final hasAvatarConfig = isFlatAvatarConfig(existingAvatarConfig) ||
+            isGeneratedAvatarConfig(existingAvatarConfig);
         setState(() {
           _firstNameCtrl.text = fName;
           _lastNameCtrl.text = lName;
@@ -186,8 +186,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool get _hasPhoto {
     if (_imageFile != null) return true;
     final u = _profilePictureUrl;
-    return u != null &&
-        (u.startsWith('http://') || u.startsWith('https://'));
+    return u != null && (u.startsWith('http://') || u.startsWith('https://'));
   }
 
   /// Add/replace the OPTIONAL profile photo. The avatar stays as the primary
@@ -212,7 +211,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ),
             if (_hasPhoto)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.white70),
+                leading:
+                    const Icon(Icons.delete_outline, color: Colors.white70),
                 title: const Text('Remove Photo'),
                 onTap: () => Navigator.pop(context, 'remove'),
               ),
@@ -280,6 +280,27 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         _profilePictureUrl = null;
       }
     });
+
+    // "Save avatar" must stick immediately: persisting only on the profile's
+    // Save & Continue silently reverted the new look whenever the user backed
+    // out of this screen instead. Failure is non-fatal — Save & Continue
+    // still carries the config with the rest of the profile.
+    final auth = context.read<AuthState>();
+    final userId = auth.currentUser?.id;
+    if (userId != null && _avatarConfig != null) {
+      try {
+        await ApiService.updateProfile(userId, {'avatarConfig': _avatarConfig});
+        await auth.refreshUser();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Avatar saved')),
+          );
+        }
+      } catch (e) {
+        debugPrint(
+            'Immediate avatar save failed (profile save will retry): $e');
+      }
+    }
   }
 
   String _currentAvatarLabel() {
@@ -647,8 +668,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         height: 64,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border:
-                              Border.all(color: const Color(0xFFFF6B35), width: 2),
+                          border: Border.all(
+                              color: const Color(0xFFFF6B35), width: 2),
                           image: DecorationImage(
                             fit: BoxFit.cover,
                             image: _imageFile != null
@@ -743,7 +764,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             child: TextButton.icon(
               onPressed: _pickImage,
               icon: const Icon(Icons.photo_camera_outlined, size: 17),
-              label: Text(_hasPhoto ? 'Change photo' : 'Add a photo (optional)'),
+              label:
+                  Text(_hasPhoto ? 'Change photo' : 'Add a photo (optional)'),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white70,
               ),
