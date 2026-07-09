@@ -146,7 +146,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       const LatLng(38.0194, -122.5376); // Default to San Rafael
   double _currentZoom = kUserLocationInitialZoom;
   LatLng? _currentUserMapPoint;
-  CourtFollowFilterMode _followFilterMode = CourtFollowFilterMode.all;
+  // Default view: courts the community follows ("all follows") — a map of
+  // real hoop spots — rather than only courts with scheduled runs.
+  CourtFollowFilterMode _followFilterMode = CourtFollowFilterMode.allFollowed;
   bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
   String? _filterAccess; // null=all, 'public', 'private'
   String? _runsFilter; // null=off, 'today'=runs today, 'all'=all upcoming runs

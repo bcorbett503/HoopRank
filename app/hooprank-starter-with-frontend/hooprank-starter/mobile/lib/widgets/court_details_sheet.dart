@@ -17,6 +17,9 @@ class CourtDetailsSheet {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      // Keep the sheet below the status bar / Dynamic Island so the drag
+      // handle is always reachable.
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _CourtDetailsSheet(court: court),
     ).whenComplete(() {
@@ -35,7 +38,9 @@ class _CourtDetailsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
+        // useSafeArea already excludes the notch; stay a touch lower still
+        // so the handle never crowds the top edge.
+        maxHeight: MediaQuery.of(context).size.height * 0.92 - 24,
       ),
       child: Container(
         decoration: BoxDecoration(
