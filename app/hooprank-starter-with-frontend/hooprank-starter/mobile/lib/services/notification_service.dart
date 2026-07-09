@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
@@ -75,6 +77,25 @@ class NotificationService with WidgetsBindingObserver {
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
+
+    // Create the Android channel up front so background FCM messages (routed
+    // to it via the manifest meta-data) never fall back to the Misc channel.
+    // This runs before runApp, so a channel failure must never sink app boot.
+    try {
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(
+            const AndroidNotificationChannel(
+              'hooprank_calendar_channel',
+              'HoopRank Calendar',
+              description: 'Confirmed run and match reminders',
+              importance: Importance.high,
+            ),
+          );
+    } catch (e) {
+      debugPrint('Failed to create notification channel: $e');
+    }
 
     // Don't auto-show badge for foreground notifications
     await _messaging.setForegroundNotificationPresentationOptions(
@@ -171,8 +192,12 @@ class NotificationService with WidgetsBindingObserver {
       await _instance._localNotifications.cancelAll();
 
       // Explicitly clear the native iOS app icon badge count.
-      // This handles background pushes that may have already set a badge value.
-      await _badgeChannel.invokeMethod('clearBadge');
+      // This handles background pushes that may have already set a badge
+      // value. The channel only exists in AppDelegate.swift, so skip it
+      // elsewhere.
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        await _badgeChannel.invokeMethod('clearBadge');
+      }
 
       // Keep foreground behavior badge-free.
       await FirebaseMessaging.instance
@@ -211,6 +236,8 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> _registerForRemoteNotifications() async {
+    // APNs registration is iOS-only; Android FCM needs no equivalent call.
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
     try {
       await _badgeChannel.invokeMethod('registerForRemoteNotifications');
     } catch (e) {
@@ -387,29 +414,51 @@ class NotificationService with WidgetsBindingObserver {
       return;
     }
 
-    await _localNotifications.zonedSchedule(
-      _stableNotificationId(reminderKey),
-      title,
-      body,
-      tz.TZDateTime.from(remindAt.toUtc(), tz.UTC),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'hooprank_calendar_channel',
-          'HoopRank Calendar',
-          channelDescription: 'Confirmed run and match reminders',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(
-          presentBadge: false,
-          presentSound: true,
-        ),
+    final id = _stableNotificationId(reminderKey);
+    final when = tz.TZDateTime.from(remindAt.toUtc(), tz.UTC);
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'hooprank_calendar_channel',
+        'HoopRank Calendar',
+        channelDescription: 'Confirmed run and match reminders',
+        importance: Importance.high,
+        priority: Priority.high,
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: jsonEncode(payload ?? const {'type': 'calendar_event'}),
+      iOS: DarwinNotificationDetails(
+        presentBadge: false,
+        presentSound: true,
+      ),
     );
+    final payloadJson = jsonEncode(payload ?? const {'type': 'calendar_event'});
+
+    Future<void> schedule(AndroidScheduleMode mode) {
+      return _localNotifications.zonedSchedule(
+        id,
+        title,
+        body,
+        when,
+        details,
+        androidScheduleMode: mode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payloadJson,
+      );
+    }
+
+    try {
+      await schedule(AndroidScheduleMode.exactAllowWhileIdle);
+    } on PlatformException {
+      // Android 12+ can deny exact alarms; an hour-ahead reminder doesn't
+      // need exact timing, and a reminder failure must never break callers
+      // (the calendar screen awaits this inside its load path).
+      try {
+        await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+      } catch (e) {
+        debugPrint('Reminder scheduling failed (inexact retry): $e');
+      }
+    } catch (e) {
+      debugPrint('Reminder scheduling failed: $e');
+    }
   }
 
   Future<void> cancelCalendarReminder(String reminderKey) async {

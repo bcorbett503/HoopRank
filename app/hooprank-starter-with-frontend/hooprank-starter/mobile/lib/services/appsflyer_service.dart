@@ -341,6 +341,8 @@ class AppsFlyerService {
   }
 
   static Future<void> _logDebugTestDeviceIdentifiers() async {
+    // IDFV is iOS-only; the channel is implemented in AppDelegate.swift.
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
     try {
       debugPrint('AppsFlyer: Requesting iOS IDFV for test device registration');
       final idfv = await _deviceIdentifiersChannel

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -209,6 +210,10 @@ class _LoginScreenState extends State<LoginScreen> {
         hasGuestAccount ? 'Save with Apple' : 'Continue with Apple';
     final googleLabel =
         hasGuestAccount ? 'Save with Google' : 'Continue with Google';
+    // Apple Sign-In is iOS-only here: on Android sign_in_with_apple requires
+    // a web-auth flow (Services ID + redirect) we don't configure, so the
+    // button would throw the moment it's tapped.
+    final showAppleSignIn = defaultTargetPlatform == TargetPlatform.iOS;
 
     return Scaffold(
       appBar: isClaimMode
@@ -244,7 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 8),
                   Text(
                     hasGuestAccount
-                        ? 'Link Apple or Google so this guest session keeps its rank, match history, and future sign-in.'
+                        ? 'Link ${showAppleSignIn ? 'Apple or Google' : 'Google'} so this guest session keeps its rank, match history, and future sign-in.'
                         : 'Track your game, climb the ranks',
                     style: const TextStyle(fontSize: 16, color: Colors.grey),
                     textAlign: TextAlign.center,
@@ -252,43 +257,47 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 48),
 
                   // Sign in with Apple Button (REQUIRED - must be first per Apple Guideline 4.8)
-                  SizedBox(
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed:
-                          _isLoading ? null : () => _loginWithProvider('apple'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Icon(Icons.apple, size: 24),
+                  if (showAppleSignIn) ...[
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _loginWithProvider('apple'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                appleLabel,
-                                style: const TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w500),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Icon(Icons.apple, size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  appleLabel,
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                  ],
 
                   // Google Sign In Button (official branding)
                   SizedBox(

@@ -11,3 +11,10 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Windows build debris — never commit
+build_log.txt
+gradle_log.txt
+gradle_error.txt
+gradle-error.txt
+signing_report.txt

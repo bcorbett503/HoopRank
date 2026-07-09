@@ -362,50 +362,56 @@ class _CourtDetailsSheet extends StatelessWidget {
                           ),
                         ),
 
-                      // Get Directions section
+                      // Get Directions section (Apple Maps is iOS-only; on
+                      // Android that URL just opens the browser)
                       Row(
                         children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () async {
-                                final appleUrl = Uri.parse(
-                                  'https://maps.apple.com/?daddr=${court.lat},${court.lng}&dirflg=d',
-                                );
-                                try {
-                                  final launched = await launchUrl(
-                                    appleUrl,
-                                    mode: LaunchMode.externalApplication,
+                          if (Theme.of(context).platform ==
+                              TargetPlatform.iOS) ...[
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final appleUrl = Uri.parse(
+                                    'https://maps.apple.com/?daddr=${court.lat},${court.lng}&dirflg=d',
                                   );
-                                  if (!launched && context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content:
-                                            Text('Could not open Apple Maps'),
-                                      ),
+                                  try {
+                                    final launched = await launchUrl(
+                                      appleUrl,
+                                      mode: LaunchMode.externalApplication,
                                     );
+                                    if (!launched && context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content:
+                                              Text('Could not open Apple Maps'),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(content: Text('Error: $e')),
+                                      );
+                                    }
                                   }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error: $e')),
-                                    );
-                                  }
-                                }
-                              },
-                              icon: const Icon(Icons.apple, size: 20),
-                              label: const Text('Apple Maps'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: BorderSide(color: Colors.grey[600]!),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                },
+                                icon: const Icon(Icons.apple, size: 20),
+                                label: const Text('Apple Maps'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  side: BorderSide(color: Colors.grey[600]!),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
+                            const SizedBox(width: 10),
+                          ],
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () async {
