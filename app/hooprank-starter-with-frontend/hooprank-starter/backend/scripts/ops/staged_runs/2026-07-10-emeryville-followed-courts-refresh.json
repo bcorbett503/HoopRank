@@ -1,0 +1,93 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Emeryville, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    {
+      "courtId": "ddf44e06-9db9-df6e-e16b-4e397929348f",
+      "courtName": "Emeryville Center of Community Life",
+      "status": "accepted_run_and_events",
+      "reviewReason": "The current official recreation page confirms Friday adult open gym after its single July 3 closure. A current Volo public listing also documents separate men's and coed league openings at this exact venue on July 15."
+    }
+  ],
+  "courtSchedules": [
+    {
+      "courtId": "ddf44e06-9db9-df6e-e16b-4e397929348f",
+      "courtName": "Emeryville Center of Community Life",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.emeryville.org/Recreation/Fitness/Fitness-Center-Open-Gym-Sports/Open-Gym-Basketball",
+      "sourceTitle": "Open Gym Basketball - City of Emeryville, CA",
+      "seriesStartsOn": "2026-07-10",
+      "seriesEndsOn": "2026-12-31",
+      "seasonEndBasis": "operational re-verification horizon; the official page presents an ongoing Friday schedule and identifies July 3 as the only listed closure",
+      "access": "Ages 18+. Adult drop-in is $6 resident/$7 non-resident; a 10-visit pass is $49 resident/$55 non-resident. Players join individually and games are recommended at 10 minutes when a waitlist forms",
+      "maxPlayers": 14,
+      "replaceActiveSchedule": true,
+      "slots": [
+        {
+          "existingRunId": "673b594f-75ea-4286-a44f-201a3e985a4c",
+          "title": "Open Gym Basketball - Emeryville Center of Community Life",
+          "weekday": "Friday",
+          "localStart": "20:00",
+          "durationMinutes": 180,
+          "maxPlayers": 14,
+          "gameMode": "5v5",
+          "courtType": "indoor",
+          "ageRange": "18+",
+          "audience": "Adults ages 18 and older",
+          "scheduleText": "Fridays 8:00-11:00 PM; ages 18+; the current page lists July 3 as a closure date"
+        }
+      ]
+    }
+  ],
+  "courtEvents": [
+    {
+      "courtId": "ddf44e06-9db9-df6e-e16b-4e397929348f",
+      "courtName": "Emeryville Center of Community Life",
+      "eventType": "league",
+      "title": "Volo Wednesday Basketball League Openings - Emeryville",
+      "confidence": "high",
+      "evidenceType": "platform",
+      "sourceUrl": "https://www.volosports.com/san-francisco/basketball",
+      "sourceTitle": "Basketball in San Francisco | Volo Sports - July 2026 public league listing",
+      "organizerName": "Volo Sports",
+      "registrationUrl": "https://www.volosports.com/san-francisco/basketball",
+      "audience": "Adult men's and adult coed divisions",
+      "ageRange": "Adults",
+      "skillLevel": "Recreational league",
+      "format": "Separate men's/coed leagues; weekly games and playoffs",
+      "uncertainty": "The public listing proves the July 15 opening date and time but does not publish a season end. Only the concrete opening sessions are published here; no ongoing recurrence is asserted.",
+      "replaceSourceWindow": { "startsOn": "2026-07-15", "endsOn": "2026-07-15" },
+      "sessions": [
+        {
+          "title": "Volo Wednesday Men's Basketball - Emeryville Opening",
+          "startsOn": "2026-07-15",
+          "endsOn": "2026-07-15",
+          "weekdays": ["Wednesday"],
+          "localStart": "19:15",
+          "localEnd": "22:15",
+          "scheduleText": "Wednesday Men's Basketball - Emeryville starts July 15, 2026, 7:15-10:15 PM at Emeryville Center for Community Life; registration closed July 10"
+        },
+        {
+          "title": "Volo Wednesday Coed Basketball - Emeryville Opening",
+          "startsOn": "2026-07-15",
+          "endsOn": "2026-07-15",
+          "weekdays": ["Wednesday"],
+          "localStart": "19:15",
+          "localEnd": "22:15",
+          "scheduleText": "Wednesday Coed Basketball - Emeryville starts July 15, 2026, 7:15-10:15 PM at Emeryville Center for Community Life; registration closed July 10"
+        }
+      ]
+    }
+  ],
+  "retireCourtEvents": [
+    {
+      "eventId": "25d91d47-1cfb-4c4b-ac85-5cefcdf2642d",
+      "courtId": "ddf44e06-9db9-df6e-e16b-4e397929348f",
+      "reason": "The prior generic July 1 series was unbounded. The refreshed public listing identifies separate men's and coed July 15 openings but does not prove a season end, so the stale recurring row is replaced by concrete opening events."
+    }
+  ]
+}

@@ -35,6 +35,7 @@ const stats = {
     courtEventsDesired: 0,
     courtEventsInserted: 0,
     courtEventsUpdated: 0,
+    courtEventsRetired: 0,
 };
 
 const WEEKDAYS = {
@@ -180,6 +181,10 @@ async function validateRoster(client) {
     assert(
         artifact.courtEvents == null || Array.isArray(artifact.courtEvents),
         'courtEvents must be an array when provided',
+    );
+    assert(
+        artifact.retireCourtEvents == null || Array.isArray(artifact.retireCourtEvents),
+        'retireCourtEvents must be an array when provided',
     );
 
     const followed = await client.query(
@@ -418,8 +423,12 @@ function buildCourtEventNotes(definition, desired, reviewedAt) {
         `Schedule text: ${desired.scheduleText}.`,
     ];
     if (definition.organizerName) parts.push(`Organizer: ${definition.organizerName}.`);
+    if (definition.registrationUrl) parts.push(`Registration URL: ${definition.registrationUrl}.`);
     if (definition.costText) parts.push(`Cost: ${definition.costText}.`);
     if (definition.audience) parts.push(`Audience: ${definition.audience}.`);
+    if (definition.ageRange) parts.push(`Age range: ${definition.ageRange}.`);
+    if (definition.skillLevel) parts.push(`Skill level: ${definition.skillLevel}.`);
+    if (definition.format) parts.push(`Format: ${definition.format}.`);
     if (definition.uncertainty) parts.push(`Uncertainty: ${definition.uncertainty}.`);
     return parts.join(' ');
 }
@@ -572,6 +581,32 @@ async function processCourtEvents(client, definition, reviewedAt) {
     stats.followsInserted += followInsert.rowCount;
 }
 
+async function processCourtEventRetirement(client, retirement, reviewedAt) {
+    assert(retirement.eventId && retirement.courtId, 'Court-event retirement is missing an ID or court');
+    assert(retirement.reason, `Court-event retirement ${retirement.eventId} is missing a reason`);
+    const reviewedCourt = artifact.reviewedCourts.find(
+        (court) => court.courtId === retirement.courtId,
+    );
+    assert(reviewedCourt, `Retirement court ${retirement.courtId} is not in reviewedCourts`);
+
+    const result = await client.query(
+        `SELECT * FROM court_events
+         WHERE id = $1 AND court_id::text = $2 AND created_by = $3`,
+        [retirement.eventId, retirement.courtId, artifact.adminUserId],
+    );
+    assert(result.rows.length === 1, `Court event ${retirement.eventId} was not found for retirement`);
+    const target = result.rows[0];
+    if (String(target.status || '').toLowerCase() === 'retired') return;
+    const retirementNote = `${target.notes || ''}\n\nRetired by followed-court refresh on ${reviewedAt.toISODate()}: ${retirement.reason}`.trim();
+    await client.query(
+        `UPDATE court_events
+         SET status = 'retired', notes = $1, updated_at = NOW()
+         WHERE id = $2 AND created_by = $3`,
+        [retirementNote, retirement.eventId, artifact.adminUserId],
+    );
+    stats.courtEventsRetired += 1;
+}
+
 async function verifyAppliedState(client, reviewedAt) {
     for (const schedule of artifact.courtSchedules) {
         const rows = await client.query(
@@ -615,6 +650,18 @@ async function verifyAppliedState(client, reviewedAt) {
             assert(String(result.rows[0].notes || '').includes(definition.sourceUrl), `Missing event source URL: ${result.rows[0].id}`);
         }
     }
+
+    for (const retirement of artifact.retireCourtEvents || []) {
+        const result = await client.query(
+            `SELECT status FROM court_events
+             WHERE id = $1 AND court_id::text = $2 AND created_by = $3`,
+            [retirement.eventId, retirement.courtId, artifact.adminUserId],
+        );
+        assert(
+            result.rows.length === 1 && result.rows[0].status === 'retired',
+            `Court event retirement verification failed: ${retirement.eventId}`,
+        );
+    }
 }
 
 (async () => {
@@ -631,6 +678,9 @@ async function verifyAppliedState(client, reviewedAt) {
         }
         for (const definition of artifact.courtEvents || []) {
             await processCourtEvents(client, definition, reviewedAt);
+        }
+        for (const retirement of artifact.retireCourtEvents || []) {
+            await processCourtEventRetirement(client, retirement, reviewedAt);
         }
         await verifyAppliedState(client, reviewedAt);
 
