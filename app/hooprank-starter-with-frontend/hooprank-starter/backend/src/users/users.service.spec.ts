@@ -66,6 +66,31 @@ describe('UsersService', () => {
 
             expect(result.hoopRank).toBe(3.0);
         });
+
+        it('stores a missing guest email as null in PostgreSQL', async () => {
+            process.env.DATABASE_URL = 'postgres://test';
+            const created = {
+                id: 'guest-uid',
+                email: null,
+                name: 'HoopRank Player01234',
+            };
+            mockDataSource.query
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([created]);
+
+            const result = await service.findOrCreate('guest-uid', '   ');
+
+            expect(mockDataSource.query).toHaveBeenNthCalledWith(
+                2,
+                expect.stringContaining('INSERT INTO users'),
+                [
+                    'guest-uid',
+                    null,
+                    expect.stringMatching(/^HoopRank Player\d{5}$/),
+                ],
+            );
+            expect(result).toEqual(created);
+        });
     });
 
     // ------------------------------------------------------------------

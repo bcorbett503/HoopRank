@@ -26,9 +26,10 @@ export class UsersService {
    * Find user by auth provider ID or create a new one.
    * Production uses auth_provider + auth_token for authentication.
    */
-  async findOrCreate(authToken: string, email: string): Promise<User> {
+  async findOrCreate(authToken: string, email?: string | null): Promise<User> {
     const isPostgres = !!process.env.DATABASE_URL;
     const generatedName = this.buildGeneratedPlayerName(authToken);
+    const normalizedEmail = email?.trim() || null;
 
     if (isPostgres) {
       // Check if user exists by id (which is the Firebase UID)
@@ -49,7 +50,7 @@ export class UsersService {
         VALUES ($1, $2, $3, 3.0, NOW(), NOW())
         RETURNING *
       `,
-        [authToken, email, generatedName],
+        [authToken, normalizedEmail, generatedName],
       );
 
       return result[0];
@@ -61,7 +62,7 @@ export class UsersService {
       user = this.usersRepository.create({
         id: authToken, // Use authToken as ID for consistency
         authToken,
-        email,
+        email: normalizedEmail ?? undefined,
         name: generatedName,
         hoopRank: 3.0,
         reputation: 5.0,
