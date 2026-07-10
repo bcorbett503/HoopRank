@@ -167,5 +167,30 @@ describe("CalendarService", () => {
     expect(sql).toContain("OR sr.created_by = $3");
     expect(sql).toContain("viewer_ra.user_id = $3");
     expect(sql).toContain("sr.invited_player_ids");
+    expect(sql).toContain('"isAttending" DESC');
+    expect(sql).toContain('"isFollowedCourt" DESC');
+    expect(sql.indexOf('"isAttending" DESC')).toBeLessThan(
+      sql.indexOf("LIMIT 1000"),
+    );
+  });
+
+  it("prioritizes relevant and concrete rows before the SQLite query limit", async () => {
+    delete process.env.DATABASE_URL;
+    dataSource.query.mockResolvedValueOnce([]);
+
+    await service.getEvents({
+      userId: "viewer-1",
+      scope: "for_you",
+      start: new Date("2026-07-08T00:00:00.000Z"),
+      end: new Date("2026-07-22T00:00:00.000Z"),
+    });
+
+    const sql = dataSource.query.mock.calls[0][0];
+    expect(sql).toContain('"isAttending" DESC');
+    expect(sql).toContain('"isFollowedCourt" DESC');
+    expect(sql).toContain("COALESCE(sr.is_recurring, 0) ASC");
+    expect(sql.indexOf('"isAttending" DESC')).toBeLessThan(
+      sql.indexOf("LIMIT 1000"),
+    );
   });
 });

@@ -149,7 +149,11 @@ export class CalendarService {
             OR (COALESCE(sr.is_recurring, false) = true AND COALESCE(sr.recurrence_rule, 'weekly') = 'weekly')
           )
           AND ${scopePredicate}
-          ORDER BY sr.scheduled_at ASC
+          ORDER BY
+            "isAttending" DESC,
+            "isFollowedCourt" DESC,
+            COALESCE(sr.is_recurring, false) ASC,
+            sr.scheduled_at ASC
           LIMIT 1000
         `,
         [query.start.toISOString(), query.end.toISOString(), query.userId],
@@ -225,7 +229,11 @@ export class CalendarService {
           OR (COALESCE(sr.is_recurring, 0) = 1 AND COALESCE(sr.recurrence_rule, 'weekly') = 'weekly')
         )
         AND ${scopePredicate}
-        ORDER BY sr.scheduled_at ASC
+        ORDER BY
+          "isAttending" DESC,
+          "isFollowedCourt" DESC,
+          COALESCE(sr.is_recurring, 0) ASC,
+          sr.scheduled_at ASC
         LIMIT 1000
       `,
       [
