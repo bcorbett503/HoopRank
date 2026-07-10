@@ -1,0 +1,103 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Newark, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    {
+      "courtId": "e9da85fa-88ad-e49e-abea-c2cfbd665814",
+      "courtName": "Newark Community Center Park",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "The City of Newark confirms a first-come, first-served combined basketball and handball court at this park, but current city calendars, recreation materials, and broader event searches do not publish a basketball run or event with a concrete schedule at this exact park."
+    },
+    {
+      "courtId": "eb143c6f-79c7-9610-a67a-b4766ccb89e0",
+      "courtName": "The Silliman Activity and Family Aquatic Center",
+      "status": "current_basketball_event_found",
+      "reviewReason": "The current four-day Cougars Girls Summer Basketball Camp is documented at the Silliman gym for July 13-16, 2026. The City cancelled its Summer 2026 adult basketball league, and open-play availability changes weekly without a durable published recurring schedule."
+    }
+  ],
+  "nonPublishedFindings": [
+    {
+      "courtId": "e9da85fa-88ad-e49e-abea-c2cfbd665814",
+      "courtName": "Newark Community Center Park",
+      "sourceUrl": "https://www.newarkca.gov/departments/parks/parks-and-sportsfields",
+      "evidenceType": "official",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "run",
+      "scheduleText": "The park has a first-come, first-served combined basketball and handball court, with no public basketball activity schedule.",
+      "reviewReason": "Court availability alone does not establish a scheduled basketball run or event."
+    },
+    {
+      "courtId": "eb143c6f-79c7-9610-a67a-b4766ccb89e0",
+      "courtName": "The Silliman Activity and Family Aquatic Center",
+      "sourceUrl": "https://www.quickscores.com/cityofnewark",
+      "evidenceType": "official_platform",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "league",
+      "scheduleText": "Adult Basketball League - Summer 2026; planned for Wednesday nights.",
+      "reviewReason": "The City of Newark sports platform explicitly states that the Summer 2026 basketball league was not offered because too few teams registered."
+    },
+    {
+      "courtId": "eb143c6f-79c7-9610-a67a-b4766ccb89e0",
+      "courtName": "The Silliman Activity and Family Aquatic Center",
+      "sourceUrl": "https://www.newarkca.gov/residents/faqs",
+      "additionalSource": "https://www.newarkca.gov/departments/recreation-and-community-services/facilities/george-m-silliman-community-activity-center",
+      "evidenceType": "official",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "run",
+      "scheduleText": "The gym supports public basketball, but the City directs visitors to call or consult social media for a weekly court schedule because daily availability varies.",
+      "reviewReason": "No current durable weekday/start-time schedule was publicly documented at review, so open court availability cannot be normalized into a recurring run."
+    }
+  ],
+  "courtSchedules": [],
+  "courtEvents": [
+    {
+      "courtId": "eb143c6f-79c7-9610-a67a-b4766ccb89e0",
+      "courtName": "The Silliman Activity and Family Aquatic Center",
+      "eventType": "camp",
+      "title": "Cougars Girls Summer Basketball Camp",
+      "confidence": "high",
+      "evidenceType": "community",
+      "sourceUrl": "https://tricityvoice.com/cougar-girls-summer-basketball-camp-is-underway/",
+      "sourceTitle": "Cougar Girls Summer Basketball Camp is underway | Tri-City Voice",
+      "organizerName": "Darryl Reina and Newark Memorial Girls Basketball",
+      "registrationUrl": "https://newarkca.activityreg.com/",
+      "costText": "$149 Newark resident / $159 non-resident; camp T-shirt included",
+      "audience": "Girls in grades 1-8",
+      "ageRange": "Grades 1-8",
+      "skillLevel": "All skill and ability levels",
+      "format": "Four-day basketball fundamentals and skills camp",
+      "uncertainty": "The published curriculum includes shooting, ball handling, passing, agility, footwork, defense, spacing, teamwork, and decision-making. No material schedule uncertainty remains after cross-checking the coach-authored announcement, event listing, city registration page, and exact facility.",
+      "additionalSources": [
+        "https://patch.com/california/newark/calendar/event/20260713/258c9452-0816-4f34-a002-6f9a2d88da26/annual-cougars-girls-basketball-camp-july-13-16-2026",
+        "https://www.newarkca.gov/departments/recreation-and-community-services/view-activities-register-online",
+        "https://www.newarkca.gov/departments/recreation-and-community-services/facilities/george-m-silliman-community-activity-center"
+      ],
+      "replaceSourceWindow": {
+        "startsOn": "2026-07-13",
+        "endsOn": "2026-07-16"
+      },
+      "sessions": [
+        {
+          "title": "Cougars Girls Summer Basketball Camp",
+          "startsOn": "2026-07-13",
+          "endsOn": "2026-07-16",
+          "weekdays": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday"
+          ],
+          "localStart": "09:00",
+          "localEnd": "12:00",
+          "scheduleText": "Monday-Thursday, July 13-16, 2026, 9:00 AM-noon at the Silliman Activity Center Gymnasium"
+        }
+      ]
+    }
+  ]
+}
