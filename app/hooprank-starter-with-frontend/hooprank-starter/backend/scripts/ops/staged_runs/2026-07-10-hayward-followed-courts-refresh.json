@@ -1,0 +1,90 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Hayward, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    {
+      "courtId": "1b8c5fec-7056-b673-6360-6367b11ff6d1",
+      "courtName": "Alden E. Oliver Sports Park",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "The current H.A.R.D. guide documents the facility as a sports complex and publishes softball activity there, but no current basketball run or event is tied to this exact park."
+    },
+    {
+      "courtId": "7900e311-01ce-420e-9daf-f09eaea2f3c7",
+      "courtName": "Centennial Park",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "H.A.R.D. documents renovated basketball courts at Centennial Park, but current guides, calendars, and event searches do not publish a concrete basketball activity time there."
+    },
+    {
+      "courtId": "b077b4e2-5e33-b348-f06b-6a22a3c86c6e",
+      "courtName": "Cherryland Community Center",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "The Summer 2026 guide lists classes and events at Cherryland Community Center, but none of its current basketball programming is assigned to this venue."
+    },
+    {
+      "courtId": "2095242e-c83d-4dbe-aff3-c60cf95de0ab",
+      "courtName": "Cherryland Park",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "H.A.R.D. documents a renovated full-size basketball court at Cherryland Park, but no current public run, league, tournament, camp, clinic, practice, or game schedule was found."
+    },
+    {
+      "courtId": "5c1d7fa1-7df3-0e70-d8fb-0b665f1c06f2",
+      "courtName": "House of Hustle",
+      "status": "activity_without_concrete_schedule",
+      "reviewReason": "The official Hayward venue page confirms basketball training and court rentals but says to stay tuned for new 2026 training sessions. No future public basketball date and time is currently published."
+    },
+    {
+      "courtId": "d8114847-2fc6-42d9-9366-bd010820e3c1",
+      "courtName": "Mount Eden Park",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "Current H.A.R.D. materials document the park and its renovated court, but no concrete public basketball activity is scheduled there."
+    },
+    {
+      "courtId": "15e323e5-232f-5682-06d7-0de95fd2f0a8",
+      "courtName": "Sorensdale Recreation Center",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "The Summer 2026 guide publishes Sorensdale's weekday adaptive day program, but its listed curriculum does not establish a basketball activity or basketball time."
+    },
+    {
+      "courtId": "bd1f927f-4991-4200-8b51-9b6589a344ec",
+      "courtName": "Southgate Park",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "Official project material confirms a basketball court at Southgate Park, but current public guides and calendars do not document scheduled basketball activity there."
+    },
+    {
+      "courtId": "03dc6fca-4a84-69f7-d786-4b0eea7e9d0c",
+      "courtName": "Weekes Community Center Park",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "The Summer 2026 guide and facility pages document the Weekes courts and current community programming, but no current basketball-specific date or recurring time is published."
+    }
+  ],
+  "nonPublishedFindings": [
+    {
+      "courtId": "5c1d7fa1-7df3-0e70-d8fb-0b665f1c06f2",
+      "courtName": "House of Hustle",
+      "sourceUrl": "https://www.houseofhustlehayward.com/classestraining",
+      "additionalSource": "https://www.houseofhustlehayward.com/courtrental",
+      "evidenceType": "official",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "clinic",
+      "scheduleText": "The venue offers personal basketball training and rentals, but its current page only says to stay tuned for new 2026 sessions.",
+      "reviewReason": "No date, weekday, or start time is public, so the activity cannot become a run or event."
+    },
+    {
+      "courtId": "15e323e5-232f-5682-06d7-0de95fd2f0a8",
+      "courtName": "Sorensdale Recreation Center",
+      "sourceUrl": "https://haywardrec.org/DocumentCenter/View/11332/HARD_20263Summer_RoundWeb",
+      "evidenceType": "official",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "program",
+      "scheduleText": "Special Needs Day Program, Monday-Friday 9:30 AM-3:30 PM, July 1-September 30, 2026.",
+      "reviewReason": "The source lists a broad adaptive day program but does not identify basketball as part of the published curriculum."
+    }
+  ],
+  "courtSchedules": [],
+  "courtEvents": []
+}
