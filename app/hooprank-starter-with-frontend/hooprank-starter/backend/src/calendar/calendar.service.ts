@@ -2,6 +2,8 @@ import { Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { getRecurrenceUntil } from "../common/weekly-recurrence";
 
+const { DateTime } = require("luxon");
+
 export type CalendarScope = "for_you" | "mine";
 
 export interface CalendarQuery {
@@ -31,6 +33,8 @@ export class CalendarService {
       runRows.map((row) => String(row.runId ?? row.id ?? "")).filter(Boolean),
     );
     const candidates = this.expandRuns(runRows, attendees, query);
+    const courtEventRows = await this.loadCourtEventRows(query);
+    candidates.push(...this.expandCourtEvents(courtEventRows, query));
 
     if (query.scope === "mine") {
       const challengeRows = await this.loadScheduledChallenges(query);
@@ -408,6 +412,311 @@ export class CalendarService {
     };
   }
 
+  private async loadCourtEventRows(query: CalendarQuery): Promise<any[]> {
+    try {
+      if (this.isPostgres) {
+        const scopePredicate =
+          query.scope === "mine"
+            ? `(
+                ce.created_by = $3
+                OR EXISTS (
+                  SELECT 1 FROM user_followed_courts mine_ufc
+                  WHERE mine_ufc.user_id = $3
+                    AND mine_ufc.court_id::text = ce.court_id::text
+                )
+              )`
+            : "TRUE";
+
+        return this.dataSource.query(
+          `
+            SELECT
+              ce.id::text AS "eventId",
+              ce.court_id::text AS "courtId",
+              c.name AS "courtName",
+              c.city AS "courtCity",
+              c.address AS "courtAddress",
+              ST_Y(c.geog::geometry) AS "courtLat",
+              ST_X(c.geog::geometry) AS "courtLng",
+              ce.created_by AS "createdBy",
+              ce.event_type AS "eventType",
+              ce.title,
+              ce.starts_at AS "startsAt",
+              ce.ends_at AS "endsAt",
+              ce.timezone,
+              COALESCE(ce.is_recurring, false) AS "isRecurring",
+              ce.recurrence_rule AS "recurrenceRule",
+              ce.series_starts_on AS "seriesStartsOn",
+              ce.series_ends_on AS "seriesEndsOn",
+              ce.exception_dates AS "exceptionDates",
+              ce.organizer_name AS "organizerName",
+              ce.registration_url AS "registrationUrl",
+              ce.source_url AS "sourceUrl",
+              ce.source_title AS "sourceTitle",
+              ce.cost_text AS "costText",
+              ce.audience,
+              ce.age_range AS "ageRange",
+              ce.skill_level AS "skillLevel",
+              ce.format,
+              ce.evidence_type AS "evidenceType",
+              ce.confidence,
+              ce.status,
+              ce.notes,
+              EXISTS (
+                SELECT 1 FROM user_followed_courts event_ufc
+                WHERE event_ufc.user_id = $3
+                  AND event_ufc.court_id::text = ce.court_id::text
+              ) AS "isFollowedCourt"
+            FROM court_events ce
+            LEFT JOIN courts c ON c.id::text = ce.court_id::text
+            WHERE LOWER(COALESCE(ce.status, 'published')) = 'published'
+              AND (
+                (
+                  COALESCE(ce.is_recurring, false) = false
+                  AND ce.starts_at <= $2
+                  AND COALESCE(ce.ends_at, ce.starts_at) >= $1
+                )
+                OR (
+                  COALESCE(ce.is_recurring, false) = true
+                  AND ce.starts_at <= $2
+                  AND (ce.series_starts_on IS NULL OR ce.series_starts_on <= $2::date)
+                  AND (ce.series_ends_on IS NULL OR ce.series_ends_on >= $1::date)
+                )
+              )
+              AND ${scopePredicate}
+            ORDER BY "isFollowedCourt" DESC, ce.starts_at ASC
+            LIMIT 1000
+          `,
+          [query.start.toISOString(), query.end.toISOString(), query.userId],
+        );
+      }
+
+      const scopePredicate =
+        query.scope === "mine"
+          ? `(
+              ce.created_by = ?
+              OR EXISTS (
+                SELECT 1 FROM user_followed_courts mine_ufc
+                WHERE mine_ufc.user_id = ? AND mine_ufc.court_id = ce.court_id
+              )
+            )`
+          : "1 = 1";
+      const scopeParams =
+        query.scope === "mine" ? [query.userId, query.userId] : [];
+
+      return this.dataSource.query(
+        `
+          SELECT
+            ce.id AS "eventId",
+            ce.court_id AS "courtId",
+            c.name AS "courtName",
+            c.city AS "courtCity",
+            c.address AS "courtAddress",
+            NULL AS "courtLat",
+            NULL AS "courtLng",
+            ce.created_by AS "createdBy",
+            ce.event_type AS "eventType",
+            ce.title,
+            ce.starts_at AS "startsAt",
+            ce.ends_at AS "endsAt",
+            ce.timezone,
+            COALESCE(ce.is_recurring, 0) AS "isRecurring",
+            ce.recurrence_rule AS "recurrenceRule",
+            ce.series_starts_on AS "seriesStartsOn",
+            ce.series_ends_on AS "seriesEndsOn",
+            ce.exception_dates AS "exceptionDates",
+            ce.organizer_name AS "organizerName",
+            ce.registration_url AS "registrationUrl",
+            ce.source_url AS "sourceUrl",
+            ce.source_title AS "sourceTitle",
+            ce.cost_text AS "costText",
+            ce.audience,
+            ce.age_range AS "ageRange",
+            ce.skill_level AS "skillLevel",
+            ce.format,
+            ce.evidence_type AS "evidenceType",
+            ce.confidence,
+            ce.status,
+            ce.notes,
+            EXISTS (
+              SELECT 1 FROM user_followed_courts event_ufc
+              WHERE event_ufc.user_id = ? AND event_ufc.court_id = ce.court_id
+            ) AS "isFollowedCourt"
+          FROM court_events ce
+          LEFT JOIN courts c ON c.id = ce.court_id
+          WHERE LOWER(COALESCE(ce.status, 'published')) = 'published'
+            AND (
+              (
+                COALESCE(ce.is_recurring, 0) = 0
+                AND ce.starts_at <= ?
+                AND COALESCE(ce.ends_at, ce.starts_at) >= ?
+              )
+              OR (
+                COALESCE(ce.is_recurring, 0) = 1
+                AND ce.starts_at <= ?
+                AND (ce.series_starts_on IS NULL OR ce.series_starts_on <= date(?))
+                AND (ce.series_ends_on IS NULL OR ce.series_ends_on >= date(?))
+              )
+            )
+            AND ${scopePredicate}
+          ORDER BY "isFollowedCourt" DESC, ce.starts_at ASC
+          LIMIT 1000
+        `,
+        [
+          query.userId,
+          query.end.toISOString(),
+          query.start.toISOString(),
+          query.end.toISOString(),
+          query.end.toISOString(),
+          query.start.toISOString(),
+          ...scopeParams,
+        ],
+      );
+    } catch (error: any) {
+      if (
+        error?.code === "42P01" ||
+        String(error?.message ?? "").includes("no such table: court_events")
+      ) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  private expandCourtEvents(
+    rows: any[],
+    query: CalendarQuery,
+  ): CalendarCandidate[] {
+    const candidates: CalendarCandidate[] = [];
+
+    for (const row of rows) {
+      const templateStart = new Date(row.startsAt);
+      if (Number.isNaN(templateStart.getTime())) continue;
+
+      const starts = this.asBoolean(row.isRecurring)
+        ? this.weeklyOccurrences(
+            templateStart,
+            this.courtEventRecurrenceRule(row),
+            query,
+          )
+        : [templateStart];
+
+      for (const scheduledAt of starts) {
+        if (!this.isWithinWindow(scheduledAt, query)) continue;
+        if (this.isCourtEventException(row, scheduledAt)) continue;
+        candidates.push(this.mapCourtEvent(row, scheduledAt, query));
+      }
+    }
+
+    return candidates;
+  }
+
+  private mapCourtEvent(
+    row: any,
+    scheduledAt: Date,
+    query: CalendarQuery,
+  ): CalendarCandidate {
+    const eventId = String(row.eventId ?? row.id ?? "");
+    const occurrenceKey = scheduledAt.toISOString();
+    const templateStart = new Date(row.startsAt);
+    const templateEnd = row.endsAt == null ? null : new Date(row.endsAt);
+    const durationMs =
+      templateEnd && !Number.isNaN(templateEnd.getTime())
+        ? Math.max(0, templateEnd.getTime() - templateStart.getTime())
+        : 0;
+    const endsAt = new Date(scheduledAt.getTime() + durationMs).toISOString();
+    const courtLat = this.asOptionalNumber(row.courtLat);
+    const courtLng = this.asOptionalNumber(row.courtLng);
+    const isOwned = String(row.createdBy ?? "") === query.userId;
+
+    return {
+      followedCourt: this.asBoolean(row.isFollowedCourt),
+      event: {
+        id: `court_event:${eventId}:${occurrenceKey}`,
+        type: "court_event",
+        scheduledAt: occurrenceKey,
+        title: String(row.title ?? "Basketball Event"),
+        distanceMiles: this.distanceMiles(
+          query.lat,
+          query.lng,
+          courtLat,
+          courtLng,
+        ),
+        isConfirmedByMe: isOwned,
+        isOwnedByMe: isOwned,
+        court: {
+          id: row.courtId == null ? null : String(row.courtId),
+          name: row.courtName ?? null,
+          city: row.courtCity ?? null,
+          address: row.courtAddress ?? row.courtCity ?? null,
+          lat: courtLat,
+          lng: courtLng,
+        },
+        courtEvent: {
+          eventId,
+          eventType: row.eventType ?? "event",
+          startsAt: occurrenceKey,
+          endsAt,
+          timezone: row.timezone ?? null,
+          isRecurring: this.asBoolean(row.isRecurring),
+          recurrenceRule: row.recurrenceRule ?? null,
+          seriesStartsOn: this.asDateOnly(row.seriesStartsOn),
+          seriesEndsOn: this.asDateOnly(row.seriesEndsOn),
+          organizerName: row.organizerName ?? null,
+          registrationUrl: row.registrationUrl ?? null,
+          sourceUrl: row.sourceUrl ?? null,
+          sourceTitle: row.sourceTitle ?? null,
+          costText: row.costText ?? null,
+          audience: row.audience ?? null,
+          ageRange: row.ageRange ?? null,
+          skillLevel: row.skillLevel ?? null,
+          format: row.format ?? null,
+          evidenceType: row.evidenceType ?? null,
+          confidence: row.confidence ?? null,
+          status: row.status ?? null,
+          notes: row.notes ?? null,
+          occurrenceKey,
+        },
+      },
+    };
+  }
+
+  private courtEventRecurrenceRule(row: any): string {
+    const existing = String(row.recurrenceRule ?? "weekly");
+    if (getRecurrenceUntil(existing) || row.seriesEndsOn == null) {
+      return existing;
+    }
+
+    const dateOnly = this.asDateOnly(row.seriesEndsOn);
+    if (!dateOnly) return existing;
+    const timezone = String(row.timezone ?? "UTC");
+    const localEnd = DateTime.fromISO(dateOnly, { zone: timezone }).endOf("day");
+    if (!localEnd.isValid) return existing;
+    return `weekly;until=${localEnd.toUTC().toISO()}`;
+  }
+
+  private isCourtEventException(row: any, scheduledAt: Date): boolean {
+    const raw = row.exceptionDates;
+    if (raw == null || raw === "") return false;
+
+    let values: unknown[];
+    if (Array.isArray(raw)) {
+      values = raw;
+    } else {
+      try {
+        const parsed = JSON.parse(String(raw));
+        values = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        values = String(raw).split(",");
+      }
+    }
+
+    const timezone = String(row.timezone ?? "UTC");
+    const occurrenceDate = DateTime.fromJSDate(scheduledAt, {
+      zone: timezone,
+    }).toISODate();
+    return values.some((value) => this.asDateOnly(value) === occurrenceDate);
+  }
+
   private async loadScheduledChallenges(query: CalendarQuery): Promise<any[]> {
     if (this.isPostgres) {
       return this.dataSource.query(
@@ -584,6 +893,17 @@ export class CalendarService {
     if (value == null || value === "") return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private asDateOnly(value: any): string | null {
+    if (value == null || value === "") return null;
+    const text = String(value);
+    const match = text.match(/^\d{4}-\d{2}-\d{2}/);
+    if (match) return match[0];
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? null
+      : parsed.toISOString().slice(0, 10);
   }
 
   private distanceMiles(

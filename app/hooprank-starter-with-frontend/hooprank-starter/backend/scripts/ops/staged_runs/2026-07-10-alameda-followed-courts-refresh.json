@@ -1,0 +1,107 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Alameda, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    { "courtId": "f331b63d-93e1-25a4-c5c3-484cdba84dd8", "courtName": "Alameda Point Gymnasium", "status": "accepted_activity", "reviewReason": "Current official sources confirm Sunday adult pickup and Summer 2026 youth basketball camps." },
+    { "courtId": "e9bb74cf-4b95-44cc-a80b-4285033481d3", "courtName": "Franklin Park", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball activity with a concrete date or recurring time was found." },
+    { "courtId": "d24e5845-4f4b-4a30-b460-b08dfdcc1f42", "courtName": "Krusi Park", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball activity with a concrete date or recurring time was found." },
+    { "courtId": "71bc7c03-c250-4579-8eae-53c93b88b305", "courtName": "Leydecker Park", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball activity with a concrete date or recurring time was found." },
+    { "courtId": "896a0d46-2a1b-08da-f47d-485acd8472ec", "courtName": "Lincoln Park Basketball Court", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball activity with a concrete date or recurring time was found." },
+    { "courtId": "d94a8371-c897-440f-8f33-99706d33d2ef", "courtName": "Longfellow Park", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball activity with a concrete date or recurring time was found." },
+    { "courtId": "22b78e1e-8520-453c-b730-d76fb059541e", "courtName": "McKinley Park", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball activity with a concrete date or recurring time was found." },
+    { "courtId": "aebf2861-6f2b-548f-672a-74a29c34b7b1", "courtName": "The Hub Sports Club - Alameda", "status": "needs_clear_court_match", "reviewReason": "A current camp source names Sofive/Bladium at the same street address, but does not prove that activity occurs on the database court represented as The Hub." },
+    { "courtId": "0a3a9ee4-287b-4ce4-821f-006190ce35e0", "courtName": "Washington Park", "status": "no_concrete_public_schedule", "reviewReason": "Community evidence supports informal pickup popularity but not a concrete organized schedule." }
+  ],
+  "courtSchedules": [
+    {
+      "courtId": "f331b63d-93e1-25a4-c5c3-484cdba84dd8",
+      "courtName": "Alameda Point Gymnasium",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.alamedaca.gov/Departments/Recreation-Parks/Open-Gym-Basketball",
+      "sourceTitle": "Open Gym - Basketball | City of Alameda",
+      "additionalSources": [
+        "https://www.outgoing.world/activity/c163740c-1af6-4961-bc04-43969fa2eae5"
+      ],
+      "access": "$10 per night after June 7, 2026; online enrollment required; no youth permitted",
+      "maxPlayers": 14,
+      "seriesStartsOn": "2026-06-07",
+      "seriesEndsOn": "2027-02-28",
+      "seasonEndBasis": "The official city page says every Sunday; a current public activity listing enumerates Sunday occurrences through February 28, 2027",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Sunday", "localStart": "18:00", "durationMinutes": 240, "title": "Adult Open Gym Basketball - Alameda Point Gym", "scheduleText": "Every Sunday 6:00-10:00 PM adult pickup basketball", "ageRange": "18+", "audience": "Adults age 18 and older" }
+      ]
+    }
+  ],
+  "courtEvents": [
+    {
+      "courtId": "f331b63d-93e1-25a4-c5c3-484cdba84dd8",
+      "courtName": "Alameda Point Gymnasium",
+      "eventType": "camp",
+      "title": "Intro to Basketball Camp - Alameda Point Gym",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.alamedaca.gov/files/assets/public/v/1/departments/alameda/rec-and-park/arpd-pdfs/summer-jun-aug/2026-summer-activity-guide.pdf",
+      "sourceTitle": "City of Alameda Summer 2026 Activity Guide",
+      "organizerName": "Alameda Recreation and Park Department",
+      "registrationUrl": "https://www.alamedaca.gov/files/assets/public/v/1/departments/alameda/rec-and-park/arpd-pdfs/summer-jun-aug/2026-summer-activity-guide.pdf",
+      "costText": "$175 resident / $200 non-resident",
+      "audience": "Youth",
+      "ageRange": "5-12",
+      "skillLevel": "Beginner",
+      "format": "Introductory skills and competitive challenges",
+      "replaceSourceWindow": { "startsOn": "2026-07-10", "endsOn": "2026-08-07" },
+      "sessions": [
+        {
+          "title": "Intro to Basketball Camp 04 - Alameda Point Gym",
+          "startsOn": "2026-07-10",
+          "endsOn": "2026-07-10",
+          "weekdays": ["Friday"],
+          "localStart": "09:00",
+          "localEnd": "12:00",
+          "scheduleText": "Session 04 runs July 6-10, 2026, Monday-Friday, 9:00 AM-12:00 PM"
+        },
+        {
+          "title": "Intro to Basketball Camp 05 - Alameda Point Gym",
+          "startsOn": "2026-07-13",
+          "endsOn": "2026-07-17",
+          "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          "localStart": "09:00",
+          "localEnd": "12:00",
+          "scheduleText": "Session 05 runs July 13-17, 2026, Monday-Friday, 9:00 AM-12:00 PM"
+        },
+        {
+          "title": "Intro to Basketball Camp 06 - Alameda Point Gym",
+          "startsOn": "2026-07-20",
+          "endsOn": "2026-07-24",
+          "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          "localStart": "09:00",
+          "localEnd": "12:00",
+          "scheduleText": "Session 06 runs July 20-24, 2026, Monday-Friday, 9:00 AM-12:00 PM"
+        },
+        {
+          "title": "Intro to Basketball Camp 07 - Alameda Point Gym",
+          "startsOn": "2026-07-27",
+          "endsOn": "2026-07-31",
+          "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          "localStart": "09:00",
+          "localEnd": "12:00",
+          "scheduleText": "Session 07 runs July 27-31, 2026, Monday-Friday, 9:00 AM-12:00 PM"
+        },
+        {
+          "title": "Intro to Basketball Camp 08 - Alameda Point Gym",
+          "startsOn": "2026-08-03",
+          "endsOn": "2026-08-07",
+          "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          "localStart": "09:00",
+          "localEnd": "12:00",
+          "scheduleText": "Session 08 runs August 3-7, 2026, Monday-Friday, 9:00 AM-12:00 PM"
+        }
+      ]
+    }
+  ]
+}

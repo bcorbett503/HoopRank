@@ -32,6 +32,9 @@ const stats = {
     futureInstancesUpdated: 0,
     futureInstancesDeleted: 0,
     followsInserted: 0,
+    courtEventsDesired: 0,
+    courtEventsInserted: 0,
+    courtEventsUpdated: 0,
 };
 
 const WEEKDAYS = {
@@ -102,6 +105,9 @@ function buildNotes(schedule, slot, sourceUrl, reviewedAt, seriesEndsOn) {
     if (schedule.seasonEndBasis) {
         parts.push(`Season bound through ${seriesEndsOn}: ${schedule.seasonEndBasis}.`);
     }
+    for (const additionalSource of schedule.additionalSources || []) {
+        parts.push(`Additional source: ${additionalSource}.`);
+    }
     if (slot.uncertainty) parts.push(`Uncertainty: ${slot.uncertainty}.`);
     return parts.join(' ');
 }
@@ -171,6 +177,10 @@ async function validateRoster(client) {
     assert(artifact.city && artifact.timezone && artifact.adminUserId, 'Artifact scope is incomplete');
     assert(Array.isArray(artifact.reviewedCourts), 'reviewedCourts must be an array');
     assert(Array.isArray(artifact.courtSchedules), 'courtSchedules must be an array');
+    assert(
+        artifact.courtEvents == null || Array.isArray(artifact.courtEvents),
+        'courtEvents must be an array when provided',
+    );
 
     const followed = await client.query(
         `SELECT c.id::text AS id, c.name
@@ -328,6 +338,194 @@ async function processCourtSchedule(client, schedule, reviewedAt) {
     stats.followsInserted += followInsert.rowCount;
 }
 
+function normalizeTitle(value) {
+    return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function expandCourtEventDefinition(definition) {
+    const desired = [];
+    for (const session of definition.sessions || []) {
+        let date = DateTime.fromISO(session.startsOn, { zone: artifact.timezone }).startOf('day');
+        const lastDate = DateTime.fromISO(session.endsOn || session.startsOn, {
+            zone: artifact.timezone,
+        }).endOf('day');
+        assert(date.isValid && lastDate.isValid, `Invalid event session window for ${definition.title}`);
+        const weekdays = new Set(session.weekdays || Object.keys(WEEKDAYS));
+
+        while (date <= lastDate) {
+            const weekday = date.toFormat('cccc');
+            if (weekdays.has(weekday)) {
+                const [startHour, startMinute] = session.localStart.split(':').map(Number);
+                const [endHour, endMinute] = session.localEnd.split(':').map(Number);
+                const startsAt = date.set({ hour: startHour, minute: startMinute });
+                let endsAt = date.set({ hour: endHour, minute: endMinute });
+                if (endsAt <= startsAt) endsAt = endsAt.plus({ days: 1 });
+                desired.push({
+                    title: session.title || definition.title,
+                    startsAt: startsAt.toUTC().toISO(),
+                    endsAt: endsAt.toUTC().toISO(),
+                    scheduleText:
+                        session.scheduleText ||
+                        `${weekday}, ${date.toISODate()}, ${session.localStart}-${session.localEnd}`,
+                });
+            }
+            date = date.plus({ days: 1 });
+        }
+    }
+    return desired;
+}
+
+function buildCourtEventNotes(definition, desired, reviewedAt) {
+    const parts = [
+        'High confidence.',
+        `Evidence type: ${definition.evidenceType}.`,
+        `Activity type: ${definition.eventType}.`,
+        `Verified ${reviewedAt.toFormat('MMMM d, yyyy')}.`,
+        `Source URL: ${definition.sourceUrl}.`,
+        `Source title: ${definition.sourceTitle}.`,
+        `Schedule text: ${desired.scheduleText}.`,
+    ];
+    if (definition.organizerName) parts.push(`Organizer: ${definition.organizerName}.`);
+    if (definition.costText) parts.push(`Cost: ${definition.costText}.`);
+    if (definition.audience) parts.push(`Audience: ${definition.audience}.`);
+    if (definition.uncertainty) parts.push(`Uncertainty: ${definition.uncertainty}.`);
+    return parts.join(' ');
+}
+
+async function processCourtEvents(client, definition, reviewedAt) {
+    const reviewedCourt = artifact.reviewedCourts.find(
+        (court) => court.courtId === definition.courtId,
+    );
+    assert(reviewedCourt, `Event court ${definition.courtId} is not in reviewedCourts`);
+    assert(definition.confidence === 'high', `Only high-confidence events can apply: ${definition.title}`);
+    assert(
+        definition.eventType && definition.sourceUrl && definition.sourceTitle,
+        `Missing event source evidence: ${definition.title}`,
+    );
+
+    const existingResult = await client.query(
+        `SELECT * FROM court_events
+         WHERE court_id::text = $1 AND created_by = $2
+         ORDER BY starts_at, id`,
+        [definition.courtId, artifact.adminUserId],
+    );
+    const existing = existingResult.rows;
+    const desiredEvents = expandCourtEventDefinition(definition);
+    const accountedIds = new Set();
+    const desiredKeys = new Set();
+
+    for (const desired of desiredEvents) {
+        const key = [
+            definition.courtId,
+            definition.eventType,
+            normalizeTitle(desired.title),
+            new Date(desired.startsAt).toISOString(),
+            definition.sourceUrl,
+        ].join('|');
+        assert(!desiredKeys.has(key), `Duplicate desired court event ${key}`);
+        desiredKeys.add(key);
+
+        const matches = existing.filter(
+            (row) =>
+                String(row.event_type) === definition.eventType &&
+                normalizeTitle(row.title) === normalizeTitle(desired.title) &&
+                new Date(row.starts_at).toISOString() === new Date(desired.startsAt).toISOString() &&
+                String(row.source_url) === definition.sourceUrl,
+        );
+        assert(matches.length <= 1, `Multiple court events match ${key}`);
+        const notes = buildCourtEventNotes(definition, desired, reviewedAt);
+        const values = [
+            definition.eventType,
+            desired.title,
+            desired.startsAt,
+            desired.endsAt,
+            artifact.timezone,
+            definition.organizerName || null,
+            definition.registrationUrl || null,
+            definition.sourceUrl,
+            definition.sourceTitle,
+            definition.costText || null,
+            definition.audience || null,
+            definition.ageRange || null,
+            definition.skillLevel || null,
+            definition.format || null,
+            definition.evidenceType,
+            definition.confidence,
+            notes,
+        ];
+
+        if (matches.length === 1) {
+            const target = matches[0];
+            await client.query(
+                `UPDATE court_events
+                 SET event_type = $1, title = $2, starts_at = $3, ends_at = $4,
+                     timezone = $5, is_recurring = false, recurrence_rule = NULL,
+                     series_starts_on = NULL, series_ends_on = NULL, exception_dates = NULL,
+                     organizer_name = $6, registration_url = $7, source_url = $8,
+                     source_title = $9, cost_text = $10, audience = $11,
+                     age_range = $12, skill_level = $13, format = $14,
+                     evidence_type = $15, confidence = $16, status = 'published',
+                     notes = $17, updated_at = NOW()
+                 WHERE id = $18 AND created_by = $19`,
+                [...values, target.id, artifact.adminUserId],
+            );
+            accountedIds.add(String(target.id));
+            stats.courtEventsUpdated += 1;
+        } else {
+            const inserted = await client.query(
+                `INSERT INTO court_events (
+                    court_id, created_by, event_type, title, starts_at, ends_at,
+                    timezone, is_recurring, organizer_name, registration_url,
+                    source_url, source_title, cost_text, audience, age_range,
+                    skill_level, format, evidence_type, confidence, status, notes,
+                    created_at, updated_at
+                 ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11,
+                    $12, $13, $14, $15, $16, $17, $18, 'published', $19, NOW(), NOW()
+                 ) RETURNING id`,
+                [definition.courtId, artifact.adminUserId, ...values],
+            );
+            accountedIds.add(String(inserted.rows[0].id));
+            stats.courtEventsInserted += 1;
+        }
+        stats.courtEventsDesired += 1;
+    }
+
+    if (definition.replaceSourceWindow) {
+        const windowStart = DateTime.fromISO(definition.replaceSourceWindow.startsOn, {
+            zone: artifact.timezone,
+        }).startOf('day');
+        const windowEnd = DateTime.fromISO(definition.replaceSourceWindow.endsOn, {
+            zone: artifact.timezone,
+        }).endOf('day');
+        const unaccounted = existing.filter((row) => {
+            const startsAt = DateTime.fromJSDate(new Date(row.starts_at), {
+                zone: artifact.timezone,
+            });
+            return (
+                String(row.source_url) === definition.sourceUrl &&
+                String(row.status || 'published').toLowerCase() === 'published' &&
+                startsAt >= windowStart &&
+                startsAt <= windowEnd &&
+                !accountedIds.has(String(row.id))
+            );
+        });
+        assert(
+            unaccounted.length === 0,
+            `Unaccounted published court events for ${definition.title}: ${unaccounted.map((row) => row.id).join(', ')}`,
+        );
+    }
+
+    const followInsert = await client.query(
+        `INSERT INTO user_followed_courts (user_id, court_id)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING
+         RETURNING court_id`,
+        [artifact.adminUserId, definition.courtId],
+    );
+    stats.followsInserted += followInsert.rowCount;
+}
+
 async function verifyAppliedState(client, reviewedAt) {
     for (const schedule of artifact.courtSchedules) {
         const rows = await client.query(
@@ -347,6 +545,28 @@ async function verifyAppliedState(client, reviewedAt) {
             assert(String(row.notes || '').includes(schedule.sourceUrl), `Missing source URL on ${row.id}`);
         }
     }
+
+    for (const definition of artifact.courtEvents || []) {
+        for (const desired of expandCourtEventDefinition(definition)) {
+            const result = await client.query(
+                `SELECT * FROM court_events
+                 WHERE court_id::text = $1 AND created_by = $2
+                   AND event_type = $3 AND LOWER(BTRIM(title)) = LOWER(BTRIM($4))
+                   AND starts_at = $5 AND source_url = $6 AND status = 'published'`,
+                [
+                    definition.courtId,
+                    artifact.adminUserId,
+                    definition.eventType,
+                    desired.title,
+                    desired.startsAt,
+                    definition.sourceUrl,
+                ],
+            );
+            assert(result.rows.length === 1, `Court event verification failed: ${desired.title} ${desired.startsAt}`);
+            assert(result.rows[0].confidence === 'high', `Court event confidence mismatch: ${result.rows[0].id}`);
+            assert(String(result.rows[0].notes || '').includes(definition.sourceUrl), `Missing event source URL: ${result.rows[0].id}`);
+        }
+    }
 }
 
 (async () => {
@@ -360,6 +580,9 @@ async function verifyAppliedState(client, reviewedAt) {
         await validateRoster(client);
         for (const schedule of artifact.courtSchedules) {
             await processCourtSchedule(client, schedule, reviewedAt);
+        }
+        for (const definition of artifact.courtEvents || []) {
+            await processCourtEvents(client, definition, reviewedAt);
         }
         await verifyAppliedState(client, reviewedAt);
 

@@ -51,6 +51,7 @@ describe("CalendarService", () => {
           photoUrl: "https://example.com/alex.jpg",
         },
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           id: "challenge-1",
@@ -125,6 +126,7 @@ describe("CalendarService", () => {
           isFollowedCourt: false,
         },
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const events = await service.getEvents({
@@ -160,6 +162,7 @@ describe("CalendarService", () => {
           isFollowedCourt: true,
         },
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const events = await service.getEvents({
@@ -189,6 +192,7 @@ describe("CalendarService", () => {
           recurrenceRule: "FREQ=WEEKLY;UNTIL=20260701T235959Z",
         },
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const events = await service.getEvents({
@@ -202,7 +206,7 @@ describe("CalendarService", () => {
   });
 
   it("loads public and viewer-associated runs for For You", async () => {
-    dataSource.query.mockResolvedValueOnce([]);
+    dataSource.query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     await service.getEvents({
       userId: "viewer-1",
@@ -232,7 +236,7 @@ describe("CalendarService", () => {
 
   it("prioritizes relevant and concrete rows before the SQLite query limit", async () => {
     delete process.env.DATABASE_URL;
-    dataSource.query.mockResolvedValueOnce([]);
+    dataSource.query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     await service.getEvents({
       userId: "viewer-1",
@@ -248,5 +252,91 @@ describe("CalendarService", () => {
     expect(sql.indexOf('"isAttending" DESC')).toBeLessThan(
       sql.indexOf("LIMIT 1000"),
     );
+  });
+
+  it("maps published one-off court events into the calendar contract", async () => {
+    dataSource.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          eventId: "event-1",
+          courtId: "court-1",
+          courtName: "Alameda Point Gymnasium",
+          courtCity: "Alameda, CA",
+          createdBy: "admin",
+          eventType: "camp",
+          title: "Intro to Basketball Camp",
+          startsAt: "2026-07-13T16:00:00.000Z",
+          endsAt: "2026-07-13T19:00:00.000Z",
+          timezone: "America/Los_Angeles",
+          isRecurring: false,
+          organizerName: "City of Alameda",
+          sourceUrl: "https://example.com/camp",
+          ageRange: "5-12",
+          confidence: "high",
+          status: "published",
+          isFollowedCourt: true,
+        },
+      ]);
+
+    const events = await service.getEvents({
+      userId: "viewer",
+      scope: "for_you",
+      start: new Date("2026-07-13T00:00:00.000Z"),
+      end: new Date("2026-07-14T00:00:00.000Z"),
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "court_event",
+      scheduledAt: "2026-07-13T16:00:00.000Z",
+      court: { id: "court-1", name: "Alameda Point Gymnasium" },
+      courtEvent: {
+        eventId: "event-1",
+        eventType: "camp",
+        endsAt: "2026-07-13T19:00:00.000Z",
+        ageRange: "5-12",
+        sourceUrl: "https://example.com/camp",
+      },
+    });
+    expect(dataSource.query.mock.calls[1][0]).toContain("FROM court_events ce");
+  });
+
+  it("expands recurring court events within their season and skips exceptions", async () => {
+    dataSource.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          eventId: "event-1",
+          courtId: "court-1",
+          courtName: "Seasonal Gym",
+          createdBy: "admin",
+          eventType: "clinic",
+          title: "Monday Clinic",
+          startsAt: "2026-07-06T16:00:00.000Z",
+          endsAt: "2026-07-06T19:00:00.000Z",
+          timezone: "America/Los_Angeles",
+          isRecurring: true,
+          recurrenceRule: "weekly",
+          seriesStartsOn: "2026-07-06",
+          seriesEndsOn: "2026-07-27",
+          exceptionDates: '["2026-07-20"]',
+          status: "published",
+        },
+      ]);
+
+    const events = await service.getEvents({
+      userId: "viewer",
+      scope: "for_you",
+      start: new Date("2026-07-01T00:00:00.000Z"),
+      end: new Date("2026-08-03T23:59:59.000Z"),
+    });
+
+    expect(events.map((event) => event.scheduledAt)).toEqual([
+      "2026-07-06T16:00:00.000Z",
+      "2026-07-13T16:00:00.000Z",
+      "2026-07-27T16:00:00.000Z",
+    ]);
+    expect(events.every((event) => event.courtEvent.endsAt.endsWith("19:00:00.000Z"))).toBe(true);
   });
 });
