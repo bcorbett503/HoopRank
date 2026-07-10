@@ -142,4 +142,30 @@ describe("CalendarService", () => {
     expect(events[0].run.runId).toBe("concrete-1");
     expect(events[1].run.runId).toBe("template-1");
   });
+
+  it("loads public and viewer-associated runs for For You", async () => {
+    dataSource.query.mockResolvedValueOnce([]);
+
+    await service.getEvents({
+      userId: "viewer-1",
+      scope: "for_you",
+      start: new Date("2026-07-08T00:00:00.000Z"),
+      end: new Date("2026-07-22T00:00:00.000Z"),
+    });
+
+    expect(dataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "LOWER(BTRIM(COALESCE(sr.visibility, 'public'))) = 'public'",
+      ),
+      [
+        "2026-07-08T00:00:00.000Z",
+        "2026-07-22T00:00:00.000Z",
+        "viewer-1",
+      ],
+    );
+    const sql = dataSource.query.mock.calls[0][0];
+    expect(sql).toContain("OR sr.created_by = $3");
+    expect(sql).toContain("viewer_ra.user_id = $3");
+    expect(sql).toContain("sr.invited_player_ids");
+  });
 });

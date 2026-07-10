@@ -94,7 +94,16 @@ export class CalendarService {
               OR COALESCE(sr.tagged_player_ids, '') LIKE ('%' || $3 || '%')
               OR COALESCE(sr.invited_player_ids, '') LIKE ('%' || $3 || '%')
             )`
-          : `COALESCE(sr.visibility, 'public') = 'public'`;
+          : `(
+              LOWER(BTRIM(COALESCE(sr.visibility, 'public'))) = 'public'
+              OR sr.created_by = $3
+              OR EXISTS (
+                SELECT 1 FROM run_attendees viewer_ra
+                WHERE viewer_ra.run_id = sr.id AND viewer_ra.user_id = $3
+              )
+              OR COALESCE(sr.tagged_player_ids, '') LIKE ('%' || $3 || '%')
+              OR COALESCE(sr.invited_player_ids, '') LIKE ('%' || $3 || '%')
+            )`;
 
       return this.dataSource.query(
         `
@@ -158,11 +167,22 @@ export class CalendarService {
             OR COALESCE(sr.tagged_player_ids, '') LIKE ('%' || ? || '%')
             OR COALESCE(sr.invited_player_ids, '') LIKE ('%' || ? || '%')
           )`
-        : `COALESCE(sr.visibility, 'public') = 'public'`;
-    const scopeParams =
-      query.scope === "mine"
-        ? [query.userId, query.userId, query.userId, query.userId]
-        : [];
+        : `(
+            LOWER(TRIM(COALESCE(sr.visibility, 'public'))) = 'public'
+            OR sr.created_by = ?
+            OR EXISTS (
+              SELECT 1 FROM run_attendees viewer_ra
+              WHERE viewer_ra.run_id = sr.id AND viewer_ra.user_id = ?
+            )
+            OR COALESCE(sr.tagged_player_ids, '') LIKE ('%' || ? || '%')
+            OR COALESCE(sr.invited_player_ids, '') LIKE ('%' || ? || '%')
+          )`;
+    const scopeParams = [
+      query.userId,
+      query.userId,
+      query.userId,
+      query.userId,
+    ];
 
     return this.dataSource.query(
       `
