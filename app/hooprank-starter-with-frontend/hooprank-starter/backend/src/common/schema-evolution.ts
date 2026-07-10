@@ -67,6 +67,17 @@ export async function runSchemaEvolution(
     await dataSource.query(
       `ALTER TABLE matches ADD COLUMN IF NOT EXISTS status_id INTEGER`,
     );
+
+    // Scheduled challenges power the cross-platform calendar. Older clients
+    // already sent this value, but the server previously discarded it.
+    await safeQuery(
+      "challenges scheduled_at",
+      `ALTER TABLE challenges ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ`,
+    );
+    await safeQuery(
+      "challenges scheduled_at index",
+      `CREATE INDEX IF NOT EXISTS idx_challenges_scheduled_at ON challenges(scheduled_at)`,
+    );
     // Pre-match rating snapshots so a contest can restore EXACT prior ratings.
     // (Elo-style updates are not reversible by re-running the formula.)
     await dataSource.query(

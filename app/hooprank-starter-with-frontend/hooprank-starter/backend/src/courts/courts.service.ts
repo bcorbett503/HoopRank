@@ -169,10 +169,16 @@ export class CourtsService implements OnModuleInit {
   // Run: npx ts-node scripts/seed-courts.ts
   // For production: DATABASE_URL="..." npx ts-node scripts/seed-courts.ts
 
-  async findAll(): Promise<Court[]> {
+  async findAll(limit?: number): Promise<Court[]> {
+    const safeLimit = typeof limit === "number" && Number.isFinite(limit)
+      ? Math.max(1, Math.min(Math.trunc(limit), 5000))
+      : undefined;
+
     // Use raw query to extract lat/lng from PostGIS geog column for production
     if (this.dialect.isPostgres) {
-      const courts = await this.dataSource.query(`
+      const limitClause = safeLimit ? "LIMIT $1" : "";
+      const courts = await this.dataSource.query(
+        `
                 SELECT 
                     id, name, city, indoor, rims, source, signature, access, venue_type, address,
                     image_url as "imageUrl",
@@ -184,13 +190,17 @@ export class CourtsService implements OnModuleInit {
                     ST_X(geog::geometry) as lng
                 FROM courts
                 ORDER BY name ASC
-            `);
+                ${limitClause}
+            `,
+        safeLimit ? [safeLimit] : [],
+      );
       return courts.map((court: any) => this.withResolvedImageUrl(court));
     }
 
     // SQLite fallback for local development
     const courts = await this.courtsRepository.find({
       order: { name: "ASC" },
+      take: safeLimit,
     });
     return courts.map((court: any) => this.withResolvedImageUrl(court));
   }

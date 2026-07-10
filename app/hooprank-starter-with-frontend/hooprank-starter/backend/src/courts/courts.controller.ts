@@ -69,6 +69,7 @@ export class CourtsController {
     @Query("maxLat") maxLat?: string,
     @Query("minLng") minLng?: string,
     @Query("maxLng") maxLng?: string,
+    @Query("limit") limit?: string,
   ): Promise<Court[]> {
     // Public read-only endpoint: map bootstrapping needs courts before auth completes.
     // If bbox parameters provided, use geographic search
@@ -80,8 +81,11 @@ export class CourtsController {
         parseFloat(maxLng),
       );
     }
-    // Otherwise return all courts
-    return this.courtsService.findAll();
+    const parsedLimit = limit ? Number.parseInt(limit, 10) : undefined;
+    // Otherwise return courts while honoring the client's requested safety cap.
+    return this.courtsService.findAll(
+      Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    );
   }
 
   @Post("admin/create")

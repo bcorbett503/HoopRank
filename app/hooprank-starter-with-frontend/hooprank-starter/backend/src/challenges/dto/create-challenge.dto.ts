@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsISO8601, IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 /**
  * DTO for POST /challenges — create a 1v1 challenge.
@@ -15,4 +15,8 @@ export class CreateChallengeDto {
     @IsOptional()
     @IsString()
     courtId?: string;
+
+    @IsOptional()
+    @IsISO8601()
+    scheduledAt?: string;
 }

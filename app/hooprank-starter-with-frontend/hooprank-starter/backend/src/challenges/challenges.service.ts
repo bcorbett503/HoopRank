@@ -17,7 +17,13 @@ export class ChallengesService {
     /**
      * Create a new challenge between two players
      */
-    async create(fromUserId: string, toUserId: string, message?: string, courtId?: string): Promise<Challenge> {
+    async create(
+        fromUserId: string,
+        toUserId: string,
+        message?: string,
+        courtId?: string,
+        scheduledAt?: string,
+    ): Promise<Challenge> {
         const isPostgres = !!process.env.DATABASE_URL;
 
         if (isPostgres) {
@@ -47,9 +53,16 @@ export class ChallengesService {
 
             const id = uuidv4();
             await this.dataSource.query(`
-                INSERT INTO challenges (id, from_user_id, to_user_id, court_id, message, status, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())
-            `, [id, fromUserId, toUserId, courtId || null, message || 'Want to play?']);
+                INSERT INTO challenges (id, from_user_id, to_user_id, court_id, message, status, scheduled_at, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), NOW())
+            `, [
+                id,
+                fromUserId,
+                toUserId,
+                courtId || null,
+                message || 'Want to play?',
+                scheduledAt ? new Date(scheduledAt) : null,
+            ]);
 
             const result = await this.dataSource.query(`SELECT * FROM challenges WHERE id = $1`, [id]);
 
@@ -68,6 +81,7 @@ export class ChallengesService {
             courtId,
             message: message || 'Want to play?',
             status: 'pending',
+            scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         });
         const saved = await this.challengesRepository.save(challenge);
 

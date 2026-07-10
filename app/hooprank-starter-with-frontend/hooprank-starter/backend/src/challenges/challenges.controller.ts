@@ -21,7 +21,13 @@ export class ChallengesController {
             throw new HttpException('Unauthorized: x-user-id header required', HttpStatus.UNAUTHORIZED);
         }
 
-        return this.challengesService.create(userId, body.toUserId, body.message, body.courtId);
+        return this.challengesService.create(
+            userId,
+            body.toUserId,
+            body.message,
+            body.courtId,
+            body.scheduledAt,
+        );
     }
 
     /**

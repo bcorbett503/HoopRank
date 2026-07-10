@@ -818,8 +818,13 @@ export class UsersService {
     // Query courts
     let courts: any[] = [];
     try {
+      const isPostgres = !!process.env.DATABASE_URL;
       courts = await this.dataSource.query(
-        `SELECT court_id as "courtId" FROM user_followed_courts WHERE user_id = $1`,
+        isPostgres
+          ? `SELECT court_id as "courtId", alerts_enabled as "alertsEnabled"
+             FROM user_followed_courts WHERE user_id = $1 ORDER BY created_at ASC`
+          : `SELECT court_id as "courtId", alerts_enabled as "alertsEnabled"
+             FROM user_followed_courts WHERE user_id = ? ORDER BY created_at ASC`,
         [userId],
       );
     } catch (courtError) {

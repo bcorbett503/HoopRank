@@ -42,6 +42,7 @@ describe('MatchesController', () => {
         'opponent-1',
         undefined,
         false,
+        false,
       );
       expect(result).toMatchObject({
         id: 'match-1',
@@ -69,11 +70,36 @@ describe('MatchesController', () => {
         'opponent-1',
         undefined,
         true,
+        false,
       );
       expect(result).toMatchObject({
         id: 'match-qp-1',
         status: 'live',
       });
+    });
+
+    it('marks a match scan-verified when created from a scanned QR token', async () => {
+      matchesService.create.mockResolvedValue({
+        id: 'match-scan-1',
+        status: 'accepted',
+        creatorId: 'creator-1',
+        opponentId: 'opponent-1',
+        scan_verified: true,
+      });
+
+      await controller.create('creator-1', {
+        guestId: 'opponent-1',
+        autoAccept: true,
+        quickPlayToken: '0123456789abcdef0123456789abcdef',
+      } as any);
+
+      expect(matchesService.create).toHaveBeenCalledWith(
+        'creator-1',
+        'opponent-1',
+        undefined,
+        true,
+        true,
+      );
     });
 
     it('rejects create when hostId does not match authenticated user', async () => {

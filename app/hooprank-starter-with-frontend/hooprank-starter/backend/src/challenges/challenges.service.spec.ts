@@ -81,6 +81,22 @@ describe('ChallengesService', () => {
                 expect.objectContaining({ courtId: 'court-1' }),
             );
         });
+
+        it('should persist the scheduled time when provided', async () => {
+            await service.create(
+                'user-a',
+                'user-b',
+                'Tomorrow night',
+                'court-1',
+                '2026-07-11T02:30:00.000Z',
+            );
+
+            expect(mockRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    scheduledAt: new Date('2026-07-11T02:30:00.000Z'),
+                }),
+            );
+        });
     });
 
     // ------------------------------------------------------------------

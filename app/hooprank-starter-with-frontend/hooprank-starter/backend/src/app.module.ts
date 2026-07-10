@@ -37,6 +37,7 @@ import { AdminController } from './admin/admin.controller';
 import { UploadController } from './upload.controller';
 import { MeController, ThreadsController } from './stubs.controller';
 import { SnakeNamingStrategy } from './snake-naming.strategy';
+import { CalendarModule } from './calendar/calendar.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { SnakeNamingStrategy } from './snake-naming.strategy';
     RunsModule,
     MapHubModule,
     SubscriptionModule,
+    CalendarModule,
     ScheduleModule.forRoot(),
     // Global rate limit: 100 requests per 60 seconds per IP
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),

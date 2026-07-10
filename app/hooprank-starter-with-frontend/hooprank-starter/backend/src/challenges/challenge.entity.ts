@@ -34,6 +34,9 @@ export class Challenge {
     @Column({ name: 'match_id', type: 'uuid', nullable: true })
     matchId: string;
 
+    @Column({ name: 'scheduled_at', type: process.env.DATABASE_URL ? 'timestamp' : 'datetime', nullable: true })
+    scheduledAt: Date | null;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

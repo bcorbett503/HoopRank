@@ -114,7 +114,7 @@ describe('MatchesService', () => {
 
             expect(mockDataSource.query).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO matches'),
-                ['accepted', 'user-a', 'user-b', 'court-1'],
+                ['accepted', 'user-a', 'user-b', 'court-1', false],
             );
             expect((result as any).status).toBe('accepted');
         });
@@ -153,6 +153,7 @@ describe('MatchesService', () => {
                 status: 'accepted',
                 creator_id: 'user-a',
                 opponent_id: 'user-b',
+                scan_verified: true,
             };
 
             const creatorUser = { id: 'user-a', hoop_rank: '3.0', games_played: '0', name: 'Player A' };
@@ -196,6 +197,7 @@ describe('MatchesService', () => {
                 status: 'accepted',
                 creator_id: 'user-a',
                 opponent_id: 'user-b',
+                scan_verified: true,
             };
 
             mockDataSource.query.mockResolvedValueOnce([match]);
@@ -230,6 +232,7 @@ describe('MatchesService', () => {
                 status: 'accepted',
                 creator_id: 'user-a',
                 opponent_id: 'user-b',
+                scan_verified: true,
             };
 
             const creatorUser = { id: 'user-a', hoop_rank: '3.0', games_played: '0', name: 'Player A' };
