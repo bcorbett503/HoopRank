@@ -149,6 +149,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   // Default view: courts the community follows ("all follows") — a map of
   // real hoop spots — rather than only courts with scheduled runs.
   CourtFollowFilterMode _followFilterMode = CourtFollowFilterMode.allFollowed;
+  // True once the user explicitly taps a follow-filter chip; the
+  // empty-viewport fallback in _updateCourtsForMapCenter never overrides
+  // an explicit choice.
+  bool _userChoseFollowFilter = false;
+  CheckInState? _observedCheckInState;
   bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
   String? _filterAccess; // null=all, 'public', 'private'
   String? _runsFilter; // null=off, 'today'=runs today, 'all'=all upcoming runs
@@ -783,6 +788,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Follow data (my follows + follower counts) loads asynchronously and
+    // drives the follows filter; refilter the viewport whenever it changes,
+    // otherwise the map can stay blank until the user pans.
+    final checkInState = Provider.of<CheckInState>(context, listen: false);
+    if (!identical(_observedCheckInState, checkInState)) {
+      _observedCheckInState?.removeListener(_handleCheckInStateChanged);
+      _observedCheckInState = checkInState
+        ..addListener(_handleCheckInStateChanged);
+    }
     final userId =
         Provider.of<AuthState>(context, listen: false).currentUser?.id.trim();
     if (_followFilterEducationUserId == userId &&
@@ -953,6 +967,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _courtService.removeListener(_handleCourtServiceChanged);
+    _observedCheckInState?.removeListener(_handleCheckInStateChanged);
     _debounceTimer?.cancel();
     _mapController.dispose();
     _searchController.dispose();
@@ -964,6 +979,12 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     if (state == AppLifecycleState.resumed) {
       _refreshCourtsFromService(force: true);
     }
+  }
+
+  void _handleCheckInStateChanged() {
+    if (!mounted || !_mapReady || _isLoading) return;
+    if (_searchController.text.trim().isNotEmpty) return;
+    _updateCourtsForMapCenter();
   }
 
   void _handleCourtServiceChanged() {
@@ -1205,6 +1226,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
 
   void _setFollowFilter(CourtFollowFilterMode mode) {
     _dismissDeepLinkPreview();
+    // An explicit tap (even re-selecting the active chip) disables the
+    // blank-viewport auto-fallback — the user owns the filter now.
+    _userChoseFollowFilter = true;
     if (_followFilterMode == mode) {
       return;
     }
@@ -1416,7 +1440,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     // Use visible bounds to filter courts - only show courts actually visible on map
     final bounds = _mapController.camera.visibleBounds;
 
-    var courtsInView = _courtService.getCourtsInBounds(
+    final rawCourtsInView = _courtService.getCourtsInBounds(
       bounds.south,
       bounds.west,
       bounds.north,
@@ -1424,7 +1448,27 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     );
 
     // Apply filters to map view as well
-    courtsInView = _applyFilters(courtsInView);
+    var courtsInView = _applyFilters(rawCourtsInView);
+
+    // Fallback: if the default follows filter hides every court in view
+    // (no followed courts around here), show all courts instead of a blank
+    // map. Only fires once follow data has actually settled, and never
+    // after the user has picked a filter themselves.
+    if (courtsInView.isEmpty &&
+        rawCourtsInView.isNotEmpty &&
+        _followFilterMode == CourtFollowFilterMode.allFollowed &&
+        !_userChoseFollowFilter &&
+        (_observedCheckInState?.followerCountsLoaded ?? false)) {
+      _followFilterMode = CourtFollowFilterMode.all;
+      courtsInView = _applyFilters(rawCourtsInView);
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content:
+              Text('No followed courts in this area yet — showing all courts.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
 
     final capped = _capCourtsForPerformance(courtsInView, isSearchMode: false);
     _prefetchTopFollowers(capped);

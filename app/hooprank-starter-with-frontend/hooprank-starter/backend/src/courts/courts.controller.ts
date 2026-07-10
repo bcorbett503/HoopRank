@@ -69,7 +69,6 @@ export class CourtsController {
     @Query("maxLat") maxLat?: string,
     @Query("minLng") minLng?: string,
     @Query("maxLng") maxLng?: string,
-    @Query("limit") limit?: string,
   ): Promise<Court[]> {
     // Public read-only endpoint: map bootstrapping needs courts before auth completes.
     // If bbox parameters provided, use geographic search
@@ -81,11 +80,15 @@ export class CourtsController {
         parseFloat(maxLng),
       );
     }
-    const parsedLimit = limit ? Number.parseInt(limit, 10) : undefined;
-    // Otherwise return courts while honoring the client's requested safety cap.
-    return this.courtsService.findAll(
-      Number.isFinite(parsedLimit) ? parsedLimit : undefined,
-    );
+    // Otherwise return the FULL court index, ignoring any client limit.
+    // The mobile map downloads the whole index once and slices it by
+    // viewport client-side; honoring `limit` here serves an
+    // alphabetical-by-name slice (mostly one region of the world) and
+    // blanks the map everywhere else. Shipped apps send `?limit=5000` as a
+    // legacy no-op cap, so this param must stay ignored until clients
+    // query by bbox instead. findAll(limit) remains available for
+    // internal callers that genuinely want a page.
+    return this.courtsService.findAll();
   }
 
   @Post("admin/create")

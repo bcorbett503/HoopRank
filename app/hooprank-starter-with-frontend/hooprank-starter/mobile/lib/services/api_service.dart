@@ -451,9 +451,13 @@ class ApiService {
     int limit = 100,
   }) async {
     try {
-      String url = '$baseUrl/courts?limit=$limit';
+      // limit <= 0 requests the FULL court index (no limit param). The map
+      // depends on having every court: a server-side LIMIT slices the list
+      // alphabetically by name and blanks whole regions of the map.
+      String url =
+          limit > 0 ? '$baseUrl/courts?limit=$limit' : '$baseUrl/courts';
       if (lat != null && lng != null) {
-        url += '&lat=$lat&lng=$lng';
+        url += url.contains('?') ? '&lat=$lat&lng=$lng' : '?lat=$lat&lng=$lng';
       }
 
       debugPrint('>>> getCourtsFromApi: calling $url');

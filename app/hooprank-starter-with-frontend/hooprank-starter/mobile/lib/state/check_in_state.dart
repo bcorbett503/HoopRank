@@ -187,6 +187,12 @@ class CheckInState extends ChangeNotifier {
   int get courtsWithFollowersCount =>
       _courtFollowerCounts.values.where((count) => count > 0).length;
 
+  // True once the follower-count fetch has settled (even on failure), so
+  // follow-based map filters can distinguish "not loaded yet" from
+  // "genuinely no follows here".
+  bool _followerCountsLoaded = false;
+  bool get followerCountsLoaded => _followerCountsLoaded;
+
   /// Initialize state for the given user session.
   /// Clears all prior state first to prevent cross-account data leakage.
   Future<void> initialize(String? userId) async {
@@ -214,6 +220,7 @@ class CheckInState extends ChangeNotifier {
     _followedTeamNames.clear();
     _playerStatuses.clear();
     _courtFollowerCounts.clear();
+    _followerCountsLoaded = false;
 
     _currentUserId = userId;
 
@@ -259,6 +266,8 @@ class CheckInState extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error fetching court follower counts: $e');
+    } finally {
+      _followerCountsLoaded = true;
     }
   }
 

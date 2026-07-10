@@ -75,7 +75,10 @@ class CourtService extends ChangeNotifier {
       final previousCount = _courts.length;
       final previousSource = _lastSource;
 
-      final apiCourts = await _fetchApiCourtsWithRetry(limit: 5000);
+      // 0 = full index. Never send a real limit here: the whole map pipeline
+      // slices this list by viewport client-side, and a server-side LIMIT
+      // returns an alphabetical world-slice that hides entire regions.
+      final apiCourts = await _fetchApiCourtsWithRetry(limit: 0);
       if (apiCourts.isNotEmpty) {
         _applyApiCourts(apiCourts);
         return;
@@ -115,7 +118,7 @@ class CourtService extends ChangeNotifier {
     }
   }
 
-  Future<List<Court>> _fetchApiCourtsWithRetry({int limit = 5000}) async {
+  Future<List<Court>> _fetchApiCourtsWithRetry({int limit = 0}) async {
     Object? lastError;
     for (var attempt = 1; attempt <= _apiRetryAttempts; attempt++) {
       try {
@@ -142,7 +145,7 @@ class CourtService extends ChangeNotifier {
     return const [];
   }
 
-  Future<List<Court>> _loadCourtsFromApi({int limit = 5000}) {
+  Future<List<Court>> _loadCourtsFromApi({int limit = 0}) {
     final loader = apiCourtsLoaderOverride;
     if (loader != null) {
       return loader(limit: limit);
