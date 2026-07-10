@@ -1,0 +1,71 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Livermore, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    {
+      "courtId": "985926fe-c1d7-0379-45a4-a42b81369bf0",
+      "courtName": "May Nissen Park",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "LARPD confirms active outdoor basketball courts at May Nissen Park, but its current Summer and Fall 2026 guides, program pages, and event calendar do not publish a basketball-specific run or event at this exact park. Current dated programs there are soccer or general recreation activities."
+    },
+    {
+      "courtId": "7078ac88-2ad4-0f65-05b0-9d0fcb765995",
+      "courtName": "Robert Livermore Community Center",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "LARPD confirms the gym supports basketball, but the current Summer 2026 basketball camp is at Cayetano Park and the Fall 2026 basketball section remains under construction without dates or times. The most recent exact-gym basketball program found ended in April 2026."
+    }
+  ],
+  "nonPublishedFindings": [
+    {
+      "courtId": "985926fe-c1d7-0379-45a4-a42b81369bf0",
+      "courtName": "May Nissen Park",
+      "sourceUrl": "https://www.larpd.org/may-nissen-park",
+      "additionalSource": "https://www.larpd.org/2026-06-26-larpd-rec-on-the-go",
+      "evidenceType": "official",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "program",
+      "scheduleText": "The park has basketball courts. LARPD's dated July activity at May Nissen is Rec-On-The-Go at the picnic area, with a non-basketball theme, and its current court-specific camps are soccer.",
+      "reviewReason": "The evidence establishes an active court but not a basketball-specific activity with a public date and time."
+    },
+    {
+      "courtId": "7078ac88-2ad4-0f65-05b0-9d0fcb765995",
+      "courtName": "Robert Livermore Community Center",
+      "sourceUrl": "https://www.larpd.org/robert-livermore-gymnasium",
+      "additionalSource": "https://www.larpd.org/recreation-and-sports-youth-fall-2026",
+      "evidenceType": "official",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "program",
+      "scheduleText": "The gym accommodates basketball and District programs, but the Fall 2026 youth basketball section is under construction and publishes no schedule.",
+      "reviewReason": "A basketball-capable venue without a concrete current date, weekday, or start time cannot become a run or court event."
+    },
+    {
+      "courtName": "Cayetano Park (outside followed-court scope)",
+      "sourceUrl": "https://www.larpd.org/skyhawks-sports-camps-summer",
+      "additionalSource": "https://www.larpd.org/summer-camps-weeks-at-a-glance",
+      "evidenceType": "official",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "camp",
+      "scheduleText": "Skyhawks Basketball Camp, July 20-24, 2026, Monday-Friday 9:00 AM-noon, ages 7-12, at Cayetano Park.",
+      "reviewReason": "This is valid current Livermore basketball activity, but Cayetano Park is not one of the admin-followed Livermore courts and the event cannot be reassigned to Robert Livermore Community Center."
+    },
+    {
+      "courtId": "7078ac88-2ad4-0f65-05b0-9d0fcb765995",
+      "courtName": "Robert Livermore Community Center",
+      "sourceUrl": "https://www.larpd.org/spring-break-camp-winter-spring-2026",
+      "evidenceType": "official",
+      "confidence": "high",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "camp",
+      "scheduleText": "Hoops Academy Camp at RLRB Gym, April 6-10, 2026, Monday-Friday 1:00-3:00 PM, ages 8-12.",
+      "reviewReason": "The exact-court basketball program ended before the July 10, 2026 refresh and is not upcoming activity."
+    }
+  ],
+  "courtSchedules": [],
+  "courtEvents": []
+}
