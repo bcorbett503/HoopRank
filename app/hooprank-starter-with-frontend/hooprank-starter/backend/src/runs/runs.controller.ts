@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Delete, Body, Param, Headers, Query } from '@nestjs/common';
 import { RunsService } from './runs.service';
+import { isRecurrenceActive, isWeeklyRecurrence } from '../common/weekly-recurrence';
 
 @Controller()
 export class RunsController {
@@ -76,9 +77,12 @@ export class RunsController {
                      ))
                   )
                 ORDER BY sr.scheduled_at ASC
-                LIMIT 50
+                LIMIT 5000
             `, [now]);
-            return runs;
+            return runs.filter((run) => {
+                if (!run.isRecurring || !isWeeklyRecurrence(run.recurrenceRule)) return true;
+                return isRecurrenceActive(run.recurrenceRule, new Date(now));
+            }).slice(0, 50);
         } catch (error) {
             console.error('getNearbyRuns error:', error.message);
             return [];

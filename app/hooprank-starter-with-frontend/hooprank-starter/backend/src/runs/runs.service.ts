@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { getRecurrenceUntil, isWeeklyRecurrence } from '../common/weekly-recurrence';
+import { getRecurrenceUntil, isRecurrenceActive, isWeeklyRecurrence } from '../common/weekly-recurrence';
 
 @Injectable()
 export class RunsService {
@@ -351,8 +351,7 @@ export class RunsService {
 
         const currentRuns = runs.filter((run) => {
             if (!run.isRecurring || !isWeeklyRecurrence(run.recurrenceRule)) return true;
-            const recurrenceUntil = getRecurrenceUntil(run.recurrenceRule);
-            return !recurrenceUntil || recurrenceUntil >= new Date(now);
+            return isRecurrenceActive(run.recurrenceRule, new Date(now));
         });
 
         // Attach attendees to each run
@@ -458,15 +457,22 @@ export class RunsService {
             params = [now.toISOString(), endOfDay.toISOString()];
         } else {
             query = `
-                SELECT DISTINCT court_id as "courtId"
+                SELECT court_id as "courtId", is_recurring as "isRecurring",
+                       recurrence_rule as "recurrenceRule", scheduled_at as "scheduledAt"
                 FROM scheduled_runs
-                WHERE scheduled_at >= $1
+                WHERE scheduled_at >= $1 OR is_recurring = true
             `;
             params = [now.toISOString()];
         }
 
         try {
-            return await this.dataSource.query(query, params) || [];
+            const rows = await this.dataSource.query(query, params) || [];
+            const activeRows = rows.filter((row) => {
+                if (!row.isRecurring || !isWeeklyRecurrence(row.recurrenceRule)) return true;
+                return isRecurrenceActive(row.recurrenceRule, now);
+            });
+            return Array.from(new Set<string>(activeRows.map((row) => String(row.courtId))))
+                .map((courtId) => ({ courtId }));
         } catch (error) {
             console.error('RunsService.getCourtsWithRuns error:', error.message);
             return [];

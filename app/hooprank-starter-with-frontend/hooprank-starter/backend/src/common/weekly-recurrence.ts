@@ -33,3 +33,8 @@ export function getRecurrenceUntil(rule: unknown): Date | null {
   const until = new Date(normalized);
   return Number.isNaN(until.getTime()) ? null : until;
 }
+
+export function isRecurrenceActive(rule: unknown, at = new Date()): boolean {
+  const until = getRecurrenceUntil(rule);
+  return !until || until >= at;
+}

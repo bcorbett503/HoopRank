@@ -1,4 +1,8 @@
-import { getRecurrenceUntil, isWeeklyRecurrence } from "./weekly-recurrence";
+import {
+  getRecurrenceUntil,
+  isRecurrenceActive,
+  isWeeklyRecurrence,
+} from "./weekly-recurrence";
 
 describe("weekly recurrence helpers", () => {
   it.each([
@@ -26,5 +30,15 @@ describe("weekly recurrence helpers", () => {
     expect(getRecurrenceUntil("weekly;until=2026-08-31")?.toISOString()).toBe(
       "2026-08-31T23:59:59.999Z",
     );
+  });
+
+  it("reports whether a bounded recurrence is active", () => {
+    const now = new Date("2026-07-10T12:00:00.000Z");
+    expect(
+      isRecurrenceActive("weekly;until=2026-08-01T00:00:00.000Z", now),
+    ).toBe(true);
+    expect(
+      isRecurrenceActive("weekly;until=2026-07-01T00:00:00.000Z", now),
+    ).toBe(false);
   });
 });

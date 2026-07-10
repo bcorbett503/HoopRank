@@ -141,6 +141,35 @@ describe('RunsService', () => {
         });
     });
 
+    describe('getCourtsWithRuns', () => {
+        it('includes active recurring courts and excludes expired recurring courts', async () => {
+            queryResults.push([
+                {
+                    courtId: 'expired-court',
+                    isRecurring: true,
+                    recurrenceRule: 'weekly;until=2020-01-01T23:59:59.999Z',
+                },
+                {
+                    courtId: 'active-court',
+                    isRecurring: true,
+                    recurrenceRule: 'weekly;until=2099-01-01T23:59:59.999Z',
+                },
+                {
+                    courtId: 'active-court',
+                    isRecurring: false,
+                    recurrenceRule: null,
+                },
+            ]);
+
+            await expect(service.getCourtsWithRuns()).resolves.toEqual([
+                { courtId: 'active-court' },
+            ]);
+            expect(mockDataSource.query.mock.calls[0][0]).toContain(
+                'scheduled_at >= $1 OR is_recurring = true',
+            );
+        });
+    });
+
     describe('cancelRun', () => {
         it('should delete run only if creator matches', async () => {
             // DELETE RETURNING returns [rows, count] format
