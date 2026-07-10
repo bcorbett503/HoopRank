@@ -1,0 +1,17 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Albany, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    {
+      "courtId": "ce595047-42d5-24ac-5f1e-657239c42735",
+      "courtName": "Basketball Courts",
+      "status": "no_concrete_public_schedule",
+      "reviewReason": "The exact 1000 Jackson Street outdoor court is publicly documented for rentals, but no current organized basketball schedule was found. A current youth basketball program at 1123 Jackson Street is a different venue and was not attached."
+    }
+  ],
+  "courtSchedules": [],
+  "courtEvents": []
+}
