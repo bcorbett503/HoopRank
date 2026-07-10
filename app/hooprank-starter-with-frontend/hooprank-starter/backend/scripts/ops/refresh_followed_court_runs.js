@@ -333,9 +333,14 @@ async function processCourtSchedule(client, schedule, reviewedAt) {
         const target = existing.find((row) => String(row.id) === runId);
         assert(target, `Retire run ${runId} was not found at ${schedule.courtName}`);
         assert(!accountedIds.has(runId), `Run ${runId} cannot be both desired and retired`);
+        const retirementMarker = `Retired by followed-court refresh on ${reviewedAt.toISODate()}`;
+        if (!isActiveTemplate(target, reviewedAt) && String(target.notes || '').includes(retirementMarker)) {
+            accountedIds.add(runId);
+            continue;
+        }
         await updateOrDeleteFutureInstances(client, target, null, artifact.timezone, true);
         const retiredUntil = reviewedAt.minus({ days: 1 }).endOf('day').toUTC().toISO({ suppressMilliseconds: false });
-        const retirementNote = `${target.notes || ''}\n\nRetired by followed-court refresh on ${reviewedAt.toISODate()}: current official schedule no longer lists this slot.`.trim();
+        const retirementNote = `${target.notes || ''}\n\n${retirementMarker}: current official schedule no longer lists this slot.`.trim();
         await client.query(
             `UPDATE scheduled_runs SET recurrence_rule = $1, notes = $2
              WHERE id = $3 AND created_by = $4`,
