@@ -143,6 +143,64 @@ describe("CalendarService", () => {
     expect(events[1].run.runId).toBe("template-1");
   });
 
+  it("honors a weekly series anchor and inclusive recurrence end", async () => {
+    dataSource.query
+      .mockResolvedValueOnce([
+        {
+          runId: "template-1",
+          courtId: "court-1",
+          courtName: "Rossi Playground",
+          createdBy: "user-1",
+          creatorName: "Brett",
+          title: "Monday Run",
+          gameMode: "3v3",
+          scheduledAt: "2026-07-13T18:00:00.000Z",
+          isRecurring: true,
+          recurrenceRule: "weekly;until=2026-07-20T23:59:59.999Z",
+          isFollowedCourt: true,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const events = await service.getEvents({
+      userId: "viewer",
+      scope: "for_you",
+      start: new Date("2026-07-01T00:00:00.000Z"),
+      end: new Date("2026-07-27T23:59:59.000Z"),
+    });
+
+    expect(events.map((event) => event.scheduledAt)).toEqual([
+      "2026-07-13T18:00:00.000Z",
+      "2026-07-20T18:00:00.000Z",
+    ]);
+  });
+
+  it("does not expand a bounded weekly series after it expires", async () => {
+    dataSource.query
+      .mockResolvedValueOnce([
+        {
+          runId: "template-1",
+          courtId: "court-1",
+          courtName: "Rossi Playground",
+          createdBy: "user-1",
+          title: "Expired Run",
+          scheduledAt: "2026-06-01T18:00:00.000Z",
+          isRecurring: true,
+          recurrenceRule: "FREQ=WEEKLY;UNTIL=20260701T235959Z",
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const events = await service.getEvents({
+      userId: "viewer",
+      scope: "for_you",
+      start: new Date("2026-07-08T00:00:00.000Z"),
+      end: new Date("2026-07-22T00:00:00.000Z"),
+    });
+
+    expect(events).toEqual([]);
+  });
+
   it("loads public and viewer-associated runs for For You", async () => {
     dataSource.query.mockResolvedValueOnce([]);
 
@@ -157,11 +215,7 @@ describe("CalendarService", () => {
       expect.stringContaining(
         "LOWER(BTRIM(COALESCE(sr.visibility, 'public'))) = 'public'",
       ),
-      [
-        "2026-07-08T00:00:00.000Z",
-        "2026-07-22T00:00:00.000Z",
-        "viewer-1",
-      ],
+      ["2026-07-08T00:00:00.000Z", "2026-07-22T00:00:00.000Z", "viewer-1"],
     );
     const sql = dataSource.query.mock.calls[0][0];
     expect(sql).toContain("OR sr.created_by = $3");
@@ -169,6 +223,8 @@ describe("CalendarService", () => {
     expect(sql).toContain("sr.invited_player_ids");
     expect(sql).toContain('"isAttending" DESC');
     expect(sql).toContain('"isFollowedCourt" DESC');
+    expect(sql).toContain("LIKE 'weekly%'");
+    expect(sql).toContain("LIKE 'FREQ=WEEKLY%'");
     expect(sql.indexOf('"isAttending" DESC')).toBeLessThan(
       sql.indexOf("LIMIT 1000"),
     );

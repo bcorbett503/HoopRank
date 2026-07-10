@@ -118,6 +118,29 @@ describe('RunsService', () => {
         });
     });
 
+    describe('getCourtRuns', () => {
+        it('hides recurring templates after their recurrence end', async () => {
+            queryResults.push([
+                {
+                    id: 'expired-template',
+                    isRecurring: true,
+                    recurrenceRule: 'weekly;until=2020-01-01T23:59:59.999Z',
+                },
+                {
+                    id: 'active-template',
+                    isRecurring: true,
+                    recurrenceRule: 'weekly;until=2099-01-01T23:59:59.999Z',
+                },
+            ]);
+            queryResults.push([]);
+
+            const runs = await service.getCourtRuns('court-1', 'viewer-1');
+
+            expect(runs.map((run) => run.id)).toEqual(['active-template']);
+            expect(mockDataSource.query).toHaveBeenCalledTimes(2);
+        });
+    });
+
     describe('cancelRun', () => {
         it('should delete run only if creator matches', async () => {
             // DELETE RETURNING returns [rows, count] format
@@ -153,6 +176,34 @@ describe('RunsService', () => {
             const cleanupCall = mockDataSource.query.mock.calls[1];
             expect(cleanupCall[0]).toContain('DELETE FROM run_attendees');
             expect(cleanupCall[1]).toEqual(['run-1']);
+        });
+    });
+
+    describe('spawnUpcomingRecurringRuns', () => {
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it('loads bounded weekly rules but skips a series after its end date', async () => {
+            jest.useFakeTimers().setSystemTime(new Date('2026-07-10T12:00:00.000Z'));
+            queryResults.push([
+                {
+                    id: 'template-1',
+                    court_id: 'court-1',
+                    created_by: 'user-1',
+                    title: 'Expired Run',
+                    scheduled_at: '2026-06-01T18:00:00.000Z',
+                    recurrence_rule: 'weekly;until=2026-07-01T23:59:59.999Z',
+                },
+            ]);
+
+            await service.spawnUpcomingRecurringRuns();
+
+            expect(mockDataSource.query).toHaveBeenCalledTimes(1);
+            const sql = mockDataSource.query.mock.calls[0][0];
+            expect(sql).toContain("LIKE 'weekly%'");
+            expect(sql).toContain("LIKE 'FREQ=WEEKLY%'");
+            expect(sql).not.toContain("recurrence_rule = 'weekly'");
         });
     });
 });

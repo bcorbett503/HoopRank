@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
+import { getRecurrenceUntil } from "../common/weekly-recurrence";
 
 export type CalendarScope = "for_you" | "mine";
 
@@ -146,7 +147,14 @@ export class CalendarService {
           LEFT JOIN users u ON u.id::text = sr.created_by::text
           WHERE (
             (COALESCE(sr.is_recurring, false) = false AND sr.scheduled_at BETWEEN $1 AND $2)
-            OR (COALESCE(sr.is_recurring, false) = true AND COALESCE(sr.recurrence_rule, 'weekly') = 'weekly')
+            OR (
+              COALESCE(sr.is_recurring, false) = true
+              AND (
+                LOWER(COALESCE(sr.recurrence_rule, 'weekly')) LIKE 'weekly%'
+                OR UPPER(COALESCE(sr.recurrence_rule, 'weekly')) LIKE 'FREQ=WEEKLY%'
+                OR UPPER(COALESCE(sr.recurrence_rule, 'weekly')) LIKE 'RRULE:FREQ=WEEKLY%'
+              )
+            )
           )
           AND ${scopePredicate}
           ORDER BY
@@ -226,7 +234,14 @@ export class CalendarService {
         LEFT JOIN users u ON u.id = sr.created_by
         WHERE (
           (COALESCE(sr.is_recurring, 0) = 0 AND sr.scheduled_at BETWEEN ? AND ?)
-          OR (COALESCE(sr.is_recurring, 0) = 1 AND COALESCE(sr.recurrence_rule, 'weekly') = 'weekly')
+          OR (
+            COALESCE(sr.is_recurring, 0) = 1
+            AND (
+              LOWER(COALESCE(sr.recurrence_rule, 'weekly')) LIKE 'weekly%'
+              OR UPPER(COALESCE(sr.recurrence_rule, 'weekly')) LIKE 'FREQ=WEEKLY%'
+              OR UPPER(COALESCE(sr.recurrence_rule, 'weekly')) LIKE 'RRULE:FREQ=WEEKLY%'
+            )
+          )
         )
         AND ${scopePredicate}
         ORDER BY
@@ -286,7 +301,11 @@ export class CalendarService {
       if (!runId) continue;
       const list = byRun.get(runId) ?? [];
       if (list.length < 8) {
-        list.push({ id: String(row.id ?? ""), name: row.name, photoUrl: row.photoUrl });
+        list.push({
+          id: String(row.id ?? ""),
+          name: row.name,
+          photoUrl: row.photoUrl,
+        });
       }
       byRun.set(runId, list);
     }
@@ -310,7 +329,11 @@ export class CalendarService {
     }
 
     for (const row of recurring) {
-      for (const scheduledAt of this.weeklyOccurrences(row.scheduledAt, query)) {
+      for (const scheduledAt of this.weeklyOccurrences(
+        row.scheduledAt,
+        row.recurrenceRule,
+        query,
+      )) {
         const key = this.runOccurrenceKey(row, scheduledAt);
         if (!candidates.has(key)) {
           candidates.set(key, this.mapRun(row, scheduledAt, attendees, query));
@@ -498,11 +521,20 @@ export class CalendarService {
     };
   }
 
-  private weeklyOccurrences(rawStart: any, query: CalendarQuery): Date[] {
+  private weeklyOccurrences(
+    rawStart: any,
+    recurrenceRule: unknown,
+    query: CalendarQuery,
+  ): Date[] {
     const template = new Date(rawStart);
     if (Number.isNaN(template.getTime())) return [];
 
-    const occurrence = new Date(query.start);
+    const until = getRecurrenceUntil(recurrenceRule);
+    const rangeEnd = until && until < query.end ? until : query.end;
+    if (template > rangeEnd) return [];
+
+    const rangeStart = template > query.start ? template : query.start;
+    const occurrence = new Date(rangeStart);
     occurrence.setUTCHours(
       template.getUTCHours(),
       template.getUTCMinutes(),
@@ -511,10 +543,11 @@ export class CalendarService {
     );
     const dayDelta = (template.getUTCDay() - occurrence.getUTCDay() + 7) % 7;
     occurrence.setUTCDate(occurrence.getUTCDate() + dayDelta);
-    if (occurrence < query.start) occurrence.setUTCDate(occurrence.getUTCDate() + 7);
+    if (occurrence < rangeStart)
+      occurrence.setUTCDate(occurrence.getUTCDate() + 7);
 
     const results: Date[] = [];
-    while (occurrence <= query.end && results.length < 14) {
+    while (occurrence <= rangeEnd && results.length < 14) {
       results.push(new Date(occurrence));
       occurrence.setUTCDate(occurrence.getUTCDate() + 7);
     }
@@ -525,13 +558,17 @@ export class CalendarService {
     return [
       String(row.courtId ?? ""),
       String(row.createdBy ?? ""),
-      String(row.title ?? "").trim().toLowerCase(),
+      String(row.title ?? "")
+        .trim()
+        .toLowerCase(),
       scheduledAt.toISOString(),
     ].join("|");
   }
 
   private isWithinWindow(date: Date, query: CalendarQuery): boolean {
-    return !Number.isNaN(date.getTime()) && date >= query.start && date <= query.end;
+    return (
+      !Number.isNaN(date.getTime()) && date >= query.start && date <= query.end
+    );
   }
 
   private asBoolean(value: any): boolean {

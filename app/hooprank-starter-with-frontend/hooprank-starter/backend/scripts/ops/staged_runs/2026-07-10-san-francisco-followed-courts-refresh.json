@@ -1,0 +1,306 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "San Francisco, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    { "courtId": "39bbaf2e-7393-d1d4-e7b8-f90d1e53fadc", "courtName": "Bay Club San Francisco", "status": "no_concrete_public_schedule", "reviewReason": "Public pages did not expose a current basketball-specific day and time." },
+    { "courtId": "b935ea2e-5d96-4745-2cdf-e61dbfaeaa5e", "courtName": "Bayview Hunter's Point YMCA", "status": "no_concrete_public_schedule", "reviewReason": "Current program material mentions basketball but does not publish a concrete recurring practice schedule." },
+    { "courtId": "4839aeae-e737-64c9-3cc4-04161a65b042", "courtName": "Bernal Rec Center Basketball Courts", "status": "accepted_schedule", "reviewReason": "Current official SF Rec and Park summer schedule lists recurring drop-in basketball." },
+    { "courtId": "87429d94-621c-0c81-6da8-abe7aa1ab541", "courtName": "Betty Ann Ong Recreation Center", "status": "accepted_schedule", "reviewReason": "Official Summer 2026 gym schedule image lists recurring basketball blocks." },
+    { "courtId": "16315643-662e-4e83-8a88-57c54fada0cd", "courtName": "DiMaggio Basketball Court", "status": "no_concrete_public_schedule", "reviewReason": "Official facility page documents the court and hours, but no organized basketball schedule." },
+    { "courtId": "fc74ef72-1ad1-0c4d-b7cc-019c010f1e68", "courtName": "Equinox Sports Club San Francisco", "status": "no_concrete_public_schedule", "reviewReason": "No current public basketball activity with a concrete day and time was found." },
+    { "courtId": "ed593ce8-e074-b1a6-9a66-17be0ad445ac", "courtName": "Eureka Valley Recreation Center", "status": "accepted_schedule", "reviewReason": "Current official facility HTML supersedes the older Summer 2026 image schedule." },
+    { "courtId": "befa4778-ac2c-f4bb-ebc6-3f38ab1874eb", "courtName": "George R. Moscone Recreation Center", "status": "accepted_schedule", "reviewReason": "Official Summer 2026 gym schedule image lists recurring drop-in basketball." },
+    { "courtId": "3dc6d74b-d6db-a921-63cb-b0a2bddc2cf1", "courtName": "Glen Park Recreation Center", "status": "accepted_schedule", "reviewReason": "Current official facility page lists June 2 through August 29 basketball hours." },
+    { "courtId": "a1e9cb90-8460-ca85-08dd-eacd56b6718a", "courtName": "Hamilton Recreation Center", "status": "accepted_schedule", "reviewReason": "Current official summer schedule lists recurring drop-in basketball." },
+    { "courtId": "ec7dbc0d-6280-a2d5-9026-e7ea824b98f1", "courtName": "Hayes Valley Basketball Court", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball schedule with a concrete day and time was found." },
+    { "courtId": "94e62656-750d-3f4e-f802-4231a81ee7e8", "courtName": "Joseph Lee Recreation Center", "status": "accepted_schedule", "reviewReason": "Current official summer schedule lists recurring drop-in basketball." },
+    { "courtId": "b638a8a8-1df2-ec14-a864-6d4d3986e84b", "courtName": "Koret Health and Recreation Center", "status": "no_concrete_public_schedule", "reviewReason": "Public material lists open recreation but not a current basketball-specific day and time." },
+    { "courtId": "7d0b0808-57f0-06a1-0273-1afe8a8cf8d9", "courtName": "Margaret S. Hayward Basketball Courts", "status": "no_concrete_public_schedule", "reviewReason": "Official page documents outdoor courts but no organized basketball schedule." },
+    { "courtId": "fb009e9e-9ed2-c24d-bba7-dedcde4f9c77", "courtName": "Minnie & Lovie Ward Recreational Center", "status": "accepted_schedule", "reviewReason": "Current official summer schedule lists recurring drop-in basketball." },
+    { "courtId": "612f23c9-57d8-4834-b550-c42c96036834", "courtName": "Mission Creek Basketball Court", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball schedule with a concrete day and time was found." },
+    { "courtId": "7d0dfa6f-b987-4780-bed5-9ff5e05631c6", "courtName": "Mission Dolores Basketball Court", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball schedule with a concrete day and time was found." },
+    { "courtId": "274ec68b-4c85-dc90-559d-2b7ffa47938a", "courtName": "Mission Recreation Center", "status": "accepted_schedule", "reviewReason": "Current official Summer 2026 schedule confirms the existing recurring open gym blocks." },
+    { "courtId": "aefa9baf-2b3b-ccba-7cd5-63dce89476ed", "courtName": "Palega Recreation Center", "status": "accepted_schedule", "reviewReason": "Official Summer 2026 gym schedule image confirms recurring basketball." },
+    { "courtId": "33677a80-28f7-f0c8-6f1b-9024f0955ada", "courtName": "Potrero Hill Recreation Center", "status": "no_concrete_public_schedule", "reviewReason": "Official pages document courts and rentals but no current organized basketball schedule." },
+    { "courtId": "10777896-f063-8886-a68a-4c6f66347099", "courtName": "Richmond Recreation Center", "status": "accepted_schedule", "reviewReason": "Current official facility page lists the summer open gym schedule and corrects Tuesday and Saturday times." },
+    { "courtId": "1583e4e7-0e04-239f-452e-0c11644444c2", "courtName": "St. Mary's Recreation Center", "status": "no_concrete_public_schedule", "reviewReason": "No current public basketball activity with a concrete day and time was found." },
+    { "courtId": "bfe3299f-01b9-4a9f-321e-f8150818731d", "courtName": "Sunset Recreation Center", "status": "accepted_schedule", "reviewReason": "Current official summer schedule lists recurring drop-in basketball." },
+    { "courtId": "e72bb902-08f6-4dc0-acc3-fa85a6aa1b10", "courtName": "The Olympic Club", "status": "no_concrete_public_schedule", "reviewReason": "No current public basketball activity with a concrete day and time was found." },
+    { "courtId": "a534c35a-3937-4851-aed5-48801b0f9983", "courtName": "The Panhandle Basketball Courts", "status": "no_concrete_public_schedule", "reviewReason": "No current organized basketball schedule with a concrete day and time was found." },
+    { "courtId": "b0b12244-1b38-d275-8c53-5a2f8ad53aab", "courtName": "Upper Noe Recreation Center", "status": "accepted_schedule", "reviewReason": "Official Summer 2026 gym schedule image confirms recurring basketball." }
+  ],
+  "courtSchedules": [
+    {
+      "courtId": "4839aeae-e737-64c9-3cc4-04161a65b042",
+      "courtName": "Bernal Rec Center Basketball Courts",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.sfrecpark.org/Facilities/Facility/Details/Bernal-Heights-Rec-Center-83",
+      "sourceTitle": "Bernal Heights Rec Center Summer Schedule",
+      "access": "Public drop-in; schedule subject to change",
+      "seriesStartsOn": "2026-06-02",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Conservative bound aligned to the current SF Rec and Park summer programming cycle",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "13:00", "durationMinutes": 405, "title": "Tuesday Drop-in Basketball - Bernal Heights", "scheduleText": "Tuesday 1:00-7:45 PM Drop-in Basketball" },
+        { "weekday": "Wednesday", "localStart": "10:00", "durationMinutes": 480, "title": "Wednesday Drop-in Basketball - Bernal Heights", "scheduleText": "Wednesday 10:00 AM-6:00 PM Drop-in Basketball" },
+        { "weekday": "Wednesday", "localStart": "18:00", "durationMinutes": 120, "title": "Wednesday 55+ Basketball - Bernal Heights", "scheduleText": "Wednesday 6:00-8:00 PM Drop-in Basketball 55 & Better", "ageRange": "55+", "audience": "Adults age 55 and better" },
+        { "weekday": "Thursday", "localStart": "13:00", "durationMinutes": 405, "title": "Thursday Drop-in Basketball - Bernal Heights", "scheduleText": "Thursday 1:00-7:45 PM Drop-in Basketball" },
+        { "weekday": "Friday", "localStart": "10:00", "durationMinutes": 585, "title": "Friday Drop-in Basketball - Bernal Heights", "scheduleText": "Friday 10:00 AM-7:45 PM Drop-in Basketball" },
+        { "weekday": "Saturday", "localStart": "10:15", "durationMinutes": 390, "title": "Saturday Drop-in Basketball - Bernal Heights", "scheduleText": "Saturday 10:15 AM-4:45 PM Drop-in Basketball" }
+      ]
+    },
+    {
+      "courtId": "87429d94-621c-0c81-6da8-abe7aa1ab541",
+      "courtName": "Betty Ann Ong Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://sfrecpark.org/ImageRepository/Document?documentId=29331",
+      "sourceTitle": "Betty Ann Ong Summer Gym Schedule 2026",
+      "access": "Public open basketball; schedule subject to change",
+      "maxPlayers": 15,
+      "seriesStartsOn": "2026-06-16",
+      "seriesEndsOn": "2026-08-15",
+      "seasonEndBasis": "Existing conservative season bound retained from the official summer schedule review",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "10:00", "durationMinutes": 330, "title": "Open Basketball - Betty Ann Ong Recreation Center", "scheduleText": "Tuesday 10:00 AM-3:30 PM Basketball" },
+        { "weekday": "Thursday", "localStart": "10:00", "durationMinutes": 630, "title": "Open Basketball - Betty Ann Ong Recreation Center", "scheduleText": "Thursday 10:00 AM-8:30 PM Basketball" },
+        { "weekday": "Friday", "localStart": "16:00", "durationMinutes": 270, "title": "Open Basketball - Betty Ann Ong Recreation Center", "scheduleText": "Friday 4:00-8:30 PM Basketball" },
+        { "weekday": "Saturday", "localStart": "09:00", "durationMinutes": 240, "title": "Open Basketball - Betty Ann Ong Recreation Center", "scheduleText": "Saturday 9:00 AM-1:00 PM Basketball" }
+      ]
+    },
+    {
+      "courtId": "ed593ce8-e074-b1a6-9a66-17be0ad445ac",
+      "courtName": "Eureka Valley Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://sfrecpark.org/Facilities/Facility/Details/Eureka-Valley-Rec-Center-86",
+      "sourceTitle": "Eureka Valley Rec Center Summer Schedule",
+      "access": "Public drop-in and open gym; contact the facility to confirm changes",
+      "seriesStartsOn": "2026-06-02",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Wednesday is explicitly listed through August 26; other slots use a conservative SF Rec and Park summer-cycle bound",
+      "replaceActiveSchedule": true,
+      "retireRunIds": [
+        "c33ebb98-e134-4328-990f-9f55c73e68ec",
+        "bbc9fb07-7e60-440a-9acc-5e9d4c26adfc",
+        "3f138fd5-803e-4794-88f7-4f2ba1965f41"
+      ],
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "09:00", "durationMinutes": 120, "title": "Tuesday 55+ Basketball - Eureka Valley", "scheduleText": "Tuesday 9:00-11:00 AM Drop-in Basketball 55 & Better", "ageRange": "55+", "audience": "Adults age 55 and better" },
+        { "weekday": "Tuesday", "localStart": "11:00", "durationMinutes": 375, "title": "Tuesday Open Gym Basketball - Eureka Valley", "scheduleText": "Tuesday 11:00 AM-5:15 PM Open Gym Basketball", "existingRunId": "43bceffc-34b6-40db-967a-c53f5b2b77ca" },
+        { "weekday": "Tuesday", "localStart": "18:00", "durationMinutes": 120, "title": "Tuesday Women's Full Court Basketball - Eureka Valley", "scheduleText": "Tuesday 6:00-8:00 PM Drop-in Women's Basketball", "ageRange": "18+", "audience": "Adult women" },
+        { "weekday": "Wednesday", "localStart": "12:00", "durationMinutes": 480, "title": "Wednesday Open Gym Basketball - Eureka Valley", "scheduleText": "Wednesday 12:00-8:00 PM Open Gym Basketball through August 26", "seriesEndsOn": "2026-08-26" },
+        { "weekday": "Thursday", "localStart": "09:00", "durationMinutes": 120, "title": "Thursday 55+ Basketball - Eureka Valley", "scheduleText": "Thursday 9:00-11:00 AM Drop-in Basketball 55 & Better", "ageRange": "55+", "audience": "Adults age 55 and better" },
+        { "weekday": "Thursday", "localStart": "11:00", "durationMinutes": 60, "title": "Thursday Open Gym Basketball - Eureka Valley", "scheduleText": "Thursday 11:00 AM-12:00 PM Open Gym Basketball" },
+        { "weekday": "Thursday", "localStart": "15:30", "durationMinutes": 90, "title": "Thursday Open Gym Basketball - Eureka Valley", "scheduleText": "Thursday 3:30-5:00 PM Open Gym Basketball" },
+        { "weekday": "Friday", "localStart": "15:30", "durationMinutes": 75, "title": "Friday Open Gym Basketball - Eureka Valley", "scheduleText": "Friday 3:30-4:45 PM Open Gym Basketball" },
+        { "weekday": "Saturday", "localStart": "13:00", "durationMinutes": 60, "title": "Saturday Open Gym Basketball - Eureka Valley", "scheduleText": "Saturday 1:00-2:00 PM Open Gym Basketball" }
+      ]
+    },
+    {
+      "courtId": "befa4778-ac2c-f4bb-ebc6-3f38ab1874eb",
+      "courtName": "George R. Moscone Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://sfrecpark.org/ImageRepository/Document?documentId=29139",
+      "sourceTitle": "Moscone Summer 2026 Gym Schedule",
+      "access": "Public drop-in; schedule subject to change",
+      "seriesStartsOn": "2026-06-01",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Official schedule window June 1 through August 29",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "15:30", "durationMinutes": 90, "title": "Tuesday Youth Drop-in Basketball - Moscone", "scheduleText": "Tuesday 3:30-5:00 PM Youth Drop-in Basketball", "ageRange": "6-17", "audience": "Youth ages 6-17" },
+        { "weekday": "Wednesday", "localStart": "13:00", "durationMinutes": 150, "title": "Wednesday Drop-in Basketball - Moscone", "scheduleText": "Wednesday 1:00-3:30 PM Drop-in Basketball, all ages" },
+        { "weekday": "Thursday", "localStart": "10:00", "durationMinutes": 150, "title": "Thursday Drop-in Basketball - Moscone", "scheduleText": "Thursday 10:00 AM-12:30 PM Drop-in Basketball, all ages" },
+        { "weekday": "Thursday", "localStart": "15:30", "durationMinutes": 90, "title": "Thursday Youth Drop-in Basketball - Moscone", "scheduleText": "Thursday 3:30-5:00 PM Youth Drop-in Basketball", "ageRange": "6-17", "audience": "Youth ages 6-17" },
+        { "weekday": "Thursday", "localStart": "17:00", "durationMinutes": 150, "title": "Thursday Women's Drop-in Basketball - Moscone", "scheduleText": "Thursday 5:00-7:30 PM Women's Drop-in Basketball", "ageRange": "18+ women", "audience": "Women age 18 and older" },
+        { "weekday": "Friday", "localStart": "13:00", "durationMinutes": 60, "title": "Friday Drop-in Basketball - Moscone", "scheduleText": "Friday 1:00-2:00 PM Drop-in Basketball, all ages" },
+        { "weekday": "Saturday", "localStart": "13:00", "durationMinutes": 210, "title": "Saturday Adult Drop-in Basketball - Moscone", "scheduleText": "Saturday 1:00-4:30 PM Adult Drop-in Basketball", "ageRange": "18+", "audience": "Adults age 18 and older" }
+      ]
+    },
+    {
+      "courtId": "3dc6d74b-d6db-a921-63cb-b0a2bddc2cf1",
+      "courtName": "Glen Park Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://sfrecpark.org/Facilities/Facility/Details/Glen-Park-Rec-Center-89",
+      "sourceTitle": "Glen Canyon Rec Center Summer Schedule",
+      "access": "Public open gym and drop-in; schedule subject to change",
+      "seriesStartsOn": "2026-06-02",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Official schedule window June 2 through August 29",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "11:30", "durationMinutes": 390, "title": "Tuesday Basketball - Glen Park", "scheduleText": "Tuesday 11:30 AM-6:00 PM Open Gym Basketball" },
+        { "weekday": "Wednesday", "localStart": "16:00", "durationMinutes": 120, "title": "Wednesday Basketball - Glen Park", "scheduleText": "Wednesday 4:00-6:00 PM Open Gym Basketball" },
+        { "weekday": "Thursday", "localStart": "16:00", "durationMinutes": 210, "title": "Thursday Basketball - Glen Park", "scheduleText": "Thursday 4:00-7:30 PM Open Gym Basketball" },
+        { "weekday": "Friday", "localStart": "12:30", "durationMinutes": 210, "title": "Friday Basketball - Glen Park", "scheduleText": "Friday 12:30-4:00 PM Open Gym Basketball" },
+        { "weekday": "Saturday", "localStart": "12:30", "durationMinutes": 150, "title": "Saturday Basketball - Glen Park", "scheduleText": "Saturday 12:30-3:00 PM Open Gym Basketball" },
+        { "weekday": "Saturday", "localStart": "15:00", "durationMinutes": 180, "title": "Saturday Wheelchair Basketball - Glen Park", "scheduleText": "Saturday 3:00-6:00 PM Drop-in Wheelchair Basketball", "ageRange": "open", "audience": "Wheelchair basketball players" }
+      ]
+    },
+    {
+      "courtId": "a1e9cb90-8460-ca85-08dd-eacd56b6718a",
+      "courtName": "Hamilton Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.sfrecpark.org/Facilities/Facility/Details/Hamilton-Rec-Center-93",
+      "sourceTitle": "Hamilton Rec Center Summer Schedule",
+      "access": "Public drop-in; schedule subject to change",
+      "seriesStartsOn": "2026-06-02",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Conservative bound aligned to the current SF Rec and Park summer programming cycle",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "15:30", "durationMinutes": 300, "title": "Tuesday Drop-in Basketball - Hamilton", "scheduleText": "Tuesday 3:30-8:30 PM Drop-in Basketball" },
+        { "weekday": "Wednesday", "localStart": "15:30", "durationMinutes": 300, "title": "Wednesday Drop-in Basketball - Hamilton", "scheduleText": "Wednesday 3:30-8:30 PM Drop-in Basketball" },
+        { "weekday": "Thursday", "localStart": "15:30", "durationMinutes": 300, "title": "Thursday Drop-in Basketball - Hamilton", "scheduleText": "Thursday 3:30-8:30 PM Drop-in Basketball" },
+        { "weekday": "Friday", "localStart": "15:30", "durationMinutes": 300, "title": "Friday Drop-in Basketball - Hamilton", "scheduleText": "Friday 3:30-8:30 PM Drop-in Basketball" },
+        { "weekday": "Saturday", "localStart": "09:30", "durationMinutes": 420, "title": "Saturday Drop-in Basketball - Hamilton", "scheduleText": "Saturday 9:30 AM-4:30 PM Drop-in Basketball" }
+      ]
+    },
+    {
+      "courtId": "94e62656-750d-3f4e-f802-4231a81ee7e8",
+      "courtName": "Joseph Lee Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.sfrecpark.org/Facilities/Facility/Details/Joseph-Lee-Rec-Center-95",
+      "sourceTitle": "Joseph Lee Rec Center Summer Schedule",
+      "access": "Public drop-in; schedule subject to change",
+      "seriesStartsOn": "2026-06-02",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Conservative bound aligned to the current SF Rec and Park summer programming cycle",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "10:00", "durationMinutes": 420, "title": "Tuesday Drop-in Basketball - Joseph Lee", "scheduleText": "Tuesday 10:00 AM-5:00 PM Drop-in Basketball" },
+        { "weekday": "Wednesday", "localStart": "10:00", "durationMinutes": 480, "title": "Wednesday Drop-in Basketball - Joseph Lee", "scheduleText": "Wednesday 10:00 AM-6:00 PM Drop-in Basketball" },
+        { "weekday": "Wednesday", "localStart": "18:00", "durationMinutes": 120, "title": "Wednesday 55+ Basketball - Joseph Lee", "scheduleText": "Wednesday 6:00-8:00 PM Drop-in Basketball 55 & Better", "ageRange": "55+", "audience": "Adults age 55 and better" },
+        { "weekday": "Thursday", "localStart": "10:00", "durationMinutes": 420, "title": "Thursday Drop-in Basketball - Joseph Lee", "scheduleText": "Thursday 10:00 AM-5:00 PM Drop-in Basketball" },
+        { "weekday": "Friday", "localStart": "10:00", "durationMinutes": 600, "title": "Friday Drop-in Basketball - Joseph Lee", "scheduleText": "Friday 10:00 AM-8:00 PM Drop-in Basketball" },
+        { "weekday": "Saturday", "localStart": "14:00", "durationMinutes": 150, "title": "Saturday Drop-in Basketball - Joseph Lee", "scheduleText": "Saturday 2:00-4:30 PM Drop-in Basketball" }
+      ]
+    },
+    {
+      "courtId": "fb009e9e-9ed2-c24d-bba7-dedcde4f9c77",
+      "courtName": "Minnie & Lovie Ward Recreational Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://sfrecpark.org/Facilities/Facility/Details/Minnie-Love-Ward-Rec-Center-97",
+      "sourceTitle": "Minnie & Lovie Ward Rec Center Summer Schedule",
+      "access": "Public drop-in; schedule subject to change",
+      "seriesStartsOn": "2026-06-02",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Conservative bound aligned to the current SF Rec and Park summer programming cycle",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Wednesday", "localStart": "18:45", "durationMinutes": 120, "title": "Wednesday Drop-in Basketball - Minnie & Lovie Ward", "scheduleText": "Wednesday 6:45-8:45 PM Drop-in Basketball" },
+        { "weekday": "Thursday", "localStart": "16:00", "durationMinutes": 135, "title": "Thursday Drop-in Basketball - Minnie & Lovie Ward", "scheduleText": "Thursday 4:00-6:15 PM Drop-in Basketball" },
+        { "weekday": "Friday", "localStart": "16:00", "durationMinutes": 285, "title": "Friday Drop-in Basketball - Minnie & Lovie Ward", "scheduleText": "Friday 4:00-8:45 PM Drop-in Basketball" },
+        { "weekday": "Saturday", "localStart": "10:30", "durationMinutes": 120, "title": "Saturday Women's Basketball - Minnie & Lovie Ward", "scheduleText": "Saturday 10:30 AM-12:30 PM Drop-in Women's Basketball", "ageRange": "open", "audience": "Women" },
+        { "weekday": "Saturday", "localStart": "12:45", "durationMinutes": 240, "title": "Saturday Drop-in Basketball - Minnie & Lovie Ward", "scheduleText": "Saturday 12:45-4:45 PM Drop-in Basketball" }
+      ]
+    },
+    {
+      "courtId": "274ec68b-4c85-dc90-559d-2b7ffa47938a",
+      "courtName": "Mission Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://sfrecpark.org/facilities/facility/details/Mission-Recreation-Center-100",
+      "sourceTitle": "Mission Recreation Center Summer 2026 Schedule",
+      "access": "Public basketball open gym; free unless otherwise noted",
+      "seriesStartsOn": "2026-05-26",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Official Summer 2026 schedule bound through August 29",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "09:00", "durationMinutes": 90, "title": "Basketball Open Gym - Mission Recreation Center", "scheduleText": "Tuesday 9:00-10:30 AM Basketball Open Gym" },
+        { "weekday": "Tuesday", "localStart": "14:30", "durationMinutes": 90, "title": "Basketball Open Gym - Mission Recreation Center", "scheduleText": "Tuesday 2:30-4:00 PM Basketball Open Gym" },
+        { "weekday": "Wednesday", "localStart": "09:00", "durationMinutes": 120, "title": "Basketball Open Gym - Mission Recreation Center", "scheduleText": "Wednesday 9:00-11:00 AM Basketball Open Gym" },
+        { "weekday": "Wednesday", "localStart": "13:00", "durationMinutes": 180, "title": "Basketball Open Gym - Mission Recreation Center", "scheduleText": "Wednesday 1:00-4:00 PM Basketball Open Gym" },
+        { "weekday": "Thursday", "localStart": "09:00", "durationMinutes": 420, "title": "Basketball Open Gym - Mission Recreation Center", "scheduleText": "Thursday 9:00 AM-4:00 PM Basketball Open Gym" },
+        { "weekday": "Friday", "localStart": "09:00", "durationMinutes": 480, "title": "Basketball Open Gym - Mission Recreation Center", "scheduleText": "Friday 9:00 AM-5:00 PM Basketball Open Gym" },
+        { "weekday": "Saturday", "localStart": "09:00", "durationMinutes": 480, "title": "Basketball Open Gym - Mission Recreation Center", "scheduleText": "Saturday 9:00 AM-5:00 PM Basketball Open Gym" }
+      ]
+    },
+    {
+      "courtId": "aefa9baf-2b3b-ccba-7cd5-63dce89476ed",
+      "courtName": "Palega Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://sfrecpark.org/ImageRepository/Document?documentId=29240",
+      "sourceTitle": "Palega Summer 2026 Gym Schedule",
+      "access": "Public drop-in; Saturday adult basketball requires registration",
+      "seriesStartsOn": "2026-06-01",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Official Summer 2026 schedule bound",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Thursday", "localStart": "18:00", "durationMinutes": 180, "title": "Thursday Women's Drop-in Basketball - Palega", "scheduleText": "Thursday 6:00-9:00 PM Women's Drop-in Basketball", "audience": "Women" },
+        { "weekday": "Saturday", "localStart": "09:00", "durationMinutes": 240, "title": "Saturday Adult Basketball - Palega", "scheduleText": "Saturday 9:00 AM-1:00 PM Adult Basketball; registration required", "ageRange": "18+", "audience": "Adults age 18 and older" }
+      ]
+    },
+    {
+      "courtId": "10777896-f063-8886-a68a-4c6f66347099",
+      "courtName": "Richmond Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.sfrecpark.org/Facilities/Facility/Details/Richmond-Rec-Center-105",
+      "sourceTitle": "Richmond Recreation Center Summer Open Gym Basketball Schedule",
+      "access": "Public open gym; schedule subject to change",
+      "maxPlayers": 15,
+      "seriesStartsOn": "2026-06-01",
+      "seriesEndsOn": "2026-08-31",
+      "seasonEndBasis": "Official page labels the schedule June through August",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "18:00", "durationMinutes": 345, "title": "Tuesday Summer Basketball Open Gym - Richmond Rec", "scheduleText": "Tuesday 6:00-11:45 PM Open Gym Basketball", "existingRunId": "9b6abbf2-74f4-454c-90b4-387794de741c" },
+        { "weekday": "Wednesday", "localStart": "14:45", "durationMinutes": 360, "title": "Wednesday Summer Basketball Open Gym - Richmond Rec", "scheduleText": "Wednesday 2:45-8:45 PM Open Gym Basketball" },
+        { "weekday": "Thursday", "localStart": "13:45", "durationMinutes": 225, "title": "Thursday Summer Basketball Open Gym - Richmond Rec", "scheduleText": "Thursday 1:45-5:30 PM Open Gym Basketball" },
+        { "weekday": "Friday", "localStart": "14:45", "durationMinutes": 360, "title": "Friday Summer Basketball Open Gym - Richmond Rec", "scheduleText": "Friday 2:45-8:45 PM Open Gym Basketball" },
+        { "weekday": "Saturday", "localStart": "13:45", "durationMinutes": 165, "title": "Saturday Summer Basketball Open Gym - Richmond Rec", "scheduleText": "Saturday 1:45-4:30 PM Open Gym Basketball" }
+      ]
+    },
+    {
+      "courtId": "bfe3299f-01b9-4a9f-321e-f8150818731d",
+      "courtName": "Sunset Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.sfrecpark.org/Facilities/Facility/Details/Sunset-Rec-Center-110",
+      "sourceTitle": "Sunset Rec Center Summer Schedule",
+      "access": "Public drop-in; schedule subject to change",
+      "seriesStartsOn": "2026-06-02",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Conservative bound aligned to the current SF Rec and Park summer programming cycle",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Thursday", "localStart": "17:30", "durationMinutes": 210, "title": "Thursday Drop-in Basketball - Sunset", "scheduleText": "Thursday 5:30-9:00 PM Drop-in Basketball" },
+        { "weekday": "Friday", "localStart": "17:30", "durationMinutes": 210, "title": "Friday Drop-in Basketball - Sunset", "scheduleText": "Friday 5:30-9:00 PM Drop-in Basketball" }
+      ]
+    },
+    {
+      "courtId": "b0b12244-1b38-d275-8c53-5a2f8ad53aab",
+      "courtName": "Upper Noe Recreation Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://sfrecpark.org/ImageRepository/Document?documentId=29245",
+      "sourceTitle": "Upper Noe Summer 2026 Gym Schedule",
+      "access": "Public open basketball; schedule subject to change",
+      "seriesStartsOn": "2026-06-01",
+      "seriesEndsOn": "2026-08-29",
+      "seasonEndBasis": "Official Summer 2026 schedule bound",
+      "replaceActiveSchedule": true,
+      "slots": [
+        { "weekday": "Tuesday", "localStart": "18:00", "durationMinutes": 165, "title": "Tuesday Adult Open Basketball - Upper Noe", "scheduleText": "Tuesday 6:00-8:45 PM Adult Open Basketball", "ageRange": "18+", "audience": "Adults age 18 and older" },
+        { "weekday": "Thursday", "localStart": "18:00", "durationMinutes": 165, "title": "Thursday Adult Open Basketball - Upper Noe", "scheduleText": "Thursday 6:00-8:45 PM Adult Open Basketball", "ageRange": "18+", "audience": "Adults age 18 and older" },
+        { "weekday": "Saturday", "localStart": "09:00", "durationMinutes": 180, "title": "Saturday Open Basketball - Upper Noe", "scheduleText": "Saturday 9:00 AM-12:00 PM Open Basketball" }
+      ]
+    }
+  ]
+}

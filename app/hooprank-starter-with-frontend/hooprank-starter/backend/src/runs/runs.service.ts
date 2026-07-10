@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { getRecurrenceUntil, isWeeklyRecurrence } from '../common/weekly-recurrence';
 
 @Injectable()
 export class RunsService {
@@ -161,7 +162,11 @@ export class RunsService {
                 SELECT *
                 FROM scheduled_runs
                 WHERE is_recurring = true
-                  AND recurrence_rule = 'weekly'
+                  AND (
+                    LOWER(COALESCE(recurrence_rule, 'weekly')) LIKE 'weekly%'
+                    OR UPPER(COALESCE(recurrence_rule, 'weekly')) LIKE 'FREQ=WEEKLY%'
+                    OR UPPER(COALESCE(recurrence_rule, 'weekly')) LIKE 'RRULE:FREQ=WEEKLY%'
+                  )
                   AND court_id = $1
                   AND COALESCE(title, '') = COALESCE($2, '')
                   AND EXTRACT(DOW FROM scheduled_at AT TIME ZONE 'UTC') = EXTRACT(DOW FROM $3::timestamptz AT TIME ZONE 'UTC')
@@ -344,12 +349,18 @@ export class RunsService {
             ORDER BY deduped."scheduledAt" ASC
         `, [courtId, userId || '', now]);
 
+        const currentRuns = runs.filter((run) => {
+            if (!run.isRecurring || !isWeeklyRecurrence(run.recurrenceRule)) return true;
+            const recurrenceUntil = getRecurrenceUntil(run.recurrenceRule);
+            return !recurrenceUntil || recurrenceUntil >= new Date(now);
+        });
+
         // Attach attendees to each run
-        for (const run of runs) {
+        for (const run of currentRuns) {
             run.attendees = await this.getRunAttendees(run.id);
         }
 
-        return runs;
+        return currentRuns;
     }
 
     async getRunAttendees(runId: string): Promise<any[]> {
@@ -480,7 +491,12 @@ export class RunsService {
                     age_range, duration_minutes, max_players, notes, 
                     tagged_player_ids, tag_mode, recurrence_rule, scheduled_at, status_id, created_at
                 FROM scheduled_runs 
-                WHERE is_recurring = true AND recurrence_rule = 'weekly'
+                WHERE is_recurring = true
+                  AND (
+                    LOWER(COALESCE(recurrence_rule, 'weekly')) LIKE 'weekly%'
+                    OR UPPER(COALESCE(recurrence_rule, 'weekly')) LIKE 'FREQ=WEEKLY%'
+                    OR UPPER(COALESCE(recurrence_rule, 'weekly')) LIKE 'RRULE:FREQ=WEEKLY%'
+                  )
             `);
 
             if (templatesRaw.length === 0) return;
@@ -519,6 +535,9 @@ export class RunsService {
 
             for (const template of templates) {
                 const originalDate = new Date(template.scheduled_at);
+                const recurrenceUntil = getRecurrenceUntil(template.recurrence_rule);
+                if (recurrenceUntil && recurrenceUntil < now) continue;
+
                 const targetDayOfWeek = originalDate.getUTCDay();
                 const targetHours = originalDate.getUTCHours();
                 const targetMinutes = originalDate.getUTCMinutes();
@@ -575,6 +594,9 @@ export class RunsService {
                 const currentDay = upcomingInstance.getUTCDay();
                 const distance = (targetDayOfWeek + 7 - currentDay) % 7;
                 upcomingInstance.setUTCDate(upcomingInstance.getUTCDate() + distance);
+
+                if (upcomingInstance < originalDate) continue;
+                if (recurrenceUntil && upcomingInstance > recurrenceUntil) continue;
 
                 // If 'upcomingInstance' is strictly inside our [NOW ... NOW + 48h] window
                 if (upcomingInstance > now && upcomingInstance <= windowEnd) {
