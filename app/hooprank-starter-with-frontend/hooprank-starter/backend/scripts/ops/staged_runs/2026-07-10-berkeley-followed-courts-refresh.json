@@ -1,0 +1,162 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Berkeley, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    {
+      "courtId": "20146e23-f02c-d39d-053e-4d2430ae5767",
+      "courtName": "Haas Pavilion",
+      "status": "accepted_events",
+      "reviewReason": "Current camp registration pages confirm two one-day Bear for a Day basketball camps at Haas Pavilion."
+    },
+    {
+      "courtId": "7ad66298-0a1c-ec11-ad07-804dadfbfa4e",
+      "courtName": "James Kenney Community Center",
+      "status": "accepted_activity",
+      "reviewReason": "Current City of Berkeley and BORP pages confirm adult open gym, women's open gym, and weekly youth wheelchair basketball practice."
+    }
+  ],
+  "courtSchedules": [
+    {
+      "courtId": "7ad66298-0a1c-ec11-ad07-804dadfbfa4e",
+      "courtName": "James Kenney Community Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://berkeleyca.gov/community-recreation/parks-recreation/facilities/james-kenney-community-center",
+      "sourceTitle": "James Kenney Community Center | City of Berkeley",
+      "access": "Public drop-in; adult and women's basketball are free; women's participants sign a waiver at each entry",
+      "maxPlayers": 14,
+      "seriesStartsOn": "2026-07-06",
+      "seriesEndsOn": "2026-12-31",
+      "seasonEndBasis": "The current city page calls each program ongoing; this conservative bound forces revalidation before 2027",
+      "replaceActiveSchedule": true,
+      "slots": [
+        {
+          "weekday": "Monday",
+          "localStart": "18:00",
+          "durationMinutes": 180,
+          "title": "Women's Basketball - James Kenney Community Center",
+          "scheduleText": "Monday 6:00-9:00 PM Women's Basketball",
+          "ageRange": "18+ women",
+          "audience": "Women age 18 and older",
+          "existingRunId": "2958e584-7323-40c9-b7a7-fa7ceb2c2f4a"
+        },
+        {
+          "weekday": "Wednesday",
+          "localStart": "18:00",
+          "durationMinutes": 180,
+          "title": "Women's Basketball - James Kenney Community Center",
+          "scheduleText": "Wednesday 6:00-9:00 PM Women's Basketball",
+          "ageRange": "18+ women",
+          "audience": "Women age 18 and older"
+        },
+        {
+          "weekday": "Wednesday",
+          "localStart": "20:00",
+          "durationMinutes": 120,
+          "title": "Adult Basketball - James Kenney Community Center",
+          "scheduleText": "Wednesday 8:00-10:00 PM Adult Basketball",
+          "ageRange": "18+",
+          "audience": "Adults age 18 and older"
+        },
+        {
+          "weekday": "Friday",
+          "localStart": "18:00",
+          "durationMinutes": 180,
+          "title": "Women's Basketball - James Kenney Community Center",
+          "scheduleText": "Friday 6:00-9:00 PM Women's Basketball",
+          "ageRange": "18+ women",
+          "audience": "Women age 18 and older"
+        }
+      ]
+    }
+  ],
+  "courtEvents": [
+    {
+      "courtId": "20146e23-f02c-d39d-053e-4d2430ae5767",
+      "courtName": "Haas Pavilion",
+      "eventType": "camp",
+      "title": "Cal Boys Basketball Bear for a Day Camp",
+      "confidence": "high",
+      "evidenceType": "platform",
+      "sourceUrl": "https://www.ussportscamps.com/basketball/cal/cal-boys-basketball-camp",
+      "sourceTitle": "Cal Boys Basketball Camp - 2026 | US Sports Camps",
+      "organizerName": "Cal Sports Camps",
+      "registrationUrl": "https://www.ussportscamps.com/basketball/cal/cal-boys-basketball-camp",
+      "costText": "$105; sold out, waitlist available",
+      "audience": "Boys entering grades 7-12",
+      "ageRange": "12-18",
+      "skillLevel": "All skill levels",
+      "format": "Bear for a Day clinic",
+      "replaceSourceWindow": { "startsOn": "2026-07-31", "endsOn": "2026-07-31" },
+      "sessions": [
+        {
+          "title": "Cal Boys Basketball Bear for a Day Camp",
+          "startsOn": "2026-07-31",
+          "endsOn": "2026-07-31",
+          "weekdays": ["Friday"],
+          "localStart": "09:00",
+          "localEnd": "16:00",
+          "scheduleText": "Friday, July 31, 2026, 9:00 AM-4:00 PM at Haas Pavilion"
+        }
+      ]
+    },
+    {
+      "courtId": "20146e23-f02c-d39d-053e-4d2430ae5767",
+      "courtName": "Haas Pavilion",
+      "eventType": "camp",
+      "title": "Cal Girls Basketball Bear for a Day Camp",
+      "confidence": "high",
+      "evidenceType": "platform",
+      "sourceUrl": "https://www.ussportscamps.com/basketball/cal/cal-girls-basketball-camp",
+      "sourceTitle": "Cal Kids Basketball Camp - 2026 | US Sports Camps",
+      "organizerName": "Cal Sports Camps",
+      "registrationUrl": "https://www.ussportscamps.com/basketball/cal/cal-girls-basketball-camp",
+      "costText": "$105; sold out, waitlist available",
+      "audience": "Girls entering grades 7-12",
+      "ageRange": "12-18",
+      "skillLevel": "All skill levels",
+      "format": "Bear for a Day clinic",
+      "replaceSourceWindow": { "startsOn": "2026-08-01", "endsOn": "2026-08-01" },
+      "sessions": [
+        {
+          "title": "Cal Girls Basketball Bear for a Day Camp",
+          "startsOn": "2026-08-01",
+          "endsOn": "2026-08-01",
+          "weekdays": ["Saturday"],
+          "localStart": "09:00",
+          "localEnd": "16:00",
+          "scheduleText": "Saturday, August 1, 2026, 9:00 AM-4:00 PM at Haas Pavilion"
+        }
+      ]
+    },
+    {
+      "courtId": "7ad66298-0a1c-ec11-ad07-804dadfbfa4e",
+      "courtName": "James Kenney Community Center",
+      "eventType": "practice",
+      "title": "BORP Youth Wheelchair Basketball Practice",
+      "confidence": "high",
+      "evidenceType": "community",
+      "sourceUrl": "https://www.borp.org/programs/youth-sports/youth-wheelchair-basketball/",
+      "sourceTitle": "Youth Wheelchair Basketball - BORP Adaptive Sports and Recreation",
+      "organizerName": "BORP Adaptive Sports and Recreation",
+      "registrationUrl": "https://www.borp.org/programs/youth-sports/youth-wheelchair-basketball/",
+      "audience": "Mixed-gender youth with lower-limb disabilities; sports chairs are available",
+      "ageRange": "5 through high school graduation",
+      "skillLevel": "All experience levels",
+      "format": "Wheelchair basketball practice",
+      "seriesStartsOn": "2026-07-11",
+      "recurringSlots": [
+        {
+          "title": "BORP Youth Wheelchair Basketball Practice",
+          "weekday": "Saturday",
+          "localStart": "11:00",
+          "localEnd": "13:00",
+          "scheduleText": "Weekly Saturdays 11:00 AM-1:00 PM at James Kenney Community Center Gym"
+        }
+      ]
+    }
+  ]
+}

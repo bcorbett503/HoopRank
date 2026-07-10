@@ -364,6 +364,11 @@ function expandCourtEventDefinition(definition) {
                     title: session.title || definition.title,
                     startsAt: startsAt.toUTC().toISO(),
                     endsAt: endsAt.toUTC().toISO(),
+                    isRecurring: false,
+                    recurrenceRule: null,
+                    seriesStartsOn: null,
+                    seriesEndsOn: null,
+                    exceptionDates: null,
                     scheduleText:
                         session.scheduleText ||
                         `${weekday}, ${date.toISODate()}, ${session.localStart}-${session.localEnd}`,
@@ -371,6 +376,33 @@ function expandCourtEventDefinition(definition) {
             }
             date = date.plus({ days: 1 });
         }
+    }
+
+    for (const slot of definition.recurringSlots || []) {
+        const seriesStartsOn = slot.seriesStartsOn || definition.seriesStartsOn;
+        assert(seriesStartsOn, `Missing recurring event seriesStartsOn for ${definition.title}`);
+        const startsAt = firstOccurrence(seriesStartsOn, slot, artifact.timezone);
+        const startLocal = DateTime.fromISO(startsAt, { zone: artifact.timezone });
+        const [endHour, endMinute] = slot.localEnd.split(':').map(Number);
+        let endLocal = startLocal.set({ hour: endHour, minute: endMinute });
+        if (endLocal <= startLocal) endLocal = endLocal.plus({ days: 1 });
+        const seriesEndsOn = slot.seriesEndsOn || definition.seriesEndsOn || null;
+        desired.push({
+            title: slot.title || definition.title,
+            startsAt,
+            endsAt: endLocal.toUTC().toISO(),
+            isRecurring: true,
+            recurrenceRule: 'weekly',
+            seriesStartsOn,
+            seriesEndsOn,
+            exceptionDates: slot.exceptionDates?.length
+                ? JSON.stringify(slot.exceptionDates)
+                : null,
+            slotKey: desiredSlotKey(slot),
+            scheduleText:
+                slot.scheduleText ||
+                `Weekly ${slot.weekday}, ${slot.localStart}-${slot.localEnd}`,
+        });
     }
     return desired;
 }
@@ -425,13 +457,20 @@ async function processCourtEvents(client, definition, reviewedAt) {
         assert(!desiredKeys.has(key), `Duplicate desired court event ${key}`);
         desiredKeys.add(key);
 
-        const matches = existing.filter(
-            (row) =>
-                String(row.event_type) === definition.eventType &&
-                normalizeTitle(row.title) === normalizeTitle(desired.title) &&
-                new Date(row.starts_at).toISOString() === new Date(desired.startsAt).toISOString() &&
-                String(row.source_url) === definition.sourceUrl,
-        );
+        const matches = existing.filter((row) => {
+            if (
+                String(row.event_type) !== definition.eventType ||
+                normalizeTitle(row.title) !== normalizeTitle(desired.title) ||
+                String(row.source_url) !== definition.sourceUrl ||
+                Boolean(row.is_recurring) !== desired.isRecurring
+            ) {
+                return false;
+            }
+            return desired.isRecurring
+                ? localSlotKey(row.starts_at, artifact.timezone) === desired.slotKey
+                : new Date(row.starts_at).toISOString() ===
+                      new Date(desired.startsAt).toISOString();
+        });
         assert(matches.length <= 1, `Multiple court events match ${key}`);
         const notes = buildCourtEventNotes(definition, desired, reviewedAt);
         const values = [
@@ -452,6 +491,11 @@ async function processCourtEvents(client, definition, reviewedAt) {
             definition.evidenceType,
             definition.confidence,
             notes,
+            desired.isRecurring,
+            desired.recurrenceRule,
+            desired.seriesStartsOn,
+            desired.seriesEndsOn,
+            desired.exceptionDates,
         ];
 
         if (matches.length === 1) {
@@ -459,14 +503,14 @@ async function processCourtEvents(client, definition, reviewedAt) {
             await client.query(
                 `UPDATE court_events
                  SET event_type = $1, title = $2, starts_at = $3, ends_at = $4,
-                     timezone = $5, is_recurring = false, recurrence_rule = NULL,
-                     series_starts_on = NULL, series_ends_on = NULL, exception_dates = NULL,
+                     timezone = $5, is_recurring = $18, recurrence_rule = $19,
+                     series_starts_on = $20, series_ends_on = $21, exception_dates = $22,
                      organizer_name = $6, registration_url = $7, source_url = $8,
                      source_title = $9, cost_text = $10, audience = $11,
                      age_range = $12, skill_level = $13, format = $14,
                      evidence_type = $15, confidence = $16, status = 'published',
                      notes = $17, updated_at = NOW()
-                 WHERE id = $18 AND created_by = $19`,
+                 WHERE id = $23 AND created_by = $24`,
                 [...values, target.id, artifact.adminUserId],
             );
             accountedIds.add(String(target.id));
@@ -475,13 +519,15 @@ async function processCourtEvents(client, definition, reviewedAt) {
             const inserted = await client.query(
                 `INSERT INTO court_events (
                     court_id, created_by, event_type, title, starts_at, ends_at,
-                    timezone, is_recurring, organizer_name, registration_url,
+                    timezone, is_recurring, recurrence_rule, series_starts_on,
+                    series_ends_on, exception_dates, organizer_name, registration_url,
                     source_url, source_title, cost_text, audience, age_range,
                     skill_level, format, evidence_type, confidence, status, notes,
                     created_at, updated_at
                  ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10, $11,
-                    $12, $13, $14, $15, $16, $17, $18, 'published', $19, NOW(), NOW()
+                    $1, $2, $3, $4, $5, $6, $7, $20, $21, $22, $23, $24,
+                    $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+                    'published', $19, NOW(), NOW()
                  ) RETURNING id`,
                 [definition.courtId, artifact.adminUserId, ...values],
             );
@@ -552,7 +598,8 @@ async function verifyAppliedState(client, reviewedAt) {
                 `SELECT * FROM court_events
                  WHERE court_id::text = $1 AND created_by = $2
                    AND event_type = $3 AND LOWER(BTRIM(title)) = LOWER(BTRIM($4))
-                   AND starts_at = $5 AND source_url = $6 AND status = 'published'`,
+                   AND starts_at = $5 AND source_url = $6 AND status = 'published'
+                   AND COALESCE(is_recurring, false) = $7`,
                 [
                     definition.courtId,
                     artifact.adminUserId,
@@ -560,6 +607,7 @@ async function verifyAppliedState(client, reviewedAt) {
                     desired.title,
                     desired.startsAt,
                     definition.sourceUrl,
+                    desired.isRecurring,
                 ],
             );
             assert(result.rows.length === 1, `Court event verification failed: ${desired.title} ${desired.startsAt}`);
