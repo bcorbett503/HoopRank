@@ -1,0 +1,85 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Dublin, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    { "courtId": "0a0d87bb-76a4-26c3-46f3-0812bf2a0463", "courtName": "Basketball Courts", "status": "no_concrete_public_schedule", "reviewReason": "The court record lacks a specific venue address and no current activity could be matched to it with high confidence." },
+    { "courtId": "8cf38c9c-7e6b-a754-5394-d6119fb52113", "courtName": "Dublin Sports Grounds", "status": "no_concrete_public_basketball_schedule", "reviewReason": "Current public events at the grounds are for other sports; no concrete basketball activity was found." },
+    { "courtId": "3ee357a1-d794-121d-ce26-70e65d547cb4", "courtName": "Fallon Sports Park", "status": "no_concrete_public_basketball_schedule", "reviewReason": "Current public events at the park are for other sports; no concrete basketball activity was found." },
+    { "courtId": "0a1eb636-bed5-c490-0720-fb43220fb7cf", "courtName": "Shannon Community Center", "status": "no_concrete_public_schedule", "reviewReason": "No current public basketball activity with a concrete date or recurring time was found." },
+    { "courtId": "59ea237b-3206-76f9-9c75-9b2eb628061a", "courtName": "Stager Community Gymnasium", "status": "accepted_events", "reviewReason": "Current official league and facility calendars document a men's league and dated youth basketball activities." },
+    { "courtId": "9e06d666-98a2-b6dd-40c8-962dd05fadd4", "courtName": "The Boulevard Rec Center", "status": "no_concrete_public_schedule", "reviewReason": "No current public basketball activity with a concrete date or recurring time was found." }
+  ],
+  "courtSchedules": [],
+  "courtEvents": [
+    {
+      "courtId": "59ea237b-3206-76f9-9c75-9b2eb628061a",
+      "courtName": "Stager Community Gymnasium",
+      "eventType": "league",
+      "title": "Dublin Men's 5-on-5 Basketball League",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://dublin.ca.gov/406/Basketball",
+      "sourceTitle": "Basketball | Dublin, CA - Official Website",
+      "organizerName": "City of Dublin Parks & Community Services",
+      "registrationUrl": "https://dublin.ca.gov/406/Basketball",
+      "audience": "Adult men; team registration only",
+      "ageRange": "18+ men",
+      "skillLevel": "Open league",
+      "format": "5-on-5 league games",
+      "seriesStartsOn": "2026-07-12",
+      "seriesEndsOn": "2026-08-02",
+      "recurringSlots": [
+        {
+          "title": "Dublin Men's 5-on-5 Basketball League",
+          "weekday": "Sunday",
+          "localStart": "16:30",
+          "localEnd": "21:30",
+          "scheduleText": "Spring/Summer 2026 league games Sundays 4:30-9:30 PM through August 2, 2026"
+        }
+      ]
+    },
+    {
+      "courtId": "59ea237b-3206-76f9-9c75-9b2eb628061a",
+      "courtName": "Stager Community Gymnasium",
+      "eventType": "clinic",
+      "title": "Wee Hoop Basketball Sessions",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.dublin.ca.gov/DocumentCenter/View/31844/Stager-Gym",
+      "sourceTitle": "Stager Community Gym Schedule - generated July 2, 2026",
+      "organizerName": "City of Dublin Parks & Community Services",
+      "registrationUrl": "https://www.dublin.ca.gov/250/Activity-Guide-Registration",
+      "audience": "Youth",
+      "skillLevel": "Introductory",
+      "format": "Youth basketball skills session",
+      "replaceSourceWindow": { "startsOn": "2026-07-11", "endsOn": "2026-07-11" },
+      "sessions": [
+        { "title": "Wee Hoop Dribblers", "startsOn": "2026-07-11", "endsOn": "2026-07-11", "weekdays": ["Saturday"], "localStart": "09:00", "localEnd": "09:35", "scheduleText": "Saturday, July 11, 2026, 9:00-9:35 AM at Stager Community Gym" },
+        { "title": "Wee Hoop Jump Shooters", "startsOn": "2026-07-11", "endsOn": "2026-07-11", "weekdays": ["Saturday"], "localStart": "09:40", "localEnd": "10:20", "scheduleText": "Saturday, July 11, 2026, 9:40-10:20 AM at Stager Community Gym" },
+        { "title": "Wee Hoop Hot Shots", "startsOn": "2026-07-11", "endsOn": "2026-07-11", "weekdays": ["Saturday"], "localStart": "10:25", "localEnd": "11:15", "scheduleText": "Saturday, July 11, 2026, 10:25-11:15 AM at Stager Community Gym" }
+      ]
+    },
+    {
+      "courtId": "59ea237b-3206-76f9-9c75-9b2eb628061a",
+      "courtName": "Stager Community Gymnasium",
+      "eventType": "camp",
+      "title": "Make Me a Pro Basketball Camp",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.dublin.ca.gov/DocumentCenter/View/31844/Stager-Gym",
+      "sourceTitle": "Stager Community Gym Schedule - generated July 2, 2026",
+      "organizerName": "City of Dublin Parks & Community Services",
+      "registrationUrl": "https://www.dublin.ca.gov/250/Activity-Guide-Registration",
+      "audience": "Youth",
+      "skillLevel": "All ability levels",
+      "format": "Basketball day camp; full-day and morning options are listed",
+      "replaceSourceWindow": { "startsOn": "2026-07-13", "endsOn": "2026-07-13" },
+      "sessions": [
+        { "title": "Make Me a Pro Basketball Camp", "startsOn": "2026-07-13", "endsOn": "2026-07-13", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "15:00", "scheduleText": "Monday, July 13, 2026, 9:00 AM-3:00 PM at Stager Community Gym; a 9:00 AM-noon option is also listed" }
+      ]
+    }
+  ]
+}
