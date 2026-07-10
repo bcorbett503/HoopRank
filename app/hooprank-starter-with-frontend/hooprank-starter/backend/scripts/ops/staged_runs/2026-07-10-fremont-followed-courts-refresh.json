@@ -1,0 +1,205 @@
+{
+  "kind": "followed_court_run_refresh_v1",
+  "city": "Fremont, CA",
+  "timezone": "America/Los_Angeles",
+  "reviewedAt": "2026-07-10",
+  "adminUserId": "4ODZUrySRUhFDC5wVW6dCySBprD2",
+  "reviewedCourts": [
+    {
+      "courtId": "54b9f2ea-80a7-dca5-f80a-25a528f227b6",
+      "courtName": "Bay Club Fremont",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "The club confirms basketball courts and member open play, but no public basketball timetable is posted. Current multi-sport camps have dated sessions, but their public listings do not specify when basketball occurs within the camp day."
+    },
+    {
+      "courtId": "22090faa-3f0e-4a36-bb9c-72324bfcb788",
+      "courtName": "David Jones Park Basketball Court",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "The City confirms the park basketball court, but no current public run, league, tournament, camp, clinic, or team schedule could be tied to it."
+    },
+    {
+      "courtId": "22a014f7-6ace-ac36-64d6-e624e4b12430",
+      "courtName": "Fremont Basketball Court",
+      "status": "no_concrete_public_basketball_schedule",
+      "reviewReason": "The Central Park courts are publicly documented, but no current dated or recurring public basketball activity was found at 1740 Stevenson Boulevard. Dynamic private lesson availability is not treated as a public court event."
+    },
+    {
+      "courtId": "b1920dbe-72a3-3bc4-dfd0-94776306b60a",
+      "courtName": "HoopSphere Basketball Academy: Flagship Facility",
+      "status": "accepted_events",
+      "reviewReason": "Current official HoopSphere pages document six weekly Fremont League divisions and four upcoming 2026 summer camp starts at the exact Flagship address."
+    },
+    {
+      "courtId": "01bc0736-d859-8606-063b-e396aa8139e2",
+      "courtName": "HoopSphere Basketball Academy: Theatre Gym",
+      "status": "accepted_events",
+      "reviewReason": "The current official Theatre Gym camp page documents four upcoming 2026 summer camp starts at the exact followed-court address."
+    },
+    {
+      "courtId": "9effaa73-56de-101c-480d-c5b826538064",
+      "courtName": "Wally Pond Irvington Community Center",
+      "status": "accepted_run_with_retirement",
+      "reviewReason": "The current official facility page confirms Saturday basketball from 7:00-9:00 AM on Court B and no longer lists the previously published Friday 12:30-1:30 PM slot."
+    }
+  ],
+  "nonPublishedFindings": [
+    {
+      "courtId": "54b9f2ea-80a7-dca5-f80a-25a528f227b6",
+      "courtName": "Bay Club Fremont",
+      "sourceUrl": "https://www.bayclubs.com/events",
+      "additionalSource": "https://www.bayclubs.com/amenity/basketball",
+      "evidenceType": "official",
+      "confidence": "medium",
+      "reviewStatus": "rejected_for_publication",
+      "activityType": "camp",
+      "scheduleText": "Bay Club Fremont lists weekday multi-sport camps from July 13 through August 28, generally 9:00 AM-4:00 PM.",
+      "reviewReason": "The basketball amenity page establishes that Fremont offers basketball, but the camp calendar does not prove a basketball segment on a particular camp date or time."
+    }
+  ],
+  "courtSchedules": [
+    {
+      "courtId": "9effaa73-56de-101c-480d-c5b826538064",
+      "courtName": "Wally Pond Irvington Community Center",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.fremont.gov/government/departments/parks-recreation/facilities-rentals/community-centers/wally-pond-irvington-community-center",
+      "sourceTitle": "Wally Pond Irvington Community Center | City of Fremont",
+      "seriesStartsOn": "2026-07-11",
+      "seriesEndsOn": "2026-12-31",
+      "seasonEndBasis": "operational re-verification horizon; the current official page presents the Saturday basketball schedule without a stated end date",
+      "access": "First-come, first-served. Current facility pricing is $5 for Fremont residents and $6 for non-residents",
+      "maxPlayers": 14,
+      "replaceActiveSchedule": true,
+      "retireRunIds": ["763f0994-f2c7-4e40-9416-36da8c58ad7f"],
+      "slots": [
+        {
+          "existingRunId": "3d1b540f-72bf-4cae-9aba-f16b2266f525",
+          "title": "Drop-In Basketball - Wally Pond Irvington Community Center",
+          "weekday": "Saturday",
+          "localStart": "07:00",
+          "durationMinutes": 120,
+          "maxPlayers": 14,
+          "gameMode": "5v5",
+          "courtType": "indoor",
+          "ageRange": "open",
+          "audience": "Public drop-in players",
+          "scheduleText": "Saturdays 7:00-9:00 AM on Court B"
+        }
+      ]
+    }
+  ],
+  "courtEvents": [
+    {
+      "courtId": "b1920dbe-72a3-3bc4-dfd0-94776306b60a",
+      "courtName": "HoopSphere Basketball Academy: Flagship Facility",
+      "eventType": "league",
+      "title": "HoopSphere Fremont League",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.hoopsphere.com/fremontleague",
+      "sourceTitle": "Fremont League | HoopSphere",
+      "organizerName": "HoopSphere Basketball Academy",
+      "registrationUrl": "https://www.hoopsphere.com/fremontleague",
+      "audience": "Youth boys, girls, and coed divisions",
+      "ageRange": "Ages 7-14 depending on division",
+      "skillLevel": "League participants",
+      "format": "Six 75-minute boys, girls, and coed league divisions",
+      "seriesStartsOn": "2026-07-11",
+      "seriesEndsOn": "2026-12-31",
+      "seasonEndBasis": "operational re-verification horizon; the current official division schedule does not state a season end",
+      "uncertainty": "The official page publishes division start times but not end times. The 75-minute duration is inferred from the spacing between consecutive division starts and retained from the prior verified records.",
+      "recurringSlots": [
+        {
+          "title": "HoopSphere Fremont League - Boys 8-10 (Sat)",
+          "weekday": "Saturday",
+          "localStart": "13:30",
+          "localEnd": "14:45",
+          "scheduleText": "Saturday Boys 8-10 division starts at 1:30 PM at 1409 Fulton Place"
+        },
+        {
+          "title": "HoopSphere Fremont League - Boys 11-14 (Sat)",
+          "weekday": "Saturday",
+          "localStart": "14:45",
+          "localEnd": "16:00",
+          "scheduleText": "Saturday Boys 11-14 division starts at 2:45 PM at 1409 Fulton Place"
+        },
+        {
+          "title": "HoopSphere Fremont League - Girls 10-14 (Sat)",
+          "weekday": "Saturday",
+          "localStart": "16:00",
+          "localEnd": "17:15",
+          "scheduleText": "Saturday Girls 10-14 division starts at 4:00 PM at 1409 Fulton Place"
+        },
+        {
+          "title": "HoopSphere Fremont League - Boys 8-10 (Sun)",
+          "weekday": "Sunday",
+          "localStart": "13:30",
+          "localEnd": "14:45",
+          "scheduleText": "Sunday Boys 8-10 division starts at 1:30 PM at 1409 Fulton Place"
+        },
+        {
+          "title": "HoopSphere Fremont League - Co-ed 7-9 (Sun)",
+          "weekday": "Sunday",
+          "localStart": "14:45",
+          "localEnd": "16:00",
+          "scheduleText": "Sunday Co-ed 7-9 division starts at 2:45 PM at 1409 Fulton Place"
+        },
+        {
+          "title": "HoopSphere Fremont League - Boys 11-14 (Sun)",
+          "weekday": "Sunday",
+          "localStart": "16:00",
+          "localEnd": "17:15",
+          "scheduleText": "Sunday Boys 11-14 division starts at 4:00 PM at 1409 Fulton Place"
+        }
+      ]
+    },
+    {
+      "courtId": "b1920dbe-72a3-3bc4-dfd0-94776306b60a",
+      "courtName": "HoopSphere Basketball Academy: Flagship Facility",
+      "eventType": "camp",
+      "title": "HoopSphere Flagship Summer Camps",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.hoopsphere.com/flagshipfacility-camps",
+      "sourceTitle": "Fremont Flagship Facility Camps | HoopSphere",
+      "organizerName": "HoopSphere Basketball Academy",
+      "registrationUrl": "https://www.hoopsphere.com/flagshipfacility-camps",
+      "audience": "Boys and girls",
+      "ageRange": "Ages 5-16",
+      "skillLevel": "All skill levels; grouped by age and ability",
+      "format": "Multi-day/one-day skills camp; row marks published start",
+      "uncertainty": "The public page explicitly publishes each start date and daily 9:00 AM-2:00 PM hours, but not each camp's end date. Each event therefore represents only the concrete published opening session.",
+      "replaceSourceWindow": { "startsOn": "2026-07-13", "endsOn": "2026-08-03" },
+      "sessions": [
+        { "title": "HoopSphere Flagship Summer Camp 7", "startsOn": "2026-07-13", "endsOn": "2026-07-13", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "14:00", "scheduleText": "Summer Camp 7 starts July 13, 2026; published camp hours are 9:00 AM-2:00 PM" },
+        { "title": "HoopSphere Flagship Summer Camp 8", "startsOn": "2026-07-20", "endsOn": "2026-07-20", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "14:00", "scheduleText": "Summer Camp 8 starts July 20, 2026; published camp hours are 9:00 AM-2:00 PM" },
+        { "title": "HoopSphere Flagship Summer Camp 9", "startsOn": "2026-07-27", "endsOn": "2026-07-27", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "14:00", "scheduleText": "Summer Camp 9 starts July 27, 2026; published camp hours are 9:00 AM-2:00 PM" },
+        { "title": "HoopSphere Flagship Summer Camp 10", "startsOn": "2026-08-03", "endsOn": "2026-08-03", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "14:00", "scheduleText": "Summer Camp 10 starts August 3, 2026; published camp hours are 9:00 AM-2:00 PM" }
+      ]
+    },
+    {
+      "courtId": "01bc0736-d859-8606-063b-e396aa8139e2",
+      "courtName": "HoopSphere Basketball Academy: Theatre Gym",
+      "eventType": "camp",
+      "title": "HoopSphere Theatre Gym Summer Camps",
+      "confidence": "high",
+      "evidenceType": "official",
+      "sourceUrl": "https://www.hoopsphere.com/theatregym-camps",
+      "sourceTitle": "Fremont Theatre Gym Camps | HoopSphere",
+      "organizerName": "HoopSphere Basketball Academy",
+      "registrationUrl": "https://www.hoopsphere.com/theatregym-camps",
+      "audience": "Boys and girls",
+      "ageRange": "Ages 7-14",
+      "skillLevel": "All skill levels; grouped by age and ability",
+      "format": "Multi-day/one-day skills camp; row marks published start",
+      "uncertainty": "The public page explicitly publishes each start date and daily 9:00 AM-2:00 PM hours, but not each camp's end date. Each event therefore represents only the concrete published opening session.",
+      "replaceSourceWindow": { "startsOn": "2026-07-13", "endsOn": "2026-08-03" },
+      "sessions": [
+        { "title": "HoopSphere Theatre Gym Summer Camp 7", "startsOn": "2026-07-13", "endsOn": "2026-07-13", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "14:00", "scheduleText": "Summer Camp 7 starts July 13, 2026; published camp hours are 9:00 AM-2:00 PM" },
+        { "title": "HoopSphere Theatre Gym Summer Camp 8", "startsOn": "2026-07-20", "endsOn": "2026-07-20", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "14:00", "scheduleText": "Summer Camp 8 starts July 20, 2026; published camp hours are 9:00 AM-2:00 PM" },
+        { "title": "HoopSphere Theatre Gym Summer Camp 9", "startsOn": "2026-07-27", "endsOn": "2026-07-27", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "14:00", "scheduleText": "Summer Camp 9 starts July 27, 2026; published camp hours are 9:00 AM-2:00 PM" },
+        { "title": "HoopSphere Theatre Gym Summer Camp 10", "startsOn": "2026-08-03", "endsOn": "2026-08-03", "weekdays": ["Monday"], "localStart": "09:00", "localEnd": "14:00", "scheduleText": "Summer Camp 10 starts August 3, 2026; published camp hours are 9:00 AM-2:00 PM" }
+      ]
+    }
+  ]
+}

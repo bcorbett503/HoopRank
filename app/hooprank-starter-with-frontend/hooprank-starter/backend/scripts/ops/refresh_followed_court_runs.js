@@ -31,6 +31,7 @@ const stats = {
     retired: 0,
     futureInstancesUpdated: 0,
     futureInstancesDeleted: 0,
+    futureInstancesPreserved: 0,
     followsInserted: 0,
     courtEventsDesired: 0,
     courtEventsInserted: 0,
@@ -130,7 +131,13 @@ async function futureConcreteRows(client, target, timezone) {
     return result.rows.filter((row) => localSlotKey(row.scheduled_at, timezone) === targetKey);
 }
 
-async function updateOrDeleteFutureInstances(client, target, desired, timezone) {
+async function updateOrDeleteFutureInstances(
+    client,
+    target,
+    desired,
+    timezone,
+    preserveAttended = false,
+) {
     const concreteRows = await futureConcreteRows(client, target, timezone);
     if (concreteRows.length === 0) return;
 
@@ -161,6 +168,21 @@ async function updateOrDeleteFutureInstances(client, target, desired, timezone) 
     }
 
     for (const row of concreteRows) {
+        if (preserveAttended && Number(row.attendee_count) > 0) {
+            const marker = `Parent schedule retired by followed-court refresh on ${artifact.reviewedAt}`;
+            if (!String(row.notes || '').includes(marker)) {
+                await client.query(
+                    `UPDATE scheduled_runs SET notes = $1 WHERE id = $2 AND created_by = $3`,
+                    [
+                        `${row.notes || ''}\n\n${marker}: the current official source no longer lists this recurring slot. This occurrence was preserved because it has registered attendees.`.trim(),
+                        row.id,
+                        artifact.adminUserId,
+                    ],
+                );
+                stats.futureInstancesPreserved += 1;
+            }
+            continue;
+        }
         assert(
             Number(row.attendee_count) === 0,
             `Refusing to delete future run ${row.id}; it has ${row.attendee_count} attendee(s)`,
@@ -311,7 +333,7 @@ async function processCourtSchedule(client, schedule, reviewedAt) {
         const target = existing.find((row) => String(row.id) === runId);
         assert(target, `Retire run ${runId} was not found at ${schedule.courtName}`);
         assert(!accountedIds.has(runId), `Run ${runId} cannot be both desired and retired`);
-        await updateOrDeleteFutureInstances(client, target, null, artifact.timezone);
+        await updateOrDeleteFutureInstances(client, target, null, artifact.timezone, true);
         const retiredUntil = reviewedAt.minus({ days: 1 }).endOf('day').toUTC().toISO({ suppressMilliseconds: false });
         const retirementNote = `${target.notes || ''}\n\nRetired by followed-court refresh on ${reviewedAt.toISODate()}: current official schedule no longer lists this slot.`.trim();
         await client.query(
@@ -429,6 +451,12 @@ function buildCourtEventNotes(definition, desired, reviewedAt) {
     if (definition.ageRange) parts.push(`Age range: ${definition.ageRange}.`);
     if (definition.skillLevel) parts.push(`Skill level: ${definition.skillLevel}.`);
     if (definition.format) parts.push(`Format: ${definition.format}.`);
+    if (desired.seriesEndsOn && definition.seasonEndBasis) {
+        parts.push(`Series bound through ${desired.seriesEndsOn}: ${definition.seasonEndBasis}.`);
+    }
+    for (const additionalSource of definition.additionalSources || []) {
+        parts.push(`Additional source: ${additionalSource}.`);
+    }
     if (definition.uncertainty) parts.push(`Uncertainty: ${definition.uncertainty}.`);
     return parts.join(' ');
 }
