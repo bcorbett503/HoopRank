@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
 import '../state/app_state.dart';
 import '../state/check_in_state.dart';
 import '../services/api_service.dart';
+import '../services/court_service.dart';
 // CourtService no longer needed - using ApiService.getCourtsFromApi for proper UUIDs
 import '../models.dart';
 
@@ -18,7 +20,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
   String _search = '';
   List<User> _players = [];
   bool _isLoading = true;
-  
+
   // Court selection
   Court? _selectedCourt;
   bool _isLoadingCourt = true;
@@ -36,28 +38,53 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
   Future<void> _loadCourts() async {
     setState(() => _isLoadingCourt = true);
     try {
-      // Load courts from backend API which has proper UUIDs
-      // This ensures court_id on matches will be valid UUIDs
-      _allCourts = await ApiService.getCourtsFromApi(limit: 200);
-      debugPrint('Loaded ${_allCourts.length} courts from API');
-      
-      // Get followed court IDs and resolve to Court objects
+      // Nearby courts from the regional cache (real backend UUIDs), instead
+      // of the old alphabetical world-slice from GET /courts?limit=200.
+      final courtService = CourtService();
+      await courtService.loadCourts();
+      Position? position;
+      try {
+        position = await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        position = null;
+      }
+      final candidates = position == null
+          ? courtService.getCourts()
+          : courtService.getCourtsNear(position.latitude, position.longitude,
+              radiusKm: 80);
+      // Offline-snapshot courts carry display-only ids that the backend
+      // rejects — never offer them for match creation.
+      _allCourts = candidates
+          .where((c) => !courtService.isDisplayOnlyCourt(c.id))
+          .take(200)
+          .toList();
+      debugPrint('Loaded ${_allCourts.length} nearby courts for match setup');
+
+      // Get followed court IDs and resolve to Court objects (even when they
+      // sit outside the nearby slice).
+      if (!mounted) return;
       final checkInState = Provider.of<CheckInState>(context, listen: false);
       final followedIds = checkInState.followedCourts;
-      _followedCourts = _allCourts.where((c) => followedIds.contains(c.id)).toList();
-      
+      await courtService.resolveCourtsByIds(followedIds);
+      _followedCourts = [
+        for (final id in followedIds)
+          if (courtService.getCourtById(id) != null)
+            courtService.getCourtById(id)!,
+      ];
+
       // Don't auto-detect - let user select court manually
-      
+
       if (mounted) setState(() => _isLoadingCourt = false);
     } catch (e) {
       debugPrint('Error loading courts from API: $e');
-      if (mounted) setState(() {
-        _courtError = 'Failed to load courts';
-        _isLoadingCourt = false;
-      });
+      if (mounted) {
+        setState(() {
+          _courtError = 'Failed to load courts';
+          _isLoadingCourt = false;
+        });
+      }
     }
   }
-
 
   void _showCourtPicker() {
     String searchText = '';
@@ -72,9 +99,16 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final filteredCourts = searchText.isEmpty
-                ? [..._followedCourts, ..._allCourts.where((c) => !_followedCourts.any((f) => f.id == c.id))]
-                : _allCourts.where((c) => c.name.toLowerCase().contains(searchText.toLowerCase())).toList();
-            
+                ? [
+                    ..._followedCourts,
+                    ..._allCourts
+                        .where((c) => !_followedCourts.any((f) => f.id == c.id))
+                  ]
+                : _allCourts
+                    .where((c) =>
+                        c.name.toLowerCase().contains(searchText.toLowerCase()))
+                    .toList();
+
             return DraggableScrollableSheet(
               initialChildSize: 0.7,
               minChildSize: 0.5,
@@ -88,35 +122,46 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                       child: Column(
                         children: [
                           Container(
-                            width: 40, height: 4,
+                            width: 40,
+                            height: 4,
                             decoration: BoxDecoration(
                               color: Colors.grey[600],
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                           const SizedBox(height: 16),
-                          const Text('Select Court', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          const Text('Select Court',
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 12),
                           TextField(
                             decoration: InputDecoration(
                               hintText: 'Search courts...',
                               prefixIcon: const Icon(Icons.search),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
                               filled: true,
                               fillColor: Colors.grey[850],
                             ),
-                            onChanged: (val) => setModalState(() => searchText = val),
+                            onChanged: (val) =>
+                                setModalState(() => searchText = val),
                           ),
                         ],
                       ),
                     ),
                     if (_followedCourts.isNotEmpty && searchText.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
                         child: Align(
                           alignment: Alignment.centerLeft,
-                          child: Text('FOLLOWED COURTS', style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.bold)),
+                          child: Text('FOLLOWED COURTS',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[500],
+                                  fontWeight: FontWeight.bold)),
                         ),
                       ),
                     Expanded(
@@ -125,36 +170,58 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                         itemCount: filteredCourts.length,
                         itemBuilder: (context, index) {
                           final court = filteredCourts[index];
-                          final isFollowed = _followedCourts.any((f) => f.id == court.id);
+                          final isFollowed =
+                              _followedCourts.any((f) => f.id == court.id);
                           final isSelected = _selectedCourt?.id == court.id;
-                          
+
                           // Add divider before "All Courts" section
-                          final showAllCourtsHeader = searchText.isEmpty && 
-                              _followedCourts.isNotEmpty && 
+                          final showAllCourtsHeader = searchText.isEmpty &&
+                              _followedCourts.isNotEmpty &&
                               index == _followedCourts.length;
-                          
+
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (showAllCourtsHeader)
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                                  child: Text('ALL COURTS', style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.bold)),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                                  child: Text('ALL COURTS',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey[500],
+                                          fontWeight: FontWeight.bold)),
                                 ),
                               ListTile(
-                                leading: Image.asset('assets/court_marker.jpg', width: 32, height: 26),
-                                title: Text(court.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                                subtitle: court.address != null ? Text(court.address!, style: TextStyle(color: Colors.grey[500], fontSize: 12)) : null,
+                                leading: Image.asset('assets/court_marker.jpg',
+                                    width: 32, height: 26),
+                                title: Text(court.name,
+                                    style: TextStyle(
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal)),
+                                subtitle: court.address != null
+                                    ? Text(court.address!,
+                                        style: TextStyle(
+                                            color: Colors.grey[500],
+                                            fontSize: 12))
+                                    : null,
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (isFollowed) Icon(Icons.star, size: 16, color: Colors.orange[300]),
-                                    if (isSelected) const Icon(Icons.check, color: Colors.green),
+                                    if (isFollowed)
+                                      Icon(Icons.star,
+                                          size: 16, color: Colors.orange[300]),
+                                    if (isSelected)
+                                      const Icon(Icons.check,
+                                          color: Colors.green),
                                   ],
                                 ),
                                 onTap: () {
                                   setState(() => _selectedCourt = court);
-                                  Provider.of<MatchState>(context, listen: false).setCourt(court);
+                                  Provider.of<MatchState>(context,
+                                          listen: false)
+                                      .setCourt(court);
                                   Navigator.pop(context);
                                 },
                               ),
@@ -194,20 +261,26 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     if (_isLoadingCourt) {
       return Row(
         children: [
-          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2)),
           const SizedBox(width: 8),
           Text('Loading courts...', style: TextStyle(color: Colors.grey[500])),
         ],
       );
     }
-    
+
     if (_selectedCourt != null) {
       return Row(
         children: [
           Image.asset('assets/court_marker.jpg', width: 24, height: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(_selectedCourt!.name, style: const TextStyle(fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+            child: Text(_selectedCourt!.name,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
           ),
           Icon(Icons.check_circle, size: 18, color: Colors.green[400]),
           const SizedBox(width: 8),
@@ -215,13 +288,14 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
         ],
       );
     }
-    
+
     // No court selected
     return Row(
       children: [
         Icon(Icons.add_location_alt, size: 18, color: Colors.orange[300]),
         const SizedBox(width: 8),
-        Text('Tap to select court', style: TextStyle(color: Colors.orange[300])),
+        Text('Tap to select court',
+            style: TextStyle(color: Colors.orange[300])),
         const Spacer(),
         Icon(Icons.chevron_right, size: 18, color: Colors.grey[400]),
       ],
@@ -233,21 +307,22 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     final auth = context.watch<AuthState>();
     final match = context.watch<MatchState>();
     final me = auth.currentUser;
-    
+
     // Detect team mode (3v3 or 5v5 vs 1v1)
     final isTeamMatch = match.mode == '3v3' || match.mode == '5v5';
-    
-    final filteredPlayers = _players.where((p) => 
-      p.name.toLowerCase().contains(_search.toLowerCase())
-    ).toList();
+
+    final filteredPlayers = _players
+        .where((p) => p.name.toLowerCase().contains(_search.toLowerCase()))
+        .toList();
 
     // For team matches, can start when we have team names; for 1v1, need opponent
-    final canStart = isTeamMatch 
+    final canStart = isTeamMatch
         ? (match.myTeamName != null && match.opponentTeamName != null)
         : match.opponent != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isTeamMatch ? 'Team Match Setup' : 'Set up your match')),
+      appBar: AppBar(
+          title: Text(isTeamMatch ? 'Team Match Setup' : 'Set up your match')),
       body: Column(
         children: [
           Expanded(
@@ -256,14 +331,16 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Mode: ${isTeamMatch ? match.mode : "1 v 1"}', style: const TextStyle(color: Colors.grey)),
+                  Text('Mode: ${isTeamMatch ? match.mode : "1 v 1"}',
+                      style: const TextStyle(color: Colors.grey)),
                   const SizedBox(height: 8),
                   // Tappable court selection row - always tappable
                   InkWell(
                     onTap: _showCourtPicker,
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: Colors.grey[850],
                         borderRadius: BorderRadius.circular(8),
@@ -272,7 +349,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                     ),
                   ),
                   const Divider(height: 24),
-                  
+
                   // TEAM MATCH UI
                   if (isTeamMatch) ...[
                     const SizedBox(height: 16),
@@ -280,7 +357,8 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                       child: Column(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.purple.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(20),
@@ -295,20 +373,25 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          const Icon(Icons.groups, size: 64, color: Colors.purple),
+                          const Icon(Icons.groups,
+                              size: 64, color: Colors.purple),
                           const SizedBox(height: 24),
-                          
+
                           // Team vs Team display
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [Colors.purple.shade900.withOpacity(0.3), Colors.deepPurple.withOpacity(0.15)],
+                                colors: [
+                                  Colors.purple.shade900.withOpacity(0.3),
+                                  Colors.deepPurple.withOpacity(0.15)
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.purple.withOpacity(0.4)),
+                              border: Border.all(
+                                  color: Colors.purple.withOpacity(0.4)),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -317,11 +400,16 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                                 Expanded(
                                   child: Column(
                                     children: [
-                                      const Text('YOUR TEAM', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                      const Text('YOUR TEAM',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey)),
                                       const SizedBox(height: 8),
                                       Text(
                                         match.myTeamName ?? 'Your Team',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16),
                                         textAlign: TextAlign.center,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
@@ -331,7 +419,8 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                                 ),
                                 // VS
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
                                   child: const Text(
                                     'VS',
                                     style: TextStyle(
@@ -345,11 +434,17 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                                 Expanded(
                                   child: Column(
                                     children: [
-                                      const Text('OPPONENT', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                      const Text('OPPONENT',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey)),
                                       const SizedBox(height: 8),
                                       Text(
-                                        match.opponentTeamName ?? 'Opponent Team',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        match.opponentTeamName ??
+                                            'Opponent Team',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16),
                                         textAlign: TextAlign.center,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
@@ -363,7 +458,8 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                           const SizedBox(height: 24),
                           Text(
                             'Select a court above (optional), then start your game!',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 13),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -372,7 +468,8 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                   ]
                   // 1V1 MATCH UI (existing code)
                   else if (match.opponent == null) ...[
-                    const Text('Choose opponent', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Choose opponent',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     TextField(
                       decoration: const InputDecoration(
@@ -390,10 +487,13 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                       Center(
                         child: Column(
                           children: [
-                            Icon(Icons.person_search, size: 48, color: Colors.grey[400]),
+                            Icon(Icons.person_search,
+                                size: 48, color: Colors.grey[400]),
                             const SizedBox(height: 8),
                             Text(
-                              _search.isEmpty ? 'No players found' : 'No players match "$_search"',
+                              _search.isEmpty
+                                  ? 'No players found'
+                                  : 'No players match "$_search"',
                               style: TextStyle(color: Colors.grey[500]),
                             ),
                           ],
@@ -403,7 +503,8 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           childAspectRatio: 2.5,
                           crossAxisSpacing: 8,
@@ -417,8 +518,13 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                             onTap: () => match.setOpponent(p.toPlayer()),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: isSelected ? Colors.deepOrange.withOpacity(0.1) : Colors.white,
-                                border: Border.all(color: isSelected ? Colors.deepOrange : Colors.grey.shade300),
+                                color: isSelected
+                                    ? Colors.deepOrange.withOpacity(0.1)
+                                    : Colors.white,
+                                border: Border.all(
+                                    color: isSelected
+                                        ? Colors.deepOrange
+                                        : Colors.grey.shade300),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               padding: const EdgeInsets.all(8),
@@ -426,8 +532,14 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  Text('Rating: ${p.rating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                  Text(p.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  Text('Rating: ${p.rating.toStringAsFixed(1)}',
+                                      style: const TextStyle(
+                                          fontSize: 10, color: Colors.grey)),
                                 ],
                               ),
                             ),
@@ -440,15 +552,19 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                     Center(
                       child: Column(
                         children: [
-                          const Text('Match Ready!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                          const Text('Match Ready!',
+                              style: TextStyle(
+                                  fontSize: 24, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 16),
                           Text(
                             'You accepted a challenge from ${match.opponent?.name ?? "opponent"}',
-                            style: const TextStyle(color: Colors.grey, fontSize: 14),
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 14),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 32),
-                          const Icon(Icons.sports_basketball, size: 80, color: Colors.deepOrange),
+                          const Icon(Icons.sports_basketball,
+                              size: 80, color: Colors.deepOrange),
                         ],
                       ),
                     ),
@@ -461,7 +577,12 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.grey[900],
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, -2))],
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 4,
+                    offset: const Offset(0, -2))
+              ],
             ),
             child: Column(
               children: [
@@ -471,20 +592,30 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(isTeamMatch ? 'Your Team' : 'You', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(isTeamMatch ? 'Your Team' : 'You',
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey)),
                         Text(
-                          isTeamMatch ? (match.myTeamName ?? 'Your Team') : (me?.name ?? 'Me'), 
+                          isTeamMatch
+                              ? (match.myTeamName ?? 'Your Team')
+                              : (me?.name ?? 'Me'),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
-                    const Text('VS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                    const Text('VS',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.grey)),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(isTeamMatch ? 'Opponent Team' : 'Opponent', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(isTeamMatch ? 'Opponent Team' : 'Opponent',
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey)),
                         Text(
-                          isTeamMatch ? (match.opponentTeamName ?? '—') : (match.opponent?.name ?? '—'), 
+                          isTeamMatch
+                              ? (match.opponentTeamName ?? '—')
+                              : (match.opponent?.name ?? '—'),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -502,7 +633,8 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isTeamMatch ? Colors.purple : Colors.deepOrange,
+                      backgroundColor:
+                          isTeamMatch ? Colors.purple : Colors.deepOrange,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
@@ -517,4 +649,3 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     );
   }
 }
-

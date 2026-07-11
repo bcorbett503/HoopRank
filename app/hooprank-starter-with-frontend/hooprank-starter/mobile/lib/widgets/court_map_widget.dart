@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show Point;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -150,6 +151,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   // Default view: courts the community follows ("all follows") — a map of
   // real hoop spots — rather than only courts with scheduled runs.
   CourtFollowFilterMode _followFilterMode = CourtFollowFilterMode.allFollowed;
+  Timer? _searchRemoteDebounce;
   // True once the user explicitly taps a follow-filter chip; the
   // empty-viewport fallback in _updateCourtsForMapCenter never overrides
   // an explicit choice.
@@ -407,6 +409,76 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     }
   }
 
+  /// Screen-space fan-out for avatars that would stack on the same spot.
+  /// Groups markers within ~72 px and moves every member except the anchor
+  /// sideways (alternating right/left) by adjusting its geographic point, so
+  /// hit-testing stays correct. Anchor priority: Me > recommended > singles
+  /// > clusters. Cluster ghosting still handles metro-zoom pile-ups; this
+  /// covers street zoom where clustering is off.
+  Map<String, LatLng> _computeAvatarFanOut({
+    required MapHubPlayer? currentUser,
+    required MapHubPlayer? recommended,
+    required List<PlayerCluster> clusters,
+  }) {
+    if (!_mapReady) return const {};
+    const groupRadiusPx = 72.0;
+    const stepPx = 92.0;
+
+    final camera = _mapController.camera;
+    final entries = <(String, LatLng, Point<double>)>[];
+    void add(String id, double lat, double lng) {
+      try {
+        final point = camera.latLngToScreenPoint(LatLng(lat, lng));
+        entries.add((id, LatLng(lat, lng), Point(point.x, point.y)));
+      } catch (_) {}
+    }
+
+    if (currentUser != null) add('__me__', currentUser.lat, currentUser.lng);
+    if (recommended != null) {
+      add(recommended.id, recommended.lat, recommended.lng);
+    }
+    for (final cluster in clusters) {
+      if (cluster.isSingle) {
+        if (cluster.single.id != recommended?.id) {
+          add(cluster.single.id, cluster.single.lat, cluster.single.lng);
+        }
+      } else {
+        add('__cluster__${cluster.members.first.id}', cluster.lat, cluster.lng);
+      }
+    }
+    if (entries.length < 2) return const {};
+
+    final offsets = <String, LatLng>{};
+    final grouped = List<bool>.filled(entries.length, false);
+    for (var i = 0; i < entries.length; i++) {
+      if (grouped[i]) continue;
+      final group = <int>[i];
+      for (var j = i + 1; j < entries.length; j++) {
+        if (grouped[j]) continue;
+        final d = entries[i].$3.distanceTo(entries[j].$3);
+        if (d < groupRadiusPx) {
+          group.add(j);
+          grouped[j] = true;
+        }
+      }
+      if (group.length < 2) continue;
+      // Anchor (group[0], highest priority) keeps its true spot; the rest
+      // alternate right/left at increasing distance.
+      for (var k = 1; k < group.length; k++) {
+        final entry = entries[group[k]];
+        final magnitude = ((k + 1) ~/ 2) * stepPx;
+        final dx = k.isOdd ? magnitude : -magnitude;
+        try {
+          final shifted = camera.pointToLatLng(
+            Point(entry.$3.x + dx, entry.$3.y),
+          );
+          offsets[entry.$1] = shifted;
+        } catch (_) {}
+      }
+    }
+    return offsets;
+  }
+
   /// Pick the best matchup among nearby players who are visible on the map.
   /// Uses the same engine + nearby-players pipeline the home feed's
   /// "recommended matchup" card used, so scoring (rating similarity,
@@ -540,6 +612,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     );
   }
 
+  /// Courts with a scheduled run lead the default map view (larger pins).
+  bool _courtHasScheduledRun(Court court) {
+    return court.hasUpcomingRun || _courtsWithRuns.contains(court.id);
+  }
+
   int _followFilterCount(CheckInState checkInState) {
     switch (_followFilterMode) {
       case CourtFollowFilterMode.mine:
@@ -559,7 +636,10 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
         }
         break;
       case CourtFollowFilterMode.allFollowed:
-        if (!_courtHasAnyFollowers(court, checkInState)) {
+        // Default view = courts with scheduled runs (big pins) + all
+        // followed courts (smaller pins).
+        if (!_courtHasScheduledRun(court) &&
+            !_courtHasAnyFollowers(court, checkInState)) {
           return false;
         }
         break;
@@ -742,7 +822,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     return (baseZoom - 1.0).clamp(3.0, 18.0).toDouble();
   }
 
-  void _maybePanToNearestCourtWithRun() {
+  Future<void> _maybePanToNearestCourtWithRun() async {
     if (_runsFilter == null) return;
 
     final messenger = ScaffoldMessenger.maybeOf(context);
@@ -753,6 +833,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       );
       return;
     }
+
+    // Run courts can sit outside every cached region; resolve the misses so
+    // the nearest-run scan below sees their coordinates.
+    await _courtService.resolveCourtsByIds(_courtsWithRuns);
+    if (!mounted || _runsFilter == null) return;
 
     final checkInState = Provider.of<CheckInState>(context, listen: false);
     final bounds = _mapController.camera.visibleBounds;
@@ -1018,6 +1103,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     _courtService.removeListener(_handleCourtServiceChanged);
     _observedCheckInState?.removeListener(_handleCheckInStateChanged);
     _debounceTimer?.cancel();
+    _searchRemoteDebounce?.cancel();
     _mapController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -1040,7 +1126,10 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     if (!mounted || _isLoading) return;
 
     if (_searchController.text.trim().isNotEmpty) {
-      _onSearchChanged(_searchController.text);
+      // Sync-only refresh: never re-arm the remote-search debounce from the
+      // service listener — remote merge → notify → re-arm would ping-pong
+      // fetches forever.
+      _applyLocalSearchResults(_searchController.text.trim());
       return;
     }
 
@@ -1091,7 +1180,14 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
     await _loadInitialRunsFilterIfNeeded();
     final courts = _courtService.getCourts();
 
-    final initialDeepLinkCourt = hasDeepLink ? _resolveDeepLinkCourt() : null;
+    var initialDeepLinkCourt = hasDeepLink ? _resolveDeepLinkCourt() : null;
+    if (hasDeepLink &&
+        initialDeepLinkCourt == null &&
+        widget.initialCourtId != null) {
+      // Court lives outside the cached regions — fetch it by id.
+      initialDeepLinkCourt =
+          await _courtService.resolveCourtById(widget.initialCourtId!);
+    }
     if (initialDeepLinkCourt != null) {
       debugPrint('MAP: Priming deep link court: ${initialDeepLinkCourt.name}');
     }
@@ -1200,7 +1296,23 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
         _activateDeepLinkPreview(targetCourt);
       }
     } else if (widget.initialCourtId != null) {
-      debugPrint('MAP: Court not found for ID: ${widget.initialCourtId}');
+      debugPrint(
+          'MAP: Court not cached; resolving ${widget.initialCourtId} remotely');
+      unawaited(_resolveDeepLinkCourtRemote());
+    }
+  }
+
+  /// Deep-linked court outside every cached region: fetch it by id and
+  /// finish the navigation once it lands.
+  Future<void> _resolveDeepLinkCourtRemote() async {
+    final id = widget.initialCourtId;
+    if (id == null || id.isEmpty) return;
+    final court = await _courtService.resolveCourtById(id);
+    if (!mounted || court == null || widget.initialCourtId != id) return;
+    if (_mapReady) {
+      _zoomToCourtAndSelect(court);
+    } else {
+      _activateDeepLinkPreview(court);
     }
   }
 
@@ -1262,9 +1374,24 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       return;
     }
 
-    List<Court> filteredCourts = _courtService.searchCourts(trimmed);
-    filteredCourts = _applyFilters(filteredCourts);
+    _applyLocalSearchResults(trimmed);
 
+    // The local cache only covers fetched regions; debounce a server search
+    // so courts anywhere in the world appear.
+    _searchRemoteDebounce?.cancel();
+    _searchRemoteDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final remote = await _courtService.searchCourtsRemote(trimmed);
+      if (!mounted || remote.isEmpty) return;
+      if (_searchController.text.trim() != trimmed) return;
+      _applyLocalSearchResults(trimmed);
+    });
+  }
+
+  /// Recompute the search-mode court list from the local cache (no network,
+  /// no debounce arming).
+  void _applyLocalSearchResults(String trimmed) {
+    if (trimmed.isEmpty) return;
+    final filteredCourts = _applyFilters(_courtService.searchCourts(trimmed));
     final capped = _capCourtsForPerformance(filteredCourts, isSearchMode: true);
     if (!mounted) return;
     _prefetchTopFollowers(capped);
@@ -1463,7 +1590,19 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
 
   Future<void> _loadInitialRunsFilterIfNeeded() async {
     final filter = widget.initialRunsFilter;
-    if (filter == null) return;
+    if (filter == null) {
+      // Even without the runs filter active, the default view surfaces
+      // courts with scheduled runs (bigger pins) — load the id set in the
+      // background so sizing/inclusion works.
+      unawaited(_loadCourtsWithRuns('all').then((ids) {
+        if (!mounted || ids.isEmpty) return;
+        setState(() => _courtsWithRuns = ids);
+        if (_mapReady) _updateCourtsForMapCenter();
+      }).catchError((Object e) {
+        debugPrint('MAP: Could not load scheduled-run court ids: $e');
+      }));
+      return;
+    }
 
     _runsFilter = filter;
     try {
@@ -1488,6 +1627,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   void _updateCourtsForMapCenter() {
     // Use visible bounds to filter courts - only show courts actually visible on map
     final bounds = _mapController.camera.visibleBounds;
+
+    // Regional overlay: fetch richer server courts for this viewport in the
+    // background; when they merge, the CourtService listener re-runs this.
+    unawaited(_courtService.ensureRegionLoaded(
+      bounds.south,
+      bounds.west,
+      bounds.north,
+      bounds.east,
+    ));
 
     final rawCourtsInView = _courtService.getCourtsInBounds(
       bounds.south,
@@ -2103,6 +2251,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       currentUserMapPlayer,
       showMapLabels,
     );
+    // Avatars standing on the same spot (common at a court) fan out side by
+    // side instead of stacking; "Me" stays anchored at the true location.
+    final avatarPositions = _computeAvatarFanOut(
+      currentUser: currentUserMapPlayer,
+      recommended: recommendedPlayer,
+      clusters: playerClusters,
+    );
+    LatLng playerPoint(MapHubPlayer p) =>
+        avatarPositions[p.id] ?? LatLng(p.lat, p.lng);
     final topOverlayOffset =
         widget.showCourtList ? 16.0 : MediaQuery.of(context).padding.top + 10.0;
 
@@ -2215,6 +2372,14 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                   markerSize *= 1.25;
                 }
 
+                // Scheduled runs are the headline: bigger pins; everything
+                // else (follows etc.) renders smaller so runs pop.
+                if (_courtHasScheduledRun(court)) {
+                  markerSize *= 1.35;
+                } else {
+                  markerSize *= 0.85;
+                }
+
                 // Scale up selected court slightly
                 // (If we had selected court state easily accessible here)
 
@@ -2256,7 +2421,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                   for (final cluster in playerClusters)
                     if (cluster.isSingle)
                       Marker(
-                        point: LatLng(cluster.single.lat, cluster.single.lng),
+                        point: playerPoint(cluster.single),
                         width: PlayerMapMarker.markerWidth,
                         height: PlayerMapMarker.markerHeight,
                         alignment: Alignment.topCenter,
@@ -2271,7 +2436,9 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                       )
                     else
                       Marker(
-                        point: LatLng(cluster.lat, cluster.lng),
+                        point: avatarPositions[
+                                '__cluster__${cluster.members.first.id}'] ??
+                            LatLng(cluster.lat, cluster.lng),
                         width: PlayerClusterMarker.markerWidth,
                         height: PlayerClusterMarker.markerHeight,
                         alignment: Alignment.topCenter,
@@ -2283,10 +2450,7 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                   // Last so the spotlighted matchup draws above neighbors.
                   if (recommendedPlayer != null)
                     Marker(
-                      point: LatLng(
-                        recommendedPlayer.lat,
-                        recommendedPlayer.lng,
-                      ),
+                      point: playerPoint(recommendedPlayer),
                       width: PlayerMapMarker.markerWidth,
                       height: PlayerMapMarker.markerHeight +
                           PlayerMapMarker.recommendedFlagExtent,

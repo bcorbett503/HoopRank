@@ -471,73 +471,10 @@ class ApiService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         debugPrint('>>> getCourtsFromApi: received ${data.length} courts');
-
-        String? clean(dynamic value) {
-          final text = value?.toString().trim();
-          if (text == null || text.isEmpty || text.toLowerCase() == 'null') {
-            return null;
-          }
-          return text;
-        }
-
-        String? firstString(List<dynamic> values) {
-          for (final value in values) {
-            final cleaned = clean(value);
-            if (cleaned != null) return cleaned;
-          }
-          return null;
-        }
-
-        double number(dynamic value) {
-          if (value is num) return value.toDouble();
-          return double.tryParse(value?.toString() ?? '') ?? 0.0;
-        }
-
-        int? integer(dynamic value) {
-          if (value is num) return value.toInt();
-          return int.tryParse(value?.toString() ?? '');
-        }
-
-        return data.whereType<Map>().map((raw) {
-          final json = Map<String, dynamic>.from(raw);
-          return Court(
-            id: json['id']?.toString() ?? '',
-            name: json['name']?.toString() ?? 'Court',
-            lat: number(json['lat']),
-            lng: number(json['lng']),
-            address: firstString([json['address'], json['city']]),
-            isSignature:
-                json['signature'] == true || json['isSignature'] == true,
-            isIndoor: json['indoor'] == true || json['isIndoor'] == true,
-            access: json['access']?.toString() ?? 'public',
-            venueType:
-                json['venue_type']?.toString() ?? json['venueType']?.toString(),
-            imageUrl: firstString([
-              json['imageUrl'],
-              json['image_url'],
-              json['heroImageUrl'],
-              json['hero_image_url'],
-            ]),
-            imageSourceUrl: firstString([
-              json['imageSourceUrl'],
-              json['image_source_url'],
-              json['photoSourceUrl'],
-              json['photo_source_url'],
-            ]),
-            imageSourceLabel: firstString([
-              json['imageSourceLabel'],
-              json['image_source_label'],
-              json['photoSourceLabel'],
-              json['photo_source_label'],
-            ]),
-            followerCount:
-                integer(json['follower_count'] ?? json['followerCount']),
-            hasUpcomingRun: json['hasUpcomingRun'] == true ||
-                json['has_upcoming_run'] == true,
-            hasUpcomingActivity: json['hasUpcomingActivity'] == true ||
-                json['has_upcoming_activity'] == true,
-          );
-        }).toList();
+        return data
+            .whereType<Map>()
+            .map((raw) => courtFromApiJson(Map<String, dynamic>.from(raw)))
+            .toList();
       } else {
         debugPrint(
             '>>> getCourtsFromApi: failed with status ${response.statusCode}');
@@ -546,6 +483,147 @@ class ApiService {
     } catch (e) {
       debugPrint('>>> getCourtsFromApi: error $e');
       return [];
+    }
+  }
+
+  /// Shared server-court JSON → [Court] mapping (list, bbox, search, by-id).
+  static Court courtFromApiJson(Map<String, dynamic> json) {
+    String? clean(dynamic value) {
+      final text = value?.toString().trim();
+      if (text == null || text.isEmpty || text.toLowerCase() == 'null') {
+        return null;
+      }
+      return text;
+    }
+
+    String? firstString(List<dynamic> values) {
+      for (final value in values) {
+        final cleaned = clean(value);
+        if (cleaned != null) return cleaned;
+      }
+      return null;
+    }
+
+    double number(dynamic value) {
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? '') ?? 0.0;
+    }
+
+    int? integer(dynamic value) {
+      if (value is num) return value.toInt();
+      return int.tryParse(value?.toString() ?? '');
+    }
+
+    return Court(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Court',
+      lat: number(json['lat']),
+      lng: number(json['lng']),
+      address: firstString([json['address'], json['city']]),
+      isSignature: json['signature'] == true || json['isSignature'] == true,
+      isIndoor: json['indoor'] == true || json['isIndoor'] == true,
+      access: json['access']?.toString() ?? 'public',
+      venueType:
+          json['venue_type']?.toString() ?? json['venueType']?.toString(),
+      imageUrl: firstString([
+        json['imageUrl'],
+        json['image_url'],
+        json['heroImageUrl'],
+        json['hero_image_url'],
+      ]),
+      imageSourceUrl: firstString([
+        json['imageSourceUrl'],
+        json['image_source_url'],
+        json['photoSourceUrl'],
+        json['photo_source_url'],
+      ]),
+      imageSourceLabel: firstString([
+        json['imageSourceLabel'],
+        json['image_source_label'],
+        json['photoSourceLabel'],
+        json['photo_source_label'],
+      ]),
+      followerCount: integer(json['follower_count'] ?? json['followerCount']),
+      hasUpcomingRun:
+          json['hasUpcomingRun'] == true || json['has_upcoming_run'] == true,
+      hasUpcomingActivity: json['hasUpcomingActivity'] == true ||
+          json['has_upcoming_activity'] == true,
+    );
+  }
+
+  /// Viewport courts: GET /courts with a bbox — the map's regional loader.
+  static Future<List<Court>> getCourtsInBbox({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 1000,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/courts').replace(queryParameters: {
+        'minLat': south.toString(),
+        'maxLat': north.toString(),
+        'minLng': west.toString(),
+        'maxLng': east.toString(),
+        'limit': limit.toString(),
+      });
+      final response = await authedGet(uri, headers: {
+        'x-user-id': _userId ?? '',
+      });
+      if (response.statusCode != 200) {
+        debugPrint('getCourtsInBbox: status ${response.statusCode}');
+        return [];
+      }
+      final List<dynamic> data = jsonDecode(response.body);
+      return data
+          .whereType<Map>()
+          .map((raw) => courtFromApiJson(Map<String, dynamic>.from(raw)))
+          .toList();
+    } catch (e) {
+      debugPrint('getCourtsInBbox: error $e');
+      return [];
+    }
+  }
+
+  /// Global court text search (GET /courts/search?q=).
+  static Future<List<Court>> searchCourtsFromApi(String query,
+      {int limit = 50}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/courts/search').replace(
+        queryParameters: {'q': query, 'limit': limit.toString()},
+      );
+      final response = await authedGet(uri, headers: {
+        'x-user-id': _userId ?? '',
+      });
+      if (response.statusCode != 200) return [];
+      final List<dynamic> data = jsonDecode(response.body);
+      return data
+          .whereType<Map>()
+          .map((raw) => courtFromApiJson(Map<String, dynamic>.from(raw)))
+          .toList();
+    } catch (e) {
+      debugPrint('searchCourtsFromApi: error $e');
+      return [];
+    }
+  }
+
+  /// Single court by id (GET /courts/:id). Unknown ids come back as an
+  /// empty 200 body, which maps to null.
+  static Future<Court?> getCourtByIdFromApi(String id) async {
+    try {
+      final response = await authedGet(
+        Uri.parse('$baseUrl/courts/${Uri.encodeComponent(id)}'),
+        headers: {'x-user-id': _userId ?? ''},
+      );
+      if (response.statusCode != 200 || response.body.trim().isEmpty) {
+        return null;
+      }
+      final parsed = jsonDecode(response.body);
+      if (parsed is! Map<String, dynamic> || parsed['id'] == null) return null;
+      return courtFromApiJson(parsed);
+    } catch (e) {
+      debugPrint('getCourtByIdFromApi: error $e');
+      return null;
     }
   }
 
@@ -2189,6 +2267,7 @@ class ApiService {
     required DateTime end,
     double? lat,
     double? lng,
+    double? radiusMiles,
   }) async {
     final query = <String, String>{
       'scope': scope,
@@ -2196,6 +2275,7 @@ class ApiService {
       'end': end.toUtc().toIso8601String(),
       if (lat != null) 'lat': lat.toString(),
       if (lng != null) 'lng': lng.toString(),
+      if (radiusMiles != null) 'radiusMiles': radiusMiles.toString(),
     };
     final response = await authedGet(
       Uri.parse('$baseUrl/calendar/events').replace(queryParameters: query),

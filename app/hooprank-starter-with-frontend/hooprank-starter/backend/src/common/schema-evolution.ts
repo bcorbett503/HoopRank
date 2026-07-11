@@ -190,6 +190,22 @@ export async function runSchemaEvolution(
       `CREATE INDEX IF NOT EXISTS idx_matches_team_match ON matches(team_match) WHERE team_match = true`,
     );
 
+    // Courts spatial + search indexes: viewport bbox queries (geog &&
+    // ST_MakeEnvelope) and ILIKE text search both scan 225k rows without
+    // these. safeQuery — pg_trgm may be unavailable on some instances.
+    await safeQuery(
+      "courts geog gist index",
+      `CREATE INDEX IF NOT EXISTS idx_courts_geog_gist ON courts USING GIST (geog)`,
+    );
+    await safeQuery(
+      "pg_trgm extension",
+      `CREATE EXTENSION IF NOT EXISTS pg_trgm`,
+    );
+    await safeQuery(
+      "courts name trgm index",
+      `CREATE INDEX IF NOT EXISTS idx_courts_name_trgm ON courts USING GIN (name gin_trgm_ops)`,
+    );
+
     // Player statuses indexes
     await dataSource.query(
       `CREATE INDEX IF NOT EXISTS idx_player_statuses_court_id ON player_statuses(court_id)`,

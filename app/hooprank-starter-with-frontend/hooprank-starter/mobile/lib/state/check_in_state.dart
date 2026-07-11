@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -237,6 +238,12 @@ class CheckInState extends ChangeNotifier {
 
     // Fetch court follower counts from API
     await _fetchCourtFollowerCounts();
+
+    // Followed courts can live outside any regionally-cached area; resolve
+    // them so name lookups never show "Unknown Court".
+    if (_followedCourts.isNotEmpty) {
+      unawaited(CourtService().resolveCourtsByIds(_followedCourts));
+    }
 
     notifyListeners();
   }

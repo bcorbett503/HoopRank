@@ -69,15 +69,18 @@ export class CourtsController {
     @Query("maxLat") maxLat?: string,
     @Query("minLng") minLng?: string,
     @Query("maxLng") maxLng?: string,
+    @Query("limit") limit?: string,
   ): Promise<Court[]> {
     // Public read-only endpoint: map bootstrapping needs courts before auth completes.
     // If bbox parameters provided, use geographic search
     if (minLat && maxLat && minLng && maxLng) {
+      const parsedLimit = limit ? Number.parseInt(limit, 10) : undefined;
       return this.courtsService.searchByLocation(
         parseFloat(minLat),
         parseFloat(maxLat),
         parseFloat(minLng),
         parseFloat(maxLng),
+        Number.isFinite(parsedLimit) ? parsedLimit : undefined,
       );
     }
     // Otherwise return the FULL court index, ignoring any client limit.
@@ -250,6 +253,20 @@ export class CourtsController {
   async getSignatureCourts() {
     const courts = await this.courtsService.findAll();
     return courts.slice(0, 20);
+  }
+
+  // Global text search; must stay declared above the ":id" wildcard route.
+  @Public()
+  @Get("search")
+  async searchCourts(
+    @Query("q") q?: string,
+    @Query("limit") limit?: string,
+  ): Promise<Court[]> {
+    const parsedLimit = limit ? Number.parseInt(limit, 10) : undefined;
+    return this.courtsService.searchByText(
+      q ?? "",
+      Number.isFinite(parsedLimit) ? (parsedLimit as number) : 50,
+    );
   }
 
   @Public()

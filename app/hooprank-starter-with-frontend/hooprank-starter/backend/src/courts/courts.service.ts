@@ -243,12 +243,19 @@ export class CourtsService implements OnModuleInit {
     maxLat: number,
     minLng: number,
     maxLng: number,
+    limit?: number,
   ): Promise<Court[]> {
+    // Viewport queries from the map need enough rows to fill a metro-level
+    // bbox after client-side filtering; cap keeps a worst-case bbox cheap.
+    const safeLimit =
+      typeof limit === "number" && Number.isFinite(limit)
+        ? Math.max(1, Math.min(Math.trunc(limit), 1000))
+        : 1000;
     if (this.dialect.isPostgres) {
       // Use PostGIS spatial query for production
       const courts = await this.dataSource.query(
         `
-                SELECT 
+                SELECT
 	                    id, name, city, indoor, rims, source, signature, access, venue_type, address,
 	                    image_url as "imageUrl",
 	                    image_source_url as "imageSourceUrl",
@@ -261,9 +268,9 @@ export class CourtsService implements OnModuleInit {
 	                FROM courts
 	                WHERE geog && ST_MakeEnvelope($1, $2, $3, $4, 4326)
 	                ORDER BY name ASC
-	                LIMIT 100
+	                LIMIT $5
             `,
-        [minLng, minLat, maxLng, maxLat],
+        [minLng, minLat, maxLng, maxLat, safeLimit],
       );
       return courts.map((court: any) => this.withResolvedImageUrl(court));
     }
@@ -280,7 +287,52 @@ export class CourtsService implements OnModuleInit {
         lngMax: maxLng,
       })
       .orderBy("court.name", "ASC")
-      .limit(100)
+      .limit(safeLimit)
+      .getMany()
+      .then((courts) =>
+        courts.map((court: any) => this.withResolvedImageUrl(court)),
+      );
+  }
+
+  /// Global name/city/address search so clients no longer need the full
+  /// index locally to find a court anywhere in the world.
+  async searchByText(query: string, limit = 50): Promise<Court[]> {
+    const trimmed = (query ?? "").trim();
+    if (!trimmed) return [];
+    const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 50, 100));
+    const needle = `%${trimmed}%`;
+
+    if (this.dialect.isPostgres) {
+      const courts = await this.dataSource.query(
+        `
+                SELECT
+	                    id, name, city, indoor, rims, source, signature, access, venue_type, address,
+	                    image_url as "imageUrl",
+	                    image_source_url as "imageSourceUrl",
+	                    image_source_label as "imageSourceLabel",
+	                    image_provider as "imageProvider",
+	                    image_place_id as "imagePlaceId",
+	                    ST_Y(geog::geometry) as lat,
+	                    ST_X(geog::geometry) as lng,
+	                    (SELECT COUNT(*) FROM user_followed_courts WHERE court_id = courts.id::text) as follower_count
+	                FROM courts
+	                WHERE name ILIKE $1 OR city ILIKE $1 OR address ILIKE $1
+	                ORDER BY name ASC
+	                LIMIT $2
+            `,
+        [needle, safeLimit],
+      );
+      return courts.map((court: any) => this.withResolvedImageUrl(court));
+    }
+
+    return this.courtsRepository
+      .createQueryBuilder("court")
+      .where(
+        "court.name LIKE :needle OR court.city LIKE :needle OR court.address LIKE :needle",
+        { needle },
+      )
+      .orderBy("court.name", "ASC")
+      .limit(safeLimit)
       .getMany()
       .then((courts) =>
         courts.map((court: any) => this.withResolvedImageUrl(court)),
