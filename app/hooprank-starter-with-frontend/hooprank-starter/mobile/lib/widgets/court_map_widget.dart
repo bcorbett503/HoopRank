@@ -2104,6 +2104,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.bcorbett.hooprank',
+              // Tile fetches fail routinely on flaky mobile connections;
+              // handle them so they never surface as uncaught exceptions.
+              errorTileCallback: (tile, error, stackTrace) {
+                debugPrint('Map tile failed (${tile.coordinates}): $error');
+              },
             ),
             MarkerLayer(
               markers: markerCourts.map((court) {

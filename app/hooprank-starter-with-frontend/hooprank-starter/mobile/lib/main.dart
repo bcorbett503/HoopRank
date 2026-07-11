@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -45,6 +47,22 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Background message: ${message.notification?.title}');
 }
 
+/// Transient network failures — map tile fetches, avatar/court image loads,
+/// DNS blips when the phone drops connectivity — are routine on mobile and
+/// must not be recorded as crashes (they were tanking crash-free users while
+/// the app kept running fine). Everything else stays fatal so real bugs page.
+bool _isTransientNetworkError(Object? error) {
+  if (error is SocketException ||
+      error is HttpException ||
+      error is TimeoutException ||
+      error is http.ClientException ||
+      error is NetworkImageLoadException) {
+    return true;
+  }
+  // google_fonts wraps its runtime font-fetch failures in a bare Exception.
+  return error.toString().contains('Failed to load font');
+}
+
 void main() {
   // Keep binding initialization + runApp in the same zone.
   runZonedGuarded(() async {
@@ -53,8 +71,15 @@ void main() {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Initialize Crashlytics — catch all Flutter framework errors
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    // Initialize Crashlytics — catch all Flutter framework errors, but only
+    // count non-network errors as fatal.
+    FlutterError.onError = (FlutterErrorDetails details) {
+      if (_isTransientNetworkError(details.exception)) {
+        FirebaseCrashlytics.instance.recordFlutterError(details, fatal: false);
+        return;
+      }
+      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+    };
 
     // Set up background message handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -78,7 +103,11 @@ void main() {
       ),
     );
   }, (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    FirebaseCrashlytics.instance.recordError(
+      error,
+      stack,
+      fatal: !_isTransientNetworkError(error),
+    );
   });
 }
 
