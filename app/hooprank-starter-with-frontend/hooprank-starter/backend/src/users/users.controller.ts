@@ -581,10 +581,30 @@ export class UsersController {
   // Public-safe single profile (sanitized fields only).
   // Must be before :id route to avoid NestJS wildcard matching.
   @Public()
+  /// avatar_config arrives as jsonb (object) on Postgres but can be a JSON
+  /// string via the TypeORM simple-json path; clients require an object and
+  /// silently fall back to the default avatar otherwise.
+  private parseAvatarConfig(raw: unknown): Record<string, unknown> | null {
+    if (!raw) return null;
+    if (typeof raw === "object") return raw as Record<string, unknown>;
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        return typeof parsed === "object" && parsed !== null ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   @Get("public/:id")
   async findOnePublic(@Param("id") id: string) {
     const u: any = await this.usersService.findOne(id);
     if (!u) return { error: "User not found" };
+    const avatarConfig = this.parseAvatarConfig(
+      u.avatarConfig ?? u.avatar_config,
+    );
     return {
       id: u.id,
       name: u.name,
@@ -592,6 +612,8 @@ export class UsersController {
       badges: u.badges || [],
       photoUrl: u.photo_url ?? u.photoUrl,
       hoopRank: parseFloat(u.hoop_rank ?? u.hoopRank) || 3.0,
+      avatarConfig,
+      avatar_config: avatarConfig,
     };
   }
 
@@ -624,6 +646,10 @@ export class UsersController {
       photoUrl: u.avatarUrl ?? u.avatar_url ?? null,
       avatar_url: u.avatarUrl ?? u.avatar_url ?? null,
       photo_url: u.avatarUrl ?? u.avatar_url ?? null,
+      // Normalized so every client version (camelCase or snake_case reader)
+      // sees the customized avatar when viewing another player's profile.
+      avatarConfig: this.parseAvatarConfig(u.avatarConfig ?? u.avatar_config),
+      avatar_config: this.parseAvatarConfig(u.avatarConfig ?? u.avatar_config),
     };
   }
 

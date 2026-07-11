@@ -124,6 +124,8 @@ export class UsersService {
           id,
           name,
           avatar_url,
+          avatar_config,
+          avatar_config as "avatarConfig",
           hoop_rank,
           position,
           city,
@@ -1015,10 +1017,11 @@ export class UsersService {
       // If still no location, return all users as fallback
       if (!lat || !lng) {
         return await this.dataSource.query(`
-          SELECT 
+          SELECT
             id,
             name,
             avatar_url as "avatarUrl",
+            avatar_config as "avatarConfig",
             hoop_rank as rating,
             position,
             city,
@@ -1057,10 +1060,11 @@ export class UsersService {
       const nearbyUsers = await this.dataSource.query(
         `
         WITH user_locations AS (
-          SELECT 
+          SELECT
             id,
             name,
             avatar_url as "avatarUrl",
+            avatar_config as "avatarConfig",
             hoop_rank as rating,
             position,
             city,

@@ -76,10 +76,11 @@ export class RankingsController {
 
             const ageSelect = hasAgeColumn ? ', u.age' : ', NULL as age';
             const players = await this.dataSource.query(`
-                SELECT 
+                SELECT
                     u.id,
                     u.name,
                     u.avatar_url as "photoUrl",
+                    u.avatar_config as "avatarConfig",
                     u.hoop_rank as "rating",
                     u.position,
                     u.city
