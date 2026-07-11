@@ -788,9 +788,11 @@ function face(cfg, m, expr){
    * so the resting face stays composed and confident. */
   const bw=11, bY=eyeY-11;
   const CONFIDENT_BROW=[[-bw,-1],[0,0],[bw,-2]];
+  /* focused/grit: inner end pulled DOWN toward the nose, outer up — a
+   * determined furrow. (Inner-up/outer-down reads as scared/worried.) */
   const brow = {
     default:CONFIDENT_BROW, joy:[[-bw,1],[0,-3],[bw,1]],
-    focused:[[-bw,-3],[bw,4]], grit:[[-bw,-3],[bw,4]],
+    focused:[[-bw,3],[bw,-2]], grit:[[-bw,4],[bw,-3]],
     cool:[[-bw,0],[bw,-4]]
   }[expr] || CONFIDENT_BROW;
   for (const side of [-1,1]){
@@ -826,6 +828,16 @@ function face(cfg, m, expr){
   if (cfg.facial!=="none" && !kid && cfg.age!=="teen"){
     const hc=HAIR_COLORS[cfg.hairColor];
     const hcL=lighten(hc,.24), hcD=darken(hc,.34);
+    /* Shared beard region (jaw + chin + sideburns, dipping around the mouth)
+     * — a full beard fills it solid, stubble tints + stipples it. Confined
+     * to the lower face so neither covers the cheeks up to the eyes. */
+    const beardRegion="M "+r2(cx-rw*.88)+" "+r2(cy+rh*.12)
+      +" C "+r2(cx-rw*.95)+" "+r2(cy+rh*.9)+" "+r2(cx-rw*.5)+" "+r2(cy+rh*1.22)+" "+r2(cx)+" "+r2(cy+rh*1.22)
+      +" C "+r2(cx+rw*.5)+" "+r2(cy+rh*1.22)+" "+r2(cx+rw*.95)+" "+r2(cy+rh*.9)+" "+r2(cx+rw*.88)+" "+r2(cy+rh*.12)
+      +" C "+r2(cx+rw*.6)+" "+r2(cy+rh*.42)+" "+r2(cx+rw*.34)+" "+r2(mY-2)+" "+r2(cx+rw*.34)+" "+r2(mY-12)
+      +" Q "+r2(cx)+" "+r2(mY-4)+" "+r2(cx-rw*.34)+" "+r2(mY-12)
+      +" C "+r2(cx-rw*.34)+" "+r2(mY-12)+" "+r2(cx-rw*.6)+" "+r2(cy+rh*.42)+" "+r2(cx-rw*.88)+" "+r2(cy+rh*.12)
+      +" Z";
     /* short directional hair strokes filling a facial-hair region */
     const fhStrokes=(x0,x1,y0,y1,n,len)=>{
       let t="";
@@ -838,16 +850,15 @@ function face(cfg, m, expr){
       return t;
     };
     if (cfg.facial==="stubble"){
-      /* dense fine stipple, not a flat wash */
-      s += el("path",{d:headPath(cx,cy+rh*.3,rw*.84,rh*.66, cfg.gender==="male"?.7:.4), fill:hc, opacity:.1});
+      /* light shadow + fine stipple, confined to the beard region so it
+       * reads as a five-o'clock shadow on the jaw, not a full mask */
       let stip="";
-      for (let i=0;i<90;i++){
+      for (let i=0;i<130;i++){
         const u=(i*0.61803)%1, v=(i*0.41421)%1;
-        const x=cx+(u-.5)*rw*1.5, y=cy+rh*.34+v*rh*.62;
-        if (Math.abs(x-cx)>rw*.7*(1-(y-cy-rh*.34)/(rh*.7))) continue;
-        stip += el("circle",{cx:r2(x),cy:r2(y),r:0.8,fill:hcD,opacity:.55});
+        const x=cx+(u-.5)*rw*1.9, y=cy+rh*.1+v*rh*1.15;
+        stip += el("circle",{cx:r2(x),cy:r2(y),r:0.85,fill:hcD,opacity:.5});
       }
-      s += stip;
+      s += el("path",{d:beardRegion, fill:hc, opacity:.09}) + clipTo(beardRegion, stip);
     }
     if (cfg.facial==="mustache" || cfg.facial==="goatee"){
       const md="M "+r2(cx-19)+" "+r2(mY-7)+" Q "+r2(cx-9)+" "+r2(mY-15)+" "+r2(cx)+" "+r2(mY-8)
@@ -863,14 +874,7 @@ function face(cfg, m, expr){
       s += el("path",{d:gd, fill:hc}) + fhStrokes(cx-11,cx+11,mY+8,mY+24,12,4);
     }
     if (cfg.facial==="beard"){
-      const bd="M "+r2(cx-rw*.88)+" "+r2(cy+rh*.12)
-        +" C "+r2(cx-rw*.95)+" "+r2(cy+rh*.9)+" "+r2(cx-rw*.5)+" "+r2(cy+rh*1.22)+" "+r2(cx)+" "+r2(cy+rh*1.22)
-        +" C "+r2(cx+rw*.5)+" "+r2(cy+rh*1.22)+" "+r2(cx+rw*.95)+" "+r2(cy+rh*.9)+" "+r2(cx+rw*.88)+" "+r2(cy+rh*.12)
-        +" C "+r2(cx+rw*.6)+" "+r2(cy+rh*.42)+" "+r2(cx+rw*.34)+" "+r2(mY-2)+" "+r2(cx+rw*.34)+" "+r2(mY-12)
-        +" Q "+r2(cx)+" "+r2(mY-4)+" "+r2(cx-rw*.34)+" "+r2(mY-12)
-        +" C "+r2(cx-rw*.34)+" "+r2(mY-12)+" "+r2(cx-rw*.6)+" "+r2(cy+rh*.42)+" "+r2(cx-rw*.88)+" "+r2(cy+rh*.12)
-        +" Z";
-      s += shape(bd, hc);
+      s += shape(beardRegion, hc);
       /* flowing beard strands + a jaw-line shadow for volume */
       let bs="";
       for (let i=0;i<22;i++){
