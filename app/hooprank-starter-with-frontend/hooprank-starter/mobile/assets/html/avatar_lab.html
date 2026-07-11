@@ -783,13 +783,16 @@ function face(cfg, m, expr){
   const eyeDx = rw*.42, eyeR = kid? 6.2 : 4.4;
   let s="";
 
-  /* brows: thinner, sitting closer to the eye line */
+  /* brows: thinner, sitting closer to the eye line. The default is a level,
+   * low, self-assured brow — an up-arched middle reads as surprised/timid,
+   * so the resting face stays composed and confident. */
   const bw=11, bY=eyeY-11;
+  const CONFIDENT_BROW=[[-bw,-1],[0,0],[bw,-2]];
   const brow = {
-    default:[[-bw,2],[0,-3],[bw,1]], joy:[[-bw,3],[0,-5],[bw,3]],
+    default:CONFIDENT_BROW, joy:[[-bw,1],[0,-3],[bw,1]],
     focused:[[-bw,-3],[bw,4]], grit:[[-bw,-3],[bw,4]],
     cool:[[-bw,0],[bw,-4]]
-  }[expr] || [[-bw,2],[0,-3],[bw,1]];
+  }[expr] || CONFIDENT_BROW;
   for (const side of [-1,1]){
     const pts = brow.map(p=>[cx+side*eyeDx+p[0]*side, bY+p[1]]);
     s += stroke(polyd(pts), ink, 3.4);
@@ -895,8 +898,10 @@ function face(cfg, m, expr){
   } else if (expr==="focused"){
     s += stroke("M "+r2(cx-7)+" "+r2(mY)+" L "+r2(cx+7)+" "+r2(mY), ink, 2.4);
   } else {
-    s += stroke("M "+r2(cx-9)+" "+r2(mY-1.5)+" Q "+r2(cx)+" "+r2(mY+4.5)+" "+r2(cx+9)+" "+r2(mY-1.5), ink, 2.4);
-    s += stroke("M "+r2(cx-5)+" "+r2(mY+6.5)+" Q "+r2(cx)+" "+r2(mY+8.5)+" "+r2(cx+5)+" "+r2(mY+6.5), sh, 1.8);
+    /* default: subtly confident closed smile — right corner lifts a touch
+     * higher than the left for a self-assured, not-timid set */
+    s += stroke("M "+r2(cx-9)+" "+r2(mY)+" Q "+r2(cx)+" "+r2(mY+4)+" "+r2(cx+10)+" "+r2(mY-3), ink, 2.4);
+    s += stroke("M "+r2(cx-4)+" "+r2(mY+6)+" Q "+r2(cx)+" "+r2(mY+8)+" "+r2(cx+5)+" "+r2(mY+5.5), sh, 1.8);
   }
 
   /* veteran lines — subtle: faint crow's feet + one soft brow furrow,
