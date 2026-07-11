@@ -2372,12 +2372,13 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                   markerSize *= 1.25;
                 }
 
-                // Scheduled runs are the headline: bigger pins; everything
-                // else (follows etc.) renders smaller so runs pop.
+                // Scheduled runs are the headline: they keep the compact
+                // pin size; everything else (follows etc.) renders at half
+                // that so the map stays airy and runs pop.
                 if (_courtHasScheduledRun(court)) {
-                  markerSize *= 1.35;
-                } else {
                   markerSize *= 0.85;
+                } else {
+                  markerSize *= 0.425;
                 }
 
                 // Scale up selected court slightly
