@@ -209,7 +209,9 @@ const SKINS = ["#FFDFC4","#F5C9A6","#E8B48C","#D29B6E","#B67D50","#96613A","#794
 const HAIR_COLORS = ["#23201D","#3E2A1D","#5D4030","#8C3B22","#D8A54C","#C4482A","#8F8F94","#E9E4DA","#F4581B"];
 const KIT = ["#F4581B","#25252B","#F4F4F0","#2B4FD8","#D8352B","#1F7A4D","#6B3FA0","#E8B23A","#1F8E9E","#7C2436"];
 const BALL_C = "#DD6B26";
-const OW = 2.6; /* outline weight */
+/* Outline weight: thin editorial line, not comic-book. The realism pass
+ * (2026-07) dropped this from 2.6 — thick outlines read as cartoon. */
+const OW = 1.5;
 
 const GENDERS = [["male","Male"],["female","Female"],["neutral","Neutral"]];
 const AGES = [["kid","Kid"],["teen","Teen"],["adult","Adult"],["vet","Veteran"]];
@@ -267,11 +269,13 @@ function shape(d, fill, outline, extra){
 /* flat cel-shade: crescent on the shadow side (screen right/bottom) of a closed
  * path, built by clipping the shape and re-painting it offset toward the light */
 let CLIP=0;
-function shadeCrescent(d, base, dx=-7, dy=-4, strength=.5){
+function shadeCrescent(d, base, dx=-9, dy=-5, strength=.5){
   const id="cl"+(CLIP++);
+  /* Softer, broader form shadow (strength*.3 was *.4): tonal rather than
+   * hard cel banding. */
   return "<clipPath id=\""+id+"\">"+el("path",{d})+"</clipPath>"
     + "<g clip-path=\"url(#"+id+")\">"
-    + el("path",{d, fill:darken(base,strength*.4)})
+    + el("path",{d, fill:darken(base,strength*.3)})
     + el("path",{d, fill:base, transform:"translate("+r2(dx)+" "+r2(dy)+")"})
     + "</g>";
 }
@@ -297,24 +301,26 @@ function norm(a,b){ const dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1; retu
 
 /* ---------- proportions ---------- */
 function metrics(cfg){
-  /* Mature proportions: smaller heads on longer bodies (~26% head height
-   * for adults instead of the old chibi ~36%). Kids/teens keep relatively
+  /* Realistic athletic proportions (2026-07 realism pass): adult head is
+   * ~16% of figure height (≈6 heads tall) — editorial sports-illustration
+   * territory rather than mascot (~26%) or chibi (~36%) — while staying
+   * legible at the 140px map-marker size. Kids/teens keep relatively
    * bigger heads via ah so age still reads. */
-  const age = {kid:{ab:.62, ah:1.12}, teen:{ab:.84, ah:1.04}, adult:{ab:1, ah:1}, vet:{ab:.98, ah:1}}[cfg.age];
-  const g = {male:{sh:47, hip:30, waist:.92}, female:{sh:39, hip:37, waist:.78}, neutral:{sh:42, hip:33, waist:.86}}[cfg.gender];
+  const age = {kid:{ab:.62, ah:1.06}, teen:{ab:.84, ah:1.02}, adult:{ab:1, ah:1}, vet:{ab:.98, ah:1}}[cfg.age];
+  const g = {male:{sh:50, hip:31, waist:.9}, female:{sh:41, hip:37, waist:.76}, neutral:{sh:45, hip:34, waist:.84}}[cfg.gender];
   const b = {slim:{lw:.82, sw:.9, ww:.86}, avg:{lw:1, sw:1, ww:1}, ath:{lw:1.14, sw:1.1, ww:.96}, heavy:{lw:1.3, sw:1.05, ww:1.42}}[cfg.build];
   const ab=age.ab, ah=age.ah;
   const groundY = 506, ankY = groundY - 18;
-  const legLen = 156*ab, torsoLen = 110*ab, neckLen = 14*ab;
+  const legLen = 172*ab, torsoLen = 118*ab, neckLen = 19*ab;
   const hipY = ankY - legLen, shY = hipY - torsoLen;
-  const headRh = 55*ah, headRw = (45 + (cfg.build==="heavy"?4:0))*ah;
-  const headCy = shY - neckLen - headRh + 10;
+  const headRh = 42*ah, headRw = (32.5 + (cfg.build==="heavy"?3:0))*ah;
+  const headCy = shY - neckLen - headRh + 6;
   return {
     cx:210, groundY, ankY, hipY, shY, headCy, headRh, headRw,
     ab, ah,
     shW: g.sh*b.sw*ab, hiW: g.hip*(cfg.build==="heavy"?1.18:1)*ab, waist: g.waist*b.ww,
-    armW: 16*b.lw*ab, legW: 20*b.lw*ab, handR: 10.5*Math.sqrt(b.lw)*ab,
-    ballR: 26*Math.min(1, ab+0.22)
+    armW: 13*b.lw*ab, legW: 17*b.lw*ab, handR: 8*Math.sqrt(b.lw)*ab,
+    ballR: 24*Math.min(1, ab+0.22)
   };
 }
 
@@ -448,21 +454,66 @@ function capPath(cx,cy,rw,rh,dropT){
 }
 function hairShine(h, hi){
   const y=h.cy-h.rh*(hi||1.02);
-  return stroke("M "+r2(h.cx-h.rw*.42)+" "+r2(y+8)+" Q "+r2(h.cx+h.rw*.06)+" "+r2(y-12)+" "+r2(h.cx+h.rw*.44)+" "+r2(y+4),
-    lighten(h.c,.22), 4.5, {opacity:.55});
+  /* Finer twin highlight streaks read as sheen without the fat glossy band. */
+  return stroke("M "+r2(h.cx-h.rw*.44)+" "+r2(y+9)+" Q "+r2(h.cx-h.rw*.05)+" "+r2(y-10)+" "+r2(h.cx+h.rw*.34)+" "+r2(y+3),
+      lighten(h.c,.3), 2.6, {opacity:.6})
+    + stroke("M "+r2(h.cx-h.rw*.3)+" "+r2(y+14)+" Q "+r2(h.cx+h.rw*.04)+" "+r2(y-3)+" "+r2(h.cx+h.rw*.36)+" "+r2(y+9),
+      lighten(h.c,.18), 1.6, {opacity:.5});
+}
+/* Fine per-strand texture flowing down the scalp — the main "higher-res"
+ * lift. Alternating lighter/darker hairs over the flat colour mass.
+ * y0/y1 are head-relative row fractions; spread widens the fan. */
+function hairStrands(h, opt){
+  const o=Object.assign({y0:-1.02, y1:-0.16, n:11, spread:1.0, bow:.42, wl:1.3, wd:1.5, op:.5}, opt||{});
+  const light=lighten(h.c,.26), dark=darken(h.c,.34);
+  let s="";
+  for (let i=0;i<o.n;i++){
+    const t=i/(o.n-1);
+    const arch=Math.sin(t*Math.PI);
+    const sx=h.cx+(t-.5)*2*h.rw*o.spread;
+    const topY=h.cy+h.rh*o.y0 - arch*h.rh*.06;
+    const botY=h.cy+h.rh*o.y1 + arch*h.rh*.04;
+    const bow=(t-.5)*h.rw*o.bow;
+    const odd=i%2;
+    s += stroke("M "+r2(sx)+" "+r2(topY)+" Q "+r2(sx+bow*.5)+" "+r2((topY+botY)/2)+" "+r2(sx+bow)+" "+r2(botY),
+      odd?light:dark, odd?o.wl:o.wd, {opacity:o.op});
+  }
+  return s;
+}
+/* Darker roots crescent along the hairline for depth under the shine. */
+function rootShade(h, k){
+  const kk=k==null?0:k;
+  return "<clipPath id=\"hs"+(CLIP)+"\">"+el("path",{d:capPath(h.cx,h.cy,h.rw,h.rh,kk)})+"</clipPath>"
+    + "<g clip-path=\"url(#hs"+(CLIP++)+")\">"
+    + el("path",{d:capPath(h.cx,h.cy+h.rh*.16,h.rw,h.rh,kk), fill:darken(h.c,.3), opacity:.4})
+    + "</g>";
 }
 const HAIR_FN = {
   bald(h){ return {back:"", front:""}; },
   buzz(h){
-    return {back:"", front: el("path",{d:capPath(h.cx,h.cy,h.rw,h.rh,0), fill:h.c, opacity:.45})};
+    /* stippled shave shadow reads as cropped stubble, not a flat cap */
+    let dots="";
+    for (let i=0;i<46;i++){
+      const a=Math.PI*(1.04+ (i*0.9973)%1 *0.92), rr=(0.35+((i*0.61803)%1)*0.62);
+      const x=h.cx+Math.cos(a)*h.rw*rr, y=h.cy-h.rh*.3+Math.sin(a)*h.rh*.62*rr;
+      dots += el("circle",{cx:r2(x),cy:r2(y),r:0.9,fill:darken(h.c,.1),opacity:.5});
+    }
+    return {back:"", front: el("path",{d:capPath(h.cx,h.cy,h.rw,h.rh,0), fill:h.c, opacity:.5})+dots};
   },
-  crop(h){ return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+hairShine(h)}; },
+  crop(h){ return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+rootShade(h)+hairStrands(h,{n:13,bow:.3})+hairShine(h)}; },
   sidepart(h){
     const cap=shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c);
     const px=h.cx-h.rw*.34;
     const part=stroke("M "+r2(px)+" "+r2(h.cy-h.rh*1.04)+" Q "+r2(px-5)+" "+r2(h.cy-h.rh*.76)+" "+r2(px-2)+" "+r2(h.cy-h.rh*.52), darken(h.c,.42), 3);
     const sweep=stroke("M "+r2(px+10)+" "+r2(h.cy-h.rh*.96)+" Q "+r2(h.cx+h.rw*.28)+" "+r2(h.cy-h.rh*1.14)+" "+r2(h.cx+h.rw*.6)+" "+r2(h.cy-h.rh*.82), lighten(h.c,.22), 4, {opacity:.55});
-    return {back:"", front: cap+part+sweep};
+    /* combed strands sweeping away from the part */
+    let comb="";
+    for (let i=0;i<7;i++){
+      const t=i/6, sx=px+2+t*(h.rw*1.5), topY=h.cy-h.rh*(1.0-t*.06);
+      comb += stroke("M "+r2(sx)+" "+r2(topY)+" Q "+r2(sx+10)+" "+r2(topY+h.rh*.3)+" "+r2(sx+16)+" "+r2(topY+h.rh*.6),
+        (i%2)?lighten(h.c,.24):darken(h.c,.3), (i%2)?1.4:1.6, {opacity:.5});
+    }
+    return {back:"", front: cap+rootShade(h)+comb+part+sweep};
   },
   flow(h){
     const fY=h.cy-h.rh*.44, sY=h.cy+h.rh*.16;
@@ -477,7 +528,14 @@ const HAIR_FN = {
       +" L "+r2(h.cx-h.rw+6)+" "+r2(h.cy-h.rh*.08)
       +" Q "+r2(h.cx-h.rw-2)+" "+r2(sY-4)+" "+r2(h.cx-h.rw-16)+" "+r2(sY)
       +" Z";
-    return {back:"", front: shape(d, h.c)+hairShine(h)};
+    /* flowing strands cascading down the sides */
+    let flowS="";
+    for (let i=0;i<9;i++){
+      const t=i/8, sx=h.cx+(t-.5)*2*(h.rw+8), topY=h.cy-h.rh*.95-Math.sin(t*Math.PI)*h.rh*.2;
+      flowS += stroke("M "+r2(sx)+" "+r2(topY)+" Q "+r2(sx+(t-.5)*22)+" "+r2(h.cy-h.rh*.2)+" "+r2(sx+(t-.5)*30)+" "+r2(h.cy-h.rh*.28),
+        (i%2)?lighten(h.c,.24):darken(h.c,.3), (i%2)?1.4:1.7, {opacity:.5});
+    }
+    return {back:"", front: shape(d, h.c)+flowS+hairShine(h)};
   },
   shaggy(h){
     const fY=h.cy-h.rh*.36;
@@ -490,7 +548,14 @@ const HAIR_FN = {
       d+=" Q "+r2((xa+xb)/2)+" "+r2(fY+15)+" "+r2(xb)+" "+r2(fY+(i%2? 1:5));
     }
     d+=" Z";
-    return {back:"", front: shape(d, h.c)};
+    /* choppy layered locks */
+    let chop="";
+    for (let i=0;i<10;i++){
+      const t=i/9, sx=h.cx+(t-.5)*2*h.rw*.96, topY=h.cy-h.rh*(1.34-Math.sin(t*Math.PI)*.1);
+      chop += stroke("M "+r2(sx)+" "+r2(topY)+" L "+r2(sx+(t-.5)*10)+" "+r2(fY+6),
+        (i%2)?lighten(h.c,.24):darken(h.c,.32), (i%2)?1.4:1.6, {opacity:.5});
+    }
+    return {back:"", front: shape(d, h.c)+chop};
   },
   spiky(h){
     const fY=h.cy-h.rh*.5;
@@ -503,31 +568,56 @@ const HAIR_FN = {
       d+=" L "+r2(xb)+" "+r2(peak)+" L "+r2(xc)+" "+r2(valley);
     }
     d+=" C "+r2(h.cx+h.rw*.5)+" "+r2(fY)+" "+r2(h.cx-h.rw*.5)+" "+r2(fY)+" "+r2(h.cx-h.rw*.92)+" "+r2(fY+6)+" Z";
-    return {back:"", front: shape(d, h.c)};
+    /* highlight each spike ridge */
+    let ridges="";
+    for (let i=0;i<n;i++){
+      const xb=xL+w*((i+.5)/n), peak=h.cy-h.rh*(1.26+.24*Math.sin(((i+.5)/n)*Math.PI));
+      ridges += stroke("M "+r2(xb)+" "+r2(peak+3)+" L "+r2(xb)+" "+r2(fY+2), lighten(h.c,.24), 1.5, {opacity:.55});
+    }
+    return {back:"", front: shape(d, h.c)+ridges};
   },
   mullet(h){
     const back="M "+r2(h.cx-h.rw*.72)+" "+r2(h.cy-h.rh*.2)
       +" L "+r2(h.cx-h.rw*.66)+" "+r2(h.cy+h.rh*1.28)
       +" Q "+r2(h.cx)+" "+r2(h.cy+h.rh*1.52)+" "+r2(h.cx+h.rw*.66)+" "+r2(h.cy+h.rh*1.28)
       +" L "+r2(h.cx+h.rw*.72)+" "+r2(h.cy-h.rh*.2)+" Z";
-    return {back: shape(back, h.c), front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+hairShine(h)};
+    /* stringy strands down the mullet tail */
+    let tailS="";
+    for (let i=0;i<6;i++){
+      const t=i/5, x=h.cx+(t-.5)*h.rw*1.3;
+      tailS += stroke("M "+r2(x)+" "+r2(h.cy-h.rh*.1)+" Q "+r2(x+(t-.5)*10)+" "+r2(h.cy+h.rh*.6)+" "+r2(x+(t-.5)*6)+" "+r2(h.cy+h.rh*1.3),
+        (i%2)?lighten(h.c,.2):darken(h.c,.3), (i%2)?1.4:1.7, {opacity:.5});
+    }
+    return {back: shape(back, h.c)+tailS, front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+rootShade(h)+hairStrands(h,{n:11,bow:.3})+hairShine(h)};
   },
   waves(h){
+    /* denser fine wave ridges with alternating tone = 360 waves texture */
     let lines="";
-    for (let i=0;i<3;i++){
-      const y=h.cy-h.rh*(1.02-i*.22);
-      lines += stroke("M "+r2(h.cx-h.rw*.62)+" "+r2(y+8)+" Q "+r2(h.cx)+" "+r2(y-10)+" "+r2(h.cx+h.rw*.62)+" "+r2(y+8), darken(h.c,.35), 3.4);
+    for (let i=0;i<6;i++){
+      const y=h.cy-h.rh*(1.0-i*.15);
+      lines += stroke("M "+r2(h.cx-h.rw*.68)+" "+r2(y+7)+" Q "+r2(h.cx-h.rw*.3)+" "+r2(y-6)+" "+r2(h.cx)+" "+r2(y+5)
+        +" Q "+r2(h.cx+h.rw*.3)+" "+r2(y+14)+" "+r2(h.cx+h.rw*.68)+" "+r2(y+3),
+        (i%2)?darken(h.c,.4):darken(h.c,.22), (i%2)?2.4:1.8, {opacity:.7});
     }
-    return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+lines};
+    return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+lines+hairShine(h)};
   },
   curls(h){
-    let blobs="";
-    for (let i=0;i<7;i++){
-      const a=Math.PI*(1.06+ i*0.148);
+    let blobs="", inner="";
+    for (let i=0;i<10;i++){
+      const a=Math.PI*(1.04+ i*0.102);
       const x=h.cx+Math.cos(a)*(h.rw+2), y=h.cy-8+Math.sin(a)*(h.rh+4);
-      blobs += circle(x,y, 11.5, h.c);
+      blobs += circle(x,y, 10.5, h.c);
     }
-    return {back:"", front: blobs + shape(capPath(h.cx,h.cy,h.rw,h.rh,.02), h.c)};
+    const cap = shape(capPath(h.cx,h.cy,h.rw,h.rh,.02), h.c);
+    /* interior coil shading: little arcs give the tight-curl read */
+    for (let i=0;i<14;i++){
+      const t=(i*0.61803)%1, u=((i*0.7548)%1);
+      const x=h.cx+(t-.5)*1.7*h.rw, y=h.cy-h.rh*.85+u*h.rh*.7;
+      const r=3.4+((i*0.37)%1)*2;
+      inner += el("path",{d:"M "+r2(x-r)+" "+r2(y)+" A "+r2(r)+" "+r2(r)+" 0 1 1 "+r2(x+r)+" "+r2(y),
+        fill:"none", stroke:(i%2)?lighten(h.c,.2):darken(h.c,.32), "stroke-width":(i%2)?1.3:1.5, opacity:.55});
+    }
+    return {back:"", front: blobs + cap + inner};
   },
   afro(h){
     const fY=h.cy-h.rh*.44;
@@ -538,7 +628,19 @@ const HAIR_FN = {
       +" C "+r2(h.cx+h.rw-10)+" "+r2(fY+7)+" "+r2(h.cx+h.rw*.5)+" "+r2(fY)+" "+r2(h.cx)+" "+r2(fY)
       +" C "+r2(h.cx-h.rw*.5)+" "+r2(fY)+" "+r2(h.cx-h.rw+10)+" "+r2(fY+7)+" "+r2(h.cx-h.rw+8)+" "+r2(h.cy-h.rh*.14)
       +" Z";
-    return {back:"", front: shape(d, h.c)+hairShine(h,1.5)};
+    /* dense coil stipple across the afro mass */
+    let coil="";
+    for (let i=0;i<40;i++){
+      const t=(i*0.61803)%1, u=(i*0.41421)%1;
+      const ang=t*Math.PI, rad=(0.4+u*0.95);
+      const x=h.cx+Math.cos(ang)*h.rw*1.5*rad*(t<.5?-1:1)*0+ (t-.5)*2*h.rw*1.4*rad;
+      const y=h.cy-h.rh*(1.5)+ (1-Math.sin(ang))*h.rh*.4 + u*h.rh*.9;
+      const r=3+(u*2.4);
+      if (y>h.cy-h.rh*.2) continue;
+      coil += el("path",{d:"M "+r2(x-r)+" "+r2(y)+" A "+r2(r)+" "+r2(r)+" 0 1 1 "+r2(x+r)+" "+r2(y),
+        fill:"none", stroke:(i%2)?lighten(h.c,.18):darken(h.c,.34), "stroke-width":1.3, opacity:.5});
+    }
+    return {back:"", front: shape(d, h.c)+coil+hairShine(h,1.5)};
   },
   hightop(h){
     const t=h.cy-h.rh*1.62, w=h.rw*.9;
@@ -548,32 +650,46 @@ const HAIR_FN = {
       +" C "+r2(h.cx+w-2)+" "+r2(t+3)+" "+r2(h.cx+w+2)+" "+r2(t+18)+" "+r2(h.cx+w)+" "+r2(h.cy-h.rh*.36)
       +" C "+r2(h.cx+w*.55)+" "+r2(h.cy-h.rh*.5)+" "+r2(h.cx-w*.55)+" "+r2(h.cy-h.rh*.5)+" "+r2(h.cx-w)+" "+r2(h.cy-h.rh*.36)
       +" Z";
-    return {back:"", front: shape(d, h.c)+stroke("M "+r2(h.cx-w+4)+" "+r2(h.cy-h.rh*.92)+" L "+r2(h.cx+w-4)+" "+r2(h.cy-h.rh*.92), darken(h.c,.3), 2.4)};
+    return {back:"", front: shape(d, h.c)+rootShade(h)+hairStrands(h,{y0:-1.5,y1:-.5,n:9,spread:.82,bow:.12})+stroke("M "+r2(h.cx-w+4)+" "+r2(h.cy-h.rh*.92)+" L "+r2(h.cx+w-4)+" "+r2(h.cy-h.rh*.92), darken(h.c,.3), 2.4)};
   },
   rows(h){
-    let braids="";
-    for (let i=-2;i<=2;i++){
-      const x0=h.cx+i*(h.rw*.3), x1=h.cx+i*(h.rw*.52);
-      braids += stroke("M "+r2(x0)+" "+r2(h.cy-h.rh*.44)
-        +" Q "+r2(h.cx+i*(h.rw*.34))+" "+r2(h.cy-h.rh*1.02)+" "+r2(x1)+" "+r2(h.cy-h.rh*.5), darken(h.c,.4), 4);
+    let braids="", bumps="";
+    for (let i=-3;i<=3;i++){
+      const x0=h.cx+i*(h.rw*.24), x1=h.cx+i*(h.rw*.46);
+      const d="M "+r2(x0)+" "+r2(h.cy-h.rh*.44)
+        +" Q "+r2(h.cx+i*(h.rw*.28))+" "+r2(h.cy-h.rh*1.04)+" "+r2(x1)+" "+r2(h.cy-h.rh*.5);
+      braids += stroke(d, darken(h.c,.42), 4.4) + stroke(d, lighten(h.c,.14), 1.4, {opacity:.55});
+      /* knot bumps along each cornrow */
+      for (let j=0;j<4;j++){
+        const t=j/3, bx=h.cx+i*(h.rw*(.24+t*.22)), by=h.cy-h.rh*(.44+t*.5);
+        bumps += el("circle",{cx:r2(bx),cy:r2(by),r:2,fill:darken(h.c,.28),opacity:.5});
+      }
     }
-    return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+braids};
+    return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+braids+bumps};
   },
   locs(h){
     let back="";
-    for (let i=0;i<7;i++){
-      const t=i/6, x=h.cx-h.rw*.95+t*h.rw*1.9;
+    for (let i=0;i<9;i++){
+      const t=i/8, x=h.cx-h.rw*.95+t*h.rw*1.9;
       const y0=h.cy-h.rh*.75, y1=h.cy+h.rh*(0.55+0.28*Math.sin(t*Math.PI));
-      back += stroke("M "+r2(x)+" "+r2(y0)+" Q "+r2(x+(t-.5)*14)+" "+r2((y0+y1)/2)+" "+r2(x+(t-.5)*20)+" "+r2(y1), h.c, 8.4, {stroke:darken(h.c,.12)});
+      const d="M "+r2(x)+" "+r2(y0)+" Q "+r2(x+(t-.5)*14)+" "+r2((y0+y1)/2)+" "+r2(x+(t-.5)*20)+" "+r2(y1);
+      back += stroke(d, darken(h.c,.12), 7.6+OW*2) + stroke(d, h.c, 7.6)
+        + stroke(d, lighten(h.c,.16), 1.8, {opacity:.5});
     }
-    return {back, front: shape(capPath(h.cx,h.cy,h.rw,h.rh,.03), h.c)};
+    return {back, front: shape(capPath(h.cx,h.cy,h.rw,h.rh,.03), h.c)+rootShade(h,.03)};
   },
   braids(h){
     let back="";
-    for (let i=0;i<8;i++){
-      const t=i/7, x=h.cx-h.rw*1.02+t*h.rw*2.04;
+    for (let i=0;i<10;i++){
+      const t=i/9, x=h.cx-h.rw*1.02+t*h.rw*2.04;
       const y1=h.cy+h.rh*(1.15+0.35*Math.sin(t*Math.PI));
-      back += stroke("M "+r2(x)+" "+r2(h.cy-h.rh*.7)+" Q "+r2(x+(t-.5)*24)+" "+r2(h.cy+h.rh*.3)+" "+r2(x+(t-.5)*34)+" "+r2(y1), h.c, 7.6, {stroke:darken(h.c,.1)});
+      const d="M "+r2(x)+" "+r2(h.cy-h.rh*.7)+" Q "+r2(x+(t-.5)*24)+" "+r2(h.cy+h.rh*.3)+" "+r2(x+(t-.5)*34)+" "+r2(y1);
+      back += stroke(d, darken(h.c,.1), 6.6+OW*2) + stroke(d, h.c, 6.6);
+      /* woven knot ticks */
+      for (let j=1;j<7;j++){
+        const u=j/7, px=x+(t-.5)*34*u, py=h.cy-h.rh*.7 + (y1-(h.cy-h.rh*.7))*u;
+        back += stroke("M "+r2(px-3)+" "+r2(py)+" L "+r2(px+3)+" "+r2(py), darken(h.c,.32), 1.6, {opacity:.55});
+      }
     }
     const part = stroke("M "+r2(h.cx)+" "+r2(h.cy-h.rh*1.0)+" L "+r2(h.cx)+" "+r2(h.cy-h.rh*.4), darken(h.c,.4), 2.6);
     return {back, front: shape(capPath(h.cx,h.cy,h.rw,h.rh,.04), h.c)+part};
@@ -581,13 +697,28 @@ const HAIR_FN = {
   pony(h){
     const tail = "M "+r2(h.cx+h.rw*.5)+" "+r2(h.cy-h.rh*1.02)
       +" C "+r2(h.cx+h.rw*1.55)+" "+r2(h.cy-h.rh*.92)+" "+r2(h.cx+h.rw*1.3)+" "+r2(h.cy+h.rh*.5)+" "+r2(h.cx+h.rw*.85)+" "+r2(h.cy+h.rh*.95);
-    return {back: stroke(tail, darken(h.c,.45), 19+OW*2) + stroke(tail, h.c, 19),
-      front: shape(capPath(h.cx,h.cy,h.rw,h.rh,-.06), h.c)
+    /* strand lines running the length of the tail */
+    let tailS="";
+    for (let k=-1;k<=1;k++){
+      const off=k*5;
+      tailS += stroke("M "+r2(h.cx+h.rw*.5+off)+" "+r2(h.cy-h.rh*1.0)
+        +" C "+r2(h.cx+h.rw*1.5+off)+" "+r2(h.cy-h.rh*.9)+" "+r2(h.cx+h.rw*1.26+off)+" "+r2(h.cy+h.rh*.5)+" "+r2(h.cx+h.rw*.83+off)+" "+r2(h.cy+h.rh*.92),
+        k?darken(h.c,.32):lighten(h.c,.2), k?2:1.6, {opacity:.5});
+    }
+    return {back: stroke(tail, darken(h.c,.45), 19+OW*2) + stroke(tail, h.c, 19) + tailS,
+      front: shape(capPath(h.cx,h.cy,h.rw,h.rh,-.06), h.c)+hairStrands(h,{y0:-1.04,y1:-.5,n:9,bow:.5})
         + circle(h.cx+h.rw*.52, h.cy-h.rh*1.0, 7.5, darken(h.c,.35))};
   },
   bun(h){
-    return {back:"", front: circle(h.cx, h.cy-h.rh*1.1, 17, h.c)
-      + shape(capPath(h.cx,h.cy,h.rw,h.rh,-.06), h.c)};
+    const knot = circle(h.cx, h.cy-h.rh*1.1, 17, h.c);
+    /* wrapped-strand arcs on the bun */
+    let wrap="";
+    for (let i=-2;i<=2;i++){
+      wrap += el("path",{d:"M "+r2(h.cx-13)+" "+r2(h.cy-h.rh*1.1+i*4)+" Q "+r2(h.cx)+" "+r2(h.cy-h.rh*1.1+i*4-4)+" "+r2(h.cx+13)+" "+r2(h.cy-h.rh*1.1+i*4),
+        fill:"none", stroke:(i%2)?lighten(h.c,.2):darken(h.c,.3), "stroke-width":1.4, opacity:.55});
+    }
+    return {back:"", front: knot+wrap
+      + shape(capPath(h.cx,h.cy,h.rw,h.rh,-.06), h.c)+hairStrands(h,{y0:-1.02,y1:-.55,n:9,bow:.4})};
   },
   long(h){
     const w=h.rw*1.24;
@@ -605,7 +736,15 @@ const HAIR_FN = {
       +" C "+r2(h.cx-h.rw*.2)+" "+r2(fY+4)+" "+r2(h.cx-h.rw*.62)+" "+r2(fY+2)+" "+r2(h.cx-h.rw+9)+" "+r2(h.cy+2)
       +" L "+r2(h.cx-h.rw+4)+" "+r2(h.cy+6)
       +" Z";
-    return {back: shape(back, h.c), front: shape(front, h.c)};
+    const w2=h.rw*1.24;
+    /* long strands falling past the shoulders */
+    let strandsB="";
+    for (let i=0;i<9;i++){
+      const t=i/8, x=h.cx+(t-.5)*2*w2*.9, topY=h.cy-h.rh*.6;
+      strandsB += stroke("M "+r2(x)+" "+r2(topY)+" C "+r2(x+(t-.5)*10)+" "+r2(h.cy+h.rh*.6)+" "+r2(x-(t-.5)*6)+" "+r2(h.cy+h.rh*1.2)+" "+r2(x+(t-.5)*4)+" "+r2(h.cy+h.rh*1.78),
+        (i%2)?lighten(h.c,.22):darken(h.c,.3), (i%2)?1.5:1.8, {opacity:.5});
+    }
+    return {back: shape(back, h.c)+strandsB, front: shape(front, h.c)+hairStrands(h,{y0:-1.4,y1:-.3,n:9,spread:1.1,bow:.5})+hairShine(h,1.3)};
   }
 };
 
@@ -615,12 +754,13 @@ function face(cfg, m, expr){
   const rw=m.headRw, rh=m.headRh;
   const skin=SKINS[cfg.skin], sh=darken(skin,.22), ink="#2E2620";
   const kid = cfg.age==="kid";
-  const eyeY = cy + rh*(kid? .14 : .05);
-  const eyeDx = rw*.42, eyeR = kid? 8.6 : 7.2;
+  const eyeY = cy + rh*(kid? .14 : .06);
+  /* Realism pass: much smaller eyes — big irises are the #1 cartoon tell. */
+  const eyeDx = rw*.42, eyeR = kid? 6.2 : 4.4;
   let s="";
 
-  /* brows */
-  const bw=13, bY=eyeY-16;
+  /* brows: thinner, sitting closer to the eye line */
+  const bw=11, bY=eyeY-11;
   const brow = {
     default:[[-bw,2],[0,-3],[bw,1]], joy:[[-bw,3],[0,-5],[bw,3]],
     focused:[[-bw,-3],[bw,4]], grit:[[-bw,-3],[bw,4]],
@@ -628,7 +768,7 @@ function face(cfg, m, expr){
   }[expr] || [[-bw,2],[0,-3],[bw,1]];
   for (const side of [-1,1]){
     const pts = brow.map(p=>[cx+side*eyeDx+p[0]*side, bY+p[1]]);
-    s += stroke(polyd(pts), ink, 5);
+    s += stroke(polyd(pts), ink, 3.4);
   }
 
   /* eyes */
@@ -638,43 +778,62 @@ function face(cfg, m, expr){
       s += el("path",{d:"M "+r2(ex-eyeR)+" "+r2(eyeY)+" A "+eyeR+" "+eyeR+" 0 0 0 "+r2(ex+eyeR)+" "+r2(eyeY)+" Z", fill:ink});
       s += stroke("M "+r2(ex-eyeR)+" "+r2(eyeY)+" L "+r2(ex+eyeR)+" "+r2(eyeY), ink, 2.6);
     } else {
-      s += el("ellipse",{cx:r2(ex),cy:r2(eyeY),rx:eyeR*.88,ry:eyeR*1.12,fill:ink});
-      s += circle(ex+2.6, eyeY-3.4, 2.5, "#FFFFFF", "#FFFFFF");
-      s += el("circle",{cx:r2(ex-2.2),cy:r2(eyeY+2.6),r:1.2,fill:"#FFFFFF",opacity:.75});
+      /* natural eye: near-round pupil, upper-lid line, single tiny catchlight */
+      s += el("ellipse",{cx:r2(ex),cy:r2(eyeY),rx:eyeR*.94,ry:eyeR,fill:ink});
+      s += stroke("M "+r2(ex-eyeR-1.5)+" "+r2(eyeY-eyeR*.55)
+        +" Q "+r2(ex)+" "+r2(eyeY-eyeR-2.2)+" "+r2(ex+eyeR+1.5)+" "+r2(eyeY-eyeR*.45), ink, 1.8);
+      s += el("circle",{cx:r2(ex+1.4),cy:r2(eyeY-1.4),r:1.1,fill:"#FFFFFF",opacity:.9});
     }
     if (cfg.gender==="female"){
-      for (let i=0;i<2;i++){
-        const a=(-0.5+i*0.45)*side;
-        s += stroke("M "+r2(ex+side*(eyeR-1))+" "+r2(eyeY-4+i*4)+" l "+r2(side*6)+" "+r2(-3+i*2), ink, 2);
-      }
+      s += stroke("M "+r2(ex+side*(eyeR+.5))+" "+r2(eyeY-2.5)+" l "+r2(side*4.5)+" -2.2", ink, 1.6);
     }
   }
 
-  /* nose */
-  const nY=eyeY+rh*.24;
-  s += stroke("M "+r2(cx-4)+" "+r2(nY-6)+" Q "+r2(cx+5)+" "+r2(nY)+" "+r2(cx-2)+" "+r2(nY+5), sh, 3.4);
-
-  /* blush */
-  s += el("ellipse",{cx:r2(cx-eyeDx-4),cy:r2(nY+2),rx:9,ry:5,fill:sh,opacity:.28});
-  s += el("ellipse",{cx:r2(cx+eyeDx+4),cy:r2(nY+2),rx:9,ry:5,fill:sh,opacity:.28});
+  /* nose: longer bridge with a soft nostril shadow — no blush (cartoon tell) */
+  const nY=eyeY+rh*.30;
+  s += stroke("M "+r2(cx-2.5)+" "+r2(eyeY+3)+" L "+r2(cx-3.5)+" "+r2(nY)+" Q "+r2(cx+3)+" "+r2(nY+4)+" "+r2(cx+5)+" "+r2(nY-1), sh, 2.6);
+  s += el("ellipse",{cx:r2(cx+1),cy:r2(nY+4.5),rx:4.5,ry:1.6,fill:sh,opacity:.35});
 
   /* facial hair (under mouth layer) */
   const mY=cy+rh*.56;
   if (cfg.facial!=="none" && !kid && cfg.age!=="teen"){
     const hc=HAIR_COLORS[cfg.hairColor];
+    const hcL=lighten(hc,.24), hcD=darken(hc,.34);
+    /* short directional hair strokes filling a facial-hair region */
+    const fhStrokes=(x0,x1,y0,y1,n,len)=>{
+      let t="";
+      for (let i=0;i<n;i++){
+        const u=(i*0.61803)%1, v=(i*0.41421)%1;
+        const x=x0+(x1-x0)*u, y=y0+(y1-y0)*v;
+        const dx=(x-cx)*0.05, L=len*(0.7+((i*0.37)%1)*0.6);
+        t += stroke("M "+r2(x)+" "+r2(y)+" l "+r2(dx)+" "+r2(L), (i%2)?hcL:hcD, (i%2)?0.9:1.1, {opacity:.55});
+      }
+      return t;
+    };
     if (cfg.facial==="stubble"){
-      s += el("path",{d:headPath(cx,cy+rh*.28,rw*.86,rh*.7, cfg.gender==="male"?.7:.4), fill:hc, opacity:.16});
+      /* dense fine stipple, not a flat wash */
+      s += el("path",{d:headPath(cx,cy+rh*.3,rw*.84,rh*.66, cfg.gender==="male"?.7:.4), fill:hc, opacity:.1});
+      let stip="";
+      for (let i=0;i<90;i++){
+        const u=(i*0.61803)%1, v=(i*0.41421)%1;
+        const x=cx+(u-.5)*rw*1.5, y=cy+rh*.34+v*rh*.62;
+        if (Math.abs(x-cx)>rw*.7*(1-(y-cy-rh*.34)/(rh*.7))) continue;
+        stip += el("circle",{cx:r2(x),cy:r2(y),r:0.8,fill:hcD,opacity:.55});
+      }
+      s += stip;
     }
     if (cfg.facial==="mustache" || cfg.facial==="goatee"){
-      s += el("path",{d:"M "+r2(cx-19)+" "+r2(mY-7)+" Q "+r2(cx-9)+" "+r2(mY-15)+" "+r2(cx)+" "+r2(mY-8)
+      const md="M "+r2(cx-19)+" "+r2(mY-7)+" Q "+r2(cx-9)+" "+r2(mY-15)+" "+r2(cx)+" "+r2(mY-8)
         +" Q "+r2(cx+9)+" "+r2(mY-15)+" "+r2(cx+19)+" "+r2(mY-7)
         +" Q "+r2(cx+8)+" "+r2(mY-3)+" "+r2(cx)+" "+r2(mY-6)
-        +" Q "+r2(cx-8)+" "+r2(mY-3)+" "+r2(cx-19)+" "+r2(mY-7)+" Z", fill:hc});
+        +" Q "+r2(cx-8)+" "+r2(mY-3)+" "+r2(cx-19)+" "+r2(mY-7)+" Z";
+      s += el("path",{d:md, fill:hc}) + fhStrokes(cx-17,cx+17,mY-11,mY-6,10,3);
     }
     if (cfg.facial==="goatee"){
-      s += el("path",{d:"M "+r2(cx-14)+" "+r2(mY+7)+" Q "+r2(cx)+" "+r2(mY+2)+" "+r2(cx+14)+" "+r2(mY+7)
+      const gd="M "+r2(cx-14)+" "+r2(mY+7)+" Q "+r2(cx)+" "+r2(mY+2)+" "+r2(cx+14)+" "+r2(mY+7)
         +" Q "+r2(cx+12)+" "+r2(mY+26)+" "+r2(cx)+" "+r2(mY+27)
-        +" Q "+r2(cx-12)+" "+r2(mY+26)+" "+r2(cx-14)+" "+r2(mY+7)+" Z", fill:hc});
+        +" Q "+r2(cx-12)+" "+r2(mY+26)+" "+r2(cx-14)+" "+r2(mY+7)+" Z";
+      s += el("path",{d:gd, fill:hc}) + fhStrokes(cx-11,cx+11,mY+8,mY+24,12,4);
     }
     if (cfg.facial==="beard"){
       const bd="M "+r2(cx-rw*.88)+" "+r2(cy+rh*.12)
@@ -685,23 +844,35 @@ function face(cfg, m, expr){
         +" C "+r2(cx-rw*.34)+" "+r2(mY-12)+" "+r2(cx-rw*.6)+" "+r2(cy+rh*.42)+" "+r2(cx-rw*.88)+" "+r2(cy+rh*.12)
         +" Z";
       s += shape(bd, hc);
+      /* flowing beard strands + a jaw-line shadow for volume */
+      let bs="";
+      for (let i=0;i<22;i++){
+        const u=(i*0.61803)%1;
+        const x=cx+(u-.5)*rw*1.5, topY=cy+rh*.3+((i*0.41421)%1)*rh*.4;
+        const botY=Math.min(topY+rh*(.4+((i*0.29)%1)*.5), cy+rh*1.18);
+        bs += stroke("M "+r2(x)+" "+r2(topY)+" Q "+r2(x+(x-cx)*.04)+" "+r2((topY+botY)/2)+" "+r2(x+(x-cx)*.08)+" "+r2(botY),
+          (i%2)?hcL:hcD, (i%2)?1:1.2, {opacity:.5});
+      }
+      s += bs;
     }
   }
 
-  /* mouth */
+  /* mouth: narrower and subtler than the cartoon originals, with a faint
+   * lower-lip shadow selling volume */
   if (expr==="joy"){
-    s += el("path",{d:"M "+r2(cx-16)+" "+r2(mY-4)+" Q "+r2(cx)+" "+r2(mY+20)+" "+r2(cx+16)+" "+r2(mY-4)+" Z", fill:"#5B2A1E", stroke:ink,"stroke-width":2.4,"paint-order":"stroke"});
-    s += el("path",{d:"M "+r2(cx-11)+" "+r2(mY-2)+" Q "+r2(cx)+" "+r2(mY+3)+" "+r2(cx+11)+" "+r2(mY-2)+" L "+r2(cx+11)+" "+r2(mY-3.6)+" L "+r2(cx-11)+" "+r2(mY-3.6)+" Z", fill:"#FFFFFF"});
+    s += el("path",{d:"M "+r2(cx-12)+" "+r2(mY-3)+" Q "+r2(cx)+" "+r2(mY+12)+" "+r2(cx+12)+" "+r2(mY-3)+" Z", fill:"#5B2A1E", stroke:ink,"stroke-width":1.6,"paint-order":"stroke"});
+    s += el("path",{d:"M "+r2(cx-8)+" "+r2(mY-1.5)+" Q "+r2(cx)+" "+r2(mY+2)+" "+r2(cx+8)+" "+r2(mY-1.5)+" L "+r2(cx+8)+" "+r2(mY-2.8)+" L "+r2(cx-8)+" "+r2(mY-2.8)+" Z", fill:"#FFFFFF"});
   } else if (expr==="grit"){
-    s += el("rect",{x:r2(cx-15),y:r2(mY-7),width:30,height:12,rx:5,fill:"#FFFFFF",stroke:ink,"stroke-width":2.4,"paint-order":"stroke"});
-    s += stroke("M "+r2(cx-5)+" "+r2(mY-7)+" L "+r2(cx-5)+" "+r2(mY+5), ink, 1.6)
-       + stroke("M "+r2(cx+5)+" "+r2(mY-7)+" L "+r2(cx+5)+" "+r2(mY+5), ink, 1.6);
+    s += el("rect",{x:r2(cx-10),y:r2(mY-5),width:20,height:8.5,rx:3.4,fill:"#FFFFFF",stroke:ink,"stroke-width":1.6,"paint-order":"stroke"});
+    s += stroke("M "+r2(cx-3.4)+" "+r2(mY-5)+" L "+r2(cx-3.4)+" "+r2(mY+3.5), ink, 1.2)
+       + stroke("M "+r2(cx+3.4)+" "+r2(mY-5)+" L "+r2(cx+3.4)+" "+r2(mY+3.5), ink, 1.2);
   } else if (expr==="cool"){
-    s += stroke("M "+r2(cx-8)+" "+r2(mY+1)+" Q "+r2(cx+6)+" "+r2(mY+6)+" "+r2(cx+14)+" "+r2(mY-3), ink, 3.4);
+    s += stroke("M "+r2(cx-6)+" "+r2(mY+1)+" Q "+r2(cx+4)+" "+r2(mY+4)+" "+r2(cx+10)+" "+r2(mY-2), ink, 2.4);
   } else if (expr==="focused"){
-    s += stroke("M "+r2(cx-9)+" "+r2(mY)+" L "+r2(cx+9)+" "+r2(mY), ink, 3.4);
+    s += stroke("M "+r2(cx-7)+" "+r2(mY)+" L "+r2(cx+7)+" "+r2(mY), ink, 2.4);
   } else {
-    s += stroke("M "+r2(cx-12)+" "+r2(mY-2)+" Q "+r2(cx)+" "+r2(mY+8)+" "+r2(cx+12)+" "+r2(mY-2), ink, 3.4);
+    s += stroke("M "+r2(cx-9)+" "+r2(mY-1.5)+" Q "+r2(cx)+" "+r2(mY+4.5)+" "+r2(cx+9)+" "+r2(mY-1.5), ink, 2.4);
+    s += stroke("M "+r2(cx-5)+" "+r2(mY+6.5)+" Q "+r2(cx)+" "+r2(mY+8.5)+" "+r2(cx+5)+" "+r2(mY+6.5), sh, 1.8);
   }
 
   /* veteran lines */
