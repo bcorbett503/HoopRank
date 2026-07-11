@@ -215,6 +215,7 @@ const OW = 1.5;
 
 const GENDERS = [["male","Male"],["female","Female"],["neutral","Neutral"]];
 const AGES = [["kid","Kid"],["teen","Teen"],["adult","Adult"],["vet","Veteran"]];
+const HEIGHTS = [["short","Short"],["below","Below avg"],["avg","Average"],["above","Above avg"],["tall","Tall"]];
 const BUILDS = [["slim","Slim"],["avg","Average"],["ath","Athletic"],["heavy","Heavy"]];
 const STANCES = [["triple","Triple threat"],["dribble","Dribble"],["shot","Jump shot"],["tuck","Ball tuck"],["defense","Defense"],["celebrate","Celebration"],["spin","Showtime"]];
 const HAIRS = [["bald","Bald"],["buzz","Buzz"],["crop","Crop"],["sidepart","Side part"],["flow","Flow"],["shaggy","Shaggy"],["spiky","Spiky"],["waves","Waves"],["curls","Curls"],["afro","Afro"],["hightop","High-top"],["rows","Cornrows"],["locs","Locs"],["braids","Box braids"],["pony","Ponytail"],["bun","Bun"],["long","Long"],["mullet","Mullet"]];
@@ -227,19 +228,23 @@ const TIGHTS_C = "#26262E";
 
 /* ---------- state ---------- */
 let state = {
-  gender:"male", age:"adult", build:"ath", skin:4,
+  gender:"male", age:"adult", height:"avg", build:"ath", skin:4,
   hair:"crop", hairColor:0, facial:"none",
   stance:"triple",
   top:"jersey", c1:0, c2:2, number:"23", shoes:2,
   legwear:"none", jewelry:"none",
   acc:{headband:false, wristbands:false, sleeve:false, glasses:false, studs:false}
 };
-/* tolerate configs saved before the legwear/jewelry axes existed */
+/* height derived from age for configs saved before height was its own axis
+ * (kids were short, adults average) — keeps legacy avatars proportional. */
+const AGE_HEIGHT_FALLBACK = {kid:"short", teen:"below", adult:"avg", vet:"avg"};
+/* tolerate configs saved before the legwear/jewelry/height axes existed */
 function normalizeConfig(cfg){
   const c=Object.assign({legwear:"none", jewelry:"none"}, cfg);
   if(!c.jewelry || c.jewelry==="none"){
     if(c.acc && c.acc.chain) c.jewelry="gold";
   }
+  if(!c.height) c.height = AGE_HEIGHT_FALLBACK[c.age] || "avg";
   c.acc=Object.assign({headband:false,wristbands:false,sleeve:false,glasses:false,studs:false}, c.acc||{});
   return c;
 }
@@ -303,17 +308,21 @@ function norm(a,b){ const dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1; retu
 function metrics(cfg){
   /* Realistic athletic proportions (2026-07 realism pass): adult head is
    * ~16% of figure height (≈6 heads tall) — editorial sports-illustration
-   * territory rather than mascot (~26%) or chibi (~36%) — while staying
-   * legible at the 140px map-marker size. Kids/teens keep relatively
-   * bigger heads via ah so age still reads. */
-  const age = {kid:{ab:.62, ah:1.06}, teen:{ab:.84, ah:1.02}, adult:{ab:1, ah:1}, vet:{ab:.98, ah:1}}[cfg.age];
+   * territory rather than mascot (~26%) or chibi (~36%). HEIGHT and AGE are
+   * independent (2026-07): height sets stature (body length + a dampened
+   * head, so taller reads leaner), age sets head-to-body ratio (younger =
+   * relatively bigger head) plus facial maturity elsewhere. */
+  const ah = {kid:1.16, teen:1.06, adult:1, vet:1}[cfg.age];
+  const hb = {short:.86, below:.93, avg:1, above:1.08, tall:1.16}[cfg.height]
+    || {short:.86, below:.93, avg:1, above:1.08, tall:1.16}[AGE_HEIGHT_FALLBACK[cfg.age]] || 1;
   const g = {male:{sh:50, hip:31, waist:.9}, female:{sh:41, hip:37, waist:.76}, neutral:{sh:45, hip:34, waist:.84}}[cfg.gender];
   const b = {slim:{lw:.82, sw:.9, ww:.86}, avg:{lw:1, sw:1, ww:1}, ath:{lw:1.14, sw:1.1, ww:.96}, heavy:{lw:1.3, sw:1.05, ww:1.42}}[cfg.build];
-  const ab=age.ab, ah=age.ah;
+  const ab=hb;                 /* pose offsets + widths scale with stature */
+  const headScale = ah*Math.pow(hb,.4);   /* dampened: tall → smaller head ratio */
   const groundY = 506, ankY = groundY - 18;
-  const legLen = 172*ab, torsoLen = 118*ab, neckLen = 19*ab;
+  const legLen = 172*hb, torsoLen = 118*hb, neckLen = 19*hb;
   const hipY = ankY - legLen, shY = hipY - torsoLen;
-  const headRh = 42*ah, headRw = (32.5 + (cfg.build==="heavy"?3:0))*ah;
+  const headRh = 42*headScale, headRw = (32.5 + (cfg.build==="heavy"?3:0))*headScale;
   const headCy = shY - neckLen - headRh + 6;
   return {
     cx:210, groundY, ankY, hipY, shY, headCy, headRh, headRw,
@@ -480,6 +489,13 @@ function hairStrands(h, opt){
   }
   return s;
 }
+/* Clip texture (strands, ridges, coils, shine) to the hair silhouette so
+ * detail strokes never poke above the hairline or bleed onto the forehead. */
+function clipTo(d, inner){
+  const id="ht"+(CLIP++);
+  return "<clipPath id=\""+id+"\">"+el("path",{d})+"</clipPath>"
+    + "<g clip-path=\"url(#"+id+")\">"+inner+"</g>";
+}
 /* Darker roots crescent along the hairline for depth under the shine. */
 function rootShade(h, k){
   const kk=k==null?0:k;
@@ -500,9 +516,11 @@ const HAIR_FN = {
     }
     return {back:"", front: el("path",{d:capPath(h.cx,h.cy,h.rw,h.rh,0), fill:h.c, opacity:.5})+dots};
   },
-  crop(h){ return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+rootShade(h)+hairStrands(h,{n:13,bow:.3})+hairShine(h)}; },
+  crop(h){ const cap=capPath(h.cx,h.cy,h.rw,h.rh,0);
+    return {back:"", front: shape(cap, h.c)+clipTo(cap, rootShade(h)+hairStrands(h,{n:13,bow:.3})+hairShine(h))}; },
   sidepart(h){
-    const cap=shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c);
+    const capD=capPath(h.cx,h.cy,h.rw,h.rh,0);
+    const cap=shape(capD, h.c);
     const px=h.cx-h.rw*.34;
     const part=stroke("M "+r2(px)+" "+r2(h.cy-h.rh*1.04)+" Q "+r2(px-5)+" "+r2(h.cy-h.rh*.76)+" "+r2(px-2)+" "+r2(h.cy-h.rh*.52), darken(h.c,.42), 3);
     const sweep=stroke("M "+r2(px+10)+" "+r2(h.cy-h.rh*.96)+" Q "+r2(h.cx+h.rw*.28)+" "+r2(h.cy-h.rh*1.14)+" "+r2(h.cx+h.rw*.6)+" "+r2(h.cy-h.rh*.82), lighten(h.c,.22), 4, {opacity:.55});
@@ -513,7 +531,7 @@ const HAIR_FN = {
       comb += stroke("M "+r2(sx)+" "+r2(topY)+" Q "+r2(sx+10)+" "+r2(topY+h.rh*.3)+" "+r2(sx+16)+" "+r2(topY+h.rh*.6),
         (i%2)?lighten(h.c,.24):darken(h.c,.3), (i%2)?1.4:1.6, {opacity:.5});
     }
-    return {back:"", front: cap+rootShade(h)+comb+part+sweep};
+    return {back:"", front: cap+clipTo(capD, rootShade(h)+comb+part+sweep)};
   },
   flow(h){
     const fY=h.cy-h.rh*.44, sY=h.cy+h.rh*.16;
@@ -535,7 +553,7 @@ const HAIR_FN = {
       flowS += stroke("M "+r2(sx)+" "+r2(topY)+" Q "+r2(sx+(t-.5)*22)+" "+r2(h.cy-h.rh*.2)+" "+r2(sx+(t-.5)*30)+" "+r2(h.cy-h.rh*.28),
         (i%2)?lighten(h.c,.24):darken(h.c,.3), (i%2)?1.4:1.7, {opacity:.5});
     }
-    return {back:"", front: shape(d, h.c)+flowS+hairShine(h)};
+    return {back:"", front: shape(d, h.c)+clipTo(d, flowS+hairShine(h))};
   },
   shaggy(h){
     const fY=h.cy-h.rh*.36;
@@ -555,7 +573,7 @@ const HAIR_FN = {
       chop += stroke("M "+r2(sx)+" "+r2(topY)+" L "+r2(sx+(t-.5)*10)+" "+r2(fY+6),
         (i%2)?lighten(h.c,.24):darken(h.c,.32), (i%2)?1.4:1.6, {opacity:.5});
     }
-    return {back:"", front: shape(d, h.c)+chop};
+    return {back:"", front: shape(d, h.c)+clipTo(d, chop)};
   },
   spiky(h){
     const fY=h.cy-h.rh*.5;
@@ -574,7 +592,7 @@ const HAIR_FN = {
       const xb=xL+w*((i+.5)/n), peak=h.cy-h.rh*(1.26+.24*Math.sin(((i+.5)/n)*Math.PI));
       ridges += stroke("M "+r2(xb)+" "+r2(peak+3)+" L "+r2(xb)+" "+r2(fY+2), lighten(h.c,.24), 1.5, {opacity:.55});
     }
-    return {back:"", front: shape(d, h.c)+ridges};
+    return {back:"", front: shape(d, h.c)+clipTo(d, ridges)};
   },
   mullet(h){
     const back="M "+r2(h.cx-h.rw*.72)+" "+r2(h.cy-h.rh*.2)
@@ -588,7 +606,8 @@ const HAIR_FN = {
       tailS += stroke("M "+r2(x)+" "+r2(h.cy-h.rh*.1)+" Q "+r2(x+(t-.5)*10)+" "+r2(h.cy+h.rh*.6)+" "+r2(x+(t-.5)*6)+" "+r2(h.cy+h.rh*1.3),
         (i%2)?lighten(h.c,.2):darken(h.c,.3), (i%2)?1.4:1.7, {opacity:.5});
     }
-    return {back: shape(back, h.c)+tailS, front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+rootShade(h)+hairStrands(h,{n:11,bow:.3})+hairShine(h)};
+    const capD=capPath(h.cx,h.cy,h.rw,h.rh,0);
+    return {back: shape(back, h.c)+tailS, front: shape(capD, h.c)+clipTo(capD, rootShade(h)+hairStrands(h,{n:11,bow:.3})+hairShine(h))};
   },
   waves(h){
     /* denser fine wave ridges with alternating tone = 360 waves texture */
@@ -599,7 +618,8 @@ const HAIR_FN = {
         +" Q "+r2(h.cx+h.rw*.3)+" "+r2(y+14)+" "+r2(h.cx+h.rw*.68)+" "+r2(y+3),
         (i%2)?darken(h.c,.4):darken(h.c,.22), (i%2)?2.4:1.8, {opacity:.7});
     }
-    return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+lines+hairShine(h)};
+    const capD=capPath(h.cx,h.cy,h.rw,h.rh,0);
+    return {back:"", front: shape(capD, h.c)+clipTo(capD, lines+hairShine(h))};
   },
   curls(h){
     let blobs="", inner="";
@@ -608,7 +628,8 @@ const HAIR_FN = {
       const x=h.cx+Math.cos(a)*(h.rw+2), y=h.cy-8+Math.sin(a)*(h.rh+4);
       blobs += circle(x,y, 10.5, h.c);
     }
-    const cap = shape(capPath(h.cx,h.cy,h.rw,h.rh,.02), h.c);
+    const capD=capPath(h.cx,h.cy,h.rw,h.rh,.02);
+    const cap = shape(capD, h.c);
     /* interior coil shading: little arcs give the tight-curl read */
     for (let i=0;i<14;i++){
       const t=(i*0.61803)%1, u=((i*0.7548)%1);
@@ -617,7 +638,7 @@ const HAIR_FN = {
       inner += el("path",{d:"M "+r2(x-r)+" "+r2(y)+" A "+r2(r)+" "+r2(r)+" 0 1 1 "+r2(x+r)+" "+r2(y),
         fill:"none", stroke:(i%2)?lighten(h.c,.2):darken(h.c,.32), "stroke-width":(i%2)?1.3:1.5, opacity:.55});
     }
-    return {back:"", front: blobs + cap + inner};
+    return {back:"", front: blobs + cap + clipTo(capD, inner)};
   },
   afro(h){
     const fY=h.cy-h.rh*.44;
@@ -640,7 +661,7 @@ const HAIR_FN = {
       coil += el("path",{d:"M "+r2(x-r)+" "+r2(y)+" A "+r2(r)+" "+r2(r)+" 0 1 1 "+r2(x+r)+" "+r2(y),
         fill:"none", stroke:(i%2)?lighten(h.c,.18):darken(h.c,.34), "stroke-width":1.3, opacity:.5});
     }
-    return {back:"", front: shape(d, h.c)+coil+hairShine(h,1.5)};
+    return {back:"", front: shape(d, h.c)+clipTo(d, coil+hairShine(h,1.5))};
   },
   hightop(h){
     const t=h.cy-h.rh*1.62, w=h.rw*.9;
@@ -650,7 +671,7 @@ const HAIR_FN = {
       +" C "+r2(h.cx+w-2)+" "+r2(t+3)+" "+r2(h.cx+w+2)+" "+r2(t+18)+" "+r2(h.cx+w)+" "+r2(h.cy-h.rh*.36)
       +" C "+r2(h.cx+w*.55)+" "+r2(h.cy-h.rh*.5)+" "+r2(h.cx-w*.55)+" "+r2(h.cy-h.rh*.5)+" "+r2(h.cx-w)+" "+r2(h.cy-h.rh*.36)
       +" Z";
-    return {back:"", front: shape(d, h.c)+rootShade(h)+hairStrands(h,{y0:-1.5,y1:-.5,n:9,spread:.82,bow:.12})+stroke("M "+r2(h.cx-w+4)+" "+r2(h.cy-h.rh*.92)+" L "+r2(h.cx+w-4)+" "+r2(h.cy-h.rh*.92), darken(h.c,.3), 2.4)};
+    return {back:"", front: shape(d, h.c)+clipTo(d, rootShade(h)+hairStrands(h,{y0:-1.5,y1:-.5,n:9,spread:.82,bow:.12})+stroke("M "+r2(h.cx-w+4)+" "+r2(h.cy-h.rh*.92)+" L "+r2(h.cx+w-4)+" "+r2(h.cy-h.rh*.92), darken(h.c,.3), 2.4))};
   },
   rows(h){
     let braids="", bumps="";
@@ -665,7 +686,8 @@ const HAIR_FN = {
         bumps += el("circle",{cx:r2(bx),cy:r2(by),r:2,fill:darken(h.c,.28),opacity:.5});
       }
     }
-    return {back:"", front: shape(capPath(h.cx,h.cy,h.rw,h.rh,0), h.c)+braids+bumps};
+    const capD=capPath(h.cx,h.cy,h.rw,h.rh,0);
+    return {back:"", front: shape(capD, h.c)+clipTo(capD, braids+bumps)};
   },
   locs(h){
     let back="";
@@ -705,8 +727,9 @@ const HAIR_FN = {
         +" C "+r2(h.cx+h.rw*1.5+off)+" "+r2(h.cy-h.rh*.9)+" "+r2(h.cx+h.rw*1.26+off)+" "+r2(h.cy+h.rh*.5)+" "+r2(h.cx+h.rw*.83+off)+" "+r2(h.cy+h.rh*.92),
         k?darken(h.c,.32):lighten(h.c,.2), k?2:1.6, {opacity:.5});
     }
+    const capD=capPath(h.cx,h.cy,h.rw,h.rh,-.06);
     return {back: stroke(tail, darken(h.c,.45), 19+OW*2) + stroke(tail, h.c, 19) + tailS,
-      front: shape(capPath(h.cx,h.cy,h.rw,h.rh,-.06), h.c)+hairStrands(h,{y0:-1.04,y1:-.5,n:9,bow:.5})
+      front: shape(capD, h.c)+clipTo(capD, hairStrands(h,{y0:-1.04,y1:-.5,n:9,bow:.5}))
         + circle(h.cx+h.rw*.52, h.cy-h.rh*1.0, 7.5, darken(h.c,.35))};
   },
   bun(h){
@@ -717,8 +740,9 @@ const HAIR_FN = {
       wrap += el("path",{d:"M "+r2(h.cx-13)+" "+r2(h.cy-h.rh*1.1+i*4)+" Q "+r2(h.cx)+" "+r2(h.cy-h.rh*1.1+i*4-4)+" "+r2(h.cx+13)+" "+r2(h.cy-h.rh*1.1+i*4),
         fill:"none", stroke:(i%2)?lighten(h.c,.2):darken(h.c,.3), "stroke-width":1.4, opacity:.55});
     }
+    const capD=capPath(h.cx,h.cy,h.rw,h.rh,-.06);
     return {back:"", front: knot+wrap
-      + shape(capPath(h.cx,h.cy,h.rw,h.rh,-.06), h.c)+hairStrands(h,{y0:-1.02,y1:-.55,n:9,bow:.4})};
+      + shape(capD, h.c)+clipTo(capD, hairStrands(h,{y0:-1.02,y1:-.55,n:9,bow:.4}))};
   },
   long(h){
     const w=h.rw*1.24;
@@ -744,7 +768,7 @@ const HAIR_FN = {
       strandsB += stroke("M "+r2(x)+" "+r2(topY)+" C "+r2(x+(t-.5)*10)+" "+r2(h.cy+h.rh*.6)+" "+r2(x-(t-.5)*6)+" "+r2(h.cy+h.rh*1.2)+" "+r2(x+(t-.5)*4)+" "+r2(h.cy+h.rh*1.78),
         (i%2)?lighten(h.c,.22):darken(h.c,.3), (i%2)?1.5:1.8, {opacity:.5});
     }
-    return {back: shape(back, h.c)+strandsB, front: shape(front, h.c)+hairStrands(h,{y0:-1.4,y1:-.3,n:9,spread:1.1,bow:.5})+hairShine(h,1.3)};
+    return {back: shape(back, h.c)+clipTo(back, strandsB), front: shape(front, h.c)+clipTo(front, hairStrands(h,{y0:-1.4,y1:-.3,n:9,spread:1.1,bow:.5})+hairShine(h,1.3))};
   }
 };
 
@@ -875,12 +899,14 @@ function face(cfg, m, expr){
     s += stroke("M "+r2(cx-5)+" "+r2(mY+6.5)+" Q "+r2(cx)+" "+r2(mY+8.5)+" "+r2(cx+5)+" "+r2(mY+6.5), sh, 1.8);
   }
 
-  /* veteran lines */
+  /* veteran lines — subtle: faint crow's feet + one soft brow furrow,
+   * thin and low-opacity so they read as age, not scars */
   if (cfg.age==="vet"){
     for (const side of [-1,1]){
-      s += stroke("M "+r2(cx+side*(eyeDx-6))+" "+r2(eyeY+13)+" q "+r2(side*8)+" 3 "+r2(side*12)+" 1", sh, 2.2);
+      s += stroke("M "+r2(cx+side*(eyeDx+eyeR))+" "+r2(eyeY-1)+" l "+r2(side*5)+" -2", sh, 1, {opacity:.4})
+         + stroke("M "+r2(cx+side*(eyeDx+eyeR))+" "+r2(eyeY+2)+" l "+r2(side*5)+" 1", sh, 1, {opacity:.4});
     }
-    s += stroke("M "+r2(cx-14)+" "+r2(cy-rh*.46)+" q 14 -4 28 0", sh, 2.2);
+    s += stroke("M "+r2(cx-11)+" "+r2(cy-rh*.5)+" q 11 -3 22 0", sh, 1.1, {opacity:.38});
   }
   return s;
 }
@@ -1251,6 +1277,7 @@ const CONTROL_GROUPS=[
   {title:"Player", items:[
     {key:"gender", label:"Gender", type:"seg", opts:GENDERS},
     {key:"age", label:"Age", type:"seg", opts:AGES},
+    {key:"height", label:"Height", type:"seg", opts:HEIGHTS},
     {key:"build", label:"Build", type:"seg", opts:BUILDS},
     {key:"skin", label:"Skin tone", type:"swatch", palette:SKINS},
   ]},
@@ -1404,8 +1431,12 @@ function rand(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function doRandomize(){
   const age=rand(AGES)[0];
   const adult = age==="adult"||age==="vet";
+  /* height is independent of age; younger players skew shorter but any
+   * combination is valid */
+  const height = age==="kid" ? rand(HEIGHTS.slice(0,3))[0]
+    : age==="teen" ? rand(HEIGHTS.slice(0,4))[0] : rand(HEIGHTS)[0];
   state={
-    gender:rand(GENDERS)[0], age, build:rand(BUILDS)[0],
+    gender:rand(GENDERS)[0], age, height, build:rand(BUILDS)[0],
     skin:Math.floor(Math.random()*SKINS.length),
     hair:rand(HAIRS)[0],
     hairColor: age==="vet" && Math.random()<.5 ? 6 : Math.floor(Math.random()*(Math.random()<.85?6:HAIR_COLORS.length)),
