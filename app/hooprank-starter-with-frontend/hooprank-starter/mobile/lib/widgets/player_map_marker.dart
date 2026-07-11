@@ -160,6 +160,10 @@ class PlayerMapMarker extends StatelessWidget {
   static const markerWidth = 192.0;
   static const markerHeight = 204.0;
 
+  /// Extra marker height used when [isRecommended]: the matchup flag sits
+  /// above the rank badge, so the whole marker grows by this much.
+  static const recommendedFlagExtent = 34.0;
+
   // Avatar figure box (kept a touch smaller so pins read cleanly on the map).
   static const _figureWidth = 140.0;
   static const _figureHeight = 134.0;
@@ -178,6 +182,12 @@ class PlayerMapMarker extends StatelessWidget {
   /// higher-priority player's. The avatar itself always renders.
   final bool showLabels;
 
+  /// Recommended matchup treatment: golden spotlight behind the avatar and
+  /// a "Recommended matchup" flag above it, nudging the user to tap and
+  /// challenge or message this player. Use the taller
+  /// [recommendedFlagExtent]-augmented marker box when set.
+  final bool isRecommended;
+
   const PlayerMapMarker({
     super.key,
     required this.player,
@@ -185,6 +195,7 @@ class PlayerMapMarker extends StatelessWidget {
     this.allowDevelopmentAvatarSprite = false,
     this.showDetails = true,
     this.showLabels = true,
+    this.isRecommended = false,
   });
 
   /// The current user hasn't customized a flat avatar yet: show the neutral
@@ -213,6 +224,9 @@ class PlayerMapMarker extends StatelessWidget {
             : player.isNewPlayer
                 ? const Color(0xFF22C55E)
                 : const Color(0xFF38BDF8);
+    // The recommended flag occupies the top strip; everything else shifts
+    // down by its extent so the avatar/badge layout stays identical.
+    final yOff = isRecommended ? recommendedFlagExtent : 0.0;
     const figureTop = 34.0;
     const statusTop = 170.0;
 
@@ -220,13 +234,23 @@ class PlayerMapMarker extends StatelessWidget {
       onTap: onTap,
       child: SizedBox(
         width: markerWidth,
-        height: markerHeight,
+        height: markerHeight + yOff,
         child: Stack(
           alignment: Alignment.topCenter,
           children: [
+            if (isRecommended)
+              Positioned(
+                top: figureTop + yOff - 10,
+                child: const _RecommendedSpotlight(),
+              ),
+            if (isRecommended)
+              const Positioned(
+                top: 0,
+                child: _RecommendedMatchupFlag(),
+              ),
             if (showLabels || player.isCurrentUser)
               Positioned(
-                top: 0,
+                top: yOff,
                 // Current user keeps the rank badge ("ELITE 4.67"); other
                 // players lead with WHO they are: "FirstName · 3.4".
                 child: _RankBadge(
@@ -236,7 +260,7 @@ class PlayerMapMarker extends StatelessWidget {
                 ),
               ),
             Positioned(
-              top: figureTop,
+              top: figureTop + yOff,
               child: flatSvg != null
                   ? SizedBox(
                       key: const ValueKey('flat_avatar_figure'),
@@ -262,14 +286,14 @@ class PlayerMapMarker extends StatelessWidget {
                     ),
             ),
             if (needsAvatarSetup)
-              const Positioned(
-                top: 30,
+              Positioned(
+                top: 30 + yOff,
                 left: 26,
-                child: _SetupNudgeBadge(),
+                child: const _SetupNudgeBadge(),
               ),
             if ((showDetails && showLabels) || player.isCurrentUser)
               Positioned(
-                top: statusTop,
+                top: statusTop + yOff,
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 160),
                   padding:
@@ -414,6 +438,85 @@ class _SetupNudgeBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Golden spotlight glow behind the recommended matchup's avatar so the
+/// marker pops against every map style without any animation cost.
+class _RecommendedSpotlight extends StatelessWidget {
+  const _RecommendedSpotlight();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: 156,
+        height: 150,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              const Color(0xFFFFC94D).withValues(alpha: 0.55),
+              const Color(0xFFFFB74D).withValues(alpha: 0.22),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.55, 1.0],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Recommended matchup" pennant that drops in above the avatar — the visual
+/// call-to-action to tap the player and challenge or message them.
+class _RecommendedMatchupFlag extends StatelessWidget {
+  const _RecommendedMatchupFlag();
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.elasticOut,
+      builder: (context, t, child) {
+        return Transform.scale(scale: 0.6 + 0.4 * t, child: child);
+      },
+      child: Container(
+        key: const ValueKey('recommended_matchup_flag'),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF6B35), Color(0xFFF59E0B)],
+          ),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.flag_rounded, size: 14, color: Colors.white),
+            SizedBox(width: 4),
+            Text(
+              'Recommended matchup',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

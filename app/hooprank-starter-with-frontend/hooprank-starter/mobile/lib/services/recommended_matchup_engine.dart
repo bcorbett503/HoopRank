@@ -1,4 +1,5 @@
 import '../models.dart';
+import '../models/map_hub_models.dart';
 
 class RecommendedMatchup {
   final User player;
@@ -40,6 +41,33 @@ class RecommendedMatchup {
 class RecommendedMatchupEngine {
   static const int minAdultAge = 18;
   static const int likelyYouthHeightInches = 62; // 5'2"
+
+  /// Map-hub variant: only players actually visible on the map can carry the
+  /// recommended-matchup flag, so candidates are intersected with the mapped
+  /// players (excluding the current user) before scoring.
+  static RecommendedMatchup? pickBestOnMap({
+    required User currentUser,
+    required List<User> candidates,
+    required Iterable<MapHubPlayer> mapPlayers,
+    required String discoverMode,
+    required double searchRadiusMiles,
+  }) {
+    final onMapIds = {
+      for (final player in mapPlayers)
+        if (!player.isCurrentUser) player.id,
+    };
+    final pool =
+        candidates.where((user) => onMapIds.contains(user.id)).toList();
+    if (pool.isEmpty) {
+      return null;
+    }
+    return pickBest(
+      currentUser: currentUser,
+      candidates: pool,
+      discoverMode: discoverMode,
+      searchRadiusMiles: searchRadiusMiles,
+    );
+  }
 
   static RecommendedMatchup? pickBest({
     required User currentUser,

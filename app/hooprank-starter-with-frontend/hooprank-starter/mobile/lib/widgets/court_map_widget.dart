@@ -10,6 +10,7 @@ import '../models/map_hub_models.dart';
 import '../utils/player_clustering.dart';
 import '../services/court_service.dart';
 import '../services/api_service.dart';
+import '../services/recommended_matchup_engine.dart';
 import '../state/check_in_state.dart';
 import '../state/app_state.dart';
 import 'package:go_router/go_router.dart';
@@ -154,6 +155,11 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
   // an explicit choice.
   bool _userChoseFollowFilter = false;
   CheckInState? _observedCheckInState;
+  // Recommended matchup: the engine picks the best opponent among nearby
+  // players who are actually visible on the map; their marker gets the
+  // spotlight + flag treatment. Computed once per map session.
+  String? _recommendedMatchupId;
+  bool _matchupComputeStarted = false;
   bool? _filterIndoor; // null=all, true=indoor only, false=outdoor only
   String? _filterAccess; // null=all, 'public', 'private'
   String? _runsFilter; // null=off, 'today'=runs today, 'all'=all upcoming runs
@@ -381,6 +387,15 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       _isMapHubLoading = false;
     });
 
+    // Pick the recommended matchup once real players are on the map.
+    if (hub != null &&
+        widget.showPlayers &&
+        hub.players.isNotEmpty &&
+        !_matchupComputeStarted) {
+      _matchupComputeStarted = true;
+      unawaited(_computeRecommendedMatchup());
+    }
+
     // First-run permission onboarding, once we know the visibility state.
     if (hub != null &&
         widget.enablePermissionOnboarding &&
@@ -389,6 +404,40 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _maybeRunPermissionOnboarding();
       });
+    }
+  }
+
+  /// Pick the best matchup among nearby players who are visible on the map.
+  /// Uses the same engine + nearby-players pipeline the home feed's
+  /// "recommended matchup" card used, so scoring (rating similarity,
+  /// proximity, reliability, youth screening) stays consistent.
+  Future<void> _computeRecommendedMatchup() async {
+    try {
+      final authUser =
+          Provider.of<AuthState>(context, listen: false).currentUser;
+      if (authUser == null) return;
+
+      final center = _mapReady ? _mapController.camera.center : _initialCenter;
+      final radiusMiles =
+          _mapHubPrivacy.discoverRadiusMi.clamp(1.0, 100.0).round();
+      final candidates = await ApiService.getNearbyPlayers(
+        radiusMiles: radiusMiles,
+        lat: center.latitude,
+        lng: center.longitude,
+      );
+      if (!mounted || candidates.isEmpty) return;
+
+      final pick = RecommendedMatchupEngine.pickBestOnMap(
+        currentUser: authUser,
+        candidates: candidates,
+        mapPlayers: _mapHubPlayers,
+        discoverMode: _mapHubPrivacy.discoverMode,
+        searchRadiusMiles: _mapHubPrivacy.discoverRadiusMi,
+      );
+      if (!mounted || pick == null) return;
+      setState(() => _recommendedMatchupId = pick.player.id);
+    } catch (e) {
+      debugPrint('Recommended matchup: skipped ($e)');
     }
   }
 
@@ -2025,9 +2074,26 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
         .where((player) => player.lat != 0 || player.lng != 0)
         .where((player) => myPlayerId == null || player.id.trim() != myPlayerId)
         .toList();
+    // The recommended matchup renders as its own spotlighted marker — never
+    // swallowed into a cluster, labels never suppressed.
+    MapHubPlayer? recommendedPlayer;
+    if (_recommendedMatchupId != null) {
+      for (final p in otherMapPlayers) {
+        if (p.id == _recommendedMatchupId) {
+          recommendedPlayer = p;
+          break;
+        }
+      }
+    }
+    final clusterablePlayers = recommendedPlayer == null
+        ? otherMapPlayers
+        : [
+            for (final p in otherMapPlayers)
+              if (p.id != recommendedPlayer.id) p,
+          ];
     // Consolidate players whose avatars would pile up at this zoom into
     // count bubbles; zooming in separates them back into full avatars.
-    final playerClusters = _computePlayerClusters(otherMapPlayers);
+    final playerClusters = _computePlayerClusters(clusterablePlayers);
     final unclusteredPlayers = [
       for (final c in playerClusters)
         if (c.isSingle) c.single,
@@ -2214,6 +2280,27 @@ class _CourtMapWidgetState extends State<CourtMapWidget>
                           onTap: () => _expandPlayerCluster(cluster),
                         ),
                       ),
+                  // Last so the spotlighted matchup draws above neighbors.
+                  if (recommendedPlayer != null)
+                    Marker(
+                      point: LatLng(
+                        recommendedPlayer.lat,
+                        recommendedPlayer.lng,
+                      ),
+                      width: PlayerMapMarker.markerWidth,
+                      height: PlayerMapMarker.markerHeight +
+                          PlayerMapMarker.recommendedFlagExtent,
+                      alignment: Alignment.topCenter,
+                      child: Builder(builder: (context) {
+                        final rec = recommendedPlayer!;
+                        return PlayerMapMarker(
+                          player: rec,
+                          isRecommended: true,
+                          showDetails: showMapLabels,
+                          onTap: () => widget.onPlayerSelected?.call(rec),
+                        );
+                      }),
+                    ),
                 ],
               ),
             if (currentUserMapPlayer != null)

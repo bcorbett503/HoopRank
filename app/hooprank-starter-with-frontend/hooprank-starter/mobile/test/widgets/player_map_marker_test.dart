@@ -29,6 +29,51 @@ void main() {
     expect(find.text('New to HoopRank'), findsOneWidget);
   });
 
+  testWidgets('PlayerMapMarker shows recommended-matchup flag when flagged',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: PlayerMapMarker(
+            player: MapHubPlayer(
+              id: 'player-rec',
+              name: 'Rival Rick',
+              lat: 37.78,
+              lng: -122.42,
+            ),
+            isRecommended: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recommended matchup'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('recommended_matchup_flag')), findsOneWidget);
+  });
+
+  testWidgets('PlayerMapMarker hides recommended flag by default',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: PlayerMapMarker(
+            player: MapHubPlayer(
+              id: 'player-plain',
+              name: 'Casual Cal',
+              lat: 37.78,
+              lng: -122.42,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+        find.byKey(const ValueKey('recommended_matchup_flag')), findsNothing);
+  });
+
   testWidgets('PlayerMapMarker highlights challenge-ready players',
       (tester) async {
     await tester.pumpWidget(

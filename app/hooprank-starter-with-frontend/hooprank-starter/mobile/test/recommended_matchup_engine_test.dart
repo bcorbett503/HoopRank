@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooprank/models.dart';
+import 'package:hooprank/models/map_hub_models.dart';
 import 'package:hooprank/services/recommended_matchup_engine.dart';
 
 User _user({
@@ -113,6 +114,79 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.player.id, 'c1');
+    });
+  });
+
+  group('RecommendedMatchupEngine.pickBestOnMap', () {
+    MapHubPlayer mapPlayer(String id, {bool isCurrentUser = false}) {
+      return MapHubPlayer(
+        id: id,
+        name: 'Player $id',
+        lat: 37.78,
+        lng: -122.42,
+        isCurrentUser: isCurrentUser,
+      );
+    }
+
+    test('only candidates visible on the map can win', () {
+      final me = _user(id: 'me', rating: 3.2, position: 'G');
+      // Stronger match overall, but not rendered on the map.
+      final offMap = _user(
+        id: 'off',
+        rating: 3.2,
+        distanceMi: 1,
+        contestRate: 0.02,
+        gamesPlayed: 20,
+        position: 'G',
+      );
+      final onMap = _user(
+        id: 'on',
+        rating: 3.6,
+        distanceMi: 8,
+        gamesPlayed: 6,
+        position: 'F',
+      );
+
+      final result = RecommendedMatchupEngine.pickBestOnMap(
+        currentUser: me,
+        candidates: [offMap, onMap],
+        mapPlayers: [mapPlayer('on'), mapPlayer('someone-else')],
+        discoverMode: 'open',
+        searchRadiusMiles: 25,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.player.id, 'on');
+    });
+
+    test('returns null when no candidate is on the map', () {
+      final me = _user(id: 'me', rating: 3.2);
+      final candidate = _user(id: 'c1', rating: 3.3, gamesPlayed: 10);
+
+      final result = RecommendedMatchupEngine.pickBestOnMap(
+        currentUser: me,
+        candidates: [candidate],
+        mapPlayers: [mapPlayer('unrelated')],
+        discoverMode: 'open',
+        searchRadiusMiles: 25,
+      );
+
+      expect(result, isNull);
+    });
+
+    test('the current user marker does not count as an on-map candidate', () {
+      final me = _user(id: 'me', rating: 3.2);
+      final candidate = _user(id: 'me', rating: 3.2);
+
+      final result = RecommendedMatchupEngine.pickBestOnMap(
+        currentUser: me,
+        candidates: [candidate],
+        mapPlayers: [mapPlayer('me', isCurrentUser: true)],
+        discoverMode: 'open',
+        searchRadiusMiles: 25,
+      );
+
+      expect(result, isNull);
     });
   });
 }
